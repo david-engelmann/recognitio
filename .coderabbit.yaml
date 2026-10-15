@@ -1,0 +1,92 @@
+# CodeRabbit review settings. Schema at
+# https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit is advisory step 0 in this repo. Its findings are read on
+# every pull request and fixed when valid. A finding that does not
+# survive scrutiny is dismissed silently with a one line reason in
+# the gate report, and nobody argues with it in pull request
+# comments. It never blocks a merge and never replaces review.
+#
+# House reality. Automatic reviews skip repositories with fewer than
+# ten stars, and this repo starts below that line. Trigger a review
+# by hand with a `@coderabbitai review` comment on the pull request.
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+tone_instructions: "Be direct and technical. No flattery, no filler."
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  # The pull request body becomes the squash commit body, so the
+  # summary belongs in the walkthrough comment instead.
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  poem: false
+  in_progress_fortune: false
+  suggested_reviewers: false
+  review_status: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 0
+    base_branches:
+      - ".*"
+
+  path_filters:
+    # Keep the review on hand written source. Generated packets and
+    # bytecode are working papers, not source.
+    - "!**/__pycache__/**"
+    - "!**/*.pyc"
+    - "!packet/**"
+    - "!packets/**"
+
+  path_instructions:
+    - path: "**/*.md"
+      instructions: |
+        Public prose here follows a copy bar. No em dashes in prose,
+        and no colons or semicolons in prose sentences either. When
+        flagging one of these marks, never suggest another banned
+        mark as the replacement. Suggest short plain sentences
+        instead. Flag claims about what the skill does that the
+        README and SKILL files do not back.
+    - path: "skills/recognitio/**"
+      instructions: |
+        The extractor reads local git only and never trusts a hosted
+        API diff. The manifest fails closed, so flag any path that
+        could present a partial packet as a complete one. The code
+        is stdlib only, so flag any new third party import.
+    - path: "tests/**"
+      instructions: |
+        Every test must be able to fail for a real reason. Flag tests
+        that assert nothing, tests that only restate the code under
+        test, and any test weakened to make the suite pass.
+    - path: "scripts/**"
+      instructions: |
+        Gate scripts are stdlib only and read only inside the repo
+        or a temporary directory. Flag a check that can pass while
+        the thing it guards is broken.
+
+  pre_merge_checks:
+    # Warnings only. CodeRabbit advises and review decides.
+    docstrings:
+      mode: "off"
+    title:
+      mode: "warning"
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/AGENTS.md"
+      - "README.md"
+  learnings:
+    scope: "local"
+
+chat:
+  auto_reply: false
