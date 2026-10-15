@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+# Least privilege. Both jobs only read the code they check out.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref. A newer push makes the older
+# result meaningless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # The gate. This job runs the same command an agent runs locally
+    # before pushing, word for word. CI is a backstop, not a gate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: run the gate
+        run: make check
+
+  dco:
+    # AGENTS.md requires a Signed-off-by trailer on every commit, so
+    # enforce it mechanically on every non-merge commit in the pull
+    # request. Push runs are the already gated squash result, so the
+    # pull request is the enforcement point. Adapted from peira.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: require Signed-off-by on every PR commit
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          missing=0
+          count=0
+          for sha in $(git rev-list --no-merges "$base..$head"); do
+            count=$((count + 1))
+            if ! git log -1 --format=%B "$sha" | grep -q '^Signed-off-by: '; then
+              echo "missing Signed-off-by: $sha $(git log -1 --format=%s "$sha")"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Every commit needs a 'Signed-off-by: Name <email>' trailer (git commit -s)."
+            exit 1
+          fi
+          echo "DCO sign-off present on all $count PR commit(s)."
