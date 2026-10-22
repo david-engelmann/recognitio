@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -75,6 +76,30 @@ class TestCheckCopy(unittest.TestCase):
                 % EM_DASH,
             )
             self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_semicolon_right_after_a_markdown_link_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "See [guide](https://example.com/spec); then continue.\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_colon_right_after_a_markdown_link_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "See [guide](https://example.com/spec): then continue.\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_markdown_link_with_clean_prose_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "See [guide](https://example.com/spec) before continuing.\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_bare_url_line_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -204,6 +229,99 @@ class TestCheckPacket(unittest.TestCase):
     def test_missing_manifest_fails(self):
         out = self.write_packet("empty", None)
         self.assertEqual(self.run_check(out), 1)
+
+    def test_empty_packet_file_fails(self):
+        out = self.write_packet(
+            "hollow", {"verified": True, "head": self.head}
+        )
+        (out / "packet.md").write_text("", encoding="utf-8")
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_null_manifest_fails(self):
+        out = self.write_packet(
+            "nullman", {"verified": True, "head": self.head}
+        )
+        (out / "manifest.json").write_text("null", encoding="utf-8")
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_non_object_manifest_fails(self):
+        out = self.write_packet(
+            "listman", {"verified": True, "head": self.head}
+        )
+        (out / "manifest.json").write_text('["verified"]', encoding="utf-8")
+        self.assertEqual(self.run_check(out), 1)
+
+
+SIGN_OFF = (
+    "Signed-off-by: David Engelmann "
+    "<81196676+david-engelmann@users.noreply.github.com>"
+)
+
+
+class TestDcoWorkflow(unittest.TestCase):
+    """The DCO job must read the trailer block, not the whole message.
+
+    The check line is taken from the workflow itself and run against
+    real commits, so reverting the workflow to a whole message grep
+    makes the buried trailer case pass and this test fail.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name) / "repo"
+        self.repo.mkdir()
+        git(self.repo, "init", "-b", "main")
+        git(self.repo, "config", "user.email", "test@example.com")
+        git(self.repo, "config", "user.name", "Test User")
+        git(self.repo, "config", "commit.gpgsign", "false")
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.pipeline = None
+        for line in workflow.splitlines():
+            stripped = line.strip()
+            if (
+                stripped.startswith("if ")
+                and "git log -1" in stripped
+                and "Signed-off-by" in stripped
+            ):
+                self.assertTrue(stripped.startswith("if ! "))
+                self.assertTrue(stripped.endswith("; then"))
+                self.pipeline = stripped[len("if ! "):-len("; then")]
+        self.assertIsNotNone(self.pipeline)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def commit_message(self, name, message):
+        msg = Path(self.tmp.name) / name
+        msg.write_text(message, encoding="utf-8")
+        git(self.repo, "commit", "--allow-empty", "-F", str(msg))
+        return git(self.repo, "rev-parse", "HEAD")
+
+    def check(self, sha):
+        env = dict(os.environ)
+        env["sha"] = sha
+        result = subprocess.run(
+            ["bash", "-c", self.pipeline],
+            cwd=str(self.repo), env=env,
+            capture_output=True, text=True,
+        )
+        return result.returncode
+
+    def test_a_proper_trailer_passes(self):
+        sha = self.commit_message(
+            "good.txt", "A change\n\n%s\n" % SIGN_OFF
+        )
+        self.assertEqual(self.check(sha), 0)
+
+    def test_a_buried_sign_off_is_not_a_trailer(self):
+        sha = self.commit_message(
+            "buried.txt",
+            "A change\n\n%s\n\nA closing paragraph follows it.\n"
+            % SIGN_OFF,
+        )
+        self.assertNotEqual(self.check(sha), 0)
 
 
 if __name__ == "__main__":

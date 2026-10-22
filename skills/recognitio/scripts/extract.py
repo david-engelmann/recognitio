@@ -18,6 +18,7 @@ cannot crash the run.
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -123,6 +124,8 @@ GIT_PIN = [
     "-c", "color.diff=false",
     "-c", "color.grep=false",
     "-c", "color.status=false",
+    "-c", "grep.column=false",
+    "-c", "diff.interHunkContext=0",
 ]
 # Diff invocations also refuse external diff drivers and textconv
 # filters, both of which can rewrite the text of a change.
@@ -151,11 +154,46 @@ def decode_bytes(data):
     return data.decode("utf-8", "surrogateescape")
 
 
+# Git location variables are scrubbed from the child environment. An
+# exported GIT_DIR defeats git -C, so an extractor launched from a git
+# hook or a configured shell would silently read a different
+# repository, and the recount would read that same repository and
+# still agree with the packet.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+# Every child process gets a timeout, the network calls to the GitHub
+# CLI included. A stalled call must fail the run, never hang it.
+PROCESS_TIMEOUT_SECONDS = 120
+
+
 def run_process(argv, cwd=None):
-    return subprocess.run(
-        list(argv), cwd=str(cwd) if cwd is not None else None,
-        capture_output=True,
-    )
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+    try:
+        return subprocess.run(
+            list(argv), cwd=str(cwd) if cwd is not None else None,
+            capture_output=True, env=env,
+            timeout=PROCESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(
+            "command timed out after %d seconds: %s"
+            % (
+                PROCESS_TIMEOUT_SECONDS,
+                " ".join(str(part) for part in argv),
+            )
+        ) from exc
 
 
 def run_argv(argv, cwd, check, label):
@@ -193,13 +231,6 @@ def merge_base(repo, left, right):
 def is_shallow(repo):
     out = run_git(repo, ["rev-parse", "--is-shallow-repository"]).stdout.strip()
     return out == "true"
-
-
-def is_ancestor(repo, maybe_ancestor, head):
-    result = run_git(
-        repo, ["merge-base", "--is-ancestor", maybe_ancestor, head], check=False
-    )
-    return result.returncode == 0
 
 
 def estimate_tokens(text):
@@ -618,8 +649,9 @@ def generated_reason(repo, diff_base, head, entry):
     if Path(path).suffix not in SOURCE_EXTS:
         return None
     ref = head if entry["status"] != "deleted" else diff_base
-    source_path = entry["old_path"] if entry["status"] == "deleted" else path
-    content = show_file(repo, ref, source_path)
+    # A deletion carries its path in path alone. old_path is set only
+    # for renames and copies, so reading through it loses the file.
+    content = show_file(repo, ref, path)
     if content is None:
         return None
     for line in content.splitlines()[:5]:
@@ -650,8 +682,8 @@ def enrich_files(repo, diff_base, head, change):
         entry["head_bytes"] = None
         if path in binary_paths:
             side_ref = head if entry["status"] != "deleted" else diff_base
-            side_path = path if entry["status"] != "deleted" else entry["old_path"]
-            data = file_bytes(repo, side_ref, side_path)
+            # The entry path names the file on both sides of a deletion.
+            data = file_bytes(repo, side_ref, path)
             if data is not None and looks_textual(data):
                 # The tree marks this file binary, through a checked in
                 # attributes file, but the content is plain text. Count
@@ -1363,10 +1395,18 @@ def findings_accounting(repo, diff_base, since, head, findings):
     ).stdout
     since_files = parse_name_status_z(status_text)
     chunks = split_diff(precise)
+    # Findings anchor at the since revision, so their paths are the
+    # paths the files carried there. Key the ranges by that side and
+    # remember where a rename moved each file, or every finding on a
+    # renamed file reads addressed because its old path is gone.
     ranges_by_path = {}
+    moved_to = {}
     for position, entry in enumerate(since_files):
         chunk = chunks[position] if position < len(chunks) else ""
-        ranges_by_path[entry["path"]] = old_side_ranges(chunk)
+        since_path = entry["old_path"] or entry["path"]
+        ranges_by_path[since_path] = old_side_ranges(chunk)
+        if entry["status"] == "renamed":
+            moved_to[since_path] = entry["path"]
     lines = []
     lines.append("### Prior findings accounting")
     lines.append("")
@@ -1374,14 +1414,17 @@ def findings_accounting(repo, diff_base, since, head, findings):
     for finding in findings:
         path = finding["path"]
         anchor = finding["line"]
-        if file_bytes(repo, head, path) is None:
+        if file_bytes(repo, head, moved_to.get(path, path)) is None:
             verdict = "addressed, the file is gone at the head"
             addressed += 1
         else:
             touched = False
             for start, count in ranges_by_path.get(path, []):
-                last = start + max(count, 1) - 1
-                if start <= anchor <= last:
+                if count == 0:
+                    # A pure insertion touches no old side line. Its
+                    # start names the line before the inserted text.
+                    continue
+                if start <= anchor <= start + count - 1:
                     touched = True
                     break
             if touched:
@@ -1407,9 +1450,13 @@ def build_rereview(repo, diff_base, head, since, findings):
     lines.append("")
     lines.append("Previous reviewed revision: %s" % since)
     lines.append("")
-    if not is_ancestor(repo, since, head):
+    shared = run_git(repo, ["merge-base", since, head], check=False)
+    if shared.returncode != 0 or not shared.stdout.strip():
         # The since ref shares no history with this change, so a
-        # re-review against it would be fiction. Say so and stop.
+        # re-review against it would be fiction. Say so and stop. A
+        # shared merge base is the test, not ancestry, because a
+        # rebase or a force push leaves the previous reviewed head a
+        # non ancestor while the two still share their history.
         lines.append(
             "The since ref %s is not an ancestor of the head and shares no "
             "usable history with this change, so no re-review accounting "

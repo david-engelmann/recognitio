@@ -71,3 +71,16 @@ Semantic Versioning.
 - The DCO job exempts dependabot by actor and requires the exact
   sign-off identity on human commits, and the copy gate now scans
   every public prose surface in the repo.
+- A second hardening round from review. The DCO job now reads the
+  trailer block of a commit message instead of the whole message,
+  the copy gate stops exempting punctuation that trails a link, and
+  the packet check rejects an empty packet file and a manifest that
+  is not a JSON object. The extractor pins the grep column and the
+  inter hunk context settings, scrubs git location variables from
+  the environment of its child processes and gives every child
+  process a timeout. Deleted files are read through their entry
+  path, so a deleted binary or generated file keeps its placeholder
+  and its receipt line. Findings accounting keys its ranges by the
+  path a finding was anchored under, ignores pure insertions, and
+  the re-review section gates on a shared merge base, so a rebased
+  head is re-reviewed instead of skipped.

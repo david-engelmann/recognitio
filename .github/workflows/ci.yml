@@ -56,7 +56,7 @@ jobs:
           count=0
           for sha in $(git rev-list --no-merges "$base..$head"); do
             count=$((count + 1))
-            if ! git log -1 --format=%B "$sha" | grep -qxF 'Signed-off-by: David Engelmann <81196676+david-engelmann@users.noreply.github.com>'; then
+            if ! git log -1 --format=%B "$sha" | git interpret-trailers --parse --no-divider | grep -qxF 'Signed-off-by: David Engelmann <81196676+david-engelmann@users.noreply.github.com>'; then
               echo "missing the Signed-off-by identity: $sha $(git log -1 --format=%s "$sha")"
               missing=1
             fi

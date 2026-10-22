@@ -11,7 +11,8 @@ Code is exempt. Fenced code blocks and inline code spans are skipped,
 as are YAML frontmatter keys, link reference definitions and lines
 that hold nothing but a file path. A URL exempts only its own span of
 a line, never the whole line, so a banned mark hiding beside a link
-is still caught.
+is still caught. The span ends at the link boundary, so punctuation
+sitting right after a link stays in the prose and is judged.
 
 Exits nonzero and lists every violation when the bar is broken.
 """
@@ -44,9 +45,24 @@ YAML_KEY = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_-]*:(\s+(.*))?$")
 YAML_BLOCK = re.compile(r":\s*[|>][+-]?\s*$")
 
 
+def _url_replacement(match):
+    """Blank a URL span but keep the punctuation that trails it.
+
+    A Markdown link ends at its closing parenthesis, and a semicolon
+    or a colon right after a link or a bare URL is prose punctuation,
+    not part of the address. A port or path colon is never the last
+    character of the span, so trimming these marks from the end of
+    the span only ever exposes prose. Whatever trails the span stays
+    in the line, so the bar still judges it.
+    """
+    span = match.group(0)
+    core = span.rstrip(");:")
+    return span[len(core):]
+
+
 def clean(text):
     """Remove the spans of a line the bar does not reach."""
-    text = URL_SPAN.sub("", text)
+    text = URL_SPAN.sub(_url_replacement, text)
     text = INLINE_CODE.sub("", text)
     return text
 
