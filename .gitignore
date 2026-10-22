@@ -28,8 +28,9 @@ htmlcov/
 *~
 .DS_Store
 
-# Extractor output. A run writes a packet and a manifest into the
-# directory named by its out flag, and those packets are working
-# papers rather than source.
+# Extractor output. The two conventional output directory names are
+# ignored here, and packets in them are working papers rather than
+# source. A run pointed at any other directory is the caller's to
+# clean up, because the extractor writes wherever its out flag says.
 packet/
 packets/

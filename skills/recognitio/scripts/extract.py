@@ -4,28 +4,44 @@
 Assembles a verified review packet (the pericope) for a pull request, a
 commit range, or a single commit, using only the local git clone. The
 extractor never trusts a hosted API diff. It resolves refs locally, builds
-tiered context, and recounts files and hunks with separate git invocations
-before it will call a packet verified. Any disagreement fails closed.
+tiered context, and recounts files, statuses, hunks and lines with
+separate git invocations before it will call a packet verified. Any
+disagreement fails closed.
+
+Every git invocation runs with its output format pinned, so ambient
+configuration in the clone or in the user's global config cannot reshape
+the diff under the packet. Path data moves through NUL delimited output,
+so quoted, spaced and Unicode paths survive end to end. All subprocess
+output is handled as bytes first, so binary files and non UTF-8 content
+cannot crash the run.
 """
 
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+EXTRACTOR_VERSION = "1.1.0"
 SOURCE_EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go"}
 MAX_CALL_SITES_PER_FUNCTION = 5
 MAX_TEST_FILES = 10
 MAX_MATCH_LINES_PER_TEST_FILE = 5
+MAX_IMPORT_LINES_PER_FILE = 20
+MAX_DEFINITIONS_PER_NAME = 3
 MAX_HISTORY_FILES = 3
 MAX_BLAME_RANGES = 10
 MAX_BLAME_SUMMARY_LINES = 10
 MAX_LOG_L_FUNCTIONS = 3
 MAX_LOG_L_CHARS = 4000
 MAX_RANGE_DIFF_CHARS = 8000
+MAX_PR_BODY_CHARS = 4000
+MAX_PRIOR_PRS = 5
+MAX_SPEC_REFERENCES = 5
 
 STATUS_NAMES = {
     "A": "added",
@@ -46,35 +62,124 @@ FUNC_PATTERNS = [
     re.compile(r"(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:async\s*)?(?:\(|function)"),
 ]
 
+CLASS_PATTERN = re.compile(r"class\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+# Literal prefixes searched when looking for a definition of a changed
+# name outside the changed files. The hit line still has to match one of
+# the function patterns or the class pattern for that exact name before
+# it counts as a definition.
+DEFINITION_PREFIXES = ("def ", "function ", "fn ", "func ", "class ")
+
+IMPORT_PATTERNS = {
+    ".py": re.compile(r"^\s*(import\s+\S|from\s+\S+\s+import)"),
+    ".js": re.compile(r"^\s*(import\s|const\s+.*=\s*require\(|let\s+.*=\s*require\(|var\s+.*=\s*require\()"),
+    ".jsx": re.compile(r"^\s*(import\s|const\s+.*=\s*require\(|let\s+.*=\s*require\(|var\s+.*=\s*require\()"),
+    ".ts": re.compile(r"^\s*(import\s|const\s+.*=\s*require\()"),
+    ".tsx": re.compile(r"^\s*(import\s|const\s+.*=\s*require\()"),
+    ".rs": re.compile(r"^\s*(pub\s+)?use\s"),
+    ".go": re.compile(r"^\s*(import\s|\"[^\"]+\")"),
+}
+
+# Files whose diff is replaced by a named placeholder in the packet.
+# The manifest still counts their lines and hunks in full, and the
+# packet header names every one of them with its reason.
+LOCKFILE_NAMES = {
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    "poetry.lock",
+    "Pipfile.lock",
+    "Gemfile.lock",
+    "composer.lock",
+    "go.sum",
+    "flake.lock",
+    "packages.lock.json",
+}
+GENERATED_SUFFIXES = (
+    ".pb.go",
+    "_pb2.py",
+    "_pb2_grpc.py",
+    ".min.js",
+    ".min.css",
+    ".generated.ts",
+    ".generated.tsx",
+)
+
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
+ISSUE_REF_RE = re.compile(r"#(\d+)\b")
+FINDING_RE = re.compile(r"^(.*?):(\d+):\s?(.*)$")
+
+# Pin the output format of every git invocation. Ambient configuration,
+# whether it sits in the clone under review or in the user's global
+# config, must not be able to reshape the data the packet is built from
+# or the data the recount reads.
+GIT_PIN = [
+    "-c", "core.quotepath=false",
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "color.ui=false",
+    "-c", "color.diff=false",
+    "-c", "color.grep=false",
+    "-c", "color.status=false",
+]
+# Diff invocations also refuse external diff drivers and textconv
+# filters, both of which can rewrite the text of a change.
+DIFF_FLAGS = ["--no-ext-diff", "--no-textconv"]
 
 
 class GitError(Exception):
     pass
 
 
-def run_git(repo, args, check=True):
-    result = subprocess.run(
-        ["git", "-C", str(repo)] + list(args),
+class Proc:
+    """A finished subprocess with text output decoded byte safely."""
+
+    def __init__(self, returncode, stdout, stderr):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def decode_bytes(data):
+    """Decode subprocess bytes without ever failing.
+
+    Surrogate escapes carry undecodable bytes through as data, so CRLF
+    endings and legacy encodings survive into the packet unchanged.
+    """
+    return data.decode("utf-8", "surrogateescape")
+
+
+def run_process(argv, cwd=None):
+    return subprocess.run(
+        list(argv), cwd=str(cwd) if cwd is not None else None,
         capture_output=True,
-        text=True,
     )
-    if check and result.returncode != 0:
+
+
+def run_argv(argv, cwd, check, label):
+    result = run_process(argv, cwd=cwd)
+    proc = Proc(
+        result.returncode,
+        decode_bytes(result.stdout),
+        decode_bytes(result.stderr),
+    )
+    if check and proc.returncode != 0:
         raise GitError(
-            "git %s failed with exit %d: %s"
-            % (" ".join(args), result.returncode, result.stderr.strip())
+            "%s failed with exit %d: %s"
+            % (label, proc.returncode, proc.stderr.strip())
         )
-    return result
+    return proc
+
+
+def run_git(repo, args, check=True):
+    argv = ["git", "-C", str(repo)] + GIT_PIN + list(args)
+    return run_argv(argv, None, check, "git " + " ".join(args))
 
 
 def run_cmd(cwd, args, check=True):
-    result = subprocess.run(list(args), cwd=str(cwd), capture_output=True, text=True)
-    if check and result.returncode != 0:
-        raise GitError(
-            "%s failed with exit %d: %s"
-            % (" ".join(args), result.returncode, result.stderr.strip())
-        )
-    return result
+    return run_argv(list(args), cwd, check, " ".join(args))
 
 
 def rev_parse(repo, ref):
@@ -83,6 +188,18 @@ def rev_parse(repo, ref):
 
 def merge_base(repo, left, right):
     return run_git(repo, ["merge-base", left, right]).stdout.strip()
+
+
+def is_shallow(repo):
+    out = run_git(repo, ["rev-parse", "--is-shallow-repository"]).stdout.strip()
+    return out == "true"
+
+
+def is_ancestor(repo, maybe_ancestor, head):
+    result = run_git(
+        repo, ["merge-base", "--is-ancestor", maybe_ancestor, head], check=False
+    )
+    return result.returncode == 0
 
 
 def estimate_tokens(text):
@@ -95,82 +212,114 @@ def cap_text(text, limit, label):
     return text[:limit] + "\n[recognitio] %s capped at %d characters.\n" % (label, limit), True
 
 
-def resolve_inputs(repo, args):
-    """Return a dict with mode, base, head, merge_base, label, and since."""
-    since_sha = rev_parse(repo, args.since) if args.since else None
+def render_notes(notes):
+    lines = []
+    for note in notes:
+        lines.append("Cap note: %s." % note)
+    if notes:
+        lines.append("")
+    return lines
 
-    if args.pr is not None:
-        view = run_cmd(
-            repo,
-            [
-                "gh", "pr", "view", str(args.pr),
-                "--json", "baseRefOid,headRefOid,baseRefName,headRefName,title",
-            ],
+
+def refuse_shallow(repo):
+    if is_shallow(repo):
+        raise GitError(
+            "the local clone is shallow, so its history is truncated and no "
+            "packet built from it can be trusted. Fetch the full history "
+            "first, for example with git fetch --unshallow, then run again"
         )
-        try:
-            data = json.loads(view.stdout)
-        except json.JSONDecodeError as exc:
-            raise GitError("gh pr view returned unparseable JSON: %s" % exc)
-        base = None
-        head = None
-        for key, target in (("baseRefOid", "base"), ("headRefOid", "head")):
-            oid = data.get(key)
-            if oid:
-                probe = run_git(repo, ["cat-file", "-e", oid + "^{commit}"], check=False)
-                if probe.returncode == 0:
-                    if target == "base":
-                        base = oid
-                    else:
-                        head = oid
-        if base is None and data.get("baseRefName"):
-            base = rev_parse(repo, data["baseRefName"])
-        if head is None and data.get("headRefName"):
-            head = rev_parse(repo, data["headRefName"])
-        if base is None or head is None:
+
+
+def resolve_pr(repo, args, since_sha):
+    view = run_cmd(
+        repo,
+        [
+            "gh", "pr", "view", str(args.pr),
+            "--json",
+            "baseRefOid,headRefOid,baseRefName,headRefName,title,body",
+        ],
+    )
+    try:
+        data = json.loads(view.stdout)
+    except json.JSONDecodeError as exc:
+        raise GitError("gh pr view returned unparseable JSON: %s" % exc)
+    resolved_refs = {}
+    for key, target in (("baseRefOid", "base"), ("headRefOid", "head")):
+        oid = data.get(key)
+        if not oid:
             raise GitError(
-                "could not resolve pull request %d refs in the local clone" % args.pr
+                "gh did not return a %s for pull request %d" % (key, args.pr)
             )
-        base = rev_parse(repo, base)
-        head = rev_parse(repo, head)
-        mb = merge_base(repo, base, head)
-        return {
-            "mode": "pr",
-            "label": "pull request %d" % args.pr,
-            "base": base,
-            "head": head,
-            "merge_base": mb,
-            "since": since_sha,
-        }
+        probe = run_git(repo, ["cat-file", "-e", oid + "^{commit}"], check=False)
+        if probe.returncode != 0:
+            raise GitError(
+                "the %s %s of pull request %d is not in the local clone. "
+                "Fetch it first, for example with gh pr checkout %d or git "
+                "fetch, then run again" % (target, oid, args.pr, args.pr)
+            )
+        resolved_refs[target] = rev_parse(repo, oid)
+    base = resolved_refs["base"]
+    head = resolved_refs["head"]
+    body = data.get("body") or ""
+    pr_info = {
+        "number": args.pr,
+        "title": data.get("title") or "",
+        "body": body,
+        "spec_references": find_spec_references(body),
+    }
+    return {
+        "mode": "pr",
+        "label": "pull request %d" % args.pr,
+        "base": base,
+        "head": head,
+        "merge_base": merge_base(repo, base, head),
+        "since": since_sha,
+        "pr": pr_info,
+    }
 
-    if args.range:
-        spec = args.range
-        if "..." in spec:
-            left, right = spec.split("...", 1)
-        elif ".." in spec:
-            left, right = spec.split("..", 1)
-        else:
-            raise GitError("range must look like A..B or A...B, got %r" % spec)
-        if not left or not right:
-            raise GitError("range must name both ends, got %r" % spec)
-        base = rev_parse(repo, left)
-        head = rev_parse(repo, right)
-        mb = merge_base(repo, base, head)
-        return {
-            "mode": "range",
-            "label": "range %s" % spec,
-            "base": base,
-            "head": head,
-            "merge_base": mb,
-            "since": since_sha,
-        }
 
-    if args.commit:
-        head = rev_parse(repo, args.commit)
-        parent = run_git(repo, ["rev-parse", "--verify", head + "^"], check=False)
-        if parent.returncode == 0:
-            base = parent.stdout.strip()
-        else:
-            base = EMPTY_TREE
+def find_spec_references(body):
+    """Collect the links and issue references a PR body carries."""
+    refs = []
+    for match in URL_RE.finditer(body):
+        ref = match.group(0).rstrip(".,;")
+        if ref not in refs:
+            refs.append(ref)
+    for match in ISSUE_REF_RE.finditer(body):
+        ref = "#" + match.group(1)
+        if ref not in refs:
+            refs.append(ref)
+    return refs[:MAX_SPEC_REFERENCES]
+
+
+def resolve_range(repo, args, since_sha):
+    spec = args.range
+    if "..." in spec:
+        left, right = spec.split("...", 1)
+    elif ".." in spec:
+        left, right = spec.split("..", 1)
+    else:
+        raise GitError("range must look like A..B or A...B, got %r" % spec)
+    if not left or not right:
+        raise GitError("range must name both ends, got %r" % spec)
+    base = rev_parse(repo, left)
+    head = rev_parse(repo, right)
+    return {
+        "mode": "range",
+        "label": "range %s" % spec,
+        "base": base,
+        "head": head,
+        "merge_base": merge_base(repo, base, head),
+        "since": since_sha,
+        "pr": None,
+    }
+
+
+def resolve_commit(repo, args, since_sha):
+    head = rev_parse(repo, args.commit)
+    parent = run_git(repo, ["rev-parse", "--verify", head + "^"], check=False)
+    if parent.returncode == 0:
+        base = parent.stdout.strip()
         return {
             "mode": "commit",
             "label": "commit %s" % head[:12],
@@ -178,30 +327,45 @@ def resolve_inputs(repo, args):
             "head": head,
             "merge_base": base,
             "since": since_sha,
+            "pr": None,
         }
-
-    if since_sha is not None:
-        head = rev_parse(repo, "HEAD")
-        mb = merge_base(repo, since_sha, head)
-        return {
-            "mode": "since",
-            "label": "changes since %s" % since_sha[:12],
-            "base": since_sha,
-            "head": head,
-            "merge_base": mb,
-            "since": since_sha,
-        }
-
-    raise GitError("one of --pr, --range, --commit, or --since is required")
+    # A root commit has no parent and no merge base. The diff runs
+    # against the empty tree, and the manifest records the merge base
+    # as absent rather than mislabelling a tree as a commit.
+    return {
+        "mode": "commit",
+        "label": "commit %s" % head[:12],
+        "base": None,
+        "head": head,
+        "merge_base": None,
+        "since": since_sha,
+        "pr": None,
+    }
 
 
-def parse_name_status(text):
+def resolve_inputs(repo, args):
+    """Return a dict with mode, refs, merge base, label, since and pr."""
+    refuse_shallow(repo)
+    since_sha = rev_parse(repo, args.since) if args.since else None
+    if args.pr is not None:
+        return resolve_pr(repo, args, since_sha)
+    if args.range:
+        return resolve_range(repo, args, since_sha)
+    if args.commit:
+        return resolve_commit(repo, args, since_sha)
+    raise GitError("one of --pr, --range, or --commit is required")
+
+
+def parse_name_status_z(text):
+    """Parse NUL delimited name-status output into file entries."""
+    fields = text.split("\0")
+    while fields and fields[-1] == "":
+        fields.pop()
     files = []
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        parts = line.split("\t")
-        code = parts[0].strip()
+    index = 0
+    while index < len(fields):
+        code = fields[index]
+        index += 1
         letter = code[:1]
         entry = {
             "status_code": code,
@@ -210,54 +374,70 @@ def parse_name_status(text):
             "path": None,
         }
         if letter in ("R", "C"):
-            entry["old_path"] = parts[1]
-            entry["path"] = parts[2]
+            entry["old_path"] = fields[index]
+            entry["path"] = fields[index + 1]
+            index += 2
         else:
-            entry["path"] = parts[1]
+            entry["path"] = fields[index]
+            index += 1
         files.append(entry)
     return files
 
 
-def parse_numstat(text):
+def parse_numstat_z(text):
+    """Parse NUL delimited numstat output.
+
+    Returns a mapping of path to (additions, deletions) plus the set of
+    paths git reported with the binary marker instead of line counts.
+    """
+    fields = text.split("\0")
+    while fields and fields[-1] == "":
+        fields.pop()
     stats = {}
-    for line in text.splitlines():
-        match = re.match(r"^(\S+)\t(\S+)\t(.*)$", line)
+    binary_paths = set()
+    index = 0
+    record_re = re.compile(r"^(\S+)\t(\S+)\t(.*)$")
+    while index < len(fields):
+        match = record_re.match(fields[index])
+        index += 1
         if not match:
             continue
         adds_raw, dels_raw, path_field = match.groups()
-        adds = int(adds_raw) if adds_raw.isdigit() else 0
-        dels = int(dels_raw) if dels_raw.isdigit() else 0
-        path = path_field
-        if " => " in path_field:
-            left, after = path_field.split(" => ", 1)
-            if "{" in left:
-                prefix = left.split("{", 1)[0]
-                path = prefix + after.replace("}", "", 1)
-            else:
-                path = after
-        stats[path] = (adds, dels)
-    return stats
+        if path_field == "":
+            # A rename carries an empty path field, then the old and
+            # new paths as their own NUL terminated fields.
+            index += 1  # the old path
+            path = fields[index]
+            index += 1
+        else:
+            path = path_field
+        if adds_raw == "-" or dels_raw == "-":
+            stats[path] = (0, 0)
+            binary_paths.add(path)
+        else:
+            stats[path] = (int(adds_raw), int(dels_raw))
+    return stats, binary_paths
 
 
 def split_diff(text):
-    chunks = {}
-    current_path = None
-    current_lines = []
-    header_re = re.compile(r"^diff --git a/(.*?) b/(.*)$")
+    """Split a full diff into per file chunks, in emission order.
 
-    def flush():
-        if current_path is not None:
-            chunks[current_path] = "".join(current_lines)
-
+    The chunk order of a git diff matches the order of the matching
+    name-status output, so callers pair chunks with file entries by
+    position. No path is ever parsed out of a diff header, which keeps
+    paths containing spaces or the text b/ intact.
+    """
+    chunks = []
+    current = None
     for line in text.splitlines(keepends=True):
-        match = header_re.match(line.rstrip("\n"))
-        if match:
-            flush()
-            current_path = match.group(2)
-            current_lines = [line]
-        elif current_path is not None:
-            current_lines.append(line)
-    flush()
+        if line.startswith("diff --git "):
+            if current is not None:
+                chunks.append("".join(current))
+            current = [line]
+        elif current is not None:
+            current.append(line)
+    if current is not None:
+        chunks.append("".join(current))
     return chunks
 
 
@@ -265,7 +445,20 @@ def count_hunks(chunk):
     return sum(1 for line in chunk.splitlines() if line.startswith("@@ "))
 
 
+def count_chunk_lines(chunk):
+    """Count added and deleted lines in a zero context diff chunk."""
+    adds = 0
+    dels = 0
+    for line in chunk.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            adds += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            dels += 1
+    return adds, dels
+
+
 def changed_ranges(chunk):
+    """New side line ranges touched by a zero context diff chunk."""
     ranges = []
     for line in chunk.splitlines():
         match = HUNK_RE.match(line)
@@ -274,6 +467,18 @@ def changed_ranges(chunk):
             count = int(match.group(4)) if match.group(4) else 1
             if count > 0:
                 ranges.append((start, start + count - 1))
+    return ranges
+
+
+def old_side_ranges(chunk):
+    """Old side line ranges touched by a zero context diff chunk."""
+    ranges = []
+    for line in chunk.splitlines():
+        match = HUNK_RE.match(line)
+        if match:
+            start = int(match.group(1))
+            count = int(match.group(2)) if match.group(2) else 1
+            ranges.append((start, count))
     return ranges
 
 
@@ -299,23 +504,300 @@ def extract_function_names(chunk):
     return names
 
 
-def show_file(repo, head, path):
-    result = run_git(repo, ["show", "%s:%s" % (head, path)], check=False)
+
+def file_bytes(repo, ref, path):
+    """Return the raw bytes of a file at a ref, or None when absent."""
+    if ref is None or path is None:
+        return None
+    result = run_process(
+        ["git", "-C", str(repo)] + GIT_PIN
+        + ["show", "%s:%s" % (ref, path)]
+    )
     if result.returncode != 0:
         return None
     return result.stdout
 
 
-def build_t0(repo, mb, head, files, numstat_text, commit_log):
+def looks_textual(data):
+    """True when bytes read as UTF-8 text with no NUL bytes early on."""
+    if data is None:
+        return False
+    if b"\0" in data[:8192]:
+        return False
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
+
+
+def decode_text(data):
+    """Decode bytes as strict UTF-8, or return None when they are not."""
+    if data is None:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def show_file(repo, head, path):
+    return decode_text(file_bytes(repo, head, path))
+
+
+def fetch_change(repo, diff_base, head):
+    """Fetch the change channels between a diff base and a head.
+
+    Path data comes back NUL delimited. The returned file entries are
+    in git's emission order, and the chunk lists pair with them by
+    position.
+    """
+    status_text = run_git(
+        repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
+        + [diff_base, head]
+    ).stdout
+    numstat_text = run_git(
+        repo, ["diff", "--numstat", "-z", "-M", "-C"] + DIFF_FLAGS
+        + [diff_base, head]
+    ).stdout
+    commit_log = run_git(
+        repo, ["log", "--oneline", "--reverse", "%s..%s" % (diff_base, head)]
+    ).stdout
+    full_diff = run_git(
+        repo,
+        ["diff", "--histogram", "--find-renames", "--find-copies", "-W"]
+        + DIFF_FLAGS + [diff_base, head],
+    ).stdout
+    precise_diff = run_git(
+        repo,
+        ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
+        + DIFF_FLAGS + [diff_base, head],
+    ).stdout
+    files = parse_name_status_z(status_text)
+    stats, binary_paths = parse_numstat_z(numstat_text)
+    full_chunks = split_diff(full_diff)
+    precise_chunks = split_diff(precise_diff)
+    chunks = {}
+    precise = {}
+    for position, entry in enumerate(files):
+        chunks[entry["path"]] = (
+            full_chunks[position] if position < len(full_chunks) else ""
+        )
+        precise[entry["path"]] = (
+            precise_chunks[position] if position < len(precise_chunks) else ""
+        )
+    return {
+        "files": files,
+        "stats": stats,
+        "binary_paths": binary_paths,
+        "chunks": chunks,
+        "precise_chunks": precise,
+        "commit_log": commit_log,
+    }
+
+
+def per_file_text_diff(repo, diff_base, head, path, context_flag):
+    """Diff one path with the text flag, for attribute marked files."""
+    result = run_git(
+        repo,
+        ["diff", "--text", "--histogram", context_flag] + DIFF_FLAGS
+        + [diff_base, head, "--", path],
+    )
+    chunks = split_diff(result.stdout)
+    return chunks[0] if chunks else ""
+
+
+def generated_reason(repo, diff_base, head, entry):
+    """Name the placeholder reason for generated files and lockfiles."""
+    path = entry["path"]
+    name = Path(path).name
+    if name in LOCKFILE_NAMES:
+        return "lockfile"
+    if path.endswith(GENERATED_SUFFIXES):
+        return "generated file"
+    if Path(path).suffix not in SOURCE_EXTS:
+        return None
+    ref = head if entry["status"] != "deleted" else diff_base
+    source_path = entry["old_path"] if entry["status"] == "deleted" else path
+    content = show_file(repo, ref, source_path)
+    if content is None:
+        return None
+    for line in content.splitlines()[:5]:
+        lowered = line.lower()
+        if "code generated" in lowered and "do not edit" in lowered:
+            return "generated file"
+    return None
+
+
+def enrich_files(repo, diff_base, head, change):
+    """Fill in counts and placeholder state for every file entry.
+
+    Returns the exclusion receipt, one entry per file that is binary,
+    attribute marked, generated or a lockfile.
+    """
+    files = change["files"]
+    stats = change["stats"]
+    binary_paths = change["binary_paths"]
+    chunks = change["chunks"]
+    precise = change["precise_chunks"]
+    exclusions = []
+    for entry in files:
+        path = entry["path"]
+        adds, dels = stats.get(path, (0, 0))
+        entry["binary"] = False
+        entry["attribute_text"] = False
+        entry["placeholder"] = None
+        entry["head_bytes"] = None
+        if path in binary_paths:
+            side_ref = head if entry["status"] != "deleted" else diff_base
+            side_path = path if entry["status"] != "deleted" else entry["old_path"]
+            data = file_bytes(repo, side_ref, side_path)
+            if data is not None and looks_textual(data):
+                # The tree marks this file binary, through a checked in
+                # attributes file, but the content is plain text. Count
+                # it and show it as text, and name it in the receipt.
+                text_chunk = per_file_text_diff(
+                    repo, diff_base, head, path, "-W"
+                )
+                zero_chunk = per_file_text_diff(
+                    repo, diff_base, head, path, "-U0"
+                )
+                chunks[path] = text_chunk
+                precise[path] = zero_chunk
+                adds, dels = count_chunk_lines(zero_chunk)
+                entry["attribute_text"] = True
+                exclusions.append({
+                    "path": path,
+                    "reason": "marked binary by repository attributes, "
+                              "counted and shown as text",
+                    "shown_as_text": True,
+                })
+            elif data is not None:
+                entry["binary"] = True
+                entry["head_bytes"] = len(data)
+                adds, dels = 0, 0
+                entry["placeholder"] = (
+                    "(binary file, %d bytes at the %s revision; no textual "
+                    "diff)" % (len(data), "head" if entry["status"] != "deleted"
+                               else "base")
+                )
+                exclusions.append({
+                    "path": path,
+                    "reason": "binary file of %d bytes" % len(data),
+                    "shown_as_text": False,
+                })
+            # When no bytes exist on either side the entry is a gitlink
+            # or similar, and the diff chunk already speaks for itself.
+        entry["additions"] = adds
+        entry["deletions"] = dels
+        entry["hunks"] = count_hunks(chunks.get(path, ""))
+        if not entry["binary"] and entry["placeholder"] is None:
+            reason = generated_reason(repo, diff_base, head, entry)
+            if reason is not None:
+                entry["placeholder"] = (
+                    "(%s; the diff is withheld from the packet and its %d "
+                    "additions and %d deletions across %d hunks are counted "
+                    "in the manifest)"
+                    % (reason, adds, dels, entry["hunks"])
+                )
+                exclusions.append({
+                    "path": path,
+                    "reason": reason,
+                    "shown_as_text": False,
+                })
+    return exclusions
+
+
+def build_header(resolved, diff_base, verified, exclusions):
+    lines = []
+    lines.append("# The pericope for %s" % resolved["label"])
+    lines.append("")
+    lines.append(
+        "A recognitio review packet. It holds the change and the context "
+        "appointed to be read with it, and nothing else."
+    )
+    lines.append("")
+    lines.append("Mode: %s" % resolved["mode"])
+    if resolved["base"] is None:
+        lines.append("Base: the empty tree, because the head is a root commit")
+    else:
+        lines.append("Base: %s" % resolved["base"])
+    lines.append("Head: %s" % resolved["head"])
+    if resolved["merge_base"] is None:
+        lines.append("Merge base: none, because the head is a root commit")
+    else:
+        lines.append("Merge base: %s" % resolved["merge_base"])
+    if resolved["since"]:
+        lines.append("Since: %s" % resolved["since"])
+    lines.append(
+        "Verified: %s" % ("yes" if verified else "NO, see the completeness section")
+    )
+    if exclusions:
+        lines.append("")
+        lines.append("Exclusions and placeholders:")
+        for item in exclusions:
+            lines.append("- %s: %s" % (item["path"], item["reason"]))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_t0(files, commit_log, pr_info):
     lines = []
     lines.append("## T0 Triage")
     lines.append("")
+    if pr_info is not None:
+        lines.append("Pull request #%d: %s" % (pr_info["number"], pr_info["title"]))
+        lines.append("")
+        lines.append("### Pull request body")
+        lines.append("")
+        body = pr_info["body"].strip()
+        if body:
+            shown, capped = cap_text(body, MAX_PR_BODY_CHARS, "pull request body")
+            lines.append("```")
+            lines.append(shown)
+            lines.append("```")
+            if capped:
+                lines.append("")
+                lines.append(
+                    "The body was capped at %d characters." % MAX_PR_BODY_CHARS
+                )
+        else:
+            lines.append("The pull request has no body.")
+        lines.append("")
+        if pr_info["spec_references"]:
+            lines.append(
+                "Spec references found in the body: %s"
+                % ", ".join(pr_info["spec_references"])
+            )
+        else:
+            lines.append("No spec reference was found in the pull request body.")
+        lines.append("")
     lines.append("Files changed: %d" % len(files))
+    lines.append("")
+    lines.append("### Files")
+    lines.append("")
+    for entry in files:
+        if entry.get("old_path"):
+            lines.append(
+                "- %s (%s, renamed from %s)"
+                % (entry["path"], entry["status"], entry["old_path"])
+            )
+        else:
+            lines.append("- %s (%s)" % (entry["path"], entry["status"]))
     lines.append("")
     lines.append("### Numstat")
     lines.append("")
     lines.append("```")
-    lines.append(numstat_text.rstrip() if numstat_text.strip() else "(no changes)")
+    numstat_lines = []
+    for entry in files:
+        if entry["binary"]:
+            numstat_lines.append("-\t-\t%s" % entry["path"])
+        else:
+            numstat_lines.append(
+                "%d\t%d\t%s"
+                % (entry["additions"], entry["deletions"], entry["path"])
+            )
+    lines.append("\n".join(numstat_lines) if numstat_lines else "(no changes)")
     lines.append("```")
     lines.append("")
     lines.append("### Commits")
@@ -344,24 +826,39 @@ def build_t1(files, chunks):
             lines.append("Renamed from: %s" % entry["old_path"])
         lines.append("")
         lines.append("```diff")
-        chunk = chunks.get(path, "")
-        lines.append(chunk.rstrip() if chunk.strip() else "(no textual diff)")
+        if entry["placeholder"] is not None:
+            lines.append(entry["placeholder"])
+        else:
+            chunk = chunks.get(path, "")
+            lines.append(chunk.rstrip() if chunk.strip() else "(no textual diff)")
         lines.append("```")
         lines.append("")
     return "\n".join(lines)
 
 
-def git_grep_lines(repo, head, term):
-    result = run_git(
-        repo, ["grep", "-n", "-w", "-e", term, head], check=False
-    )
+
+def git_grep_lines(repo, head, term, fixed=True):
+    """Return (path, line number, content) hits for a term at a head.
+
+    Output is NUL delimited, so paths containing colons or spaces parse
+    exactly. Terms are fixed strings by default, never patterns.
+    """
+    args = ["grep", "-n", "-z", "-w", "-e", term, head]
+    if fixed:
+        args = ["grep", "-n", "-z", "-w", "-F", "-e", term, head]
+    result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
         return []
     out = []
     for line in result.stdout.splitlines():
-        parts = line.split(":", 3)
-        if len(parts) == 4 and parts[2].isdigit():
-            out.append((parts[1], int(parts[2]), parts[3]))
+        fields = line.split("\0")
+        if len(fields) < 3:
+            continue
+        revpath, lineno = fields[0], fields[1]
+        content = "\0".join(fields[2:])
+        path = revpath.split(":", 1)[1] if ":" in revpath else revpath
+        if lineno.isdigit():
+            out.append((path, int(lineno), content))
     return out
 
 
@@ -378,15 +875,12 @@ def is_test_path(path):
     )
 
 
-def build_t2(repo, head, files, functions_by_file):
+def source_entries(files):
+    return [entry for entry in files if Path(entry["path"]).suffix in SOURCE_EXTS]
+
+
+def call_sites_section(repo, head, files, functions_by_file, notes):
     lines = []
-    lines.append("## T2 Companions")
-    lines.append("")
-    lines.append(
-        "Call sites and test files found by deterministic search at the head revision."
-    )
-    lines.append("")
-    notes = []
     content_cache = {}
 
     def context_block(path, lineno):
@@ -403,18 +897,9 @@ def build_t2(repo, head, files, functions_by_file):
             block.append("%s:%d: %s" % (path, number, rows[number - 1]))
         return "\n".join(block)
 
-    source_files = [
-        entry for entry in files if Path(entry["path"]).suffix in SOURCE_EXTS
-    ]
-    if not source_files:
-        lines.append("No changed source files, so no companions were gathered.")
-        lines.append("")
-        return "\n".join(lines), notes
-
-    for entry in source_files:
+    for entry in source_entries(files):
         path = entry["path"]
-        names = functions_by_file.get(path, [])
-        for name in names:
+        for name in functions_by_file.get(path, []):
             hits = [
                 hit for hit in git_grep_lines(repo, head, name) if hit[0] != path
             ]
@@ -438,15 +923,121 @@ def build_t2(repo, head, files, functions_by_file):
                     lines.append("")
             lines.append("```")
             lines.append("")
+    return lines
 
+
+def imports_section(repo, head, files, notes):
+    lines = []
+    lines.append("### Imports of the changed files")
+    lines.append("")
+    any_imports = False
+    for entry in source_entries(files):
+        path = entry["path"]
+        if entry["status"] == "deleted":
+            continue
+        pattern = IMPORT_PATTERNS.get(Path(path).suffix)
+        if pattern is None:
+            continue
+        content = show_file(repo, head, path)
+        if content is None:
+            continue
+        in_go_block = False
+        found = []
+        for number, row in enumerate(content.splitlines(), start=1):
+            stripped = row.strip()
+            if Path(path).suffix == ".go":
+                if stripped.startswith("import ("):
+                    in_go_block = True
+                    continue
+                if in_go_block and stripped == ")":
+                    in_go_block = False
+                    continue
+                if in_go_block or pattern.match(row):
+                    found.append((number, stripped))
+            elif pattern.match(row):
+                found.append((number, stripped))
+        if not found:
+            continue
+        any_imports = True
+        shown = found[:MAX_IMPORT_LINES_PER_FILE]
+        if len(found) > len(shown):
+            notes.append(
+                "imports of %s capped at %d of %d"
+                % (path, len(shown), len(found))
+            )
+        lines.append("#### %s" % path)
+        lines.append("")
+        lines.append("```")
+        for number, row in shown:
+            lines.append("%d: %s" % (number, row))
+        lines.append("```")
+        lines.append("")
+    if not any_imports:
+        lines.append("No import lines were found in the changed source files.")
+        lines.append("")
+    return lines
+
+
+def line_defines(line, name):
+    for pattern in FUNC_PATTERNS:
+        match = pattern.match(line.strip())
+        if match and match.group(1) == name:
+            return True
+    match = CLASS_PATTERN.match(line.strip())
+    return bool(match and match.group(1) == name)
+
+
+def definitions_section(repo, head, files, functions_by_file, notes):
+    lines = []
+    lines.append("### Definitions of changed names elsewhere")
+    lines.append("")
+    changed_paths = {entry["path"] for entry in files}
+    any_found = False
+    for entry in source_entries(files):
+        for name in functions_by_file.get(entry["path"], []):
+            hits = []
+            for prefix in DEFINITION_PREFIXES:
+                for hit in git_grep_lines(
+                    repo, head, prefix + name, fixed=True
+                ):
+                    if hit[0] not in changed_paths and line_defines(hit[2], name):
+                        hits.append(hit)
+            hits = sorted(set(hits))
+            if not hits:
+                continue
+            any_found = True
+            shown = hits[:MAX_DEFINITIONS_PER_NAME]
+            if len(hits) > len(shown):
+                notes.append(
+                    "definitions of %s capped at %d of %d"
+                    % (name, len(shown), len(hits))
+                )
+            lines.append("#### %s" % name)
+            lines.append("")
+            lines.append("```")
+            for hit_path, hit_line, content in shown:
+                lines.append("%s:%d: %s" % (hit_path, hit_line, content.strip()))
+            lines.append("```")
+            lines.append("")
+    if not any_found:
+        lines.append(
+            "No definitions of the changed names were found outside the "
+            "changed files."
+        )
+        lines.append("")
+    return lines
+
+
+def test_files_section(repo, head, files, functions_by_file, notes):
+    lines = []
     test_hits = {}
-    all_names = []
-    for entry in source_files:
+    changed_paths = [entry["path"] for entry in files]
+    for entry in source_entries(files):
         stem = Path(entry["path"]).stem
         terms = [stem] + functions_by_file.get(entry["path"], [])
         for term in terms:
             for hit_path, hit_line, content in git_grep_lines(repo, head, term):
-                if is_test_path(hit_path) and hit_path not in [e["path"] for e in files]:
+                if is_test_path(hit_path) and hit_path not in changed_paths:
                     test_hits.setdefault(hit_path, []).append(
                         (hit_line, content)
                     )
@@ -455,33 +1046,55 @@ def build_t2(repo, head, files, functions_by_file):
     if not test_hits:
         lines.append("No test files mention the changed modules or functions.")
         lines.append("")
-    else:
-        test_paths = sorted(test_hits)
-        if len(test_paths) > MAX_TEST_FILES:
-            notes.append(
-                "test files capped at %d of %d" % (MAX_TEST_FILES, len(test_paths))
-            )
-            test_paths = test_paths[:MAX_TEST_FILES]
-        for test_path in test_paths:
-            hits = sorted(test_hits[test_path])
-            lines.append("#### %s" % test_path)
-            lines.append("")
-            shown = hits[:MAX_MATCH_LINES_PER_TEST_FILE]
-            if len(hits) > len(shown):
-                notes.append(
-                    "matches in %s capped at %d of %d"
-                    % (test_path, len(shown), len(hits))
-                )
-            lines.append("```")
-            for hit_line, content in shown:
-                lines.append("%d: %s" % (hit_line, content))
-            lines.append("```")
-            lines.append("")
-    for note in notes:
-        lines.append("Cap note: %s." % note)
-    if notes:
+        return lines
+    test_paths = sorted(test_hits)
+    if len(test_paths) > MAX_TEST_FILES:
+        notes.append(
+            "test files capped at %d of %d" % (MAX_TEST_FILES, len(test_paths))
+        )
+        test_paths = test_paths[:MAX_TEST_FILES]
+    for test_path in test_paths:
+        hits = sorted(test_hits[test_path])
+        lines.append("#### %s" % test_path)
         lines.append("")
-    return "\n".join(lines), notes
+        shown = hits[:MAX_MATCH_LINES_PER_TEST_FILE]
+        if len(hits) > len(shown):
+            notes.append(
+                "matches in %s capped at %d of %d"
+                % (test_path, len(shown), len(hits))
+            )
+        lines.append("```")
+        for hit_line, content in shown:
+            lines.append("%d: %s" % (hit_line, content))
+        lines.append("```")
+        lines.append("")
+    return lines
+
+
+def build_t2(repo, head, files, functions_by_file):
+    """Return the T2 text, its cap notes, and its source file count."""
+    lines = []
+    lines.append("## T2 Companions")
+    lines.append("")
+    lines.append(
+        "Call sites, imports, definitions and test files found by "
+        "deterministic search at the head revision."
+    )
+    lines.append("")
+    notes = []
+    sources = source_entries(files)
+    if not sources:
+        lines.append("No changed source files, so no companions were gathered.")
+        lines.append("")
+        return "\n".join(lines), notes, 0
+    lines.extend(call_sites_section(repo, head, files, functions_by_file, notes))
+    lines.extend(imports_section(repo, head, files, notes))
+    lines.extend(
+        definitions_section(repo, head, files, functions_by_file, notes)
+    )
+    lines.extend(test_files_section(repo, head, files, functions_by_file, notes))
+    lines.extend(render_notes(notes))
+    return "\n".join(lines), notes, len(sources)
 
 
 def find_function_span(content_lines, name, path):
@@ -518,22 +1131,18 @@ def find_function_span(content_lines, name, path):
     return (start + 1, min(len(content_lines), start + 40))
 
 
-def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
-    lines = []
-    lines.append("## T3 History")
-    lines.append("")
-    notes = []
+def top_history_files(files, stats):
     ranked = sorted(
         files,
-        key=lambda e: stats.get(e["path"], (0, 0))[0] + stats.get(e["path"], (0, 0))[1],
+        key=lambda e: stats.get(e["path"], (0, 0))[0]
+        + stats.get(e["path"], (0, 0))[1],
         reverse=True,
     )
-    top_files = [e for e in ranked if e["status"] != "deleted"][:MAX_HISTORY_FILES]
-    if not top_files:
-        lines.append("No files with history to summarise.")
-        lines.append("")
-        return "\n".join(lines), notes
+    return [e for e in ranked if e["status"] != "deleted"][:MAX_HISTORY_FILES]
 
+
+def blame_section(repo, head, top_files, ranges_by_file, notes):
+    lines = []
     lines.append("### Blame summary for changed ranges")
     lines.append("")
     range_count = 0
@@ -550,7 +1159,8 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
             range_count += 1
             result = run_git(
                 repo,
-                ["blame", "--porcelain", "-L", "%d,%d" % (start, end), head, "--", path],
+                ["blame", "--porcelain", "-L", "%d,%d" % (start, end),
+                 head, "--", path],
                 check=False,
             )
             if result.returncode != 0:
@@ -584,7 +1194,11 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
             lines.append("%s %s lines %d" % (author, sha, count))
         lines.append("```")
         lines.append("")
+    return lines
 
+
+def evolution_section(repo, head, top_files, functions_by_file, notes):
+    lines = []
     lines.append("### Recent evolution of changed functions")
     lines.append("")
     log_count = 0
@@ -627,19 +1241,183 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
     if log_count == 0:
         lines.append("No changed functions had traceable history.")
         lines.append("")
-    for note in notes:
-        lines.append("Cap note: %s." % note)
-    if notes:
+    return lines
+
+
+def prior_prs(repo, paths):
+    """List recent PRs touching the given paths, or None when unknown.
+
+    Uses the GitHub CLI as metadata only. Any failure returns None and
+    the caller degrades honestly instead of inventing history.
+    """
+    if shutil.which("gh") is None:
+        return None
+    try:
+        view = run_cmd(
+            repo,
+            [
+                "gh", "pr", "list", "--state", "all", "--limit", "30",
+                "--json", "number,title,state,files",
+            ],
+        )
+        data = json.loads(view.stdout)
+    except (GitError, json.JSONDecodeError):
+        return None
+    wanted = set(paths)
+    found = []
+    for pr in data:
+        pr_files = {item.get("path") for item in pr.get("files") or []}
+        if pr_files & wanted:
+            found.append({
+                "number": pr.get("number"),
+                "title": pr.get("title") or "",
+                "state": pr.get("state") or "",
+            })
+    return found
+
+
+def prior_prs_section(repo, top_files):
+    lines = []
+    lines.append("### Prior pull requests touching these files")
+    lines.append("")
+    paths = [entry["path"] for entry in top_files]
+    found = prior_prs(repo, paths) if paths else []
+    if found is None:
+        lines.append(
+            "Prior pull requests are unavailable in this environment. The "
+            "GitHub CLI is missing or this clone is not a GitHub checkout, "
+            "so no pull request history was gathered."
+        )
         lines.append("")
-    return "\n".join(lines), notes
+        return lines
+    if not found:
+        lines.append(
+            "No earlier pull requests in the recent list touch these files."
+        )
+        lines.append("")
+        return lines
+    for pr in found[:MAX_PRIOR_PRS]:
+        lines.append(
+            "- #%s %s (%s)" % (pr["number"], pr["title"], pr["state"].lower())
+        )
+    lines.append("")
+    return lines
 
 
-def build_rereview(repo, mb, head, since):
+def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
+    """Return the T3 text, its cap notes, and its history file count."""
+    lines = []
+    lines.append("## T3 History")
+    lines.append("")
+    notes = []
+    top_files = top_history_files(files, stats)
+    if not top_files:
+        lines.append("No files with history to summarise.")
+        lines.append("")
+        return "\n".join(lines), notes, 0
+    lines.extend(blame_section(repo, head, top_files, ranges_by_file, notes))
+    lines.extend(
+        evolution_section(repo, head, top_files, functions_by_file, notes)
+    )
+    lines.extend(prior_prs_section(repo, top_files))
+    lines.extend(render_notes(notes))
+    return "\n".join(lines), notes, len(top_files)
+
+
+def parse_findings(text):
+    """Parse a findings file of one finding per line, anchored path:line."""
+    findings = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = FINDING_RE.match(line)
+        if not match:
+            raise GitError(
+                "findings line does not carry a path:line anchor: %r" % raw
+            )
+        findings.append({
+            "path": match.group(1),
+            "line": int(match.group(2)),
+            "text": match.group(3),
+        })
+    return findings
+
+
+def findings_accounting(repo, diff_base, since, head, findings):
+    """Mark each prior finding addressed or unaddressed.
+
+    A finding counts as addressed when the file is gone at the head or
+    when the lines it anchors to sit inside a hunk of the diff between
+    the previous reviewed head and this head. When the anchored lines
+    survive that diff untouched, the finding is unaddressed.
+    """
+    precise = run_git(
+        repo,
+        ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
+        + DIFF_FLAGS + [since, head],
+    ).stdout
+    status_text = run_git(
+        repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
+        + [since, head]
+    ).stdout
+    since_files = parse_name_status_z(status_text)
+    chunks = split_diff(precise)
+    ranges_by_path = {}
+    for position, entry in enumerate(since_files):
+        chunk = chunks[position] if position < len(chunks) else ""
+        ranges_by_path[entry["path"]] = old_side_ranges(chunk)
+    lines = []
+    lines.append("### Prior findings accounting")
+    lines.append("")
+    addressed = 0
+    for finding in findings:
+        path = finding["path"]
+        anchor = finding["line"]
+        if file_bytes(repo, head, path) is None:
+            verdict = "addressed, the file is gone at the head"
+            addressed += 1
+        else:
+            touched = False
+            for start, count in ranges_by_path.get(path, []):
+                last = start + max(count, 1) - 1
+                if start <= anchor <= last:
+                    touched = True
+                    break
+            if touched:
+                verdict = "addressed, the anchored lines changed"
+                addressed += 1
+            else:
+                verdict = "unaddressed, the anchored lines are unchanged"
+        lines.append(
+            "- %s:%d %s — %s" % (path, anchor, finding["text"], verdict)
+        )
+    lines.append("")
+    lines.append(
+        "Findings addressed: %d of %d. Findings unaddressed: %d."
+        % (addressed, len(findings), len(findings) - addressed)
+    )
+    lines.append("")
+    return lines
+
+
+def build_rereview(repo, diff_base, head, since, findings):
     lines = []
     lines.append("## Re-review")
     lines.append("")
     lines.append("Previous reviewed revision: %s" % since)
     lines.append("")
+    if not is_ancestor(repo, since, head):
+        # The since ref shares no history with this change, so a
+        # re-review against it would be fiction. Say so and stop.
+        lines.append(
+            "The since ref %s is not an ancestor of the head and shares no "
+            "usable history with this change, so no re-review accounting "
+            "is possible against it. The tiers above cover the whole "
+            "change, and nothing here claims otherwise." % since
+        )
+        lines.append("")
+        return "\n".join(lines)
     commits = run_git(
         repo, ["log", "--oneline", "--reverse", "%s..%s" % (since, head)]
     ).stdout
@@ -653,7 +1431,8 @@ def build_rereview(repo, mb, head, since):
     lines.append("")
     result = run_git(
         repo,
-        ["range-diff", "%s..%s" % (mb, since), "%s..%s" % (mb, head)],
+        ["range-diff", "%s..%s" % (diff_base, since),
+         "%s..%s" % (diff_base, head)],
         check=False,
     )
     lines.append("```")
@@ -667,64 +1446,223 @@ def build_rereview(repo, mb, head, since):
             repo,
             ["diff", "--stat", "%s...%s" % (since, head)],
         ).stdout
-        lines.append("Range diff was not available. Diff stat since the previous review:")
+        lines.append(
+            "Range diff was not available. Diff stat since the previous review:"
+        )
         lines.append(delta.rstrip() if delta.strip() else "(no changes)")
     lines.append("```")
     lines.append("")
+    if findings:
+        lines.extend(
+            findings_accounting(repo, diff_base, since, head, findings)
+        )
     return "\n".join(lines)
 
 
-def verify_counts(repo, mb, head, manifest_files):
-    """Recount files and hunks with separate git invocations.
+def verify_counts(repo, diff_base, head, manifest_files):
+    """Recount the change with separate git invocations.
 
-    Returns a list of discrepancy strings. An empty list means the manifest
-    matches an independent recount.
+    The recount repeats the fetch and the measurement, then also
+    recounts added and deleted lines straight from the recount's own
+    zero context diff. Returns a list of discrepancy strings. An empty
+    list means the manifest matches the recount in files, statuses,
+    old paths, hunks and lines.
     """
     discrepancies = []
-    status_text = run_git(
-        repo, ["diff", "--name-status", "-M", "-C", mb, head]
-    ).stdout
-    recounted_files = parse_name_status(status_text)
+    change = fetch_change(repo, diff_base, head)
+    enrich_files(repo, diff_base, head, change)
+    recounted = change["files"]
     manifest_by_path = {entry["path"]: entry for entry in manifest_files}
-    recounted_by_path = {entry["path"]: entry for entry in recounted_files}
+    recounted_by_path = {entry["path"]: entry for entry in recounted}
     for path in sorted(set(manifest_by_path) - set(recounted_by_path)):
         discrepancies.append("file in manifest but not in recount: %s" % path)
     for path in sorted(set(recounted_by_path) - set(manifest_by_path)):
         discrepancies.append("file in recount but not in manifest: %s" % path)
     for path in sorted(set(manifest_by_path) & set(recounted_by_path)):
-        if manifest_by_path[path]["status"] != recounted_by_path[path]["status"]:
+        mine = manifest_by_path[path]
+        theirs = recounted_by_path[path]
+        if mine["status"] != theirs["status"]:
             discrepancies.append(
                 "status mismatch for %s: manifest %s, recount %s"
-                % (
-                    path,
-                    manifest_by_path[path]["status"],
-                    recounted_by_path[path]["status"],
-                )
+                % (path, mine["status"], theirs["status"])
             )
-    full = run_git(
-        repo,
-        ["diff", "--histogram", "--find-renames", "--find-copies", "-W", mb, head],
-    ).stdout
-    recounted_chunks = split_diff(full)
-    for path, entry in manifest_by_path.items():
-        chunk = recounted_chunks.get(path)
-        if chunk is None:
-            if entry["hunks"] != 0:
-                discrepancies.append(
-                    "no diff chunk in recount for %s but manifest lists %d hunks"
-                    % (path, entry["hunks"])
-                )
-            continue
-        recounted_hunks = count_hunks(chunk)
-        if recounted_hunks != entry["hunks"]:
+        if mine.get("old_path") != theirs.get("old_path"):
+            discrepancies.append(
+                "old path mismatch for %s: manifest %s, recount %s"
+                % (path, mine.get("old_path"), theirs.get("old_path"))
+            )
+        if mine["hunks"] != theirs["hunks"]:
             discrepancies.append(
                 "hunk count mismatch for %s: manifest %d, recount %d"
-                % (path, entry["hunks"], recounted_hunks)
+                % (path, mine["hunks"], theirs["hunks"])
             )
-    for path in recounted_chunks:
-        if path not in manifest_by_path:
-            discrepancies.append("diff chunk in recount but not in manifest: %s" % path)
+        if mine["additions"] != theirs["additions"] or \
+                mine["deletions"] != theirs["deletions"]:
+            discrepancies.append(
+                "line count mismatch for %s: manifest +%d -%d, recount "
+                "+%d -%d"
+                % (
+                    path,
+                    mine["additions"],
+                    mine["deletions"],
+                    theirs["additions"],
+                    theirs["deletions"],
+                )
+            )
+        if not theirs["binary"] and not theirs["attribute_text"]:
+            counted = count_chunk_lines(
+                change["precise_chunks"].get(path, "")
+            )
+            if counted != (mine["additions"], mine["deletions"]):
+                discrepancies.append(
+                    "recounted lines for %s disagree: manifest +%d -%d, "
+                    "counted from the recount diff +%d -%d"
+                    % (
+                        path,
+                        mine["additions"],
+                        mine["deletions"],
+                        counted[0],
+                        counted[1],
+                    )
+                )
+    manifest_adds = sum(e["additions"] for e in manifest_files)
+    manifest_dels = sum(e["deletions"] for e in manifest_files)
+    recount_adds = sum(e["additions"] for e in recounted)
+    recount_dels = sum(e["deletions"] for e in recounted)
+    if (manifest_adds, manifest_dels) != (recount_adds, recount_dels):
+        discrepancies.append(
+            "total line counts disagree: manifest +%d -%d, recount +%d -%d"
+            % (manifest_adds, manifest_dels, recount_adds, recount_dels)
+        )
     return discrepancies
+
+
+
+def parse_tier_selection(text):
+    """Parse a tier selector such as 0-3 or 0,1 into tier names."""
+    if text is None:
+        return {"T0", "T1", "T2", "T3"}
+    selected = set()
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            low_raw, high_raw = part.split("-", 1)
+            if not (low_raw.isdigit() and high_raw.isdigit()):
+                raise ValueError("tier range %r is not two numbers" % part)
+            low, high = int(low_raw), int(high_raw)
+            if low > high or low < 0 or high > 3:
+                raise ValueError("tier range %r is outside 0-3" % part)
+            for number in range(low, high + 1):
+                selected.add("T%d" % number)
+        elif part.isdigit() and 0 <= int(part) <= 3:
+            selected.add("T%d" % int(part))
+        else:
+            raise ValueError("tier %r is not one of 0, 1, 2, 3" % part)
+    if "T0" not in selected or "T1" not in selected:
+        raise ValueError("T0 and T1 are always included in a packet")
+    return selected
+
+
+def tier_placeholder(tier, state):
+    title = "## T2 Companions" if tier == "T2" else "## T3 History"
+    if state == "dropped":
+        body = (
+            "Dropped under the token budget. The change in T1 is complete."
+        )
+    else:
+        body = "Not selected for this run. The change in T1 is complete."
+    return "%s\n\n%s\n" % (title, body)
+
+
+def render_completeness(budget, packet_estimate, tier_info, dropped,
+                        verified, discrepancies):
+    lines = []
+    lines.append("## Budget and completeness")
+    lines.append("")
+    lines.append(
+        "Budget in tokens: %s"
+        % (budget if budget is not None else "none set")
+    )
+    lines.append("Packet estimate in tokens: %d" % packet_estimate)
+    for tier in ("T0", "T1", "T2", "T3"):
+        info = tier_info[tier]
+        if info["state"] == "included":
+            lines.append(
+                "%s included at about %d tokens across %d files"
+                % (tier, info["estimated_tokens"], info["files"])
+            )
+        elif info["state"] == "dropped":
+            lines.append(
+                "%s dropped under the token budget. The full tier runs "
+                "about %d tokens across %d files"
+                % (tier, info["estimated_tokens"], info["files"])
+            )
+        else:
+            lines.append("%s not selected for this run" % tier)
+    if dropped:
+        for item in dropped:
+            lines.append(
+                "Dropped %s because of the %s." % (item["tier"], item["reason"])
+            )
+    else:
+        lines.append("No tier was dropped.")
+    lines.append("")
+    if verified:
+        lines.append(
+            "Completeness check passed. A separate recount of files, "
+            "statuses, old paths, hunks and lines matches the manifest."
+        )
+    else:
+        lines.append(
+            "Completeness check FAILED. This packet must not be reviewed "
+            "as if it were whole. Discrepancies follow."
+        )
+        for item in discrepancies:
+            lines.append("Missing or mismatched: %s" % item)
+    lines.append("")
+    return "\n".join(lines)
+
+
+def base_manifest(argv):
+    return {
+        "extractor": "recognitio extract.py",
+        "version": EXTRACTOR_VERSION,
+        "command": ["extract.py"] + list(argv),
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def write_manifest(out_dir, manifest):
+    text = json.dumps(manifest, indent=2) + "\n"
+    (out_dir / "manifest.json").write_bytes(text.encode("utf-8"))
+
+
+def write_failure_manifest(out_dir, argv, message, resolved=None):
+    """Leave a receipt that cannot be mistaken for a verified packet."""
+    manifest = base_manifest(argv)
+    manifest.update({
+        "mode": resolved["mode"] if resolved else None,
+        "label": resolved["label"] if resolved else None,
+        "base": resolved["base"] if resolved else None,
+        "head": resolved["head"] if resolved else None,
+        "merge_base": resolved["merge_base"] if resolved else None,
+        "since": resolved["since"] if resolved else None,
+        "files": [],
+        "tiers": {},
+        "budget": {"budget_tokens": None, "estimated_tokens": 0,
+                   "dropped": []},
+        "cap_notes": [],
+        "exclusions": [],
+        "verified": False,
+        "error": message,
+        "discrepancies": [message],
+    })
+    try:
+        write_manifest(out_dir, manifest)
+    except OSError:
+        pass
 
 
 def parse_args(argv):
@@ -736,7 +1674,16 @@ def parse_args(argv):
     parser.add_argument("--range", dest="range", default=None, help="A..B or A...B")
     parser.add_argument("--commit", default=None, help="a single commit")
     parser.add_argument(
-        "--since", default=None, help="previous reviewed revision for re-review"
+        "--since", default=None,
+        help="previous reviewed revision, a re-review input to any mode",
+    )
+    parser.add_argument(
+        "--tiers", default=None,
+        help="tier selection such as 0-3 or 0,1; T0 and T1 always included",
+    )
+    parser.add_argument(
+        "--findings", default=None,
+        help="file of prior findings, one per line anchored as path:line: text",
     )
     parser.add_argument(
         "--budget", type=int, default=None,
@@ -748,106 +1695,126 @@ def parse_args(argv):
     chosen = [args.pr is not None, bool(args.range), bool(args.commit)]
     if sum(chosen) > 1:
         parser.error("choose exactly one of --pr, --range, or --commit")
-    if sum(chosen) == 0 and not args.since:
-        parser.error("one of --pr, --range, --commit, or --since is required")
+    if sum(chosen) == 0:
+        parser.error(
+            "one of --pr, --range, or --commit is required. --since is a "
+            "re-review input and cannot stand alone"
+        )
+    if args.findings and not args.since:
+        parser.error("--findings needs --since, the previous reviewed revision")
+    try:
+        args.tiers_selected = parse_tier_selection(args.tiers)
+    except ValueError as exc:
+        parser.error(str(exc))
     return args
 
 
-def main(argv=None):
-    args = parse_args(argv)
-    repo = Path(args.repo).resolve()
-    out_dir = Path(args.out)
-    try:
-        resolved = resolve_inputs(repo, args)
-    except GitError as exc:
-        print("recognitio: %s" % exc, file=sys.stderr)
-        return 2
-
-    mb = resolved["merge_base"]
+def run_pipeline(args, repo, out_dir, argv):
+    resolved = resolve_inputs(repo, args)
+    diff_base = resolved["merge_base"]
+    if diff_base is None:
+        diff_base = EMPTY_TREE
     head = resolved["head"]
 
-    try:
-        status_text = run_git(
-            repo, ["diff", "--name-status", "-M", "-C", mb, head]
-        ).stdout
-        numstat_text = run_git(
-            repo, ["diff", "--numstat", "-M", "-C", mb, head]
-        ).stdout
-        commit_log = run_git(
-            repo, ["log", "--oneline", "--reverse", "%s..%s" % (mb, head)]
-        ).stdout
-        full_diff = run_git(
-            repo,
-            ["diff", "--histogram", "--find-renames", "--find-copies", "-W", mb, head],
-        ).stdout
-        precise_diff = run_git(
-            repo,
-            ["diff", "--histogram", "--find-renames", "--find-copies", "-U0", mb, head],
-        ).stdout
-    except GitError as exc:
-        print("recognitio: %s" % exc, file=sys.stderr)
-        return 2
+    findings = []
+    if args.findings:
+        try:
+            findings_text = Path(args.findings).read_text(
+                encoding="utf-8", errors="surrogateescape"
+            )
+        except OSError as exc:
+            raise GitError("cannot read the findings file: %s" % exc)
+        findings = parse_findings(findings_text)
 
-    files = parse_name_status(status_text)
+    change = fetch_change(repo, diff_base, head)
+    files = change["files"]
     if not files:
-        print(
-            "recognitio: the resolved change is empty, no packet was built",
-            file=sys.stderr,
-        )
+        message = "the resolved change is empty, no packet was built"
+        write_failure_manifest(out_dir, argv, message, resolved)
+        print("recognitio: %s" % message, file=sys.stderr)
         return 2
-    stats = parse_numstat(numstat_text)
-    chunks = split_diff(full_diff)
-    precise_chunks = split_diff(precise_diff)
-
-    for entry in files:
-        path = entry["path"]
-        adds, dels = stats.get(path, (0, 0))
-        entry["additions"] = adds
-        entry["deletions"] = dels
-        entry["hunks"] = count_hunks(chunks.get(path, ""))
+    exclusions = enrich_files(repo, diff_base, head, change)
+    chunks = change["chunks"]
+    stats = change["stats"]
 
     functions_by_file = {
         entry["path"]: extract_function_names(chunks.get(entry["path"], ""))
         for entry in files
     }
     ranges_by_file = {
-        entry["path"]: changed_ranges(precise_chunks.get(entry["path"], ""))
+        entry["path"]: changed_ranges(change["precise_chunks"].get(
+            entry["path"], ""))
         for entry in files
     }
 
-    t0 = build_t0(repo, mb, head, files, numstat_text, commit_log)
+    selected = args.tiers_selected
+    t0 = build_t0(files, change["commit_log"], resolved["pr"])
     t1 = build_t1(files, chunks)
-    t2, t2_notes = build_t2(repo, head, files, functions_by_file)
-    t3, t3_notes = build_t3(repo, head, files, stats, ranges_by_file, functions_by_file)
+    t2, t2_notes, t2_files = "", [], 0
+    if "T2" in selected:
+        t2, t2_notes, t2_files = build_t2(repo, head, files, functions_by_file)
+    t3, t3_notes, t3_files = "", [], 0
+    if "T3" in selected:
+        t3, t3_notes, t3_files = build_t3(
+            repo, head, files, stats, ranges_by_file, functions_by_file
+        )
+    rereview = ""
+    if resolved["since"]:
+        rereview = build_rereview(
+            repo, diff_base, head, resolved["since"], findings
+        )
+
+    tier_texts = {"T0": t0, "T1": t1, "T2": t2, "T3": t3}
+    tier_files = {
+        "T0": len(files), "T1": len(files), "T2": t2_files, "T3": t3_files,
+    }
+    header_provisional = build_header(resolved, diff_base, True, exclusions)
+
+    def total_with(dropped):
+        total = estimate_tokens(header_provisional)
+        total += estimate_tokens(t0) + estimate_tokens(t1)
+        total += estimate_tokens(rereview)
+        for tier in ("T2", "T3"):
+            if tier not in selected:
+                total += estimate_tokens(tier_placeholder(tier, "not selected"))
+            elif tier in dropped:
+                total += estimate_tokens(tier_placeholder(tier, "dropped"))
+            else:
+                total += estimate_tokens(tier_texts[tier])
+        return total
+
+    completeness_estimate = estimate_tokens(
+        render_completeness(args.budget, 0, {
+            tier: {"state": "included", "estimated_tokens": 0, "files": 0}
+            for tier in ("T0", "T1", "T2", "T3")
+        }, [], True, [])
+    ) + 16
 
     dropped = []
-    included = {"T0": True, "T1": True, "T2": True, "T3": True}
-    tier_texts = {"T0": t0, "T1": t1, "T2": t2, "T3": t3}
-
     if args.budget is not None:
-        core_tokens = estimate_tokens(t0) + estimate_tokens(t1)
-        if core_tokens > args.budget:
-            print(
-                "recognitio: T0 and T1 alone need about %d tokens, over the "
-                "budget of %d. The change itself is never truncated. Raise "
-                "the budget or split the change."
-                % (core_tokens, args.budget),
-                file=sys.stderr,
+        optional = [tier for tier in ("T3", "T2") if tier in selected]
+        core = total_with(set(optional)) + completeness_estimate
+        if core > args.budget:
+            core_tokens = (
+                estimate_tokens(header_provisional) + estimate_tokens(t0)
+                + estimate_tokens(t1) + estimate_tokens(rereview)
+                + completeness_estimate
             )
+            message = (
+                "T0 and T1 alone need about %d tokens, over the budget of "
+                "%d. The change itself is never truncated. Raise the budget "
+                "or split the change." % (core_tokens, args.budget)
+            )
+            write_failure_manifest(out_dir, argv, message, resolved)
+            print("recognitio: %s" % message, file=sys.stderr)
             return 2
-        total = core_tokens + estimate_tokens(t2) + estimate_tokens(t3)
-        if total > args.budget:
-            dropped.append(
-                {"tier": "T3", "reason": "budget of %d tokens" % args.budget}
-            )
-            included["T3"] = False
-            total -= estimate_tokens(t3)
-        if total > args.budget:
-            dropped.append(
-                {"tier": "T2", "reason": "budget of %d tokens" % args.budget}
-            )
-            included["T2"] = False
-            total -= estimate_tokens(t2)
+        for tier in optional:
+            dropped_so_far = {item["tier"] for item in dropped}
+            if total_with(dropped_so_far) + completeness_estimate > args.budget:
+                dropped.append(
+                    {"tier": tier, "reason": "budget of %d tokens" % args.budget}
+                )
+    dropped_names = {item["tier"] for item in dropped}
 
     manifest_files = [
         {
@@ -858,109 +1825,88 @@ def main(argv=None):
             "additions": entry["additions"],
             "deletions": entry["deletions"],
             "hunks": entry["hunks"],
+            "binary": entry["binary"],
+            "attribute_text": entry["attribute_text"],
+            "placeholder": entry["placeholder"],
         }
         for entry in files
     ]
 
     try:
-        discrepancies = verify_counts(repo, mb, head, manifest_files)
+        discrepancies = verify_counts(repo, diff_base, head, manifest_files)
     except GitError as exc:
         discrepancies = ["verification could not run: %s" % exc]
     verified = not discrepancies
 
-    header_lines = []
-    header_lines.append("# The pericope for %s" % resolved["label"])
-    header_lines.append("")
-    header_lines.append(
-        "A recognitio review packet. It holds the change and the context "
-        "appointed to be read with it, and nothing else."
-    )
-    header_lines.append("")
-    header_lines.append("Mode: %s" % resolved["mode"])
-    header_lines.append("Base: %s" % resolved["base"])
-    header_lines.append("Head: %s" % head)
-    header_lines.append("Merge base: %s" % mb)
-    if resolved["since"]:
-        header_lines.append("Since: %s" % resolved["since"])
-    header_lines.append(
-        "Verified: %s" % ("yes" if verified else "NO, see the completeness section")
-    )
-    header_lines.append("")
-    header = "\n".join(header_lines)
-
-    sections = [header, t0, t1]
-    if included["T2"]:
-        sections.append(t2)
-    else:
-        sections.append(
-            "## T2 Companions\n\nDropped under the token budget. "
-            "The change in T1 is complete.\n"
-        )
-    if included["T3"]:
-        sections.append(t3)
-    else:
-        sections.append(
-            "## T3 History\n\nDropped under the token budget. "
-            "The change in T1 is complete.\n"
-        )
-    if resolved["since"]:
-        sections.append(build_rereview(repo, mb, head, resolved["since"]))
-
-    tier_accounting = {}
+    tier_info = {}
     for tier in ("T0", "T1", "T2", "T3"):
-        tier_accounting[tier] = {
-            "included": included[tier],
-            "estimated_tokens": estimate_tokens(tier_texts[tier]) if included[tier] else 0,
+        if tier in dropped_names:
+            state = "dropped"
+        elif tier not in selected:
+            state = "not selected"
+        else:
+            state = "included"
+        if state == "included":
+            emitted = estimate_tokens(tier_texts[tier])
+        elif state == "dropped":
+            emitted = estimate_tokens(tier_placeholder(tier, "dropped"))
+        elif tier in ("T2", "T3"):
+            emitted = estimate_tokens(tier_placeholder(tier, "not selected"))
+        else:
+            emitted = estimate_tokens(tier_texts[tier])
+        tier_info[tier] = {
+            "state": state,
+            "included": state == "included",
+            "estimated_tokens": estimate_tokens(tier_texts[tier]),
+            "emitted_tokens": emitted,
+            "files": tier_files[tier],
         }
-    packet_estimate = estimate_tokens("\n".join(sections))
 
-    completeness = []
-    completeness.append("## Budget and completeness")
-    completeness.append("")
-    completeness.append("Budget in tokens: %s" % (args.budget if args.budget is not None else "none set"))
-    completeness.append("Packet estimate in tokens: %d" % packet_estimate)
-    for tier in ("T0", "T1", "T2", "T3"):
-        completeness.append(
-            "%s %s at about %d tokens"
-            % (
-                tier,
-                "included" if included[tier] else "dropped",
-                tier_accounting[tier]["estimated_tokens"],
+    header = build_header(resolved, diff_base, verified, exclusions)
+    sections = [header, t0, t1]
+    for tier in ("T2", "T3"):
+        if tier_info[tier]["state"] == "included":
+            sections.append(tier_texts[tier])
+        else:
+            sections.append(
+                tier_placeholder(tier, tier_info[tier]["state"])
             )
-        )
-    if dropped:
-        for item in dropped:
-            completeness.append(
-                "Dropped %s because of the %s." % (item["tier"], item["reason"])
-            )
-    else:
-        completeness.append("No tier was dropped.")
-    completeness.append("")
-    if verified:
-        completeness.append(
-            "Completeness check passed. A separate recount of files, "
-            "statuses, and hunks matches the manifest."
-        )
-    else:
-        completeness.append(
-            "Completeness check FAILED. This packet must not be reviewed as "
-            "if it were whole. Discrepancies follow."
-        )
-        for item in discrepancies:
-            completeness.append("Missing or mismatched: %s" % item)
-    completeness.append("")
-    sections.append("\n".join(completeness))
-    packet = "\n".join(sections)
+    if resolved["since"]:
+        sections.append(rereview)
 
-    manifest = {
+    packet_estimate = 0
+    packet = ""
+    for _round in range(5):
+        completeness = render_completeness(
+            args.budget, packet_estimate, tier_info, dropped,
+            verified, discrepancies,
+        )
+        packet = "\n".join(sections + [completeness])
+        new_estimate = estimate_tokens(packet)
+        if new_estimate == packet_estimate:
+            break
+        packet_estimate = new_estimate
+
+    manifest = base_manifest(argv)
+    manifest.update({
         "mode": resolved["mode"],
         "label": resolved["label"],
         "base": resolved["base"],
         "head": head,
-        "merge_base": mb,
+        "merge_base": resolved["merge_base"],
         "since": resolved["since"],
+        "pr": (
+            {
+                "number": resolved["pr"]["number"],
+                "title": resolved["pr"]["title"],
+                "spec_references": resolved["pr"]["spec_references"],
+            }
+            if resolved["pr"] else None
+        ),
         "files": manifest_files,
-        "tiers": tier_accounting,
+        "exclusions": exclusions,
+        "selected_tiers": sorted(selected),
+        "tiers": tier_info,
         "budget": {
             "budget_tokens": args.budget,
             "estimated_tokens": packet_estimate,
@@ -969,13 +1915,12 @@ def main(argv=None):
         "cap_notes": t2_notes + t3_notes,
         "verified": verified,
         "discrepancies": discrepancies,
-    }
+    })
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "packet.md").write_text(packet, encoding="utf-8")
-    (out_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    (out_dir / "packet.md").write_bytes(
+        packet.encode("utf-8", "surrogateescape")
     )
+    write_manifest(out_dir, manifest)
 
     if not verified:
         for item in discrepancies:
@@ -991,6 +1936,31 @@ def main(argv=None):
         % (out_dir, len(files))
     )
     return 0
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    raw_argv = list(sys.argv[1:]) if argv is None else list(argv)
+    repo = Path(args.repo).resolve()
+    out_dir = Path(args.out)
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("packet.md", "manifest.json"):
+            stale = out_dir / name
+            if stale.exists():
+                stale.unlink()
+    except OSError as exc:
+        print(
+            "recognitio: cannot prepare the output directory: %s" % exc,
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        return run_pipeline(args, repo, out_dir, raw_argv)
+    except GitError as exc:
+        write_failure_manifest(out_dir, raw_argv, str(exc))
+        print("recognitio: %s" % exc, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
