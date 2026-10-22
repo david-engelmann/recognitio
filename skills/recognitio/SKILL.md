@@ -32,11 +32,13 @@ Follow these steps in order.
 5. Hand the packet to the review skill when verification passed. Stop and say exactly what is missing when verification failed.
 6. Record the base, the head, and the merge base from the manifest wherever the review itself gets recorded, so the review can be reproduced later.
 
+Run the commands from the repository root, where the paths below resolve.
+
 ```bash
-python3 scripts/extract.py --pr 123 --out packet --repo .
-python3 scripts/extract.py --range main...feature --out packet --repo .
-python3 scripts/extract.py --commit HEAD --out packet --repo .
-python3 scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
+python3 skills/recognitio/scripts/extract.py --pr 123 --out packet --repo .
+python3 skills/recognitio/scripts/extract.py --range main...feature --out packet --repo .
+python3 skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
+python3 skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
 
 ## Choosing tiers
