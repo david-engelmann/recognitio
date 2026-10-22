@@ -1,5 +1,7 @@
-# The gate for this repo. CI runs the check target word for word,
-# so a green local run is the whole contract.
+# The gate for this repo. A green local run covers the checks on the
+# local Python version only. CI runs the check target word for word
+# on both configured Python versions and adds one job with no local
+# step, the DCO trailer check.
 
 PYTHON ?= python3
 

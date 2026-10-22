@@ -3,6 +3,9 @@
 <!-- One sentence on what this pull request does, plus the issue or
 spec item it serves. -->
 
+<!-- The title follows Conventional Commits and becomes the squash
+commit title, for example `feat(extract): refuse shallow clones`. -->
+
 ## Verified
 
 <!-- The review readiness block. Review starts from evidence, so

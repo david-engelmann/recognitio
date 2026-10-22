@@ -27,8 +27,11 @@ The first command is the full gate and the second is the narrow form
 to use while working. The gate runs the extractor test suite, the
 skill validator at `scripts/check_skill.py`, the copy bar scan at
 `scripts/check_copy.py`, and an end to end extractor smoke that must
-produce a verified manifest. CI runs the gate word for word. Green
-local gates first, then merge. CI is a backstop, not a gate.
+produce a verified manifest. CI runs the gate word for word and
+adds one job with no local step. That job checks the Signed-off-by
+trailer on pull request commits, and a green local run says nothing
+about it. Green local gates first, then merge. CI is a backstop,
+not a gate.
 
 ## Layout map
 
@@ -39,6 +42,10 @@ local gates first, then merge. CI is a backstop, not a gate.
 - `tests/` holds the extractor suite. Fixture repositories are built
   in temporary directories by the tests themselves.
 - `scripts/` holds the gate checks and the smoke script.
+  `scripts/check_packet.py` validates a packet directory before a
+  review is stamped on it.
+- `docs/decisions.md` records the design decisions that depart from
+  the research sketch, with the reason for each one.
 - `.github/` holds the CI workflow and the templates.
 
 ## Hard rules
@@ -66,9 +73,13 @@ local gates first, then merge. CI is a backstop, not a gate.
   from `main` by David alone.
 - Pull request titles follow Conventional Commits and become the
   squash commit title. Merges are squash only.
-- Every commit carries a `Signed-off-by` trailer with the identity
-  of David Engelmann. Sign commits with `git commit -s` and let the
-  DCO job in CI check the trailer.
+- Every human commit carries a `Signed-off-by` trailer with the
+  exact identity of David Engelmann. Sign commits with
+  `git commit -s` and let the DCO job in CI check the trailer. The
+  job requires that exact identity on every non-merge commit of a
+  pull request. Dependabot is exempt by actor, because its commits
+  are machine made and cannot carry a sign-off, and the exemption
+  lives in the workflow file next to the check.
 - Changelog entries go at the end of the `[Unreleased]` section of
   CHANGELOG.md. A released section is never edited after its tag.
 - Update this file in the same change that makes part of it wrong.
@@ -88,6 +99,9 @@ this map instead.
 
 ## Current state
 
-Written on 2026-10-15. The first version of the skill is built and
-landing on `dev`, with the extractor, the four tier model and the
-fail closed manifest in place. No release has been tagged yet.
+Written on 2026-10-15 and updated on 2026-10-22. The first version
+of the skill is built and landing on `dev`, with the extractor, the
+four tier model and the fail closed manifest in place. The first
+perfection cycle hardened the extractor against ambient git
+configuration, grew the tier content the design called for, and put
+the gate scripts under test. No release has been tagged yet.

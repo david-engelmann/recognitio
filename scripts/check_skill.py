@@ -22,17 +22,29 @@ DESCRIPTION_LIMIT = 1024
 
 
 def parse_frontmatter(text):
-    """Return the frontmatter mapping of a skill file, or None."""
+    """Return the frontmatter mapping of a skill file, or None.
+
+    Indented continuation lines belong to the value above them, as
+    YAML folding reads them, so a wrapped description is measured at
+    its full length and not at the length of its first line.
+    """
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return None
     fields = {}
+    current_key = None
     for line in lines[1:]:
         if line.strip() == "---":
             return fields
+        if line[:1] in (" ", "\t") and current_key is not None:
+            fields[current_key] = (
+                fields[current_key] + " " + line.strip()
+            ).strip()
+            continue
         if ":" in line:
             key, _, value = line.partition(":")
-            fields[key.strip()] = value.strip()
+            current_key = key.strip()
+            fields[current_key] = value.strip()
     return None
 
 
@@ -51,14 +63,14 @@ def main():
         name = fields.get("name", "")
         if not name:
             problems.append("frontmatter has no name field")
-        else:
-            if name != SKILL_DIR.name:
-                problems.append(
-                    "frontmatter name %r does not match the skill directory %r"
-                    % (name, SKILL_DIR.name)
-                )
-            if name != "recognitio":
-                problems.append("frontmatter name %r is not 'recognitio'" % name)
+        elif name != SKILL_DIR.name:
+            # The directory is named recognitio by construction, so
+            # this one check also keeps the skill from ever taking
+            # the bundled code-review name.
+            problems.append(
+                "frontmatter name %r does not match the skill directory %r"
+                % (name, SKILL_DIR.name)
+            )
         description = fields.get("description", "")
         if not description:
             problems.append("frontmatter has no description field")
