@@ -17,6 +17,11 @@ suite measures the extractor. These files measure the skill.
 - `PASS-NOTES.md` holds the per pass notes behind the results
   summary, naming who ran each pass, the condition it held and
   what it reported.
+- `checksums.json` holds the checksum record the eval
+  integrity gate reads. Every artefact file under `tasks/`
+  and the results file and the per pass notes stand in it by
+  digest, and a deliberate update refreshes the record with
+  the write flag of the gate script.
 - `tasks/task-06/transcripts.md` holds the full verbatim
   transcripts of the two passes over the replay task, under
   the publication standard that every run from round 6 onward

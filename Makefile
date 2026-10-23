@@ -12,6 +12,7 @@ check:
 	$(PYTHON) scripts/check_skill.py
 	$(PYTHON) scripts/check_version.py
 	$(PYTHON) scripts/check_copy.py
+	$(PYTHON) scripts/check_evals.py
 	$(PYTHON) scripts/smoke_extract.py
 
 test: check

@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 7, with each round
+found, from the first cycle through round 8, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -192,6 +192,28 @@ behaviour change stands covered by
 `test_no_function_in_check_copy_passes_the_length_ceiling`
 in the gate script suite for its ceiling and by the whole
 fence test set for its behaviour (R7-01).
+
+## Round 8 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| No gate guarded the eval artefacts, so a quiet edit to a transcript fence or a planted grading rule or a recorded results cell left the gate green (R8-RT-01) | `test_a_transcript_edit_fails_naming_its_file` and `test_a_planted_rule_edit_fails_naming_its_file` and `test_a_results_cell_edit_fails_the_totals_check` and `test_a_tampered_diff_fails_the_rebuild` and `test_the_checksum_record_regenerates_and_then_passes` in the gate script suite, with `test_the_real_eval_artefacts_pass` in the gate script suite pinning the pristine tree and `test_a_task_with_crlf_sources_rebuilds_byte_for_byte` and `test_a_manifest_entry_missing_a_key_fails_the_rebuild` and `test_a_non_object_manifest_is_a_problem_not_a_crash` in the gate script suite pinning the rebuild shapes the CodeRabbit answers on pull request 12 hardened |
+| No gate compared the corpus index against the suite, so a renamed test silently orphaned its rows (R8-RT-02) | `test_a_renamed_cited_test_fails_the_corpus_check` and `test_a_corpus_name_that_never_existed_fails` in the gate script suite, with `test_the_real_eval_artefacts_pass` in the gate script suite pinning the pristine index against the suite |
+
+Three round 8 repairs stand as records only with no test
+of their own, and this section records them as uncovered
+in the open under the rule at the head of this file. The
+gate description and the current state text in AGENTS.md
+gained their round 8 sentences in the same change. This
+round 8 section itself stands as a record of the change.
+The round 8 fix review report stands in the reviews folder
+as a record of this change and no test pins it. The saved
+packet text of each task also stands outside the rebuild
+the gate runs, because the commit subjects and authors of
+the original fixture commits stand in no sources file, so
+the gate covers the saved packets with the checksum record
+and with the section check of the packet checker and says
+so in the open in the gate script.
 
 ## Disclosure incidents with no test of their own
 
