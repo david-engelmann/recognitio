@@ -7,9 +7,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +33,41 @@ def git(repo, *args):
     if result.returncode != 0:
         raise AssertionError("git %s failed: %s" % (" ".join(args), result.stderr))
     return result.stdout.strip()
+
+
+class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
+    # A fixture repository can gain a file while its temporary
+    # directory is being removed. CI job 120492623700 on Python
+    # 3.10 failed in teardown with OSError Errno 39 Directory not
+    # empty on the pack folder inside a fixture repository after
+    # every assertion in the test had passed, and a rerun passed.
+    # The cleanup shipped with Python 3.12 tolerates that race
+    # and the one shipped with Python 3.10 does not. Removal here
+    # retries a bounded number of times with a short pause and
+    # then raises, so a tree that truly cannot be removed still
+    # fails loudly instead of passing in silence.
+
+    cleanup_attempts = 5
+    cleanup_delay_seconds = 0.1
+
+    def cleanup(self):
+        last_error = None
+        for attempt in range(self.cleanup_attempts):
+            try:
+                shutil.rmtree(self.name)
+            except FileNotFoundError:
+                last_error = None
+                break
+            except OSError as error:
+                last_error = error
+                if attempt + 1 < self.cleanup_attempts:
+                    time.sleep(self.cleanup_delay_seconds)
+            else:
+                last_error = None
+                break
+        if last_error is not None:
+            raise last_error
+        self._finalizer.detach()
 
 
 EM_DASH = "\u2014"
@@ -87,7 +124,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertIn(expected, comment_names)
 
     def test_em_dash_in_issue_template_config_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yml",
                 "blank_issues_enabled: true\n"
@@ -100,7 +137,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_em_dash_in_a_workflow_comment_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "ci.yml",
                 "name: ci\n"
@@ -115,7 +152,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([], [path]), 1)
 
     def test_shell_code_in_a_run_block_is_not_prose(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "ci.yml",
                 "name: ci\n"
@@ -130,7 +167,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([], [path]), 0)
 
     def test_em_dash_in_a_makefile_comment_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "Makefile",
                 "# The gate for this repo %s run it first.\n"
@@ -143,7 +180,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([], [path]), 1)
 
     def test_em_dash_in_a_gitignore_comment_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, ".gitignore",
                 "# Extractor output %s working papers.\n"
@@ -152,7 +189,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([], [path]), 1)
 
     def test_em_dash_in_a_dependabot_comment_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "dependabot.yml",
                 "# Keep the pinned actions current %s weekly.\n"
@@ -163,7 +200,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([], [path]), 1)
 
     def test_em_dash_beside_a_url_is_still_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
                 "See https://example.com/spec for the plan %s truly.\n"
@@ -172,7 +209,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_semicolon_right_after_a_markdown_link_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
                 "See [guide](https://example.com/spec); then continue.\n",
@@ -180,7 +217,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_colon_right_after_a_markdown_link_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
                 "See [guide](https://example.com/spec): then continue.\n",
@@ -188,7 +225,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_markdown_link_with_clean_prose_passes(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
                 "See [guide](https://example.com/spec) before continuing.\n",
@@ -196,7 +233,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_bare_url_line_passes(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
                 "The plan lives at https://example.com/spec today.\n",
@@ -204,7 +241,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
     def test_em_dash_in_a_template_shaped_file_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "CLAUDE.md",
                 "All guidance lives elsewhere %s read it first.\n" % EM_DASH,
@@ -212,7 +249,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_yaml_block_scalar_prose_is_scanned(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "reviews:\n  instructions: |\n"
@@ -263,7 +300,7 @@ class TestCheckCopy(unittest.TestCase):
         )
 
     def test_discovery_extends_to_a_new_markdown_file_by_rule(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "docs").mkdir()
             note = root / "docs" / "new-note.md"
@@ -285,7 +322,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertNotIn("evals/tasks/task-99/packet.md", found)
 
     def test_discovery_skips_dependency_dirs_and_outside_symlinks(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "docs").mkdir()
             (root / "docs" / "note.md").write_text(
@@ -320,7 +357,7 @@ class TestCheckCopy(unittest.TestCase):
                 self.assertNotIn("docs/linked.md", found)
 
     def test_discovery_extends_to_new_yaml_files_by_rule(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             form = root / ".github" / "ISSUE_TEMPLATE" / "feature_form.yml"
             form.parent.mkdir(parents=True)
@@ -360,7 +397,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertIn(".github/dependabot.yml", comments)
 
     def test_a_new_yaml_issue_form_joins_the_fence(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             form = root / ".github" / "ISSUE_TEMPLATE" / "feature_form.yml"
             form.parent.mkdir(parents=True)
@@ -375,7 +412,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on(found), 1)
 
     def test_the_walk_and_discovery_share_one_exclusion_rule(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "docs").mkdir()
             (root / "docs" / "note.md").write_text(
@@ -414,13 +451,13 @@ class TestCheckCopy(unittest.TestCase):
             )
 
     def test_manifest_discovery_returns_missing_paths_for_the_caller(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             found = self.mod.discover_manifest_files(Path(tmp))
             self.assertEqual(len(found), 2)
             self.assertTrue(all(not p.exists() for p in found))
 
     def test_em_dash_in_a_manifest_description_is_caught(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "plugin.json",
                 '{"name": "x", "description": "Does a thing %s '
@@ -444,7 +481,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(code, 1)
 
     def test_a_flow_mapping_value_is_structure_not_prose(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "point: {x: 1, y: 2}\n",
@@ -452,7 +489,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_nested_sequence_of_mappings_is_structure_not_prose(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "items:\n"
@@ -462,7 +499,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_colon_inside_a_flow_mapping_value_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "point: {label: \"Read: now\"}\n",
@@ -470,7 +507,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_colon_inside_a_list_item_flow_mapping_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "items:\n"
@@ -479,7 +516,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_prose_mapping_value_with_a_colon_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "note: see the guide for details: the long version\n",
@@ -487,7 +524,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_prose_value_in_a_nested_sequence_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "items:\n"
@@ -506,7 +543,7 @@ class TestCheckCopy(unittest.TestCase):
             "2fa: enabled\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 0, text)
 
@@ -517,7 +554,7 @@ class TestCheckCopy(unittest.TestCase):
             "\"my key\": see the guide: the long version\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
 
@@ -529,7 +566,7 @@ class TestCheckCopy(unittest.TestCase):
             "point: &anchor\n  x: 1\n  y: 2\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 0, text)
 
@@ -543,7 +580,7 @@ class TestCheckCopy(unittest.TestCase):
             "point: {inner: {x: 1}}\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 0, text)
 
@@ -555,19 +592,19 @@ class TestCheckCopy(unittest.TestCase):
             "point: {\"label\":\"Read: now\"}\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
 
     def test_an_apostrophe_in_a_plain_flow_scalar_is_not_a_quote(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "tags: [don't, ok]\n"
                 "next: value\n",
             )
             self.assertEqual(self.run_main_on([path]), 0)
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "tags: [don't, \"Read: now\"]\n",
@@ -575,13 +612,13 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_text_after_a_flow_collection_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "ports: [80, 443] # Open: web\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "ports: [80, 443] # Open web\n",
@@ -596,12 +633,12 @@ class TestCheckCopy(unittest.TestCase):
             "  Summary: only colon is here\"\n",
         )
         for text in shapes:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
 
     def test_a_key_shaped_continuation_of_a_plain_scalar_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "description: Long prose starts\n"
@@ -610,7 +647,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_key_shaped_line_inside_a_flow_quoted_scalar_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "point: {label: \"Read\n"
@@ -619,7 +656,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_ordinary_keys_after_a_plain_value_still_parse(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "name: Readme\n"
@@ -630,7 +667,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_multiline_flow_mapping_with_prose_values_still_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "point: {\n"
@@ -641,7 +678,7 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_yaml_keys_and_directives_are_syntax(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
                 "# yaml-language-server: $schema=https://example.com/s.json\n"
@@ -688,7 +725,7 @@ class TestCheckSkill(unittest.TestCase):
         self.assertEqual(fields["description"], "first part second part")
 
     def test_over_limit_folded_description_fails(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             skill_dir = Path(tmp) / "recognitio"
             skill_dir.mkdir()
             long_half = "x" * 600
@@ -711,7 +748,7 @@ class TestCheckSkill(unittest.TestCase):
             self.assertIn("over the 1024 limit", captured.getvalue())
 
     def run_main_on_skill_text(self, text):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             skill_dir = Path(tmp) / "recognitio"
             skill_dir.mkdir()
             skill_md = skill_dir / "SKILL.md"
@@ -781,7 +818,7 @@ class TestCheckSkill(unittest.TestCase):
             )
 
     def test_a_name_with_consecutive_hyphens_fails_the_gate(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             skill_dir = Path(tmp) / "recognitio"
             skill_dir.mkdir()
             skill_md = skill_dir / "SKILL.md"
@@ -949,7 +986,7 @@ class TestCheckVersion(unittest.TestCase):
 
     def run_main_on_texts(self, plugin_text, marketplace_text,
                           changelog_text):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
             plugin.write_text(plugin_text, encoding="utf-8")
@@ -1230,7 +1267,7 @@ class TestPluginPackaging(unittest.TestCase):
 class TestCheckPacket(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_packet")
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = RetryingTemporaryDirectory()
         self.repo = Path(self.tmp.name) / "repo"
         self.repo.mkdir()
         git(self.repo, "init", "-b", "main")
@@ -1406,7 +1443,7 @@ class TestDcoWorkflow(unittest.TestCase):
     """
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = RetryingTemporaryDirectory()
         self.repo = Path(self.tmp.name) / "repo"
         self.repo.mkdir()
         git(self.repo, "init", "-b", "main")
@@ -1504,7 +1541,7 @@ class TestCheckEvals(unittest.TestCase):
         self.assertEqual(self.mod.all_problems(ROOT), [])
 
     def test_a_transcript_edit_fails_naming_its_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "tasks" / "task-06" / "transcripts.md"
             text = target.read_text(encoding="utf-8")
@@ -1527,7 +1564,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_planted_rule_edit_fails_naming_its_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "tasks" / "task-02" / "planted.md"
             text = target.read_text(encoding="utf-8")
@@ -1546,7 +1583,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_results_cell_edit_fails_the_totals_check(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "RESULTS.md"
             text = target.read_text(encoding="utf-8")
@@ -1564,7 +1601,7 @@ class TestCheckEvals(unittest.TestCase):
             self.assertIn("evals/RESULTS.md", named[0])
 
     def test_a_tampered_diff_fails_the_rebuild(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "tasks" / "task-01" / "diff.patch"
             data = target.read_bytes()
@@ -1579,7 +1616,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_the_checksum_record_regenerates_and_then_passes(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "tasks" / "task-03" / "planted.md"
             text = target.read_text(encoding="utf-8")
@@ -1597,7 +1634,7 @@ class TestCheckEvals(unittest.TestCase):
             self.assertEqual(self.mod.checksum_problems(root), [])
 
     def test_a_manifest_entry_missing_a_key_fails_the_rebuild(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = (
                 root / "evals" / "tasks" / "task-03" / "manifest.json"
@@ -1616,7 +1653,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_non_object_manifest_is_a_problem_not_a_crash(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = (
                 root / "evals" / "tasks" / "task-02" / "manifest.json"
@@ -1629,7 +1666,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_task_with_crlf_sources_rebuilds_byte_for_byte(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             task = root / "evals" / "tasks" / "task-07"
             task.mkdir()
@@ -1688,7 +1725,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_renamed_cited_test_fails_the_corpus_check(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "tests" / "test_gate_scripts.py"
             text = target.read_text(encoding="utf-8")
@@ -1707,7 +1744,7 @@ class TestCheckEvals(unittest.TestCase):
             )
 
     def test_a_corpus_name_that_never_existed_fails(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             root = self.copy_fixture(tmp)
             target = root / "evals" / "corpus.md"
             text = target.read_text(encoding="utf-8")
@@ -1722,6 +1759,44 @@ class TestCheckEvals(unittest.TestCase):
             self.assertIn(
                 "test_a_name_that_never_existed", problems[0]
             )
+
+
+class TestRetryingTemporaryDirectory(unittest.TestCase):
+    def test_cleanup_retries_a_removal_that_fails_once(self):
+        holder = RetryingTemporaryDirectory()
+        Path(holder.name, "kept.txt").write_text("x", encoding="utf-8")
+        real_rmtree = shutil.rmtree
+        calls = []
+
+        def flaky(path, *args, **kwargs):
+            calls.append(path)
+            if len(calls) == 1:
+                raise OSError("directory not empty")
+            return real_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(shutil, "rmtree", flaky):
+            with mock.patch.object(time, "sleep", lambda seconds: None):
+                holder.cleanup()
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(Path(holder.name).exists())
+
+    def test_cleanup_raises_after_the_bound_when_removal_always_fails(self):
+        holder = RetryingTemporaryDirectory()
+        calls = []
+
+        def always_fails(path, *args, **kwargs):
+            calls.append(path)
+            raise OSError("directory not empty")
+
+        try:
+            with mock.patch.object(shutil, "rmtree", always_fails):
+                with mock.patch.object(time, "sleep", lambda seconds: None):
+                    with self.assertRaises(OSError):
+                        holder.cleanup()
+            self.assertEqual(len(calls), holder.cleanup_attempts)
+        finally:
+            holder.cleanup()
+        self.assertFalse(Path(holder.name).exists())
 
 
 if __name__ == "__main__":

@@ -3,9 +3,11 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -17,6 +19,41 @@ EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
 spec = importlib.util.spec_from_file_location("recognitio_extract", EXTRACT)
 extract_mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(extract_mod)
+
+
+class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
+    # A fixture repository can gain a file while its temporary
+    # directory is being removed. CI job 120492623700 on Python
+    # 3.10 failed in teardown with OSError Errno 39 Directory not
+    # empty on the pack folder inside a fixture repository after
+    # every assertion in the test had passed, and a rerun passed.
+    # The cleanup shipped with Python 3.12 tolerates that race
+    # and the one shipped with Python 3.10 does not. Removal here
+    # retries a bounded number of times with a short pause and
+    # then raises, so a tree that truly cannot be removed still
+    # fails loudly instead of passing in silence.
+
+    cleanup_attempts = 5
+    cleanup_delay_seconds = 0.1
+
+    def cleanup(self):
+        last_error = None
+        for attempt in range(self.cleanup_attempts):
+            try:
+                shutil.rmtree(self.name)
+            except FileNotFoundError:
+                last_error = None
+                break
+            except OSError as error:
+                last_error = error
+                if attempt + 1 < self.cleanup_attempts:
+                    time.sleep(self.cleanup_delay_seconds)
+            else:
+                last_error = None
+                break
+        if last_error is not None:
+            raise last_error
+        self._finalizer.detach()
 
 MODULE_V1 = '''"""Fixture module."""
 
@@ -125,7 +162,7 @@ def read_manifest(out):
 
 class Fixture(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = RetryingTemporaryDirectory()
         self.repo = Path(self.tmp.name) / "repo"
         init_repo(self.repo)
         write_tree(self.repo, {
@@ -245,7 +282,7 @@ class TestFunctionOnFirstLine(unittest.TestCase):
     """
 
     def test_call_sites_found_when_function_starts_the_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "m.py": (
@@ -277,7 +314,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
     """Ambient git configuration must not reshape a verified packet."""
 
     def test_unicode_filename_keeps_its_change(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"caf\u00e9.py": "def a():\n    return 1\n"},
                 {"caf\u00e9.py": "def a():\n    return 2\n"},
@@ -292,7 +329,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertIn("return 2", (out / "packet.md").read_text())
 
     def test_directory_name_with_space_and_b_fragment(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a b/c.py": "x = 1\n"},
                 {"a b/c.py": "x = 2\n"},
@@ -305,7 +342,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertIn("x = 2", (out / "packet.md").read_text())
 
     def test_noprefix_and_colour_config_do_not_hide_the_change(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"mod.py": "v = 'v1'\n"},
                 {"mod.py": "v = 'v2'\n"},
@@ -320,7 +357,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertIn("'v2'", (out / "packet.md").read_text())
 
     def test_external_diff_driver_is_not_used(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"mod.py": "v = 'v1'\n"},
                 {"mod.py": "v = 'v2'\n"},
@@ -332,7 +369,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertIn("'v2'", (out / "packet.md").read_text())
 
     def test_grep_column_config_does_not_hide_definitions(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "module.py": (
@@ -357,7 +394,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
             )
 
     def test_textconv_filter_is_not_applied(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             init_repo(repo)
             script = Path(tmp) / "conv.sh"
@@ -381,7 +418,7 @@ class TestPinnedOutputFormats(unittest.TestCase):
 
 class TestBinaryAndAttributeMarking(unittest.TestCase):
     def test_binary_file_gets_a_placeholder_not_a_crash(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n", "blob.bin": bytes(range(256))},
                 {"a.py": "x = 2\n", "blob.bin": bytes(range(255, -1, -1))},
@@ -401,7 +438,7 @@ class TestBinaryAndAttributeMarking(unittest.TestCase):
             )
 
     def test_latin1_source_does_not_crash(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"legacy.py": b"# caf\xe9\nx = 1\n"},
                 {"legacy.py": b"# caf\xe9\nx = 2\n"},
@@ -413,7 +450,7 @@ class TestBinaryAndAttributeMarking(unittest.TestCase):
             self.assertTrue(read_manifest(out)["verified"])
 
     def test_attribute_binary_marking_over_text_is_counted_as_text(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {".gitattributes": "mod.py binary\n", "mod.py": "v = 'v1'\n"},
                 {"mod.py": "v = 'v2'\n"},
@@ -439,7 +476,7 @@ class TestBinaryAndAttributeMarking(unittest.TestCase):
 
 class TestDeletedFiles(unittest.TestCase):
     def test_deleted_binary_file_gets_placeholder_and_receipt(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             init_repo(repo)
             write_tree(repo, {
@@ -466,7 +503,7 @@ class TestDeletedFiles(unittest.TestCase):
             self.assertIn("-\t-\tblob.bin", (out / "packet.md").read_text())
 
     def test_deleted_generated_file_gets_placeholder(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             init_repo(repo)
             write_tree(repo, {
@@ -500,7 +537,7 @@ class TestDeletedFiles(unittest.TestCase):
 
 class TestChildEnvironment(unittest.TestCase):
     def test_exported_git_dir_does_not_redirect_the_extraction(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -539,7 +576,7 @@ class TestChildEnvironment(unittest.TestCase):
 
 class TestShallowAndRootCommits(unittest.TestCase):
     def test_shallow_clone_is_refused(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             src = make_repo(tmp, [{"a.py": "x = 1\n"}, {"a.py": "x = 2\n"}])
             shallow = Path(tmp) / "shallow"
             subprocess.run(
@@ -553,7 +590,7 @@ class TestShallowAndRootCommits(unittest.TestCase):
             self.assertIn("shallow", result.stderr)
 
     def test_root_commit_records_no_merge_base(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [{"a.py": "x = 1\n"}, {"a.py": "x = 2\n"}])
             root = git(repo, "rev-list", "--max-parents=0", "HEAD")
             out = Path(tmp) / "out"
@@ -636,7 +673,7 @@ class TestPullRequestMode(Fixture):
 
 class TestBudget(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = RetryingTemporaryDirectory()
         self.repo = make_repo(self.tmp.name, [
             {
                 "module.py": MODULE_V1,
@@ -795,7 +832,7 @@ class TestFailClosedEndToEnd(Fixture):
 
 class TestReReviewSemantics(unittest.TestCase):
     def test_unrelated_since_produces_a_scoped_empty_section(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -814,7 +851,7 @@ class TestReReviewSemantics(unittest.TestCase):
             self.assertNotIn("Commits since the previous review", packet)
 
     def test_findings_on_a_renamed_file_stay_unaddressed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [
                 {"old.py": body, "note.txt": "a note\n"},
@@ -839,7 +876,7 @@ class TestReReviewSemantics(unittest.TestCase):
             )
 
     def test_pure_insertion_does_not_address_the_line_before_it(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -862,7 +899,7 @@ class TestReReviewSemantics(unittest.TestCase):
             )
 
     def test_interhunk_context_config_does_not_mark_untouched_lines(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 21))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -887,7 +924,7 @@ class TestReReviewSemantics(unittest.TestCase):
             )
 
     def test_rebased_head_gets_a_rereview(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [{"a.py": "x = 1\n"}])
             git(repo, "checkout", "-b", "feature")
             write_tree(repo, {"a.py": "x = 2\n"})
@@ -913,14 +950,14 @@ class TestReReviewSemantics(unittest.TestCase):
             self.assertIn("Commits since the previous review", packet)
 
     def test_since_alone_is_not_a_mode(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [{"a.py": "x = 1\n"}])
             out = Path(tmp) / "out"
             result = run_extract_cli(repo, out, "--since", "HEAD")
             self.assertEqual(result.returncode, 2, result.stderr)
 
     def test_findings_accounting_marks_addressed_and_unaddressed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"mod.py": "a = 1\nb = 2\nc = 3\nd = 4\ne = 5\n"},
                 {"note.txt": "a note\n"},
@@ -950,7 +987,7 @@ class TestReReviewSemantics(unittest.TestCase):
 
 class TestPathEdgeCases(unittest.TestCase):
     def test_call_sites_found_for_colon_paths(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "m.py": "def beta():\n    return 1\n",
@@ -968,7 +1005,7 @@ class TestPathEdgeCases(unittest.TestCase):
             self.assertIn("we:ird.py", packet)
 
     def test_crlf_bytes_survive_into_the_packet(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"crlf.py": b"a = 1\r\nb = 2\r\n"},
                 {"crlf.py": b"a = 9\r\nb = 2\r\n"},
@@ -981,7 +1018,7 @@ class TestPathEdgeCases(unittest.TestCase):
 
 class TestTierContent(unittest.TestCase):
     def test_t2_carries_imports_and_definitions(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "module.py": (
@@ -1003,7 +1040,7 @@ class TestTierContent(unittest.TestCase):
             self.assertIn("defs.py", packet)
 
     def test_prior_prs_degrade_honestly_without_github(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"module.py": MODULE_V1},
                 {"module.py": MODULE_V2},
@@ -1042,7 +1079,7 @@ class TestReplaceRefs(unittest.TestCase):
         return repo, real_head
 
     def test_replace_ref_cannot_swap_the_reviewed_content(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, real_head = self.build_replaced_repo(tmp)
             out = Path(tmp) / "out"
             result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
@@ -1055,7 +1092,7 @@ class TestReplaceRefs(unittest.TestCase):
             self.assertNotIn("BENIGN REPLACEMENT", packet)
 
     def test_replace_env_vars_cannot_reenable_replacement(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, real_head = self.build_replaced_repo(tmp)
             env = dict(os.environ)
             env["GIT_NO_REPLACE_OBJECTS"] = "0"
@@ -1092,7 +1129,7 @@ class TestStructuralLineCounts(unittest.TestCase):
         self.assertEqual(extract_mod.count_chunk_lines(chunk), (1, 0))
 
     def test_removed_sql_comment_verifies(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"q.sql": "SELECT 1;\n-- old note\nSELECT 2;\n"},
                 {"q.sql": "SELECT 1;\nSELECT 2;\n"},
@@ -1108,7 +1145,7 @@ class TestStructuralLineCounts(unittest.TestCase):
             )
 
     def test_added_toml_delimiter_verifies(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"doc.md": "# Title\n\nbody\n"},
                 {"doc.md": "+++\n# Title\n\nbody\n"},
@@ -1124,7 +1161,7 @@ class TestStructuralLineCounts(unittest.TestCase):
             )
 
     def test_attribute_marked_sql_counts_are_cross_checked(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".gitattributes": "* binary\n",
@@ -1149,7 +1186,7 @@ class TestLiteralPathspecMeasurement(unittest.TestCase):
     """Per file re-measurement names files literally (N3)."""
 
     def test_renamed_attribute_file_is_measured_as_its_delta(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".gitattributes": "*.py binary\n",
@@ -1172,7 +1209,7 @@ class TestLiteralPathspecMeasurement(unittest.TestCase):
             )
 
     def test_glob_named_file_shows_its_own_diff(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".gitattributes": "* binary\n",
@@ -1204,7 +1241,7 @@ class TestRereviewPins(unittest.TestCase):
     """The re-review diffs refuse text conversion too (N4)."""
 
     def test_range_diff_cannot_be_rewritten_by_a_textconv_driver(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = Path(tmp) / "repo"
             init_repo(repo)
             script = Path(tmp) / "conv.sh"
@@ -1271,7 +1308,7 @@ class TestCompanionSearchText(unittest.TestCase):
     """Companion searches read attribute marked files as text (N5)."""
 
     def test_call_sites_found_when_tree_marks_sources_binary(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".gitattributes": "*.py binary\n",
@@ -1308,7 +1345,7 @@ class TestGhFailureShapes(unittest.TestCase):
     """Every GitHub CLI failure lands in the failure contract (N6)."""
 
     def test_missing_gh_fails_with_a_receipt_not_a_traceback(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -1328,7 +1365,7 @@ class TestGhFailureShapes(unittest.TestCase):
             self.assertFalse(read_manifest(out)["verified"])
 
     def test_gh_view_returning_a_list_fails_cleanly(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -1346,7 +1383,7 @@ class TestGhFailureShapes(unittest.TestCase):
             self.assertFalse(read_manifest(out)["verified"])
 
     def test_gh_list_with_wrongly_shaped_files_degrades(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -1385,7 +1422,7 @@ class TestParseFailureReceipts(unittest.TestCase):
     """Argument rejections clear the output directory too (N7)."""
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = RetryingTemporaryDirectory()
         self.repo = make_repo(self.tmp.name, [
             {"a.py": "x = 1\n"},
             {"a.py": "x = 2\n"},
@@ -1425,7 +1462,7 @@ class TestGeneratedMarkerTiming(unittest.TestCase):
     """A generated marker must predate the change to exempt it (N8)."""
 
     def test_marker_arriving_in_the_change_is_shown_and_flagged(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"gen.py": 'VALUE = "safe"\n'},
                 {
@@ -1454,7 +1491,7 @@ class TestGeneratedMarkerTiming(unittest.TestCase):
             )
 
     def test_marker_standing_at_base_still_withholds_the_diff(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "gen.py": (
@@ -1500,7 +1537,7 @@ class TestFenceSafety(unittest.TestCase):
         return "\n".join(kept)
 
     def test_forged_completeness_section_stays_inside_the_fence(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -1583,7 +1620,7 @@ class TestReReviewTraces(unittest.TestCase):
     """Re-review leaves a trace of empty and capped inputs (N11, N12)."""
 
     def test_empty_findings_file_is_named_in_the_packet(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"a.py": "x = 1\n"},
                 {"a.py": "x = 2\n"},
@@ -1602,7 +1639,7 @@ class TestReReviewTraces(unittest.TestCase):
             self.assertIn("contained no findings", packet)
 
     def test_findings_accounting_is_capped_and_states_it(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -1629,7 +1666,7 @@ class TestExclusionReceiptDedup(unittest.TestCase):
     """One receipt entry per file, in one voice (N13)."""
 
     def test_attribute_marked_lockfile_gets_one_receipt_entry(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".gitattributes": "* binary\n",
@@ -1661,7 +1698,7 @@ class TestRound1FilenameSafety(unittest.TestCase):
     """A newline in a filename forges nothing and corrupts no count."""
 
     def test_newline_filename_content_change_verifies_honestly(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {EVIL_NAME: "x = 1\n"},
                 {EVIL_NAME: "x = 2\n"},
@@ -1689,7 +1726,7 @@ class TestRound1FilenameSafety(unittest.TestCase):
             self.assertIn("evil.py\\n## Budget and completeness", packet)
 
     def test_rename_into_a_newline_filename_forges_nothing(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [{"plain.py": "x = 1\n"}])
             (repo / "plain.py").rename(repo / EVIL_NAME)
             commit_all(repo, "rename into a crafted name")
@@ -1717,7 +1754,7 @@ class TestRound1FindingsExistence(unittest.TestCase):
     """Findings on paths that never existed are not addressed."""
 
     def test_never_existed_paths_read_unaddressed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -1749,7 +1786,7 @@ class TestRound1BinaryToText(unittest.TestCase):
     """A binary to text transition is receipted by its real reason."""
 
     def test_transition_receipt_and_no_raw_nul_in_packet(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"data.py": b"old\x00line\nsecond\x00line\n"},
                 {"data.py": "hello = 1\nworld = 2\n"},
@@ -1785,7 +1822,7 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
         self.assertNotIn(";", packet)
 
     def test_packet_over_binary_and_generated_changes_is_clean(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "a.py": "x = 1\n",
@@ -1813,7 +1850,7 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
             self.assert_clean(packet)
 
     def test_packet_over_a_rereview_is_clean(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"mod.py": "a = 1\nb = 2\nc = 3\n"},
                 {"note.txt": "a note\n"},
@@ -1848,7 +1885,7 @@ class TestRound2CapNoteEscaping(unittest.TestCase):
 
     def test_imports_cap_note_cannot_forge_a_section(self):
         imports = "".join("import mod%02d\n" % i for i in range(25))
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {CAP_EVIL_NAME: imports + "value = 1\n"},
                 {CAP_EVIL_NAME: imports + "value = 2\n"},
@@ -1903,7 +1940,7 @@ class TestRound2GrepAttribution(unittest.TestCase):
         ])
 
     def test_grep_lines_attribute_a_newline_named_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = self.build_repo(tmp)
             head = git(repo, "rev-parse", "HEAD")
             hits = extract_mod.git_grep_lines(repo, head, "greet")
@@ -1912,7 +1949,7 @@ class TestRound2GrepAttribution(unittest.TestCase):
             self.assertNotIn("innocent.py", paths, hits)
 
     def test_packet_names_the_crafted_test_file_and_its_lines(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = self.build_repo(tmp)
             out = Path(tmp) / "out"
             result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
@@ -1934,7 +1971,7 @@ class TestRound2FindingsDedupe(unittest.TestCase):
     """Duplicate findings count once and crowd nothing out (RT2-06)."""
 
     def test_duplicates_cannot_crowd_out_a_unique_finding(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -2017,7 +2054,7 @@ class TestRound2CompanionScaling(unittest.TestCase):
             extract_mod.run_git = original
 
     def test_build_t2_runs_one_grep_however_many_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             commits = []
             base = {}
             head_files = {}
@@ -2077,7 +2114,7 @@ class TestRound3TestSectionDedupe(unittest.TestCase):
             "    assert add(0, 0) == 0\n"
             "    assert add_tax(0, 0) == 0\n"
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "util.py": (
@@ -2175,7 +2212,7 @@ class TestRound3BulkBoundaries(unittest.TestCase):
             ".hidden", "-lead", "trail-", "foo.", "caf\u00e9",
             "\u00e9cole", "util",
         ]
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [{"corpus.txt": corpus}])
             head = git(repo, "rev-parse", "HEAD")
             bulk = extract_mod.git_grep_bulk(repo, head, terms)
@@ -2248,7 +2285,7 @@ class TestRound4RenameCompanion(unittest.TestCase):
         )
 
     def test_old_name_only_importlib_line_is_found_after_a_rename(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = build_rename_repo(
                 tmp, "test_calc.py",
                 "import importlib\n"
@@ -2278,7 +2315,7 @@ class TestRound4RenameCompanion(unittest.TestCase):
         test_text = "".join(
             "value%d = \"oldcalc\"\n" % i for i in range(1, 8)
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = build_rename_repo(tmp, "test_legacy.py", test_text)
             out = Path(tmp) / "out"
             result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
@@ -2294,7 +2331,7 @@ class TestRound4RenameCompanion(unittest.TestCase):
             self.assertNotIn("value6 = \"oldcalc\"", packet)
 
     def test_ordinary_change_still_finds_its_test_mentions(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "util.py": "def add(a, b):\n    return a + b\n",
@@ -2341,7 +2378,7 @@ class TestRound4FindingsSpelling(unittest.TestCase):
         )
 
     def test_dotted_pair_counts_once_with_one_verdict(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -2402,7 +2439,7 @@ class TestRound6CopyRereview(unittest.TestCase):
         return (out / "packet.md").read_text(), statuses
 
     def test_modify_plus_copy_packet_pins_both_verdicts(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, previous = build_modify_and_copy_repo(tmp, True)
             packet, statuses = self.run_packet(
                 tmp, repo, previous,
@@ -2421,7 +2458,7 @@ class TestRound6CopyRereview(unittest.TestCase):
             self.assertIn("Findings addressed: 1 of 2", packet)
 
     def test_rereview_ranges_for_a_copy_entry_hold_no_source_ranges(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, previous = build_modify_and_copy_repo(tmp, True)
             head = git(repo, "rev-parse", "HEAD")
             ranges, moved_to, _head, _since = extract_mod.rereview_ranges(
@@ -2432,7 +2469,7 @@ class TestRound6CopyRereview(unittest.TestCase):
             self.assertEqual(moved_to, {}, moved_to)
 
     def test_modify_without_a_copy_control_is_unchanged(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, previous = build_modify_and_copy_repo(tmp, False)
             packet, statuses = self.run_packet(
                 tmp, repo, previous,
@@ -2484,7 +2521,7 @@ class TestRound7VerdictContent(unittest.TestCase):
         return (out / "packet.md").read_text(), statuses
 
     def test_a_line_endings_only_rename_leaves_findings_unaddressed(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, previous = build_ending_flip_rename_repo(
                 tmp, with_edit=False
             )
@@ -2512,7 +2549,7 @@ class TestRound7VerdictContent(unittest.TestCase):
             self.assertEqual(ranges.get("oldcalc.py"), [], ranges)
 
     def test_a_rename_with_a_real_change_still_counts_it(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo, previous = build_ending_flip_rename_repo(
                 tmp, with_edit=True
             )
@@ -2566,7 +2603,7 @@ class TestRound6FindingsSpellings(unittest.TestCase):
             "sub/mod.py ",
         ]
         for spelling in spellings:
-            with tempfile.TemporaryDirectory() as tmp:
+            with RetryingTemporaryDirectory() as tmp:
                 body = "line01 = 1\nline02 = 2\n"
                 repo = make_repo(tmp, [{"sub/mod.py": body}])
                 previous = git(repo, "rev-parse", "HEAD")
@@ -2596,7 +2633,7 @@ class TestRound6FindingsSpellings(unittest.TestCase):
                 self.assertNotIn("never existed", packet, spelling)
 
     def test_space_before_the_anchor_colon_counts_once(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             body = "line01 = 1\nline02 = 2\n"
             repo = make_repo(tmp, [{"mod.py": body}])
             previous = git(repo, "rev-parse", "HEAD")
@@ -2620,7 +2657,7 @@ class TestRound6FindingsSpellings(unittest.TestCase):
             self.assertNotIn("never existed", packet)
 
     def test_decomposed_path_counts_once_with_the_composed_file(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             composed = "caf\u00e9.py"
             decomposed = "cafe\u0301.py"
             body = "line01 = 1\nline02 = 2\n"
@@ -2684,7 +2721,7 @@ class TestRound6InstructionFiles(unittest.TestCase):
             )
 
     def test_packet_flags_instruction_files_in_triage_and_manifest(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     "AGENTS.md": "Never force push.\n",
@@ -2751,7 +2788,7 @@ class TestRound6InstructionFiles(unittest.TestCase):
             )
 
     def test_packet_flags_the_new_instruction_surfaces(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {
                     ".github/instructions/review.instructions.md":
@@ -2791,7 +2828,7 @@ class TestRound6InstructionFiles(unittest.TestCase):
             )
 
     def test_a_rename_to_or_from_an_instruction_name_flags(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
                 {"notes.md": "Some notes.\n", "AGENTS.md": "Guidance.\n"},
             ])
@@ -2809,6 +2846,44 @@ class TestRound6InstructionFiles(unittest.TestCase):
             self.assertTrue(flags["guidance.md"], flags)
             packet = (out / "packet.md").read_text()
             self.assertIn("instruction file", packet)
+
+
+class TestRetryingTemporaryDirectory(unittest.TestCase):
+    def test_cleanup_retries_a_removal_that_fails_once(self):
+        holder = RetryingTemporaryDirectory()
+        Path(holder.name, "kept.txt").write_text("x", encoding="utf-8")
+        real_rmtree = shutil.rmtree
+        calls = []
+
+        def flaky(path, *args, **kwargs):
+            calls.append(path)
+            if len(calls) == 1:
+                raise OSError("directory not empty")
+            return real_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(shutil, "rmtree", flaky):
+            with mock.patch.object(time, "sleep", lambda seconds: None):
+                holder.cleanup()
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(Path(holder.name).exists())
+
+    def test_cleanup_raises_after_the_bound_when_removal_always_fails(self):
+        holder = RetryingTemporaryDirectory()
+        calls = []
+
+        def always_fails(path, *args, **kwargs):
+            calls.append(path)
+            raise OSError("directory not empty")
+
+        try:
+            with mock.patch.object(shutil, "rmtree", always_fails):
+                with mock.patch.object(time, "sleep", lambda seconds: None):
+                    with self.assertRaises(OSError):
+                        holder.cleanup()
+            self.assertEqual(len(calls), holder.cleanup_attempts)
+        finally:
+            holder.cleanup()
+        self.assertFalse(Path(holder.name).exists())
 
 
 if __name__ == "__main__":

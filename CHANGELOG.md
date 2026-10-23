@@ -480,3 +480,12 @@ This unreleased work carries version 1.3.0.
   while the suite count gave no signal. The eval gate now
   extracts the test names the index cites and fails with
   the missing names listed.
+- Fixture teardown in the test suite could fail on Python
+  3.10 when a file appeared inside a fixture repository
+  while its temporary directory was being removed, so a
+  run whose assertions all passed still errored in
+  cleanup. Both test modules now remove fixture trees
+  through a temporary directory subclass that retries the
+  removal a bounded number of times and raises when the
+  tree still stands after the bound, and pinning tests
+  cover both the retry and the raise.
