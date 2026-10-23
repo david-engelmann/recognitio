@@ -1512,10 +1512,13 @@ def test_files_section(repo, head, files, functions_by_file, notes,
                     # and line here, before the cap below applies, so
                     # the cap and its note count distinct lines and a
                     # line that matches several terms cannot crowd
-                    # distinct lines out of the section.
-                    hits_for_file = test_hits.setdefault(hit_path, [])
-                    if (hit_line, content) not in hits_for_file:
-                        hits_for_file.append((hit_line, content))
+                    # distinct lines out of the section. The section
+                    # sorts each file's hits before display, so a set
+                    # per file loses no ordering and membership stays
+                    # constant time however many lines match.
+                    test_hits.setdefault(hit_path, set()).add(
+                        (hit_line, content)
+                    )
     lines.append("### Test files that mention the changed code")
     lines.append("")
     if not test_hits:

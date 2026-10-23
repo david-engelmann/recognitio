@@ -68,7 +68,7 @@ without reading three audit reports first.
 | The version gate shape admitted Unicode digits, so a version written with an Arabic Indic digit passed as coherent (RT3-03) | `test_a_unicode_digit_version_is_not_a_version` in the gate script suite |
 | The YAML half of the copy fence stayed a two file hand list while the claims promised discovery by rule (ST3-01) | `test_discovery_extends_to_new_yaml_files_by_rule` and `test_a_new_yaml_issue_form_joins_the_fence` in the gate script suite, with the completeness walk in `test_fence_covers_every_authored_prose_file_in_the_tree` extended to the YAML class |
 | The completeness test walk encoded exclusion rules that contradicted the discovery exclusions (ST3-02) | `test_the_walk_and_discovery_share_one_exclusion_rule` in the gate script suite, with the walk and the discovery both calling the shared `is_fence_excluded` predicate in the copy gate |
-| The eval runner note still described the two pass method after round 2 moved to three conditions plus a clean control (SP3-01) | Uncovered. The repair is the runner note in `evals/README.md` itself, and no test pins the runner note prose |
+| The eval runner note still described the two pass method after round 2 moved to three conditions plus a clean control (SP3-01) | `test_the_runner_note_describes_the_current_method` in the gate script suite |
 
 ## Disclosure incidents with no test of their own
 

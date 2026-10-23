@@ -302,3 +302,12 @@ This unreleased work carries version 1.3.0.
   full, three passes in a fixed order with the fair raw
   condition and the clean control, where it previously still
   described the two pass method round 2 replaced.
+- Four answers to review of the round 3 change itself. The
+  runner note now carries a gate test that pins the three pass
+  method and the clean control, and the corpus index records
+  the finding as covered by it. The held out trigger set and
+  its per pass verdicts now stand in the trigger results file
+  in full, and the proposal section is dated so a reader can
+  tell which description shipped. The test files dedupe keeps
+  its hits in a set per file, so a test file with many matching
+  lines no longer pays a growing list scan for each new hit.

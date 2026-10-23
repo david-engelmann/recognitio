@@ -451,6 +451,15 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 0)
 
 
+class TestEvalDocs(unittest.TestCase):
+    def test_the_runner_note_describes_the_current_method(self):
+        text = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("Run the three passes in a fixed order", text)
+        self.assertIn("fair raw pass", text)
+        self.assertIn("clean control", text)
+        self.assertNotIn("Run the two passes", text)
+
+
 class TestCheckSkill(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_skill")

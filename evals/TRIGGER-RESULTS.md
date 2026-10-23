@@ -68,7 +68,10 @@ merging.
 
 The proposal below adds one boundary sentence to the shipped
 description and changes nothing else. It was recorded in round
-1 and it is still a proposal. It is not applied in this change.
+1 and it was still a proposal when the round 2 section above
+was written, and that section applied nothing. Round 3 applied
+it, and the round 3 section at the end of this file records
+the held out run that settled it.
 
 Proposed text. Extracts the changes from a pull request, a
 commit range, or a single commit and assembles them with their
@@ -87,13 +90,13 @@ same conditions as the second pass above, and it scored 19 of
 is evidence for the proposal and not a shipped result, and the
 proposal was written against the old set, so this set is not
 held out data for it. The proposal should win repeated fresh
-passes before anyone applies it, and this round applies
-nothing.
+passes before anyone applies it, and the round 2 change that
+recorded this applied nothing.
 
 ## Round 3 held out run
 
 The proposal text above was frozen as written before this run
-began, and it was not edited afterwards. A fresh held out set
+began, and it was not edited afterward. A fresh held out set
 of twenty queries was written after the freeze. No query in
 the held out set appears in the saved trigger set in this
 directory, and the near misses are packet adjacent work of the
@@ -139,3 +142,52 @@ discipline and it is applied to the skill file in this
 change. The shipped description the passes scored against is
 the text the proposal section above was written against, and
 the applied text is that proposal word for word.
+
+The held out set stands below with the labels that were fixed
+before scoring, so this run can be regraded from this file
+alone. The per pass verdicts follow the set. Every query a
+pass is not recorded as missing was judged correctly in that
+pass.
+
+Should trigger. H1 Gather the diff for pull request 482
+together with the functions around it so the review can begin
+from the full picture. H2 Take the commits on this branch
+since the release and bundle them into a single packet with
+their callers and tests. H3 We amended the branch again.
+Rebuild the packet for the same change so I can check it
+against the last reviewed head. H4 Pull out everything that
+changed in the last commit, including the enclosing functions,
+and lay it out for review. H5 Before anyone starts reviewing,
+make sure the packet for this range holds every file and hunk
+in the change. H6 Assemble the change from main to this
+feature branch with its history into one document for the
+reviewers. H7 Fetch the changes in PR 77 from the local clone
+and package them with the test files that touch them. H8 I
+want to re-check a change after a rebase. Build the packet
+again against the previous reviewed revision. H9 Collect the
+diff for the hotfix range plus the definitions of the names
+it changes into a single verified bundle. H10 Prepare the
+evidence pack a reviewer needs for this pull request, with
+blame and prior work on the same files.
+
+Should not trigger. N1 Read this packet and tell me which
+findings are blockers and which are nits. N2 Approve pull
+request 482 and leave the approval comment. N3 Take the
+packet for this branch and write the review comments directly
+on the pull request. N4 Patch the bug this packet points at
+and push the fix. N5 Using the packet as your source, draft
+the release notes entry for this change. N6 Stamp this change
+as reviewed and record the verdict in the gate report. N7
+Explain to the team in plain language what this packet says
+changed and why it matters. N8 Write the missing tests for
+the function this packet flags as untested. N9 Cherry pick
+the commits in this packet onto the release branch. N10 Turn
+the findings in this packet into tickets ranked by severity.
+
+Per pass verdicts for the shipped description. The first pass
+scored 10 of 10 on the should trigger group and 9 of 10 on
+the near misses and missed N5. The second pass scored 9 of 10
+on the should trigger group and 10 of 10 on the near misses
+and missed H7. The third pass scored 10 of 10 on both groups
+and missed nothing. Per pass verdicts for the proposal. Every
+pass scored 10 of 10 on both groups and missed nothing.
