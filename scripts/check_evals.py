@@ -35,7 +35,11 @@ over the earlier tasks that keeps every total true is the
 deliberate residual of this check, recorded in the decisions
 file, because those passes survive only as curated notes and a
 parser over that prose would manufacture confidence the record
-does not carry.
+does not carry. The same check runs a planted defect anchor for
+each of tasks 01 to 05, probing the rebuilt head for the effect
+each planted file describes, so a sources tamper that drops a
+defect fails even after the documented anchor move and checksum
+refresh.
 
 The fourth check rebuilds each task from its sources file. The
 rebuilt diff must match the saved diff byte for byte and the
@@ -73,7 +77,7 @@ section against the corpus coverage record at
 evals/corpus-coverage.json, which stands apart from the checksum
 refresh like the source anchors. Dropping a row or a citation
 fails here even after a checksum refresh, because the refresh
-does not move the coverage record. A deliberate index change
+does not move this record. A deliberate index change
 moves the coverage first with the coverage write flag, as its
 own committed step.
 
@@ -117,6 +121,7 @@ GIT_PIN = [
     "-c", "diff.mnemonicPrefix=false",
     "-c", "color.ui=false",
     "-c", "color.diff=false",
+    "-c", "color.status=false",
     "-c", "color.grep=false",
     "-c", "color.status=false",
     "-c", "grep.column=false",
@@ -299,19 +304,20 @@ def results_problems(root):
 def task06_planted_rule(task_dir):
     """Parse the task-06 planted grading rule into checkable parts.
 
-    Returns the D1 file name and the old module name. Fails
-    closed. When the rule prose no longer parses, the caller
-    reports a problem instead of grading against a guess.
+    Returns the D1 file name, the old module name and the new
+    module name. Fails closed. When the rule prose no longer
+    parses, the caller reports a problem instead of grading
+    against a guess.
     """
     try:
         text = (task_dir / "planted.md").read_text(encoding="utf-8")
     except OSError:
-        return None, None, ["the task-06 planted file cannot be read"]
+        return None, None, None, ["the task-06 planted file cannot be read"]
     rename = re.search(r"renames (\w+)\.py to (\w+)\.py", text)
     d1 = re.search(r"(\w+\.py) still imports", text)
     if rename is None or d1 is None:
-        return None, None, ["the task-06 planted rule no longer parses"]
-    return d1.group(1), rename.group(1), []
+        return None, None, None, ["the task-06 planted rule no longer parses"]
+    return d1.group(1), rename.group(1), rename.group(2), []
 
 
 def transcript_fences(task_dir):
@@ -350,35 +356,72 @@ def doubled_operand(diff):
     return None
 
 
+def _fence_sentences(fence):
+    """Split a transcript fence into sentences for evidence tying.
+
+    The split needs the whitespace after the mark, because file
+    names like report.py carry periods that are not sentence
+    ends.
+    """
+    return [s.strip() for s in re.split(r"[.!?]+\s+", fence) if s.strip()]
+
+
 def task06_grade_fence(fence, d1_file, old_module, operand):
     """Grade one transcript fence under the planted rule.
 
-    The D1 defect sits in an unchanged file, so the rule counts
-    it only when the pass names the file and its import of the
-    old module name. The D2 defect sits in the diff itself, so
-    the rule counts it when the pass names the doubled return
-    line.
+    Both defects need an evidence level tie, not token presence.
+    The D1 defect credits only when one sentence names the file
+    beside its stale import statement and carries no denial of
+    that import. The D2 defect credits only when one sentence
+    carries the doubled operand expression or the operand beside
+    a doubling word, with no denial in that sentence. A casual
+    note that appends the file name or the operand to a fence
+    that never places the finding no longer moves the grade.
     """
-    d1 = (
-        re.search(r"\b%s\b" % re.escape(d1_file), fence) is not None
-        and re.search(r"\b%s\b" % re.escape(old_module), fence)
-        is not None
+    sentences = _fence_sentences(fence)
+    file_pat = r"\b%s\b" % re.escape(d1_file)
+    import_pat = (
+        r"\bfrom\s+%s\s+import\b|\bimport\s+%s\b"
+        % (re.escape(old_module), re.escape(old_module))
     )
-    doubled = (
-        re.search(
-            r"\b%s\b.*\b%s\b"
-            % (re.escape(operand), re.escape(operand)),
-            fence,
-            re.DOTALL,
+    d1_denial_pat = (
+        r"\bno\s+(?:stale\s+|old\s+)?import\b"
+        r"|\bno\s+longer\s+imports?\b"
+        r"|\bdoes\s+not\s+import\b|\bdoesn't\s+import\b"
+        r"|\bnever\s+imported\b"
+        r"|\bwithout\s+(?:an?\s+)?import\b"
+    )
+    d1 = any(
+        re.search(file_pat, sentence) is not None
+        and re.search(import_pat, sentence) is not None
+        and re.search(d1_denial_pat, sentence) is None
+        for sentence in sentences
+    )
+    doubled_pat = (
+        r"\b%s\b\s*(?:\+|plus)\s*\b%s\b"
+        % (re.escape(operand), re.escape(operand))
+    )
+    operand_pat = r"\b%s\b" % re.escape(operand)
+    doubling_pat = (
+        r"\b(doubled|doubles|doubling|twice|itself"
+        r"|duplicated|duplicates|duplicate)\b"
+    )
+    d2_denial_pat = (
+        r"\bno\s+(?:doubling|doubled|defect)\b"
+        r"|\bnot\s+(?:doubled|found)\b"
+        r"|\bnever\b|n't\b|\bwithout\b"
+    )
+    d2 = any(
+        (
+            re.search(doubled_pat, sentence) is not None
+            or (
+                re.search(operand_pat, sentence) is not None
+                and re.search(doubling_pat, sentence) is not None
+            )
         )
-        is not None
+        and re.search(d2_denial_pat, sentence) is None
+        for sentence in sentences
     )
-    named = re.search(r"\b%s\b" % re.escape(operand), fence) is not None
-    doubling = (
-        re.search(r"\b(doubled|doubles|twice|itself|plus)\b", fence)
-        is not None
-    )
-    d2 = doubled or (named and doubling)
     return (1 if d1 else 0, 1 if d2 else 0)
 
 
@@ -427,14 +470,111 @@ def recorded_task06_scores(root):
     return scores["RESULTS.md"], []
 
 
-def task06_anchor_problems(repo, rebuilt_diff, d1_file, old_module):
+def _anchor_env():
+    """Scrub the probe environment so imports resolve from the fixture."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_SCRUB_VARS and key != "PYTHONPATH"
+    }
+
+
+def _anchor_import_breaks(repo, d1_file):
+    """Require importing the D1 file from the rebuilt head to fail.
+
+    The planted D1 defect is that the import names a module that
+    no longer exists and the file breaks at import time. A shim
+    that re-exports the name keeps the import text while the
+    defect is gone, so the anchor imports the file for real in a
+    fresh interpreter and fails the check when the import stops
+    breaking.
+    """
+    module = d1_file[:-3] if d1_file.endswith(".py") else d1_file
+    try:
+        run = subprocess.run(
+            [sys.executable, "-c", "import %s" % module],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_anchor_env(),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return "the D1 import probe could not run with %s" % exc
+    if run.returncode == 0:
+        return (
+            "the planted D1 defect of task-06 no longer stands in "
+            "the rebuilt head: importing %s succeeds" % module
+        )
+    if "ModuleNotFoundError" not in run.stderr and "ImportError" not in run.stderr:
+        return (
+            "the planted D1 defect of task-06 no longer stands in "
+            "the rebuilt head: importing %s fails without an import error" % module
+        )
+    return None
+
+
+def _anchor_doubled_result(repo, new_module, func_name, sample=(1, 2, 3)):
+    """Require the renamed module's function to return doubled totals.
+
+    The planted D2 defect is that every total comes back doubled.
+    The probe loads the module source from the rebuilt head in an
+    isolated namespace and calls the function the D1 import
+    names, requiring twice the plain sum. A doubled expression
+    moved into a comment no longer passes.
+    """
+    try:
+        source = (repo / (new_module + ".py")).read_text(encoding="utf-8")
+    except OSError as exc:
+        return "the D2 effect probe cannot read %s.py with %s" % (
+            new_module,
+            exc,
+        )
+    namespace = {"__name__": "anchor_probe"}
+    try:
+        exec(compile(source, "%s.py" % new_module, "exec"), namespace)
+    except Exception as exc:
+        return "the D2 effect probe cannot load %s.py with %s" % (
+            new_module,
+            exc,
+        )
+    func = namespace.get(func_name)
+    if not callable(func):
+        return "the D2 effect probe finds no callable %s in %s.py" % (
+            func_name,
+            new_module,
+        )
+    try:
+        result = func(list(sample))
+    except Exception as exc:
+        return "the D2 effect probe calling %s fails with %s" % (
+            func_name,
+            exc,
+        )
+    if result != 2 * sum(sample):
+        return (
+            "the planted D2 defect of task-06 no longer stands in "
+            "the rebuilt head: %s(%s) returns %r instead of the doubled %r"
+            % (func_name, list(sample), result, 2 * sum(sample))
+        )
+    return None
+
+
+def task06_anchor_problems(repo, rebuilt_diff, d1_file, old_module, new_module):
     """Check the planted defects still stand in the rebuilt artefacts.
 
-    Returns the doubled operand the D2 grading needs. A tampered
-    sources file that drops a planted defect fails here even when
-    every artefact was regenerated from it and every refreshable
-    record was refreshed, because the transcripts and the planted
-    rule still describe the defect the head no longer carries.
+    Returns the doubled operand the D2 grading needs. Each leg
+    checks the effect the planted file describes, not the defect
+    text. The D1 leg imports the D1 file from the rebuilt head
+    and requires the import to break on the missing old module,
+    so a shim that re-exports the name no longer passes. The D2
+    leg evaluates the renamed module's function and requires the
+    doubled result, so a doubled expression moved into a comment
+    no longer passes. A tampered sources file that drops a
+    planted defect fails here even when every artefact was
+    regenerated from it and every refreshable record was
+    refreshed, because the transcripts and the planted rule
+    still describe the defect the head no longer carries.
     """
     operand = doubled_operand(rebuilt_diff)
     if operand is None:
@@ -458,6 +598,16 @@ def task06_anchor_problems(repo, rebuilt_diff, d1_file, old_module):
             "the planted D1 defect of task-06 no longer stands in "
             "the rebuilt head"
         )
+    imported = re.match(
+        r"\s*from %s import (\w+)" % re.escape(old_module), first_line
+    )
+    if imported is not None:
+        effect = _anchor_import_breaks(repo, d1_file)
+        if effect is not None:
+            problems.append(effect)
+        effect = _anchor_doubled_result(repo, new_module, imported.group(1))
+        if effect is not None:
+            problems.append(effect)
     return operand, problems
 
 
@@ -466,16 +616,18 @@ def task06_problems(root):
 
     The derivation ties the diff, the packet, the transcripts and
     both summaries together leg by leg. The planted grading rule
-    parses into the D1 file and the old module name, the rebuilt
-    head must still carry the stale import and the rebuilt diff
-    must still carry the doubled return line, each transcript
-    fence grades under the rule, and the derived scores must
-    match the recorded sentences in both summaries. Any leg that
-    moves without the others fails here.
+    parses into the D1 file and the old and new module names, the
+    rebuilt head must still break on the stale import and return
+    doubled totals, each transcript fence grades under the rule,
+    and the derived scores must match the recorded sentences in
+    both summaries. Any leg that moves without the others fails
+    here.
     """
     task_dir = root / "evals" / "tasks" / "task-06"
     problems = []
-    d1_file, old_module, parse_problems = task06_planted_rule(task_dir)
+    d1_file, old_module, new_module, parse_problems = task06_planted_rule(
+        task_dir
+    )
     problems.extend(parse_problems)
     fences, fence_problems = transcript_fences(task_dir)
     problems.extend(fence_problems)
@@ -493,7 +645,7 @@ def task06_problems(root):
                 tmp, sources
             )
             operand, anchor_problems = task06_anchor_problems(
-                repo, rebuilt_diff, d1_file, old_module
+                repo, rebuilt_diff, d1_file, old_module, new_module
             )
             problems.extend(anchor_problems)
     except (
@@ -533,6 +685,169 @@ def task06_problems(root):
             % (packet_d1 + packet_d2, packet_found)
         )
     return problems
+
+
+TASK_ANCHOR_PROBES = {
+    # Each probe is a snippet run with the rebuilt fixture repo as
+    # the working directory, plus the expectation that proves the
+    # planted defect still stands. The exit zero expectation means
+    # the defect stands when the snippet passes. A raises
+    # expectation means the defect stands when the snippet fails
+    # with the named exception, which is how the TypeError and
+    # circular import defects show themselves.
+    "task-01": [
+        (
+            "the planted D1 defect of task-01 no longer stands in "
+            "the rebuilt head",
+            "from shop import total; total()",
+            "raises:TypeError",
+        ),
+        (
+            "the planted D2 defect of task-01 no longer stands in "
+            "the rebuilt head",
+            "from calc import price; assert price(2, 3, 1) == 2 * 3 + 2 * 1",
+            "exit_zero",
+        ),
+    ],
+    "task-02": [
+        (
+            "the planted D1 defect of task-02 no longer stands in "
+            "the rebuilt head",
+            "from parse import parse_port; assert parse_port('abc') is None",
+            "exit_zero",
+        ),
+        (
+            "the planted D2 defect of task-02 no longer stands in "
+            "the rebuilt head",
+            "from parse import parse_port; assert parse_port('8080') == 8081",
+            "exit_zero",
+        ),
+    ],
+    "task-03": [
+        (
+            "the planted D1 defect of task-03 no longer stands in "
+            "the rebuilt head",
+            "from legacy import slugify; assert slugify('A B') == 'a-b'",
+            "exit_zero",
+        ),
+        (
+            "the planted D2 defect of task-03 no longer stands in "
+            "the rebuilt head",
+            "from util import make_slug; assert make_slug('A B') == 'ab'",
+            "exit_zero",
+        ),
+    ],
+    "task-04": [
+        (
+            "the planted D1 defect of task-04 no longer stands in "
+            "the rebuilt head",
+            "import report",
+            "raises:ImportError",
+        ),
+        (
+            "the planted D2 defect of task-04 no longer stands in "
+            "the rebuilt head",
+            "import sys, types; data = types.ModuleType('data'); "
+            "data.show = lambda: None; sys.modules['data'] = data; "
+            "from report import render; assert render() == 'OK '",
+            "exit_zero",
+        ),
+    ],
+    # Task-05 is the clean control. Its anchor pins the documented
+    # behavior instead of a planted defect, namely that the helper
+    # and its caller stay consistent with the change.
+    "task-05": [
+        (
+            "the clean control task-05 no longer behaves as its "
+            "planted file describes",
+            "from util import add, add_tax; "
+            "assert add(2, 3) == 5; assert add_tax(2, 3) == 5",
+            "exit_zero",
+        ),
+        (
+            "the clean control task-05 no longer behaves as its "
+            "planted file describes",
+            "from page import heading_total; assert heading_total(2, 3) == 5",
+            "exit_zero",
+        ),
+    ],
+}
+
+
+def _run_anchor_probe(repo, code, expect):
+    """Run one anchor probe snippet against the rebuilt fixture repo.
+
+    Returns None when the probe confirms the planted defect still
+    stands, else a message naming the failure.
+    """
+    try:
+        run = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_anchor_env(),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return "the anchor probe could not run with %s" % exc
+    if expect == "exit_zero":
+        if run.returncode != 0:
+            lines = run.stderr.strip().splitlines()
+            detail = lines[-1] if lines else "no output"
+            return "the anchor probe failed with %s" % detail
+        return None
+    exc_name = expect.split(":", 1)[1]
+    if run.returncode == 0:
+        return (
+            "the anchor probe passed but the planted defect "
+            "requires %s" % exc_name
+        )
+    if exc_name not in run.stderr:
+        lines = run.stderr.strip().splitlines()
+        detail = lines[-1] if lines else "no output"
+        return "the anchor probe failed without %s, with %s" % (
+            exc_name,
+            detail,
+        )
+    return None
+
+
+def task_anchor_problems(root, task_name):
+    """Check one task's planted defects still stand in its rebuilt head.
+
+    Tasks 01 to 04 carry planted defects and task-05 is the clean
+    control whose documented behavior the probes pin instead. Each
+    probe runs the rebuilt head and checks the effect the planted
+    file describes, so a sources tamper that drops a defect fails
+    here even after the documented anchor move and checksum
+    refresh. This is the tasks 01 to 05 counterpart to the
+    task-06 anchor.
+    """
+    task_dir = root / "evals" / "tasks" / task_name
+    try:
+        sources = strict_json_loads(
+            (task_dir / "sources.json").read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return ["the %s sources cannot be read with %s" % (task_name, exc)]
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, _base, _head, _diff = build_fixture_repo(tmp, sources)
+            problems = []
+            for message, code, expect in TASK_ANCHOR_PROBES[task_name]:
+                failure = _run_anchor_probe(repo, code, expect)
+                if failure is not None:
+                    problems.append("%s: %s" % (message, failure))
+            return problems
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+        AssertionError,
+        subprocess.SubprocessError,
+    ) as exc:
+        return ["the %s rebuild failed with %s" % (task_name, exc)]
 
 
 def cited_test_names(text):
@@ -1016,6 +1331,8 @@ def all_problems(root):
     problems.extend(checksum_problems(root))
     problems.extend(results_problems(root))
     problems.extend(task06_problems(root))
+    for task_name in ("task-01", "task-02", "task-03", "task-04", "task-05"):
+        problems.extend(task_anchor_problems(root, task_name))
     problems.extend(source_anchor_problems(root))
     problems.extend(corpus_problems(root))
     problems.extend(corpus_coverage_problems(root))
@@ -1086,7 +1403,8 @@ def main(argv=None):
     print(
         "check_evals: eval artefacts match their checksum record "
         "and the results totals add up and the task-06 scores "
-        "re-derive from its transcripts and every task rebuilds "
+        "re-derive from its transcripts and every planted defect "
+        "still stands in its rebuilt head and every task rebuilds "
         "from its sources and every task sources file matches its "
         "anchor and every corpus name stands in the suite and the "
         "corpus coverage record matches the index"

@@ -1,6 +1,8 @@
 ---
 name: recognitio
 description: Extracts the changes from a pull request, a commit range, or a single commit and assembles them with their surrounding context into one verified packet, so a review can start from evidence instead of a bare diff. Use it when someone asks to extract changes, pull a diff for review, prepare a review packet, re-review a change after new commits, or confirm that everything in a change is present before review begins. The skill assembles evidence only. It does not conduct the review itself, judge whether a change is safe to merge, or fix findings.
+context: fork
+background: false
 ---
 
 # Recognitio
@@ -40,6 +42,9 @@ python3 skills/recognitio/scripts/extract.py --range main...feature --out packet
 python3 skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
 python3 skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
+
+
+When the host runs this skill in a forked subagent, the return to the main conversation carries only the packet directory, the manifest's verified flag, and the base, head, and merge base refs. The reviewer opens the packet file itself for the evidence and never works from a reprinted copy.
 
 ## Choosing tiers
 

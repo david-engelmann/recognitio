@@ -36,7 +36,9 @@ fails on the first file whose bytes moved. The record loads
 through a strict reader that refuses a repeated key, and its keys
 use the forward slash spelling on every host. The check also
 re-derives the task-06 scores from its transcripts and its planted
-grading rule, compares each task sources file against the source
+grading rule, runs a planted defect anchor for each of tasks 01 to
+04 against the rebuilt head with a clean behavior anchor for
+task-05, compares each task sources file against the source
 anchor record at `evals/source-anchors.json`, and compares each
 corpus section against the coverage record at
 `evals/corpus-coverage.json`. The anchor and coverage records stand
@@ -211,6 +213,14 @@ record the gate trusts, spelled record keys with forward
 slashes on every host, brought the corpus index under the
 checksum record with a per section coverage floor, completed
 the round 8 corpus section, and pinned the shipped help output
-against banned marks. The owner dropped
+against banned marks. The round 11 pass then set the skill
+frontmatter control panel with a forked run and a synchronous
+background, stated the five unset fields and their limits in the
+decision record with a trigger protocol carve out for the disable
+and paths fields, tightened the task-06 planted grading rule
+against note plants that deny imports and against doubled operand
+overcounting, and anchored each of tasks 01 to 04 with a planted
+defect probe against the rebuilt head beside a clean behavior
+anchor for task-05. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

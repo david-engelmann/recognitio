@@ -157,3 +157,51 @@ have no transcript to tie to, and the round 9 red team proved
 the gap is real by moving two cells with the totals unchanged.
 Recording the limit beats pretending the totals check sees
 what it cannot see.
+
+A further note recorded on 2026-10-23 in round 11. The fixture
+integrity counterpart to the residual above now lands. The gate
+runs a planted defect anchor for each of tasks 01 to 04, probing
+the rebuilt head for the effect each planted file describes, and
+a clean behavior anchor for task-05, the clean control, pinning
+its documented behavior instead of a planted defect. A sources
+tamper that drops a defect fails the anchor even after the
+documented anchor move and checksum refresh. The score
+distribution residual above stands unchanged.
+
+## 9. Build 1, the skill frontmatter control panel
+
+Recorded on 2026-10-23 in round 11. The skill frontmatter gains
+the Claude Code extension fields the round 11 external lane
+graded from the primary docs, and nothing else. `context: fork`
+runs the skill in an isolated subagent, because packet assembly
+does git reads and file writes that should not pollute the
+review conversation, and `background: false` keeps the run
+synchronous so the reviewer waits for the packet instead of
+racing it. The skill text accounts for the fork, and a forked run
+returns only the packet directory, the manifest's verified flag,
+and the base, head, and merge base refs, while the reviewer opens
+the packet file itself for the evidence.
+
+Five fields stay unset on purpose, and each omission is a limit
+stated here rather than a promise. `disable-model-invocation`
+stays at its default false, because setting it true changes the
+trigger mechanism the description protocol tests. `paths` stays
+unset, because review requests span every file and the primary
+docs promise only narrower auto activation, not a smaller skill.
+`arguments` stays unset, because the skill takes its inputs from
+the invoking message and declaring placeholders without using
+them would be a dead control. `model` and `effort` stay unset,
+because a model pin names a moving target the retirements keep
+moving, and both fields are silently not used when the session
+or the organization does not support them.
+
+Two carve outs to the description protocol follow from the field
+grading. A future change that sets `disable-model-invocation`
+to true, or that sets `paths` to narrow auto activation, counts
+as a trigger surface change and reruns the full trigger protocol
+with two judge families, because the skill the model can no
+longer auto invoke is not the skill the protocol tested. The six
+Agent Skills spec fields remain the portability floor, and every
+panel field above it is documented as a Claude Code extension
+that other hosts silently ignore or hard fail per their own
+rules, which the round 11 external lane records.
