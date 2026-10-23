@@ -164,8 +164,176 @@ LINK_REFERENCE = re.compile(r"^\s*\[[^\]]+\]:")
 BARE_PATH = re.compile(r"^[\w.@~+-]+(/[\w.@~+-]+)+/?$")
 INLINE_CODE = re.compile(r"`[^`]*`")
 URL_SPAN = re.compile(r"https?://\S+")
-YAML_KEY = re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_-]*:(\s+(.*))?$")
 YAML_BLOCK = re.compile(r":\s*[|>][+-]?\s*$")
+
+
+def _quoted_end(text, start=0):
+    """The index just past a quoted scalar, or None when it spans on.
+
+    The text at start is the opening quote. A doubled single quote
+    is an escaped quote inside a single quoted scalar, and a
+    backslash escapes the next character inside a double quoted
+    one, so neither ends the scalar.
+    """
+    quote = text[start]
+    index = start + 1
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and quote == '"':
+            index += 2
+            continue
+        if char == quote:
+            if quote == "'" and text[index + 1:index + 2] == "'":
+                index += 2
+                continue
+            return index + 1
+        index += 1
+    return None
+
+
+def _split_key(candidate, flow=False):
+    """Split one YAML line into its key and value, or return None.
+
+    Key recognition is structural rather than a character pattern.
+    Any scalar a YAML line can carry as a key is a key, quoted or
+    plain, dotted or numeric or spaced or slashed or digit led,
+    and only the value after its colon is prose. The colon that
+    ends a key is the first colon standing outside quotes and
+    outside any flow collection that is followed by a space or by
+    the end of the line, or by anything at all inside a flow
+    collection. A line with no such colon carries no key.
+    """
+    if not candidate:
+        return None
+    if candidate[0] in "\"'":
+        end = _quoted_end(candidate)
+        if end is None:
+            return None
+        rest = candidate[end:].lstrip()
+        if rest.startswith(":") and (
+            len(rest) == 1 or rest[1] in " \t"
+        ):
+            return candidate[:end], rest[1:].strip()
+        return None
+    depth = 0
+    quote = None
+    index = 0
+    while index < len(candidate):
+        char = candidate[index]
+        if quote is not None:
+            if char == "\\" and quote == '"':
+                index += 1
+            elif char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+        elif char == "#" and index > 0 and candidate[index - 1] in " \t":
+            return None
+        elif char == ":" and depth == 0:
+            following = candidate[index + 1:index + 2]
+            if flow and following != ":":
+                key = candidate[:index].strip()
+                return (key, candidate[index + 1:].strip()) if key else None
+            if following == "" or following in " \t":
+                key = candidate[:index].strip()
+                if not key or key[0] in "{[&*!%@`":
+                    return None
+                return key, candidate[index + 1:].strip()
+        index += 1
+    return None
+
+
+def _strip_value_prefix(value):
+    """Drop the anchor and tag tokens standing before a YAML value.
+
+    An anchor or a tag is structure that names or types the value
+    after it, so the value a reader meets starts after those
+    tokens, whether what follows is a flow collection, a quoted
+    scalar or a plain one.
+    """
+    text = value.strip()
+    while text:
+        if text.startswith("&"):
+            parts = text.split(None, 1)
+            if len(parts) == 1:
+                return ""
+            text = parts[1].lstrip()
+            continue
+        if text.startswith("!<"):
+            end = text.find(">")
+            if end == -1:
+                return text
+            text = text[end + 1:].lstrip()
+            continue
+        if text.startswith("!"):
+            parts = text.split(None, 1)
+            if len(parts) == 1:
+                return ""
+            text = parts[1].lstrip()
+            continue
+        return text
+    return text
+
+
+def _flow_scan(text):
+    """The flow depth and open quote a flow text ends in."""
+    depth = 0
+    quote = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is not None:
+            if char == "\\" and quote == '"':
+                index += 1
+            elif char == quote:
+                if quote == "'" and text[index + 1:index + 2] == "'":
+                    index += 1
+                else:
+                    quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+        index += 1
+    return depth, quote
+
+
+def _flow_complete(text):
+    depth, quote = _flow_scan(text)
+    return depth <= 0 and quote is None
+
+
+def _flow_close_index(text):
+    """The index where the flow collection opening a text closes."""
+    depth = 0
+    quote = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is not None:
+            if char == "\\" and quote == '"':
+                index += 1
+            elif char == quote:
+                if quote == "'" and text[index + 1:index + 2] == "'":
+                    index += 1
+                else:
+                    quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return len(text)
 
 
 def _url_replacement(match):
@@ -256,55 +424,72 @@ def _flow_parts(text):
     return parts
 
 
-def flow_prose_values(text):
-    """Yield the scalar values inside a flow mapping.
+def _flow_value_values(value):
+    """Yield the prose inside one flow value."""
+    value = _strip_value_prefix(value)
+    if value.startswith("{") or value.startswith("["):
+        yield from flow_prose_values(value)
+    elif value:
+        yield value
 
-    The braces and the key marks of a flow mapping are structure
-    and stay exempt. A value standing inside one can still be a
-    prose sentence a reader meets, quoted or plain, so each value
-    is yielded for the scan in the same way a block value is. A
-    nested flow collection yields the values inside it.
+
+def flow_prose_values(text):
+    """Yield the scalar values inside a flow collection.
+
+    The brackets and the key marks of a flow collection are
+    structure and stay exempt. A value standing inside one can
+    still be a prose sentence a reader meets, quoted or plain, so
+    each value is yielded for the scan in the same way a block
+    value is. A nested flow collection yields the values inside
+    it, whether it stands as a mapping value, as a list item, or
+    inside another flow collection. A bare entry of a flow
+    sequence is a value and is yielded, while a bare key of a
+    flow mapping names a null value and stays exempt.
     """
     text = text.strip()
-    if not text.startswith("{"):
-        yield text
+    if text.startswith("{"):
+        close = _flow_close_index(text)
+        for part in _flow_parts(text[1:close]):
+            part = part.strip()
+            if not part:
+                continue
+            split = _split_key(part, flow=True)
+            if split:
+                yield from _flow_value_values(split[1])
         return
-    depth = 0
-    quote = None
-    close = len(text)
+    if text.startswith("["):
+        close = _flow_close_index(text)
+        for part in _flow_parts(text[1:close]):
+            part = part.strip()
+            if not part:
+                continue
+            if part.startswith("{") or part.startswith("["):
+                yield from flow_prose_values(part)
+                continue
+            split = _split_key(part, flow=True)
+            if split:
+                yield from _flow_value_values(split[1])
+            else:
+                yield part
+        return
+    yield text
+
+
+def _closes_quote(text, quote):
+    """Whether a line closes a quoted scalar opened earlier."""
     index = 0
     while index < len(text):
         char = text[index]
-        if quote is not None:
-            if char == "\\" and quote == '"':
-                index += 1
-            elif char == quote:
-                quote = None
-        elif char in "\"'":
-            quote = char
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                close = index
-                break
-        index += 1
-    for part in _flow_parts(text[1:close]):
-        part = part.strip()
-        if not part:
+        if char == "\\" and quote == '"':
+            index += 2
             continue
-        match = YAML_KEY.match(part)
-        value = match.group(2) if match and match.group(2) else part
-        value = value.strip()
-        if value.startswith("{") or value.startswith("["):
-            if value.startswith("[") and value.endswith("]"):
-                for item in _flow_parts(value[1:-1]):
-                    yield from flow_prose_values(item)
-            else:
-                yield from flow_prose_values(value)
-        else:
-            yield value
+        if char == quote:
+            if quote == "'" and text[index + 1:index + 2] == "'":
+                index += 2
+                continue
+            return True
+        index += 1
+    return False
 
 
 def yaml_prose_lines(lines):
@@ -312,9 +497,24 @@ def yaml_prose_lines(lines):
 
     Comments are prose. So are block scalar bodies and the plain or
     quoted values on key lines and the scalar values inside flow
-    mappings. Keys and structure are syntax.
+    collections. Keys and structure are syntax.
+
+    The reader is stateful where YAML is. A scalar that spans
+    lines carries its state with it, so a continuation line is
+    yielded as prose in full even when it is shaped like a key,
+    because inside a spanning scalar it is prose and not a key. A
+    flow collection that spans lines is gathered until it closes
+    and then read by the flow reader as one collection. A plain
+    scalar opened by a key continues only on lines indented past
+    the column its key stands in, so the next key of the same
+    mapping, standing at the same column, is never swallowed as
+    a continuation.
     """
     block_indent = None
+    open_quote = None
+    flow_buffer = None
+    flow_start = 0
+    plain_key_col = None
     for number, raw in enumerate(lines, start=1):
         stripped = raw.strip()
         indent = len(raw) - len(raw.lstrip())
@@ -325,6 +525,21 @@ def yaml_prose_lines(lines):
                 if stripped:
                     yield number, clean(raw)
                 continue
+        if open_quote is not None:
+            # A line inside a spanning quoted scalar is prose in
+            # full, whatever shape its first words take.
+            yield number, clean(raw)
+            if _closes_quote(raw, open_quote):
+                open_quote = None
+            continue
+        if flow_buffer is not None:
+            flow_buffer.append(stripped)
+            joined = "\n".join(flow_buffer)
+            if _flow_complete(joined):
+                for value in flow_prose_values(joined):
+                    yield flow_start, clean(value)
+                flow_buffer = None
+            continue
         if not stripped:
             continue
         if stripped.startswith("#"):
@@ -336,7 +551,15 @@ def yaml_prose_lines(lines):
             continue
         if YAML_BLOCK.search(raw):
             block_indent = indent
+            plain_key_col = None
             continue
+        if plain_key_col is not None:
+            if indent > plain_key_col:
+                # A line inside a spanning plain scalar is prose
+                # in full, whatever shape its first words take.
+                yield number, clean(raw)
+                continue
+            plain_key_col = None
         candidate = stripped
         while candidate.startswith("- "):
             # Repeated list markers are structure too. A nested
@@ -344,28 +567,67 @@ def yaml_prose_lines(lines):
             # and stripping only one leaves the inner key standing
             # as if it were prose.
             candidate = candidate[2:].lstrip()
-        if candidate.startswith("{"):
-            # A flow mapping standing as a list item is structure
-            # in its braces and its key marks, and its values are
+        candidate_col = len(raw.rstrip()) - len(candidate)
+        flow_text = _strip_value_prefix(candidate)
+        if flow_text.startswith("{") or flow_text.startswith("["):
+            # A flow collection standing as a list item, behind an
+            # anchor or a tag as much as bare, is structure in its
+            # brackets and its key marks, and its values are
             # yielded for the scan by the flow reader.
-            for value in flow_prose_values(candidate):
-                yield number, clean(value)
+            if _flow_complete(flow_text):
+                for value in flow_prose_values(flow_text):
+                    yield number, clean(value)
+            else:
+                flow_buffer = [flow_text]
+                flow_start = number
+            plain_key_col = None
             continue
-        match = YAML_KEY.match(candidate)
-        if match:
-            value = match.group(2)
-            if value:
-                if value.lstrip().startswith("{"):
-                    # A flow mapping value is structure in its
-                    # braces and its key marks, while the values
-                    # inside it can still be prose, so the flow
-                    # reader yields those values for the scan.
+        split = _split_key(candidate)
+        if split:
+            _key, value = split
+            if not value:
+                plain_key_col = None
+                continue
+            value = _strip_value_prefix(value)
+            if not value:
+                plain_key_col = None
+                continue
+            if value.startswith("{") or value.startswith("["):
+                # A flow collection standing as a key value, after
+                # any anchor or tag tokens, is read by the flow
+                # reader in the same way.
+                if _flow_complete(value):
                     for inner in flow_prose_values(value):
                         yield number, clean(inner)
-                    continue
+                else:
+                    flow_buffer = [value]
+                    flow_start = number
+                plain_key_col = None
+                continue
+            if value[0] in "\"'":
                 yield number, clean(value)
+                if _quoted_end(value) is None:
+                    open_quote = value[0]
+                plain_key_col = None
+                continue
+            yield number, clean(value)
+            # A plain scalar value can span the lines that follow
+            # it. Its column is the column the key stands in, so
+            # only a line indented past that column continues it.
+            plain_key_col = candidate_col
+            continue
+        if candidate and candidate[0] in "\"'" \
+                and _quoted_end(candidate) is None:
+            yield number, clean(candidate)
+            open_quote = candidate[0]
+            plain_key_col = None
             continue
         yield number, clean(candidate)
+        if candidate and candidate[0] not in "{[\"'":
+            plain_key_col = candidate_col
+    if flow_buffer is not None:
+        for value in flow_prose_values("\n".join(flow_buffer)):
+            yield flow_start, clean(value)
 
 
 def comment_spans(path):

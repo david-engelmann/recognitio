@@ -23,7 +23,7 @@ Recognitio takes the other path. Extraction runs against the local clone, where 
 
 Take one install route only. Installing through two routes installs the skill twice.
 
-The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers.
+The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting.
 
 ```bash
 /plugin marketplace add david-engelmann/recognitio
@@ -91,7 +91,7 @@ The script at `scripts/check_packet.py` validates a packet directory before a re
 
 The packet is built in four tiers.
 
-- T0 is triage, with the pull request title, body and spec references when the mode resolves them, the file list, the numstat summary, and the commit list for the range.
+- T0 is triage, with the pull request title, body and spec references when the mode resolves them, the file list, the numstat summary, and the commit list for the range. A changed file whose name marks it as an instruction bearing file, such as an AGENTS.md or a SKILL.md at any depth, is flagged as an instruction file in that list, and its record in the manifest carries the same flag, so a reviewer can tell which changed files will steer the next agent that loads the tree.
 - T1 is the change, with per file diffs that carry whole enclosing function context instead of a fixed line radius.
 - T2 is the companions, with call sites of the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and test files that mention the changed modules. Companions come from deterministic search only, each one is capped, and the packet says when a cap was hit.
 - T3 is history, with a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. That lookup checks the three most changed files against the thirty most recent pull requests and shows at most five matches, and the packet states that window where it reports the results. When the CLI cannot name them, the tier says so.

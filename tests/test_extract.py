@@ -2369,5 +2369,293 @@ class TestRound4FindingsSpelling(unittest.TestCase):
             )
 
 
+def build_modify_and_copy_repo(tmp, with_copy=True):
+    body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 21))
+    repo = make_repo(tmp, [{"orig.py": body}])
+    previous = git(repo, "rev-parse", "HEAD")
+    changed = body.replace("line05 = 5", "line05 = 55")
+    head_files = {"orig.py": changed}
+    if with_copy:
+        head_files["zzcopy.py"] = body.replace(
+            "line20 = 20", "line20 = 99"
+        )
+    write_tree(repo, head_files)
+    commit_all(repo, "modify one line and maybe copy the file")
+    return repo, previous
+
+
+class TestRound6CopyRereview(unittest.TestCase):
+    """A copy never writes ranges under its source path (R6-RT-01)."""
+
+    def run_packet(self, tmp, repo, previous, findings_text):
+        findings = Path(tmp) / "findings.txt"
+        findings.write_text(findings_text)
+        out = Path(tmp) / "out"
+        result = run_extract_cli(
+            repo, out, "--range", "%s..HEAD" % previous,
+            "--since", previous, "--findings", str(findings),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(out)
+        self.assertTrue(manifest["verified"], manifest["discrepancies"])
+        statuses = {f["path"]: f["status"] for f in manifest["files"]}
+        return (out / "packet.md").read_text(), statuses
+
+    def test_modify_plus_copy_packet_pins_both_verdicts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, previous = build_modify_and_copy_repo(tmp, True)
+            packet, statuses = self.run_packet(
+                tmp, repo, previous,
+                "orig.py:5: the changed line worry\n"
+                "orig.py:20: the untouched line worry\n",
+            )
+            self.assertEqual(statuses.get("zzcopy.py"), "copied", statuses)
+            self.assertIn(
+                "orig.py:5 the changed line worry. addressed, "
+                "the anchored lines changed", packet,
+            )
+            self.assertIn(
+                "orig.py:20 the untouched line worry. unaddressed, "
+                "the anchored lines are unchanged", packet,
+            )
+            self.assertIn("Findings addressed: 1 of 2", packet)
+
+    def test_rereview_ranges_for_a_copy_entry_hold_no_source_ranges(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, previous = build_modify_and_copy_repo(tmp, True)
+            head = git(repo, "rev-parse", "HEAD")
+            ranges, moved_to, _head, _since = extract_mod.rereview_ranges(
+                repo, previous, head
+            )
+            self.assertEqual(ranges.get("orig.py"), [(5, 1)], ranges)
+            self.assertNotIn("zzcopy.py", ranges, ranges)
+            self.assertEqual(moved_to, {}, moved_to)
+
+    def test_modify_without_a_copy_control_is_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, previous = build_modify_and_copy_repo(tmp, False)
+            packet, statuses = self.run_packet(
+                tmp, repo, previous,
+                "orig.py:5: the changed line worry\n"
+                "orig.py:20: the untouched line worry\n",
+            )
+            self.assertNotIn("zzcopy.py", statuses, statuses)
+            self.assertIn(
+                "orig.py:5 the changed line worry. addressed, "
+                "the anchored lines changed", packet,
+            )
+            self.assertIn(
+                "orig.py:20 the untouched line worry. unaddressed, "
+                "the anchored lines are unchanged", packet,
+            )
+            self.assertIn("Findings addressed: 1 of 2", packet)
+
+
+class TestRound6FindingsSpellings(unittest.TestCase):
+    """Sibling findings spellings count once (R6-RT-02, R6-RT-03)."""
+
+    def test_normalize_finding_path_covers_each_spelling(self):
+        cases = {
+            "sub/./mod.py": "sub/mod.py",
+            "sub//mod.py": "sub/mod.py",
+            "sub\\mod.py": "sub/mod.py",
+            "mod.py ": "mod.py",
+            "././mod.py": "mod.py",
+            "cafe\u0301.py": "caf\u00e9.py",
+            "MOD.PY": "MOD.PY",
+        }
+        for given, expected in cases.items():
+            self.assertEqual(
+                extract_mod.normalize_finding_path(given), expected, given
+            )
+
+    def test_each_spelling_pair_counts_once_with_one_verdict(self):
+        spellings = [
+            "sub/./mod.py",
+            "sub//mod.py",
+            "sub\\mod.py",
+            "sub/mod.py ",
+        ]
+        for spelling in spellings:
+            with tempfile.TemporaryDirectory() as tmp:
+                body = "line01 = 1\nline02 = 2\n"
+                repo = make_repo(tmp, [{"sub/mod.py": body}])
+                previous = git(repo, "rev-parse", "HEAD")
+                write_tree(repo, {
+                    "sub/mod.py": body.replace(
+                        "line01 = 1", "line01 = 11"
+                    ),
+                })
+                commit_all(repo, "change the first line")
+                findings = Path(tmp) / "findings.txt"
+                findings.write_text(
+                    "sub/mod.py:1: the worry\n"
+                    "%s:1: the worry\n" % spelling
+                )
+                out = Path(tmp) / "out"
+                result = run_extract_cli(
+                    repo, out, "--range", "%s..HEAD" % previous,
+                    "--since", previous, "--findings", str(findings),
+                )
+                self.assertEqual(
+                    result.returncode, 0, (spelling, result.stderr)
+                )
+                packet = (out / "packet.md").read_text()
+                self.assertIn(
+                    "Findings addressed: 1 of 1", packet, spelling
+                )
+                self.assertNotIn("never existed", packet, spelling)
+
+    def test_space_before_the_anchor_colon_counts_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = "line01 = 1\nline02 = 2\n"
+            repo = make_repo(tmp, [{"mod.py": body}])
+            previous = git(repo, "rev-parse", "HEAD")
+            write_tree(repo, {
+                "mod.py": body.replace("line01 = 1", "line01 = 11"),
+            })
+            commit_all(repo, "change the first line")
+            findings = Path(tmp) / "findings.txt"
+            findings.write_text(
+                "mod.py:1: the worry\n"
+                "mod.py :1: the worry\n"
+            )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "%s..HEAD" % previous,
+                "--since", previous, "--findings", str(findings),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Findings addressed: 1 of 1", packet)
+            self.assertNotIn("never existed", packet)
+
+    def test_decomposed_path_counts_once_with_the_composed_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            composed = "caf\u00e9.py"
+            decomposed = "cafe\u0301.py"
+            body = "line01 = 1\nline02 = 2\n"
+            repo = make_repo(tmp, [{composed: body}])
+            previous = git(repo, "rev-parse", "HEAD")
+            write_tree(repo, {
+                composed: body.replace("line01 = 1", "line01 = 11"),
+            })
+            commit_all(repo, "change the first line")
+            findings = Path(tmp) / "findings.txt"
+            findings.write_text(
+                "%s:1: the worry\n" % composed
+                + "%s:1: the worry\n" % decomposed
+            )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "%s..HEAD" % previous,
+                "--since", previous, "--findings", str(findings),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Findings addressed: 1 of 1", packet)
+            self.assertNotIn("never existed", packet)
+
+    def test_distinct_line_and_distinct_file_still_count_separately(self):
+        findings = [
+            {"path": "sub/./mod.py", "line": 1, "text": "the worry"},
+            {"path": "sub/mod.py", "line": 2, "text": "the worry"},
+            {"path": "sub/other.py", "line": 1, "text": "the worry"},
+            {"path": "sub\\mod.py", "line": 1, "text": "the worry"},
+        ]
+        unique, duplicates = extract_mod.dedupe_findings(findings)
+        self.assertEqual(duplicates, 1)
+        self.assertEqual(
+            [(f["path"], f["line"]) for f in unique],
+            [("sub/mod.py", 1), ("sub/mod.py", 2), ("sub/other.py", 1)],
+        )
+
+
+class TestRound6InstructionFiles(unittest.TestCase):
+    """Changed instruction files are flagged as such (R6-RT-06)."""
+
+    def test_each_instruction_name_flags_and_an_ordinary_file_does_not(self):
+        for path in (
+            "AGENTS.md",
+            "CLAUDE.md",
+            "SKILL.md",
+            "skills/demo/SKILL.md",
+            "docs/AGENTS.md",
+            "GEMINI.md",
+            ".github/copilot-instructions.md",
+            ".cursorrules",
+            ".cursor/rules/review.mdc",
+        ):
+            self.assertTrue(
+                extract_mod.is_instruction_path(path), path
+            )
+        for path in ("src/app.py", "README.md", "docs/guide.md"):
+            self.assertFalse(
+                extract_mod.is_instruction_path(path), path
+            )
+
+    def test_packet_flags_instruction_files_in_triage_and_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "AGENTS.md": "Never force push.\n",
+                    "CLAUDE.md": "Run the tests.\n",
+                    "skills/demo/SKILL.md": "Do the thing.\n",
+                    ".github/copilot-instructions.md": "Check well.\n",
+                    "src/app.py": "x = 1\n",
+                },
+                {
+                    "AGENTS.md": "Never force push. Ever.\n",
+                    "CLAUDE.md": "Run the tests first.\n",
+                    "skills/demo/SKILL.md": "Do the thing well.\n",
+                    ".github/copilot-instructions.md": "Check well twice.\n",
+                    "src/app.py": "x = 2\n",
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            flags = {
+                f["path"]: f["instruction_file"] for f in manifest["files"]
+            }
+            self.assertTrue(flags["AGENTS.md"], flags)
+            self.assertTrue(flags["CLAUDE.md"], flags)
+            self.assertTrue(flags["skills/demo/SKILL.md"], flags)
+            self.assertTrue(
+                flags[".github/copilot-instructions.md"], flags
+            )
+            self.assertFalse(flags["src/app.py"], flags)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("- AGENTS.md (modified, instruction file)", packet)
+            self.assertIn(
+                "- skills/demo/SKILL.md (modified, instruction file)",
+                packet,
+            )
+            self.assertIn("- src/app.py (modified)", packet)
+            self.assertNotIn("- src/app.py (modified, instruction", packet)
+
+    def test_a_rename_to_or_from_an_instruction_name_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"notes.md": "Some notes.\n", "AGENTS.md": "Guidance.\n"},
+            ])
+            (repo / "notes.md").rename(repo / "CLAUDE.md")
+            (repo / "AGENTS.md").rename(repo / "guidance.md")
+            commit_all(repo, "rename in both directions")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            flags = {
+                f["path"]: f["instruction_file"] for f in manifest["files"]
+            }
+            self.assertTrue(flags["CLAUDE.md"], flags)
+            self.assertTrue(flags["guidance.md"], flags)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("instruction file", packet)
+
+
 if __name__ == "__main__":
     unittest.main()

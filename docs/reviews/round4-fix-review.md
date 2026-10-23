@@ -62,5 +62,21 @@ the control tests held. The corpus test names were extracted
 from the index and checked against the suite, and every name
 cited exists in it.
 
+An amendment in the round 6 fix change completes this
+checked record with the identifiers the template requires,
+taken from the pull request 9 record and its fix report. The
+base of the packet range is ab9291ded2cc3e0e9b46dc6eae35cdbeea2cee58.
+The head that carried the code and docs fixes is recorded in
+the fix report in short form as 2c6d746 and its full form was
+not recorded at the time. The final pushed head of pull
+request 9 is 174fee1387c17cdd70edd4607231562d1304bfdd.
+The packet check command run against the packet for that
+range exited 0 and its manifest reported verified true. The
+full gate command make check run on the final tree of the
+pull request exited 0 with 162 tests. The separate targeted
+test commands behind the revert runs are not recorded at the
+time beyond the account above, and no exit code for them was
+recorded at the time either.
+
 Findings disposition. Fixed 1. Wrong 0. Intentional 0. Not
 worth it 0.

@@ -98,6 +98,27 @@ import in the imports section, so both halves stood on the page.
 D2 is the trailing space and case change in the returned string,
 and both passes found it.
 
+task-06 is the replay task added in round 6. It rebuilds at
+fixture scale the rename shape that pull request 9 fixed,
+where a paired rename dropped the old module name from the
+companion search. D1 sits in report.py, which still imports
+the total function from ledger after that module is renamed
+to book.py, and test_ledger.py carries the same stale import
+as corroborating evidence. The raw pass warned that unnamed
+importers of the old name would break and named no file, so
+D1 does not count as found under the grading rule. The
+packet pass named report.py line 1 from the call sites
+section beside the rename in the triage tier. D2 is the
+subtotal added to itself in the changed return line, and
+both passes found it. The raw pass reported 1 of 2 on this
+task and the packet pass reported 2 of 2. The task stands as
+an additional task and its numbers join no headline total
+above, so the totals over tasks 01 to 04 and the clean
+control record over task-05 stay reproducible as they stand.
+The full verbatim transcripts of both passes stand in
+transcripts.md inside the task-06 folder, and the per pass
+entry in PASS-NOTES.md points at them.
+
 task-05 plants nothing. The change adds the add_tax helper in
 util.py and updates its one caller in page.py with the right
 arguments, and test_util.py still calls the unchanged add
@@ -139,6 +160,17 @@ weight to the original run. The task-05 passes were run by the
 lane that designed the task, which is the weakest form of the
 clean control measurement, and the file says so in the open so
 a later round can rerun it with fresh eyes.
+
+The task-06 passes were run by the round 6 fix lane on
+2026-10-23. The raw pass read only the diff file and the
+packet pass read only the packet file, which the shipped
+extractor produced with a verified manifest, and the planted
+file was opened only after both transcripts existed. The
+lane that ran the passes also built the task, because the
+task is a replay of a documented finding from pull request
+9, so the run stands as a protocol demonstration graded
+under the stated rule rather than as blind evidence, and
+the file says so in the open.
 
 The round 4 rerun was run by the round 4 fix lane on
 2026-10-23, a lane that did not design any of the five tasks.

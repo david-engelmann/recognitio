@@ -1,0 +1,13 @@
+diff --git a/ledger.py b/book.py
+similarity index 68%
+rename from ledger.py
+rename to book.py
+index 7d539f5..e0b6259 100644
+--- a/ledger.py
++++ b/book.py
+@@ -3,4 +3,4 @@
+ 
+ def total(items):
+     subtotal = sum(items)
+-    return subtotal
++    return subtotal + subtotal

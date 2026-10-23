@@ -155,6 +155,15 @@ its new one, exempted YAML structure from the copy fence while
 keeping prose values under it, normalised a leading ./ in
 findings paths, completed the corpus index with its round 2
 section, and gave decision 3 an explicit trigger for a runnable
-incident suite. The owner dropped
+incident suite. The round 6 pass then stopped a copied entry
+from writing re-review ranges under its source path, set the
+marketplace entry to strict so the plugin loads through the
+marketplace route beside a gate check on the manifest pair,
+read YAML structure in the copy fence by structure rather
+than by key pattern, flagged instruction bearing files in the
+packet, completed findings path normalisation across its
+sibling spellings, guarded the skill file size in the gate,
+and added a replay eval task drawn from a real merged pull
+request with verbatim transcripts. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

@@ -112,6 +112,31 @@ This unreleased work carries version 1.3.0.
   over all five tasks with the clean control under both
   conditions, recorded in the per pass notes with totals that
   agree with the recorded results.
+- A flag for instruction bearing files in the packet. The
+  triage file list marks a changed file whose name stands in
+  the instruction name set, and its manifest record carries
+  the same flag as a boolean, with a rename judged from either
+  of its names.
+- A sixth paired eval task that replays a real merged pull
+  request at fixture scale, built from pull request 9 and
+  its rename finding, with the full verbatim transcripts of
+  its raw and packet passes kept beside the summary in the
+  task folder. The task stands as an additional task and its
+  numbers join no headline total.
+- Round 4 and round 6 sections in the corpus index, mapping
+  each incident of those rounds to its covering tests by
+  exact name and recording the record only repairs of each
+  round as uncovered in the open.
+- A size guard on the skill file in the skill validator, set
+  at 16000 characters with a 20 percent buffer under the
+  disclosed host cut, and a manifest conflict check in the
+  version gate that fails when a marketplace entry and the
+  plugin manifest both specify components under a strict
+  false entry.
+- A review report for the round 6 fix change itself, written
+  from the template in REVIEW.md at
+  `docs/reviews/round6-fix-review.md` with a real four way
+  disposition count of its own findings.
 
 ### Fixed
 
@@ -335,8 +360,9 @@ This unreleased work carries version 1.3.0.
   named, and the test files section no longer prints a false
   absence over it.
 - The copy fence now treats YAML structure as the syntax its
-  docstring always said it was. A flow mapping value is
-  skipped as structure and repeated list markers are stripped
+  docstring always said it was. The scalar values inside a
+  flow mapping are scanned as prose while its braces and key
+  marks stay exempt, and repeated list markers are stripped
   before the key test, so a nested sequence of mappings is
   read as structure, while plain prose values are judged in
   full as before.
@@ -353,3 +379,28 @@ This unreleased work carries version 1.3.0.
   braces and key marks stay exempt. The finding in the first
   populated review report now names the line range of its
   evidence, as the evidence rule in REVIEW.md requires.
+- A copied entry in a re-review interval no longer writes its
+  old side ranges under its source path. Those ranges describe
+  the delta of the copy and not an edit to the source, and
+  writing them overwrote the ranges of the source file its
+  own modification and flipped both verdicts on a modify and
+  copy shape inside a verified packet.
+- Findings path normalisation now covers the whole path. A
+  dot segment in the middle of a path, a doubled separator, a
+  backslash used as a separator, stray space before the
+  anchor colon, and a path written in decomposed Unicode
+  form are each accounted under the one plain composed
+  spelling of the file they name, while case is never folded.
+- The marketplace entry now sets strict to true, so the
+  plugin loads through the marketplace route. Both manifests
+  specify the skill, and under the strict false entry the
+  host refused to load the plugin for conflicting manifests
+  while the install command still reported success.
+- The YAML half of the copy fence now reads its lines
+  structurally. Key recognition accepts any scalar key a YAML
+  line can carry, a scalar that spans lines keeps its state
+  so a key shaped continuation line is judged as prose in
+  full, and a flow collection is read wherever it stands,
+  after an anchor or a tag or inside a flow sequence as much
+  as in the positions earlier rounds covered, while prose
+  values in every one of those shapes still flag.

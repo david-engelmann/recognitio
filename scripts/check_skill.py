@@ -5,8 +5,9 @@ Checks that the SKILL file exists where the skill format expects it,
 that its frontmatter names the skill after its directory, that the
 name follows the character rules of the skill specification, that
 the description is present and within the length limit the skill
-loaders enforce, and that the bundled extractor script exists and
-compiles.
+loaders enforce, that the whole skill file stays under the size
+limit that guards it against host truncation, and that the
+bundled extractor script exists and compiles.
 
 The name rules come from the specification. A name runs at most 64
 characters, uses lowercase letters and numbers and hyphens only,
@@ -29,6 +30,13 @@ SKILL_MD = SKILL_DIR / "SKILL.md"
 EXTRACT = SKILL_DIR / "scripts" / "extract.py"
 DESCRIPTION_LIMIT = 1024
 NAME_LIMIT = 64
+# The host reattaches each skill after a compaction cut at 20000
+# characters, so a skill that grows past that cut loses its tail
+# instructions for the rest of a session with no other signal.
+# The gate trips at 16000 characters, a 20 percent buffer under
+# the cut, while a move into a references file is still a small
+# edit rather than an emergency rewrite at the cliff edge.
+SKILL_TEXT_LIMIT = 16000
 NAME_CHARS = re.compile(r"^[a-z0-9-]+$")
 
 
@@ -90,7 +98,14 @@ def main():
         problems.append("missing skill file at %s" % SKILL_MD.relative_to(ROOT))
         fields = None
     else:
-        fields = parse_frontmatter(SKILL_MD.read_text(encoding="utf-8"))
+        skill_text = SKILL_MD.read_text(encoding="utf-8")
+        if len(skill_text) > SKILL_TEXT_LIMIT:
+            problems.append(
+                "SKILL.md runs %d characters, over the %d limit. "
+                "Move detail into a references file the skill "
+                "points at" % (len(skill_text), SKILL_TEXT_LIMIT)
+            )
+        fields = parse_frontmatter(skill_text)
         if fields is None:
             problems.append("SKILL.md has no readable frontmatter block")
 
