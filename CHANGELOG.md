@@ -7,6 +7,8 @@ Semantic Versioning.
 
 ## [Unreleased]
 
+This unreleased work carries version 1.3.0.
+
 ### Added
 
 - The recognitio skill in its first working version. The bundled
@@ -39,6 +41,24 @@ Semantic Versioning.
   research sketch and why.
 - Tests for the gate scripts themselves, for pull request mode with
   a stand in GitHub CLI, and for all three budget outcomes.
+- Plugin packaging. A plugin manifest and a marketplace listing
+  live under `.claude-plugin/`, the plugin manifest lists the
+  skill by its explicit path, and a version coherence gate keeps the version strings of
+  the plugin manifest, the marketplace listing, the extractor and
+  the changelog in agreement.
+- An eval layer under `evals/`. A paired run over four fixture
+  tasks with planted defects records what a reviewer finds from
+  the packet against what the same reviewer finds from the raw
+  diff, a saved trigger set scores the skill description, and a
+  corpus index maps the audit incidents to the tests that cover
+  them.
+- Review guidance for this repo in `REVIEW.md`, covering what
+  failure looks like here, the paths a reviewer may skip, a cap
+  on nits, a file and line evidence rule, and the audit until
+  dry stopping rule.
+- A trust and limits section in the readme, with a short mirror
+  in the skill text, stating what the extractor does and does
+  not do and what a verified packet does not prove.
 
 ### Fixed
 
@@ -151,3 +171,22 @@ Semantic Versioning.
 - The pipeline is split into named stage functions, and the
   packet write fails in the same clean voice as every other run
   failure instead of escaping as a traceback.
+- A filename carrying a newline can no longer forge packet
+  sections or corrupt its own line counts. The numstat parser
+  reads a path across newlines to the true end of its record,
+  and the packet escapes control characters wherever it names
+  a file, while the manifest keeps the true path as data.
+- Findings anchored to paths that never existed at the previous
+  reviewed revision or at the head are no longer counted as
+  addressed. They read unaddressed with the reason stated, so a
+  mistyped or crafted path cannot inflate the addressed summary.
+- A file that changed from binary content to text is receipted
+  by that transition instead of as marked binary by repository
+  attributes, and raw NUL bytes from the old binary side are
+  named in the packet rather than carried into its text.
+- Three generated packet sentences that carried banned marks are
+  plain sentences now, and the suite scans generated packet
+  prose for the marks over a binary change and over a re-review.
+- The skill validator now enforces the frontmatter name
+  character rules of the specification, so a rename or a second
+  skill cannot break them without the gate noticing.

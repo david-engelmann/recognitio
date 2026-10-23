@@ -1,0 +1,12 @@
+{
+  "base": {
+    "legacy.py": "def slugify(text):\n    return text.lower().replace(\" \", \"-\")\n",
+    "page.py": "from util import slugify\n\n\ndef heading(text):\n    return slugify(text)\n",
+    "util.py": "def slugify(text):\n    return text.lower().replace(\" \", \"-\")\n"
+  },
+  "head": {
+    "legacy.py": "def slugify(text):\n    return text.lower().replace(\" \", \"-\")\n",
+    "page.py": "from util import make_slug\n\n\ndef heading(text):\n    return make_slug(text)\n",
+    "util.py": "def make_slug(text):\n    return text.lower().replace(\" \", \"\")\n"
+  }
+}

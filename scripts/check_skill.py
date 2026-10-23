@@ -3,13 +3,22 @@
 
 Checks that the SKILL file exists where the skill format expects it,
 that its frontmatter names the skill after its directory, that the
-description is present and within the length limit the skill loaders
-enforce, and that the bundled extractor script exists and compiles.
+name follows the character rules of the skill specification, that
+the description is present and within the length limit the skill
+loaders enforce, and that the bundled extractor script exists and
+compiles.
+
+The name rules come from the specification. A name runs at most 64
+characters, uses lowercase letters and numbers and hyphens only,
+never starts or ends with a hyphen, and never holds two hyphens in
+a row. A future rename or a second skill could break those rules
+without any other check noticing, so the gate carries them.
 
 Exits nonzero with one line per problem when anything fails.
 """
 
 import py_compile
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -19,6 +28,32 @@ SKILL_DIR = ROOT / "skills" / "recognitio"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 EXTRACT = SKILL_DIR / "scripts" / "extract.py"
 DESCRIPTION_LIMIT = 1024
+NAME_LIMIT = 64
+NAME_CHARS = re.compile(r"^[a-z0-9-]+$")
+
+
+def name_problems(name):
+    """The specification character problems a skill name carries."""
+    problems = []
+    if len(name) > NAME_LIMIT:
+        problems.append(
+            "frontmatter name runs %d characters, over the %d limit"
+            % (len(name), NAME_LIMIT)
+        )
+    if not NAME_CHARS.match(name):
+        problems.append(
+            "frontmatter name %r uses characters outside lowercase "
+            "letters, numbers and hyphens" % name
+        )
+    if name.startswith("-") or name.endswith("-"):
+        problems.append(
+            "frontmatter name %r starts or ends with a hyphen" % name
+        )
+    if "--" in name:
+        problems.append(
+            "frontmatter name %r holds consecutive hyphens" % name
+        )
+    return problems
 
 
 def parse_frontmatter(text):
@@ -63,7 +98,9 @@ def main():
         name = fields.get("name", "")
         if not name:
             problems.append("frontmatter has no name field")
-        elif name != SKILL_DIR.name:
+        else:
+            problems.extend(name_problems(name))
+        if name and name != SKILL_DIR.name:
             # The directory is named recognitio by construction, so
             # this one check also keeps the skill from ever taking
             # the bundled code-review name.

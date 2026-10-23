@@ -1,0 +1,10 @@
+diff --git a/parse.py b/parse.py
+index 1a21324..165412f 100644
+--- a/parse.py
++++ b/parse.py
+@@ -1,2 +1,4 @@
+ def parse_port(text):
+-    return int(text)
++    if not text.isdigit():
++        return None
++    return int(text) + 1

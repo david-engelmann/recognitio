@@ -1,0 +1,21 @@
+diff --git a/page.py b/page.py
+index 289e682..9f2b1cc 100644
+--- a/page.py
++++ b/page.py
+@@ -1,5 +1,5 @@
+-from util import slugify
++from util import make_slug
+ 
+ 
+ def heading(text):
+-    return slugify(text)
++    return make_slug(text)
+diff --git a/util.py b/util.py
+index a34eedf..433289a 100644
+--- a/util.py
++++ b/util.py
+@@ -1,2 +1,2 @@
+-def slugify(text):
+-    return text.lower().replace(" ", "-")
++def make_slug(text):
++    return text.lower().replace(" ", "")
