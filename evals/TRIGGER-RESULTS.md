@@ -2,8 +2,9 @@
 
 This file records how the shipped skill description scored
 against the saved trigger set in this directory. The set was
-strengthened in round 2 and this file records the round 2 runs.
-The round 1 runs over the earlier set are history now, and the
+strengthened in round 2 and this file records the round 2 runs
+and the round 3 held out run that settled the proposal. The
+round 1 runs over the earlier set are history now, and the
 outcome they recorded was 19 of 20 by majority verdict with
 query 11 as the one misroute.
 
@@ -88,3 +89,53 @@ proposal was written against the old set, so this set is not
 held out data for it. The proposal should win repeated fresh
 passes before anyone applies it, and this round applies
 nothing.
+
+## Round 3 held out run
+
+The proposal text above was frozen as written before this run
+began, and it was not edited afterwards. A fresh held out set
+of twenty queries was written after the freeze. No query in
+the held out set appears in the saved trigger set in this
+directory, and the near misses are packet adjacent work of the
+same confusable kind as the strengthened set. The labels were
+fixed before any scoring pass ran.
+
+The held out should trigger queries ask to gather a diff with
+the functions around it, to bundle branch commits into a
+packet with their callers and tests, to rebuild a packet after
+an amend, to pull a single commit with its enclosing
+functions, to confirm a packet holds every file and hunk, to
+assemble a change with its history for reviewers, to package a
+pull request with the test files that touch it, to rebuild a
+packet after a rebase against the previous reviewed revision,
+to collect a hotfix range with the definitions of the names it
+changes, and to prepare an evidence pack with blame and prior
+work. The held out near misses ask to judge which findings in
+a packet are blockers, to approve a pull request, to write
+review comments from a packet, to patch the bug a packet
+points at, to draft release notes from a packet, to stamp a
+change as reviewed, to explain a packet in plain language, to
+write tests a packet calls for, to cherry pick the commits in
+a packet, and to turn packet findings into ranked tickets.
+
+Three passes scored each description. Every pass was judged
+by the outside model from round 2, openai/gpt-4o-mini through
+OpenRouter at temperature zero, given nothing but the
+description under test and the twenty queries in a shuffled
+order with no labels. The three passes used three different
+shuffles. The winner discipline for this run was fixed before
+the scores were read. The proposal would be applied only if
+it outscored the shipped description in total across the
+three passes and lost no single pass.
+
+The shipped description scored 19 of 20 in the first pass,
+19 of 20 in the second pass, and 20 of 20 in the third pass,
+for a total of 58 of 60. Its misses were the release notes
+near miss in the first pass and the local clone pull request
+query in the second pass. The proposal scored 20 of 20 in
+every pass, for a total of 60 of 60. The proposal won two
+passes and tied the third and lost none, so it met the
+discipline and it is applied to the skill file in this
+change. The shipped description the passes scored against is
+the text the proposal section above was written against, and
+the applied text is that proposal word for word.

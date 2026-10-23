@@ -10,12 +10,12 @@
     "--range",
     "HEAD~1..HEAD"
   ],
-  "created_utc": "2026-10-23T06:34:48.197596+00:00",
+  "created_utc": "2026-10-23T08:05:00.819528+00:00",
   "mode": "range",
   "label": "range HEAD~1..HEAD",
-  "base": "3f80507942e960215635593b9a92438e7b065818",
-  "head": "21ec2aa7a91343c9bdf487a872593b5067c07c06",
-  "merge_base": "3f80507942e960215635593b9a92438e7b065818",
+  "base": "8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672",
+  "head": "02fad663e902bb34aed684684c4897fd42aaa34d",
+  "merge_base": "8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672",
   "since": null,
   "pr": null,
   "files": [
@@ -71,8 +71,8 @@
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 229,
-      "emitted_tokens": 229,
+      "estimated_tokens": 223,
+      "emitted_tokens": 223,
       "files": 2
     },
     "T3": {
@@ -92,7 +92,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 975,
+    "estimated_tokens": 969,
     "dropped": []
   },
   "cap_notes": [],

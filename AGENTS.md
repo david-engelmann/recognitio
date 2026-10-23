@@ -142,6 +142,11 @@ The round 2 pass then escaped the cap notes, rebuilt the companion
 search on its NUL delimited records and one bulk search, deduped
 the findings accounting, hardened the version gate against wrong
 typed JSON, and made the copy fence discover its surfaces by rule.
-The owner dropped the branch ceremony on 2026-10-22 and `main`
-became the working branch the same evening. No release has been
-tagged yet.
+The round 3 pass then deduped the test files section by line,
+brought the bulk matcher under the same boundary rule as the per
+term search, restricted the version shape to ASCII digits, made
+the YAML half of the copy fence discover by the same rule as the
+Markdown half with one shared exclusion predicate, and settled the
+skill description on a held out trigger run. The owner dropped
+the branch ceremony on 2026-10-22 and `main` became the working
+branch the same evening. No release has been tagged yet.

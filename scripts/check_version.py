@@ -23,7 +23,12 @@ MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
 EXTRACT_PY = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
 
-VERSION_SHAPE = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+# The digit classes are written as ASCII ranges on purpose. A
+# backslash d class in a Python pattern also matches Unicode
+# decimal digits, so a version written with Arabic Indic digits
+# would pass the shape and agree across surfaces while not being
+# a version any tool can read.
+VERSION_SHAPE = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 VERSION_RE = re.compile(VERSION_SHAPE)
 EXTRACTOR_RE = re.compile(r'^EXTRACTOR_VERSION\s*=\s*"([^"]+)"', re.M)
 RELEASED_RE = re.compile(r"^## \[(%s)\]" % VERSION_SHAPE, re.M)

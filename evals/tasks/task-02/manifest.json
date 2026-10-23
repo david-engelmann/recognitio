@@ -6,16 +6,16 @@
     "--repo",
     "/home/hatch/workspace/recognitio-eval-scratch/task-02/repo",
     "--range",
-    "e637a54d903236c06074e403a16376d8d43d1600..770c08cd14543db9ee83ee2f14df6d3d3cd02151",
+    "9a422a7c8fdb57efb50b1fa93ba604bb52712e99..d6af5760ead34f0b2cf23e7dd2d643eaf28bfa4d",
     "--out",
     "/home/hatch/workspace/recognitio-eval-scratch/task-02/packet"
   ],
-  "created_utc": "2026-10-23T05:02:57.136491+00:00",
+  "created_utc": "2026-10-23T08:04:52.384142+00:00",
   "mode": "range",
-  "label": "range e637a54d903236c06074e403a16376d8d43d1600..770c08cd14543db9ee83ee2f14df6d3d3cd02151",
-  "base": "e637a54d903236c06074e403a16376d8d43d1600",
-  "head": "770c08cd14543db9ee83ee2f14df6d3d3cd02151",
-  "merge_base": "e637a54d903236c06074e403a16376d8d43d1600",
+  "label": "range 9a422a7c8fdb57efb50b1fa93ba604bb52712e99..d6af5760ead34f0b2cf23e7dd2d643eaf28bfa4d",
+  "base": "9a422a7c8fdb57efb50b1fa93ba604bb52712e99",
+  "head": "d6af5760ead34f0b2cf23e7dd2d643eaf28bfa4d",
+  "merge_base": "9a422a7c8fdb57efb50b1fa93ba604bb52712e99",
   "since": null,
   "pr": null,
   "files": [
@@ -58,8 +58,8 @@
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 214,
-      "emitted_tokens": 214,
+      "estimated_tokens": 206,
+      "emitted_tokens": 206,
       "files": 1
     },
     "T3": {
@@ -79,7 +79,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 783,
+    "estimated_tokens": 775,
     "dropped": []
   },
   "cap_notes": [],

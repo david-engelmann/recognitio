@@ -81,6 +81,20 @@ This unreleased work carries version 1.3.0.
   in the corpus index, and the path from that index to a
   runnable corpus stated in the index and in the decisions
   file with the remaining deferral and its reason.
+- A per pass notes file for the paired evals, naming who ran
+  each pass, the condition it held and what it reported, so the
+  record behind the results summary can be regraded.
+- A held out trigger run for the skill description. The
+  tightened proposal from round 1 was frozen, a fresh set of
+  twenty queries was written after the freeze, and three
+  description only passes scored both texts on that set. The
+  proposal won and the tightened description is applied to the
+  skill file in this change, with the boundary sentence that
+  the skill assembles evidence only.
+- A findings disposition count in the review report template
+  in REVIEW.md, sorting findings into fixed and wrong and
+  intentional and not worth it, so reviews that follow the
+  template produce the noise accounting signal.
 
 ### Fixed
 
@@ -257,3 +271,34 @@ This unreleased work carries version 1.3.0.
   released heading. The copy discovery skips dependency
   directories and symlinks that leave the tree, and a missing
   plugin manifest is reported instead of passing unscanned.
+- The test files section of the packet now dedupes its hits by
+  file and line before the matches cap applies, and the cap
+  note counts distinct lines. One line that matched the module
+  stem and two function names previously printed three times
+  and crowded distinct lines out of the section, and the saved
+  eval packets for tasks 01 and 02 and 05 carried the same
+  duplication and are regenerated in this change.
+- The bulk companion matcher now holds every term to the word
+  boundary rule at both ends, whatever characters the term
+  begins or ends with. Terms beginning with a dot or ending
+  with a hyphen and terms carrying non ASCII letters previously
+  gained hits in the bulk search that the per term grep
+  rejects, and a differential test over those terms now pins
+  the two searches to the same hits.
+- The version gate shape now admits ASCII digits only. A
+  version written with a Unicode decimal digit previously
+  passed the shape and agreed across every surface.
+- The YAML half of the copy fence now discovers its files by
+  the same location and suffix rule as the Markdown half, with
+  the comment span class kept for files whose values are code,
+  and the completeness walk and the discovery share one
+  exclusion predicate in the gate code so the two cannot
+  encode opposite rules for the same locations again. The
+  discovery exclusions are the rule that governs, because a
+  local tree holding a dependency directory or a virtual
+  environment is a normal contributor state and those files
+  are not authored prose.
+- The eval runner note now describes the current method in
+  full, three passes in a fixed order with the fair raw
+  condition and the clean control, where it previously still
+  described the two pass method round 2 replaced.

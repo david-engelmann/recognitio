@@ -14,6 +14,9 @@ suite measures the extractor. These files measure the skill.
   file that names the defects and the grading rule.
 - `RESULTS.md` records the paired run, its method and its
   numbers, with the limits stated beside them.
+- `PASS-NOTES.md` holds the per pass notes behind the results
+  summary, naming who ran each pass, the condition it held and
+  what it reported.
 - `trigger-set.md` holds the saved trigger queries and
   `TRIGGER-RESULTS.md` records how the shipped description
   scored against them.
@@ -40,13 +43,20 @@ a two-commit git history. The first commit is the base and the
 second is the change under review. A packet only counts when
 its manifest reports verified.
 
-Run the two passes in a fixed order. The raw pass reads only the
-diff and writes its findings down. The packet pass then reads
-only the packet and writes its findings down. Neither pass may
-open the planted file, and the planted file is opened only after
-both sets of notes exist. Grade each planted defect found or not
-found under the rule the planted file states, and write the
-numbers and the limits into RESULTS.md in the same change.
+Run the three passes in a fixed order. The raw pass reads only
+the diff and writes its findings down. The fair raw pass then
+reads the diff plus the list of files the change touches and
+writes its findings down. The packet pass then reads only the
+packet and writes its findings down. No pass may open the
+planted file, and the planted file is opened only after all
+three sets of notes exist. Grade each planted defect found or
+not found under the rule the planted file states. Run every
+pass over the clean control task as well, where the task plants
+nothing and every defect a pass reports counts as a false lead.
+Write the numbers and the limits into RESULTS.md in the same
+change, and write the per pass notes into PASS-NOTES.md in the
+same change, naming who ran each pass, the condition it held,
+and what it reported.
 
 A pass that wants the whole repo open has left the terms of the
 run. The question this eval answers is narrow. It asks what a

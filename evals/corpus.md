@@ -1,8 +1,9 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 1, and maps each one
-to the regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
+found, from the first cycle through round 1 and the round 3
+incidents in their own section below, and maps each one to the
+regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
 incident is recorded here as uncovered, with the gap stated in
 the open, and that gap is the finding the next round should
@@ -57,6 +58,17 @@ without reading three audit reports first.
 | A binary to text transition was receipted as marked binary by repository attributes | `test_transition_receipt_and_no_raw_nul_in_packet` in the extractor suite |
 | Raw NUL bytes from the old binary blob landed in the packet | `test_transition_receipt_and_no_raw_nul_in_packet` in the extractor suite |
 | Generated packet prose carried banned marks from the extractor strings | `test_packet_over_binary_and_generated_changes_is_clean` and `test_packet_over_a_rereview_is_clean` in the extractor suite |
+
+## Round 3 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| One test line printed once per term that matched it and the duplicates crowded the matches cap (RT3-01) | `test_a_line_matching_several_terms_prints_once_before_the_cap` in the extractor suite |
+| The bulk term matcher waived the boundary check at any end of a term outside the ASCII word set and gained hits the per term grep rejects (RT3-02) | `test_term_matches_line_holds_non_word_edges_to_boundaries` and `test_bulk_search_agrees_with_per_term_grep_on_edge_terms` in the extractor suite |
+| The version gate shape admitted Unicode digits, so a version written with an Arabic Indic digit passed as coherent (RT3-03) | `test_a_unicode_digit_version_is_not_a_version` in the gate script suite |
+| The YAML half of the copy fence stayed a two file hand list while the claims promised discovery by rule (ST3-01) | `test_discovery_extends_to_new_yaml_files_by_rule` and `test_a_new_yaml_issue_form_joins_the_fence` in the gate script suite, with the completeness walk in `test_fence_covers_every_authored_prose_file_in_the_tree` extended to the YAML class |
+| The completeness test walk encoded exclusion rules that contradicted the discovery exclusions (ST3-02) | `test_the_walk_and_discovery_share_one_exclusion_rule` in the gate script suite, with the walk and the discovery both calling the shared `is_fence_excluded` predicate in the copy gate |
+| The eval runner note still described the two pass method after round 2 moved to three conditions plus a clean control (SP3-01) | Uncovered. The repair is the runner note in `evals/README.md` itself, and no test pins the runner note prose |
 
 ## Disclosure incidents with no test of their own
 
