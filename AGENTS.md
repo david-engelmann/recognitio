@@ -39,8 +39,9 @@ not a gate.
   when the skill triggers.
 - `skills/recognitio/scripts/extract.py` is the extractor. It is
   stdlib only and runs against a local clone.
-- `tests/` holds the extractor suite. Fixture repositories are built
-  in temporary directories by the tests themselves.
+- `tests/` holds the extractor suite and the gate script suite.
+  Fixture repositories are built in temporary directories by the
+  tests themselves.
 - `scripts/` holds the gate checks and the smoke script.
   `scripts/check_packet.py` validates a packet directory before a
   review is stamped on it.
@@ -79,7 +80,12 @@ not a gate.
   job requires that exact identity on every non-merge commit of a
   pull request. Dependabot is exempt by actor, because its commits
   are machine made and cannot carry a sign-off, and the exemption
-  lives in the workflow file next to the check.
+  lives in the workflow file next to the check. The exemption keys
+  on the actor and not on the author of the commits. A re-run or a
+  reopen that a person triggers on a dependabot pull request names
+  that person as the actor, so the job runs on those events and
+  fails the machine made commits it was built to skip. That edge
+  is known and accepted.
 - Changelog entries go at the end of the `[Unreleased]` section of
   CHANGELOG.md. A released section is never edited after its tag.
 - Update this file in the same change that makes part of it wrong.
@@ -104,4 +110,8 @@ of the skill is built and landing on `dev`, with the extractor, the
 four tier model and the fail closed manifest in place. The first
 perfection cycle hardened the extractor against ambient git
 configuration, grew the tier content the design called for, and put
-the gate scripts under test. No release has been tagged yet.
+the gate scripts under test. The second cycle pinned object
+identity against replace refs, rebuilt the recount the first cycle
+added so ordinary content cannot fail or slip it, and closed the
+failure paths at the argument checking boundary. No release has
+been tagged yet.

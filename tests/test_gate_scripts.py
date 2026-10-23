@@ -43,14 +43,17 @@ class TestCheckCopy(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def run_main_on(self, files):
+    def run_main_on(self, files, comment_files=()):
         original = self.mod.PROSE_FILES
+        original_comments = self.mod.COMMENT_FILES
         self.mod.PROSE_FILES = files
+        self.mod.COMMENT_FILES = list(comment_files)
         try:
             with redirect_stderr(io.StringIO()):
                 return self.mod.main()
         finally:
             self.mod.PROSE_FILES = original
+            self.mod.COMMENT_FILES = original_comments
 
     def test_every_public_prose_surface_is_scanned(self):
         names = {str(path.relative_to(ROOT)) for path in self.mod.PROSE_FILES}
@@ -64,9 +67,96 @@ class TestCheckCopy(unittest.TestCase):
             ".github/pull_request_template.md",
             ".github/ISSUE_TEMPLATE/bug_report.md",
             ".github/ISSUE_TEMPLATE/feature_request.md",
+            ".github/ISSUE_TEMPLATE/config.yml",
             ".coderabbit.yaml",
         ):
             self.assertIn(expected, names)
+        comment_names = {
+            str(path.relative_to(ROOT)) for path in self.mod.COMMENT_FILES
+        }
+        for expected in (
+            ".github/workflows/ci.yml",
+            ".github/dependabot.yml",
+            "Makefile",
+            ".gitignore",
+        ):
+            self.assertIn(expected, comment_names)
+
+    def test_em_dash_in_issue_template_config_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yml",
+                "blank_issues_enabled: true\n"
+                "contact_links:\n"
+                "  - name: Readme\n"
+                "    url: https://example.com/readme\n"
+                "    about: What the skill does %s in plain words.\n"
+                % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_em_dash_in_a_workflow_comment_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "ci.yml",
+                "name: ci\n"
+                "\n"
+                "# The gate runs first %s always.\n"
+                "jobs:\n"
+                "  check:\n"
+                "    steps:\n"
+                "      - run: |\n"
+                "          echo one; echo two\n" % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([], [path]), 1)
+
+    def test_shell_code_in_a_run_block_is_not_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "ci.yml",
+                "name: ci\n"
+                "\n"
+                "# The gate runs first.\n"
+                "jobs:\n"
+                "  check:\n"
+                "    steps:\n"
+                "      - run: |\n"
+                "          echo \"needs: this; that\"; exit 1\n",
+            )
+            self.assertEqual(self.run_main_on([], [path]), 0)
+
+    def test_em_dash_in_a_makefile_comment_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "Makefile",
+                "# The gate for this repo %s run it first.\n"
+                "\n"
+                "PYTHON ?= python3\n"
+                "\n"
+                "check:\n"
+                "\tpython3 -m unittest discover -s tests\n" % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([], [path]), 1)
+
+    def test_em_dash_in_a_gitignore_comment_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, ".gitignore",
+                "# Extractor output %s working papers.\n"
+                "packet/\n" % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([], [path]), 1)
+
+    def test_em_dash_in_a_dependabot_comment_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "dependabot.yml",
+                "# Keep the pinned actions current %s weekly.\n"
+                "version: 2\n"
+                "updates:\n"
+                "  - package-ecosystem: \"github-actions\"\n" % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([], [path]), 1)
 
     def test_em_dash_beside_a_url_is_still_caught(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,10 +299,18 @@ class TestCheckPacket(unittest.TestCase):
             return self.mod.main([str(out), "--repo", str(self.repo)])
 
     def test_verified_packet_for_the_current_head_passes(self):
-        out = self.write_packet(
-            "good", {"verified": True, "head": self.head}
+        out = self.write_sections_packet(
+            "good",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
         )
         self.assertEqual(self.run_check(out), 0)
+
+    def test_a_manifest_without_sections_fails(self):
+        out = self.write_packet(
+            "nosections", {"verified": True, "head": self.head}
+        )
+        self.assertEqual(self.run_check(out), 1)
 
     def test_unverified_packet_fails(self):
         out = self.write_packet(
@@ -221,8 +319,11 @@ class TestCheckPacket(unittest.TestCase):
         self.assertEqual(self.run_check(out), 1)
 
     def test_packet_for_a_stale_head_fails(self):
-        out = self.write_packet(
-            "stale", {"verified": True, "head": "0" * 40}
+        out = self.write_sections_packet(
+            "stale",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
+            head="0" * 40,
         )
         self.assertEqual(self.run_check(out), 1)
 
@@ -250,6 +351,83 @@ class TestCheckPacket(unittest.TestCase):
         )
         (out / "manifest.json").write_text('["verified"]', encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
+
+    def write_sections_packet(self, name, sections, packet_text,
+                              head=None):
+        out = Path(self.tmp.name) / name
+        out.mkdir()
+        (out / "packet.md").write_text(packet_text, encoding="utf-8")
+        (out / "manifest.json").write_text(
+            json.dumps({
+                "verified": True,
+                "head": self.head if head is None else head,
+                "sections": sections,
+            }),
+            encoding="utf-8",
+        )
+        return out
+
+    def test_recorded_sections_present_and_filled_pass(self):
+        out = self.write_sections_packet(
+            "whole",
+            ["## T0 Triage", "## T2 Companions"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T2 Companions\n\nThe companions.\n",
+        )
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_a_thin_packet_wearing_a_full_manifest_fails(self):
+        out = self.write_sections_packet(
+            "thin",
+            ["## T0 Triage", "## T2 Companions", "## T3 History"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T2 Companions\n\nNot selected for this run.\n",
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_a_recorded_section_with_no_content_fails(self):
+        out = self.write_sections_packet(
+            "gutted",
+            ["## T0 Triage", "## T2 Companions"],
+            "# packet\n\n## T0 Triage\n\n"
+            "## T2 Companions\n\nThe companions.\n",
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_a_heading_inside_a_fence_satisfies_nothing(self):
+        out = self.write_sections_packet(
+            "fenced",
+            ["## T0 Triage", "## T3 History"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "````\n## T3 History\n\nQuoted text, not a section.\n````\n",
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_exported_git_dir_does_not_redirect_the_packet_check(self):
+        decoy = Path(self.tmp.name) / "decoy"
+        decoy.mkdir()
+        git(decoy, "init", "-b", "main")
+        git(decoy, "config", "user.email", "test@example.com")
+        git(decoy, "config", "user.name", "Test User")
+        git(decoy, "config", "commit.gpgsign", "false")
+        (decoy / "z.py").write_text("z = 1\n")
+        git(decoy, "add", "-A")
+        git(decoy, "commit", "-m", "decoy")
+        out = self.write_sections_packet(
+            "good",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
+        )
+        env = dict(os.environ)
+        env["GIT_DIR"] = str(decoy / ".git")
+        env["GIT_WORK_TREE"] = str(decoy)
+        original = os.environ
+        os.environ = env
+        try:
+            code = self.run_check(out)
+        finally:
+            os.environ = original
+        self.assertEqual(code, 0)
 
 
 SIGN_OFF = (
@@ -322,6 +500,24 @@ class TestDcoWorkflow(unittest.TestCase):
             % SIGN_OFF,
         )
         self.assertNotEqual(self.check(sha), 0)
+
+    def test_a_wrong_sign_off_identity_fails(self):
+        sha = self.commit_message(
+            "wrong.txt",
+            "A change\n\nSigned-off-by: Someone Else "
+            "<someone@example.invalid>\n",
+        )
+        self.assertNotEqual(self.check(sha), 0)
+
+    def test_the_workflow_exempts_dependabot_by_actor(self):
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "if: github.event_name == 'pull_request' && "
+            "github.actor != 'dependabot[bot]'",
+            workflow,
+        )
 
 
 if __name__ == "__main__":
