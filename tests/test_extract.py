@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
-EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 
 spec = importlib.util.spec_from_file_location("recognitio_extract", EXTRACT)
 extract_mod = importlib.util.module_from_spec(spec)

@@ -565,3 +565,37 @@ This unreleased work carries version 1.3.0.
 - The user facing tiers help text carried a semicolon no
   gate reached. The string is rewritten with no banned marks
   and a test scans the help output of the shipped scripts.
+- The canonical skill moved to `.agents/skills/recognitio/`
+  with a symlink into `.claude/skills/` for the home platform.
+  The skill validator now checks both spellings with the copy
+  direction pinned canonical to home, the copy fence scans the
+  canonical skill prose, the plugin and marketplace manifests
+  name the new skill path, and the install routes in the readme
+  name the canonical source. Two spellings of one skill can no
+  longer drift apart unnoticed.
+- The three spellings of the skill description are pinned in
+  the gate tests. A copy bar clean rewrite of the frontmatter
+  description or of either manifest blurb now fails the gate,
+  so the trigger results winner discipline cannot be broken
+  under a green gate.
+- The packaging manifests now load through a strict JSON reader
+  that refuses a repeated key. A duplicate version key in the
+  plugin manifest or the marketplace listing now fails the
+  version gate instead of silently resolving to the last value.
+- The marketplace listing is pinned to its single plugin entry.
+  A second entry naming the same skill under another name now
+  fails the gate.
+- A wrong typed strict key on a marketplace entry is now a
+  named problem. The string "false" no longer reads as strict
+  true in silence.
+- Four new gate messages in the eval checker that joined
+  clauses with a colon now follow the file's colon free
+  convention. The duplicated git config entry, the bare
+  contraction form in the denial pattern, the double blank line
+  in the skill text and the duplicated test helper are cleaned
+  up beside them.
+- Decision 3 carries an amended first event. The standalone
+  tool the old event named can never be built under the
+  program's ruling, so the event is now a provider adaptation
+  build whose brief needs the corpus rows as runnable skill
+  tasks for its evidence.

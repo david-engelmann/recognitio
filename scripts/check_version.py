@@ -20,8 +20,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
-EXTRACT_PY = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
+
+
+class DuplicateKeyError(ValueError):
+    """A JSON object holds the same key twice."""
+
+
+def _reject_duplicate_keys(pairs):
+    record = {}
+    for key, value in pairs:
+        if key in record:
+            raise DuplicateKeyError("repeated key %r" % (key,))
+        record[key] = value
+    return record
+
+
+def strict_json_loads(text):
+    """Parse JSON refusing a repeated key in any object.
+
+    A plain load keeps the last value of a repeated key in
+    silence, which lets a second version entry hide beside the
+    one the gate certifies. This is the same reader the eval
+    records load through in scripts/check_evals.py, kept as a
+    second copy because the gate scripts never import each
+    other. Every manifest this gate trusts loads through it.
+    """
+    return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
 
 # The digit classes are written as ASCII ranges on purpose. A
 # backslash d class in a Python pattern also matches Unicode
@@ -38,7 +64,7 @@ SECTION_RE = re.compile(r"^## \[", re.M)
 
 
 def plugin_version(text):
-    data = json.loads(text)
+    data = strict_json_loads(text)
     if not isinstance(data, dict):
         return None
     return data.get("version")
@@ -55,7 +81,7 @@ def marketplace_versions(text):
     at all certifies nothing, so that shape raises instead and
     the caller records it as a problem in the gate voice.
     """
-    data = json.loads(text)
+    data = strict_json_loads(text)
     if not isinstance(data, dict):
         return [None]
     versions = []
@@ -106,13 +132,18 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
     under the experimental object of the entry, which is the
     current home of themes. The server fields stand outside
     the set, and the round 6 probe confirmed an mcpServers
-    pair loads under strict false. Wrong typed input is left
-    to the version checks in this gate, which already name it.
+    pair loads under strict false. A strict key with the wrong
+    type is named as its own problem below, because the gate
+    cannot verify what the host does with a strict that is
+    neither true nor false nor absent.
     """
     try:
-        plugin = json.loads(plugin_text)
-        market = json.loads(marketplace_text)
-    except (json.JSONDecodeError, TypeError):
+        plugin = strict_json_loads(plugin_text)
+        market = strict_json_loads(marketplace_text)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        # A repeated key is named by the version readers below,
+        # so this function stays silent on unparsable input and
+        # never escapes as a traceback.
         return []
     if not isinstance(plugin, dict) or not isinstance(market, dict):
         return []
@@ -127,7 +158,22 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
         # and false. A missing strict key reads as true on the
         # host, so an entry that omits it appends its components
         # to the manifest and loads.
-        if entry.get("strict") is not False:
+        if "strict" not in entry:
+            continue
+        strict = entry["strict"]
+        if not isinstance(strict, bool):
+            # A wrong typed strict, such as the string "false",
+            # is not a false the host honors and not a true
+            # either. The gate cannot verify what the host does
+            # with it, so it fails loudly instead of silently
+            # reading it as strict true.
+            problems.append(
+                "marketplace entry %r sets strict to %r, which is "
+                "not a boolean, so the gate cannot tell how the "
+                "host reads it" % (entry.get("name"), strict)
+            )
+            continue
+        if strict is not False:
             continue
         experimental = entry.get("experimental")
         if not isinstance(experimental, dict):

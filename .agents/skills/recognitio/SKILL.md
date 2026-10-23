@@ -37,12 +37,11 @@ Follow these steps in order.
 Run the commands from the repository root, where the paths below resolve.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --pr 123 --out packet --repo .
-python3 skills/recognitio/scripts/extract.py --range main...feature --out packet --repo .
-python3 skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
-python3 skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --pr 123 --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
-
 
 When the host runs this skill in a forked subagent, the return to the main conversation carries only the packet directory, the manifest's verified flag, and the base, head, and merge base refs. The reviewer opens the packet file itself for the evidence and never works from a reprinted copy.
 

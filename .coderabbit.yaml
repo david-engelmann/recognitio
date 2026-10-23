@@ -51,7 +51,7 @@ reviews:
         mark as the replacement. Suggest short plain sentences
         instead. Flag claims about what the skill does that the
         README and SKILL files do not back.
-    - path: "skills/recognitio/**"
+    - path: ".agents/skills/recognitio/**"
       instructions: |
         The extractor reads local git only and never trusts a hosted
         API diff. The manifest fails closed, so flag any path that

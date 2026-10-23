@@ -64,11 +64,10 @@ tests and fixtures the index rows point at.
 A further note recorded on 2026-10-23 in round 4. The deferral
 above now carries an explicit trigger instead of an open ended
 one. The incident rows lift into a runnable suite at the first
-of three events. The first event is a decision to publish the
-extractor and the packet checker as a standalone tool that
-other agents or skills can delegate to, because such a tool
-needs the suite as its own regression evidence and gains a
-consumer that runs it on purpose. The second event is the
+of three events. The first event is a provider adaptation build
+whose brief needs the corpus rows as runnable skill tasks for its
+evidence, because such a build gains a consumer that runs the
+suite on purpose. The second event is the
 opening of any round whose brief asks for findings measured
 per tier per token, because that measurement needs tasks to
 run the skill against and the index rows are those tasks in
@@ -80,6 +79,19 @@ event based trigger rather than a date is that the cost the
 round 2 note names is duplication, and duplication is only
 worth paying when a consumer exists or when the program ends
 and the record must stand on its own.
+
+A further note recorded on 2026-10-23 in round 12. The first
+event above is amended through the plan-round10 section 7
+routing, and now reads as a provider adaptation build whose
+brief needs the corpus rows as runnable skill tasks for its
+evidence. The reason is that ruling 1 cancelled the standalone
+tool outright, so the event as written could never fire, while
+a provider adaptation build that needs incident replay tasks as
+its eval evidence is the consumer this program can actually
+produce. The second and third events stand unchanged. The
+shorthand at evals/corpus.md that names the first event as a
+standalone tool decision now defers to this amended wording,
+and the corpus file itself is untouched by this round.
 
 ## 4. Enforcement ships as a script and as prose
 

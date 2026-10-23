@@ -108,7 +108,7 @@ class TestCheckCopy(unittest.TestCase):
             "CHANGELOG.md",
             "CLAUDE.md",
             "docs/decisions.md",
-            "skills/recognitio/SKILL.md",
+            ".agents/skills/recognitio/SKILL.md",
             ".github/pull_request_template.md",
             ".github/ISSUE_TEMPLATE/bug_report.md",
             ".github/ISSUE_TEMPLATE/feature_request.md",
@@ -739,15 +739,28 @@ class TestCheckSkill(unittest.TestCase):
                 % (long_half, long_half),
                 encoding="utf-8",
             )
-            original = (self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT)
+            original = (
+                self.mod.SKILL_DIR,
+                self.mod.SKILL_MD,
+                self.mod.EXTRACT,
+                self.mod.HOME_SKILL_DIR,
+            )
             self.mod.SKILL_DIR = skill_dir
             self.mod.SKILL_MD = skill_md
-            self.mod.EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+            self.mod.EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
+            # The home spelling follows the overridden canonical, so
+            # the layout check reads the fixture and not the tree.
+            self.mod.HOME_SKILL_DIR = skill_dir
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
             finally:
-                self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
+                (
+                    self.mod.SKILL_DIR,
+                    self.mod.SKILL_MD,
+                    self.mod.EXTRACT,
+                    self.mod.HOME_SKILL_DIR,
+                ) = original
             self.assertEqual(code, 1)
             self.assertIn("over the 1024 limit", captured.getvalue())
 
@@ -757,15 +770,28 @@ class TestCheckSkill(unittest.TestCase):
             skill_dir.mkdir()
             skill_md = skill_dir / "SKILL.md"
             skill_md.write_text(text, encoding="utf-8")
-            original = (self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT)
+            original = (
+                self.mod.SKILL_DIR,
+                self.mod.SKILL_MD,
+                self.mod.EXTRACT,
+                self.mod.HOME_SKILL_DIR,
+            )
             self.mod.SKILL_DIR = skill_dir
             self.mod.SKILL_MD = skill_md
-            self.mod.EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+            self.mod.EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
+            # The home spelling follows the overridden canonical, so
+            # the layout check reads the fixture and not the tree.
+            self.mod.HOME_SKILL_DIR = skill_dir
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
             finally:
-                self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
+                (
+                    self.mod.SKILL_DIR,
+                    self.mod.SKILL_MD,
+                    self.mod.EXTRACT,
+                    self.mod.HOME_SKILL_DIR,
+                ) = original
             return code, captured.getvalue()
 
     def test_a_skill_file_past_the_size_limit_fails(self):
@@ -830,15 +856,28 @@ class TestCheckSkill(unittest.TestCase):
                 "---\nname: recog--nitio\ndescription: a packet\n---\n\n# X\n",
                 encoding="utf-8",
             )
-            original = (self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT)
+            original = (
+                self.mod.SKILL_DIR,
+                self.mod.SKILL_MD,
+                self.mod.EXTRACT,
+                self.mod.HOME_SKILL_DIR,
+            )
             self.mod.SKILL_DIR = skill_dir
             self.mod.SKILL_MD = skill_md
-            self.mod.EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+            self.mod.EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
+            # The home spelling follows the overridden canonical, so
+            # the layout check reads the fixture and not the tree.
+            self.mod.HOME_SKILL_DIR = skill_dir
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
             finally:
-                self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
+                (
+                    self.mod.SKILL_DIR,
+                    self.mod.SKILL_MD,
+                    self.mod.EXTRACT,
+                    self.mod.HOME_SKILL_DIR,
+                ) = original
             self.assertEqual(code, 1)
             self.assertIn("consecutive hyphens", captured.getvalue())
 
@@ -1225,33 +1264,37 @@ class TestCheckVersion(unittest.TestCase):
 
 
 class TestPluginPackaging(unittest.TestCase):
-    def test_plugin_manifest_names_the_skill_and_its_path(self):
-        data = json.loads(
-            (ROOT / ".claude-plugin" / "plugin.json").read_text(
-                encoding="utf-8"
-            )
+    def setUp(self):
+        self.mod = load_script("check_version")
+
+    def load_manifest(self, name):
+        # The pinning tests read through the strict reader, so a
+        # manifest with a repeated key fails here the same way it
+        # fails the version gate.
+        return self.mod.strict_json_loads(
+            (ROOT / ".claude-plugin" / name).read_text(encoding="utf-8")
         )
+
+    def test_plugin_manifest_names_the_skill_and_its_path(self):
+        data = self.load_manifest("plugin.json")
         self.assertEqual(data["name"], "recognitio")
-        self.assertEqual(data["skills"], ["./skills/recognitio/"])
+        self.assertEqual(data["skills"], ["./.agents/skills/recognitio/"])
         self.assertTrue(data["version"])
 
     def test_plugin_manifest_carries_the_owner_email(self):
-        data = json.loads(
-            (ROOT / ".claude-plugin" / "plugin.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        data = self.load_manifest("plugin.json")
         self.assertEqual(
             data["author"]["email"],
             "81196676+david-engelmann@users.noreply.github.com",
         )
 
     def test_marketplace_lists_the_plugin_with_its_skill_path(self):
-        data = json.loads(
-            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        data = self.load_manifest("marketplace.json")
+        # The listing carries exactly one plugin entry. A second
+        # entry naming the same skill under another name is the
+        # identity family in its purest form, so the gate pins
+        # the count, not just the recognitio entry.
+        self.assertEqual(len(data["plugins"]), 1, data["plugins"])
         entries = [p for p in data["plugins"] if p["name"] == "recognitio"]
         self.assertEqual(len(entries), 1, data["plugins"])
         self.assertEqual(entries[0]["source"], "./")
@@ -1259,13 +1302,557 @@ class TestPluginPackaging(unittest.TestCase):
         # the definition the host loads and the pair may both name
         # the skill without conflicting. Under strict false the
         # host refused to load this pair at all, as the round 6
-        # marketplace install run showed.
+        # marketplace install run showed. The strict value is
+        # pinned as a real boolean, because a wrong typed strict
+        # such as the string "false" must fail loudly instead of
+        # reading as strict true in silence.
+        self.assertIsInstance(entries[0]["strict"], bool)
         self.assertTrue(entries[0]["strict"])
         # The entry carries the skills list of the researched
         # official shape, naming the same path the plugin manifest
         # names, so a marketplace reader sees the skill the entry
-        # installs without opening the manifest first.
-        self.assertEqual(entries[0]["skills"], ["./skills/recognitio/"])
+        # installs without opening the manifest first. The two
+        # spellings are asserted coherent with each other, not
+        # just pinned to two literals that could drift apart in
+        # a later edit.
+        self.assertEqual(entries[0]["skills"], ["./.agents/skills/recognitio/"])
+        plugin = self.load_manifest("plugin.json")
+        self.assertEqual(entries[0]["skills"], plugin["skills"])
+
+    def test_a_repeated_key_in_plugin_json_fails(self):
+        text = (
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        evil = text.replace(
+            '"version":"1.3.0"', '"version":"9.9.9","version":"1.3.0"', 1
+        )
+        self.assertNotEqual(evil, text)
+        with self.assertRaises(self.mod.DuplicateKeyError):
+            self.mod.strict_json_loads(evil)
+
+    def test_a_repeated_key_in_marketplace_json_fails(self):
+        text = (
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        evil = text.replace('"version": "1.3.0"', '"version": "9.9.9", "version": "1.3.0"', 1)
+        self.assertNotEqual(evil, text)
+        with self.assertRaises(self.mod.DuplicateKeyError):
+            self.mod.strict_json_loads(evil)
+
+    def test_a_wrong_typed_strict_key_is_a_problem(self):
+        plugin_text = (
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        market_text = (
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        data = json.loads(market_text)
+        data["plugins"][0]["strict"] = "false"
+        problems = self.mod.manifest_conflict_problems(
+            plugin_text, json.dumps(data)
+        )
+        self.assertTrue(
+            any("not a boolean" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_missing_strict_key_stays_silent(self):
+        # A missing strict key reads as true on the host, so it is
+        # not a wrong typed key and must not be named.
+        plugin_text = (
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        market_text = (
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        data = json.loads(market_text)
+        del data["plugins"][0]["strict"]
+        problems = self.mod.manifest_conflict_problems(
+            plugin_text, json.dumps(data)
+        )
+        self.assertEqual(problems, [])
+
+
+class TestDescriptionPins(unittest.TestCase):
+    """The three spellings of the skill description are pinned.
+
+    The frontmatter description is the trigger identity the
+    TRIGGER-RESULTS.md winner discipline protects. No description
+    change ships without a winning scored run. The manifest
+    descriptions are the listing blurbs. A copy bar clean rewrite
+    of any of the three spellings must fail the gate, so each
+    text is pinned here. A deliberate change updates the
+    spelling, this pin, the trigger record and the changelog in
+    the same change, and the change notes say the description
+    change is a spec change and why.
+    """
+
+    FRONTMATTER_DESCRIPTION = (
+        "Extracts the changes from a pull request, a commit range, or a single "
+        "commit and assembles them with their surrounding context into one "
+        "verified packet, so a review can start from evidence instead of a bare "
+        "diff. Use it when someone asks to extract changes, pull a diff for "
+        "review, prepare a review packet, re-review a change after new commits, "
+        "or confirm that everything in a change is present before review "
+        "begins. The skill assembles evidence only. It does not conduct the "
+        "review itself, judge whether a change is safe to merge, or fix "
+        "findings."
+    )
+    MANIFEST_DESCRIPTION = (
+        "Assembles a pull request or a commit range from a local clone into one "
+        "verified review packet, so a review starts from evidence instead of a "
+        "bare diff."
+    )
+
+    def setUp(self):
+        self.skill_mod = load_script("check_skill")
+        self.version_mod = load_script("check_version")
+
+    def frontmatter_description(self):
+        text = (
+            ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        fields = self.skill_mod.parse_frontmatter(text)
+        self.assertIsNotNone(fields)
+        return fields["description"]
+
+    def manifest_description(self, name):
+        data = self.version_mod.strict_json_loads(
+            (ROOT / ".claude-plugin" / name).read_text(encoding="utf-8")
+        )
+        return data["description"]
+
+    def marketplace_entry_description(self):
+        data = self.version_mod.strict_json_loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        return data["plugins"][0]["description"]
+
+    def test_frontmatter_description_is_pinned(self):
+        self.assertEqual(
+            self.frontmatter_description(), self.FRONTMATTER_DESCRIPTION
+        )
+
+    def test_plugin_manifest_description_is_pinned(self):
+        self.assertEqual(
+            self.manifest_description("plugin.json"),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_marketplace_entry_description_is_pinned(self):
+        self.assertEqual(
+            self.marketplace_entry_description(),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+
+class TestCanonicalSkillLayout(unittest.TestCase):
+    """Build 2, the canonical skill at .agents/skills/recognitio.
+
+    The home platform spelling at .claude/skills/recognitio is a
+    symlink to the canonical. These tests run the red team's T1
+    to T10 adversarial plan against the build. Drift between the
+    spellings, version drift on each spelling, the pinned copy
+    direction, the symlink shape, the fence coverage of the new
+    location, both spellings through the skill validator, the
+    moved manifest pins, resolving command examples, slash
+    spellings of the packaged path, and the install route naming
+    the canonical source.
+    """
+
+    def setUp(self):
+        self.skill_mod = load_script("check_skill")
+        self.copy_mod = load_script("check_copy")
+        self.version_mod = load_script("check_version")
+
+    def make_layout(self, tmp, home_shape="symlink"):
+        root = Path(tmp) / "root"
+        canonical = root / ".agents" / "skills" / "recognitio"
+        home = root / ".claude" / "skills" / "recognitio"
+        shutil.copytree(
+            ROOT / ".agents" / "skills" / "recognitio", canonical
+        )
+        if home_shape == "symlink":
+            home.parent.mkdir(parents=True)
+            home.symlink_to(Path("../../.agents/skills/recognitio"))
+        else:
+            shutil.copytree(canonical, home)
+        return root
+
+    def layout_problems(self, root):
+        canonical = root / ".agents" / "skills" / "recognitio"
+        home = root / ".claude" / "skills" / "recognitio"
+        return self.skill_mod.layout_problems(canonical, home, root=root)
+
+    def run_main_on(self, root):
+        canonical = root / ".agents" / "skills" / "recognitio"
+        home = root / ".claude" / "skills" / "recognitio"
+        mod = self.skill_mod
+        original = (
+            mod.SKILL_DIR,
+            mod.SKILL_MD,
+            mod.EXTRACT,
+            mod.HOME_SKILL_DIR,
+        )
+        mod.SKILL_DIR = canonical
+        mod.SKILL_MD = canonical / "SKILL.md"
+        mod.EXTRACT = canonical / "scripts" / "extract.py"
+        mod.HOME_SKILL_DIR = home
+        try:
+            with redirect_stderr(io.StringIO()) as captured:
+                code = mod.main(root=root)
+        finally:
+            (
+                mod.SKILL_DIR,
+                mod.SKILL_MD,
+                mod.EXTRACT,
+                mod.HOME_SKILL_DIR,
+            ) = original
+        return code, captured.getvalue()
+
+    def test_the_shipped_home_spelling_is_a_symlink_to_canonical(self):
+        # T3. The copy direction is pinned structurally. The home
+        # spelling is a link, so it cannot drift and there is no
+        # sync step that could copy the wrong way.
+        home = ROOT / ".claude" / "skills" / "recognitio"
+        canonical = ROOT / ".agents" / "skills" / "recognitio"
+        self.assertTrue(home.is_symlink())
+        self.assertTrue(
+            os.path.samefile(home.resolve(), canonical.resolve())
+        )
+
+    def test_a_symlink_home_spelling_passes_the_layout(self):
+        # T1, T4. The symlink shape the build ships.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="symlink")
+            self.assertEqual(self.layout_problems(root), [])
+
+    def test_a_byte_identical_home_copy_passes_the_layout(self):
+        # T1, T4. The copy shape the build also accepts.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            self.assertEqual(self.layout_problems(root), [])
+
+    def test_a_symlink_pointing_elsewhere_fails(self):
+        # T1. A home spelling that resolves to another directory
+        # is a second instruction source.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="symlink")
+            other = root / "other"
+            other.mkdir()
+            (other / "SKILL.md").write_text(
+                "---\nname: recognitio\ndescription: other\n---\n",
+                encoding="utf-8",
+            )
+            home = root / ".claude" / "skills" / "recognitio"
+            home.unlink()
+            home.symlink_to(Path("../../other"))
+            problems = self.layout_problems(root)
+            self.assertTrue(problems, "expected a layout problem")
+            self.assertTrue(
+                any(".claude/skills/recognitio" in p for p in problems),
+                problems,
+            )
+
+    def test_a_symlink_leaving_the_tree_fails(self):
+        # T4. A home spelling that points outside the tree is a
+        # pointer at an uncontrolled skill.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="symlink")
+            outside = Path(tmp) / "outside"
+            outside.mkdir()
+            home = root / ".claude" / "skills" / "recognitio"
+            home.unlink()
+            home.symlink_to(outside)
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any("outside the tree" in p for p in problems), problems
+            )
+
+    def test_a_drifted_home_copy_fails_naming_the_file(self):
+        # T1. Plant A of the red team plan, drift in the home
+        # spelling only.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            home_md = root / ".claude" / "skills" / "recognitio" / "SKILL.md"
+            text = home_md.read_text(encoding="utf-8")
+            home_md.write_text(
+                text.replace("Judgement belongs", "Judgement stays"),
+                encoding="utf-8",
+            )
+            problems = self.layout_problems(root)
+            self.assertTrue(problems, "expected a layout problem")
+            self.assertTrue(
+                any("SKILL.md" in p and "drifted" in p for p in problems),
+                problems,
+            )
+
+    def test_an_extra_file_in_the_home_copy_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            (root / ".claude" / "skills" / "recognitio" / "EXTRA.md").write_text(
+                "# extra\n", encoding="utf-8"
+            )
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any("extra file" in p for p in problems), problems
+            )
+
+    def test_a_missing_home_spelling_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="symlink")
+            home = root / ".claude" / "skills" / "recognitio"
+            home.unlink()
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any("missing" in p for p in problems), problems
+            )
+
+    def test_drift_in_the_home_copy_fails_the_full_skill_gate(self):
+        # T1 against the real gate entry point, not just the
+        # layout function.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            home_md = root / ".claude" / "skills" / "recognitio" / "SKILL.md"
+            text = home_md.read_text(encoding="utf-8")
+            home_md.write_text(
+                text.replace("Judgement belongs", "Judgement stays"),
+                encoding="utf-8",
+            )
+            code, output = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertIn(".claude/skills/recognitio", output)
+
+    def test_drift_in_the_canonical_copy_fails_the_full_skill_gate(self):
+        # T1 plant B, drift in the canonical spelling only.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            canonical_md = (
+                root / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            )
+            text = canonical_md.read_text(encoding="utf-8")
+            canonical_md.write_text(
+                text.replace("Judgement belongs", "Judgement stays"),
+                encoding="utf-8",
+            )
+            code, output = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertIn(".agents/skills/recognitio", output)
+
+    def test_drift_never_flows_from_home_to_canonical(self):
+        # T3. After a failed gate on a drifted home copy, the
+        # canonical bytes are untouched. There is no sync step
+        # that could copy the drift the wrong way.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            canonical_md = (
+                root / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            )
+            before = canonical_md.read_bytes()
+            home_md = root / ".claude" / "skills" / "recognitio" / "SKILL.md"
+            home_md.write_text(
+                home_md.read_text(encoding="utf-8").replace(
+                    "Judgement belongs", "Judgement stays"
+                ),
+                encoding="utf-8",
+            )
+            code, _output = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertEqual(canonical_md.read_bytes(), before)
+
+    def test_extractor_version_drift_in_canonical_fails_coherence(self):
+        # T2. A version bearing drift on the canonical spelling.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            extract = (
+                root / ".agents" / "skills" / "recognitio"
+                / "scripts" / "extract.py"
+            )
+            text = extract.read_text(encoding="utf-8")
+            self.assertIn('EXTRACTOR_VERSION = "1.3.0"', text)
+            planted = text.replace(
+                'EXTRACTOR_VERSION = "1.3.0"',
+                'EXTRACTOR_VERSION = "1.3.1"',
+                1,
+            )
+            version = self.version_mod.extractor_version(planted)
+            self.assertEqual(version, "1.3.1")
+            problems = self.version_mod.coherence_problems(
+                {"EXTRACTOR_VERSION": version, "plugin.json": "1.3.0"}
+            )
+            self.assertTrue(
+                any("disagree" in p for p in problems), problems
+            )
+
+    def test_extractor_version_drift_in_home_copy_fails_layout(self):
+        # T2. The same plant on a real directory home spelling is
+        # caught by the layout check, because the copy is no longer
+        # byte identical to the canonical.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            extract = (
+                root / ".claude" / "skills" / "recognitio"
+                / "scripts" / "extract.py"
+            )
+            text = extract.read_text(encoding="utf-8")
+            extract.write_text(
+                text.replace(
+                    'EXTRACTOR_VERSION = "1.3.0"',
+                    'EXTRACTOR_VERSION = "1.3.1"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any("drifted" in p for p in problems), problems
+            )
+
+    def test_canonical_skill_md_is_discovered_exactly_once(self):
+        # T4, T5. The copy bar scans the canonical skill prose
+        # through the canonical path only. The home spelling is a
+        # symlink the discovery walk does not descend into, so no
+        # file is scanned twice and the canonical is not silently
+        # excluded by the dot directory rule.
+        names = [
+            str(p.relative_to(ROOT))
+            for p in self.copy_mod.discover_prose_files()
+        ]
+        self.assertIn(".agents/skills/recognitio/SKILL.md", names)
+        self.assertEqual(
+            names.count(".agents/skills/recognitio/SKILL.md"), 1
+        )
+        self.assertEqual(
+            [n for n in names if n.startswith(".claude/skills/")], []
+        )
+
+    def test_dot_directories_without_skill_prose_stay_excluded(self):
+        # T5. The exclusion fix is surgical. Tool directories are
+        # still outside the fence.
+        self.assertTrue(
+            self.copy_mod.is_fence_excluded(
+                ROOT, ROOT / ".venv" / "lib" / "x.md"
+            )
+        )
+        self.assertFalse(
+            self.copy_mod.is_fence_excluded(
+                ROOT, ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            )
+        )
+        self.assertFalse(
+            self.copy_mod.is_fence_excluded(
+                ROOT, ROOT / ".github" / "workflows" / "ci.yml"
+            )
+        )
+
+    def test_a_broken_name_in_home_spelling_fails_naming_it(self):
+        # T6. Each spelling goes through the validator on its own.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            home_md = root / ".claude" / "skills" / "recognitio" / "SKILL.md"
+            home_md.write_text(
+                "---\nname: recog--nitio\ndescription: a packet\n---\n\n# X\n",
+                encoding="utf-8",
+            )
+            code, output = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertIn(".claude/skills/recognitio", output)
+            self.assertIn("consecutive hyphens", output)
+
+    def test_a_broken_name_in_canonical_spelling_fails_naming_it(self):
+        # T6. The canonical spelling gets the same treatment.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            canonical_md = (
+                root / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            )
+            canonical_md.write_text(
+                "---\nname: recog--nitio\ndescription: a packet\n---\n\n# X\n",
+                encoding="utf-8",
+            )
+            code, output = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertIn(".agents/skills/recognitio", output)
+            self.assertIn("consecutive hyphens", output)
+
+    def test_skill_command_examples_resolve_at_both_spellings(self):
+        # T8. Every example path in the shipped SKILL.md resolves
+        # to a file at the canonical spelling and through the home
+        # spelling, so the move cannot leave stale paths the copy
+        # scan never checks.
+        text = (
+            ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        paths = re.findall(r"python3 (\S+)", text)
+        self.assertTrue(paths, "expected command examples in SKILL.md")
+        for path in paths:
+            self.assertTrue(
+                (ROOT / path).is_file(), "example path missing: %s" % path
+            )
+            self.assertTrue(
+                path.startswith(".agents/skills/recognitio/"),
+                "example path outside the canonical skill: %s" % path,
+            )
+            home_path = path.replace(
+                ".agents/skills/recognitio/",
+                ".claude/skills/recognitio/",
+                1,
+            )
+            self.assertTrue(
+                (ROOT / home_path).is_file(),
+                "example path missing at home spelling: %s" % home_path,
+            )
+
+    def test_a_backslash_skills_path_fails_the_manifest_pin(self):
+        # T9. A backslash spelling of the packaged path is a
+        # different string and must fail the pin, never read as
+        # the same pointer.
+        data = self.version_mod.strict_json_loads(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        data["skills"] = [".\\.agents\\skills\\recognitio\\"]
+        with self.assertRaises(AssertionError):
+            self.assertEqual(
+                data["skills"], ["./.agents/skills/recognitio/"]
+            )
+
+    def test_a_no_dot_slash_skills_path_fails_the_manifest_pin(self):
+        # T9. The plant H restyle, accepted silently before the
+        # pins.
+        data = self.version_mod.strict_json_loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        data["plugins"][0]["skills"] = [".agents/skills/recognitio"]
+        with self.assertRaises(AssertionError):
+            self.assertEqual(
+                data["plugins"][0]["skills"],
+                ["./.agents/skills/recognitio/"],
+            )
+
+    def test_readme_install_route_names_the_canonical_source(self):
+        # T10. The folder copy route installs from the canonical
+        # skill, not from the old location.
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("cp -r .agents/skills/recognitio", text)
+        self.assertNotIn("cp -r skills/recognitio", text)
 
 
 class TestCheckPacket(unittest.TestCase):
@@ -1532,11 +2119,11 @@ class TestCheckEvals(unittest.TestCase):
         shutil.copytree(ROOT / "tests", root / "tests")
         shutil.copytree(ROOT / "scripts", root / "scripts")
         skill_scripts = (
-            root / "skills" / "recognitio" / "scripts"
+            root / ".agents" / "skills" / "recognitio" / "scripts"
         )
         skill_scripts.mkdir(parents=True)
         shutil.copy2(
-            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
+            ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py",
             skill_scripts / "extract.py",
         )
         return root
@@ -1734,7 +2321,7 @@ class TestCheckEvals(unittest.TestCase):
             (task / "diff.patch").write_bytes(diff)
             out = work / "out"
             extract = (
-                root / "skills" / "recognitio" / "scripts" / "extract.py"
+                root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
             )
             run = subprocess.run(
                 [sys.executable, str(extract), "--repo", str(repo),
@@ -1970,7 +2557,7 @@ class TestCheckEvals(unittest.TestCase):
             (task / "diff.patch").write_bytes(diff)
             out = work / "out"
             extract = (
-                root / "skills" / "recognitio" / "scripts" / "extract.py"
+                root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
             )
             run = subprocess.run(
                 [sys.executable, str(extract), "--repo", str(repo),
@@ -2139,7 +2726,7 @@ class TestCheckEvals(unittest.TestCase):
 
     def test_help_output_carries_no_banned_marks(self):
         scripts = [
-            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
+            ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py",
             ROOT / "scripts" / "check_evals.py",
             ROOT / "scripts" / "check_packet.py",
         ]

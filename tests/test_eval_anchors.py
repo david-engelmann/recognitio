@@ -30,6 +30,21 @@ def load_script(name):
     return module
 
 
+def copy_fixture(tmp):
+    """A scratch tree with the evals, tests, scripts and skill extractor."""
+    root = Path(tmp) / "root"
+    shutil.copytree(ROOT / "evals", root / "evals")
+    shutil.copytree(ROOT / "tests", root / "tests")
+    shutil.copytree(ROOT / "scripts", root / "scripts")
+    skill_scripts = root / ".agents" / "skills" / "recognitio" / "scripts"
+    skill_scripts.mkdir(parents=True)
+    shutil.copy2(
+        ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py",
+        skill_scripts / "extract.py",
+    )
+    return root
+
+
 class TestFenceGraderTightening(unittest.TestCase):
     """The grader needs evidence level ties, not token presence."""
 
@@ -92,19 +107,6 @@ class TestEffectAnchors(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_evals")
 
-    def copy_fixture(self, tmp):
-        root = Path(tmp) / "root"
-        shutil.copytree(ROOT / "evals", root / "evals")
-        shutil.copytree(ROOT / "tests", root / "tests")
-        shutil.copytree(ROOT / "scripts", root / "scripts")
-        skill_scripts = root / "skills" / "recognitio" / "scripts"
-        skill_scripts.mkdir(parents=True)
-        shutil.copy2(
-            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
-            skill_scripts / "extract.py",
-        )
-        return root
-
     def task06_sources(self):
         path = ROOT / "evals" / "tasks" / "task-06" / "sources.json"
         return json.loads(path.read_text(encoding="utf-8"))
@@ -147,7 +149,7 @@ class TestEffectAnchors(unittest.TestCase):
 
     def test_task01_three_argument_tamper_fails_the_task_anchor(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = self.copy_fixture(tmp)
+            root = copy_fixture(tmp)
             sources_path = root / "evals" / "tasks" / "task-01" / "sources.json"
             sources = json.loads(sources_path.read_text(encoding="utf-8"))
             sources["head"]["shop.py"] = (
@@ -175,22 +177,9 @@ class TestAgreementPin(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_evals")
 
-    def copy_fixture(self, tmp):
-        root = Path(tmp) / "root"
-        shutil.copytree(ROOT / "evals", root / "evals")
-        shutil.copytree(ROOT / "tests", root / "tests")
-        shutil.copytree(ROOT / "scripts", root / "scripts")
-        skill_scripts = root / "skills" / "recognitio" / "scripts"
-        skill_scripts.mkdir(parents=True)
-        shutil.copy2(
-            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
-            skill_scripts / "extract.py",
-        )
-        return root
-
     def test_a_single_summary_move_fails_the_agreement_check(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = self.copy_fixture(tmp)
+            root = copy_fixture(tmp)
             target = root / "evals" / "RESULTS.md"
             text = target.read_text(encoding="utf-8")
             text = re.sub(

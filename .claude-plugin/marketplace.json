@@ -16,7 +16,7 @@
       "strict": true,
       "version": "1.3.0",
       "skills": [
-        "./skills/recognitio/"
+        "./.agents/skills/recognitio/"
       ]
     }
   ]

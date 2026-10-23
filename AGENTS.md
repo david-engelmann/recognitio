@@ -7,9 +7,12 @@ single source of agent guidance here, and CLAUDE.md points at it.
 
 Recognitio is an agent skill that pulls the relevant changes out of
 a pull request or a commit range and assembles them into a verified
-review packet. The packet is called the pericope. The skill lives in
-`skills/recognitio/` and its extractor is the script at
-`skills/recognitio/scripts/extract.py`.
+review packet. The packet is called the pericope. The canonical
+skill lives in `.agents/skills/recognitio/` and its extractor is
+the script at `.agents/skills/recognitio/scripts/extract.py`. A
+symlink at `.claude/skills/recognitio` points at the canonical
+skill for the home platform, so the two spellings are one skill
+and the canonical is the only spelling that ever changes.
 
 The skill assembles evidence and nothing more. Judgement about the
 code belongs to the review skill that reads the packet downstream.
@@ -56,9 +59,11 @@ not a gate.
 
 ## Layout map
 
-- `skills/recognitio/SKILL.md` holds the skill text an agent reads
-  when the skill triggers.
-- `skills/recognitio/scripts/extract.py` is the extractor. It is
+- `.agents/skills/recognitio/SKILL.md` holds the skill text an agent reads
+  when the skill triggers. It is the canonical copy. The home
+  platform spelling at `.claude/skills/recognitio/` is a symlink
+  to it, so edits land in the canonical copy only.
+- `.agents/skills/recognitio/scripts/extract.py` is the extractor. It is
   stdlib only and runs against a local clone.
 - `tests/` holds the extractor suite and the gate script suite.
   Fixture repositories are built in temporary directories by the
@@ -221,6 +226,17 @@ and paths fields, tightened the task-06 planted grading rule
 against note plants that deny imports and against doubled operand
 overcounting, and anchored each of tasks 01 to 04 with a planted
 defect probe against the rebuilt head beside a clean behavior
-anchor for task-05. The owner dropped
+anchor for task-05. The round 12 pass then moved the canonical
+skill to `.agents/skills/recognitio/` with a symlink into
+`.claude/skills/` for the home platform, taught the skill
+validator and the copy fence to cover both spellings with the
+copy direction pinned canonical to home, pinned the three
+spellings of the skill description against silent rewrites,
+refused repeated keys in the packaging manifests, pinned the
+marketplace listing to its single plugin entry, named a wrong
+typed strict key as its own problem, rewrote the new gate
+messages to the file's colon free convention, and amended the
+first event of decision 3 after the standalone tool ruling
+cancelled it. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

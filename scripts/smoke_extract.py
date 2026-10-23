@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHECK_PACKET = ROOT / "scripts" / "check_packet.py"
 
 GIT_ENV = dict(

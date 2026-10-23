@@ -123,7 +123,6 @@ GIT_PIN = [
     "-c", "color.diff=false",
     "-c", "color.status=false",
     "-c", "color.grep=false",
-    "-c", "color.status=false",
     "-c", "grep.column=false",
     "-c", "diff.interHunkContext=0",
 ]
@@ -409,7 +408,11 @@ def task06_grade_fence(fence, d1_file, old_module, operand):
     d2_denial_pat = (
         r"\bno\s+(?:doubling|doubled|defect)\b"
         r"|\bnot\s+(?:doubled|found)\b"
-        r"|\bnever\b|n't\b|\bwithout\b"
+        r"|\bisn't\s+doubled\b|\bwasn't\s+doubled\b"
+        r"|\baren't\s+doubled\b|\bweren't\s+doubled\b"
+        r"|\bdon't\s+double\b|\bdoesn't\s+double\b"
+        r"|\bdidn't\s+double\b"
+        r"|\bnever\b|\bwithout\b"
     )
     d2 = any(
         (
@@ -504,12 +507,13 @@ def _anchor_import_breaks(repo, d1_file):
     if run.returncode == 0:
         return (
             "the planted D1 defect of task-06 no longer stands in "
-            "the rebuilt head: importing %s succeeds" % module
+            "the rebuilt head with %s, and its import succeeds" % module
         )
     if "ModuleNotFoundError" not in run.stderr and "ImportError" not in run.stderr:
         return (
             "the planted D1 defect of task-06 no longer stands in "
-            "the rebuilt head: importing %s fails without an import error" % module
+            "the rebuilt head with %s failing to import and no "
+            "import error raised" % module
         )
     return None
 
@@ -554,7 +558,8 @@ def _anchor_doubled_result(repo, new_module, func_name, sample=(1, 2, 3)):
     if result != 2 * sum(sample):
         return (
             "the planted D2 defect of task-06 no longer stands in "
-            "the rebuilt head: %s(%s) returns %r instead of the doubled %r"
+            "the rebuilt head with %s(%s) returning %r instead of "
+            "the doubled %r"
             % (func_name, list(sample), result, 2 * sum(sample))
         )
     return None
@@ -838,7 +843,7 @@ def task_anchor_problems(root, task_name):
             for message, code, expect in TASK_ANCHOR_PROBES[task_name]:
                 failure = _run_anchor_probe(repo, code, expect)
                 if failure is not None:
-                    problems.append("%s: %s" % (message, failure))
+                    problems.append("%s with %s" % (message, failure))
             return problems
     except (
         OSError,
@@ -1194,7 +1199,7 @@ def rebuild_problems(root, task_dir, tmp):
             "its sources" % task_dir.name
         )
     out = Path(tmp) / "out"
-    extract = root / "skills" / "recognitio" / "scripts" / "extract.py"
+    extract = root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
     run = subprocess.run(
         [sys.executable, str(extract), "--repo", str(repo),
          "--range", "%s..%s" % (base, head),

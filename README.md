@@ -39,7 +39,7 @@ npx skills add david-engelmann/recognitio
 The folder copy route still works by hand. Copy the skill folder into any skills directory your agent reads.
 
 ```bash
-cp -r skills/recognitio ~/.claude/skills/recognitio
+cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 ```
 
 The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
@@ -49,38 +49,38 @@ The extractor needs Python 3.10 or newer and git, and pull request mode also nee
 Extract a pull request by number. The base and head are resolved with the GitHub CLI and the extraction itself runs on local git objects. Both refs must already live in the local clone. When either one is missing the run stops and says to fetch it, because guessing from a same named local branch would build a packet for the wrong change.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --pr 123 --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --pr 123 --out packet --repo .
 ```
 
 Extract a commit range. Both spellings work and both use merge base semantics, so the packet shows what the head proposes rather than drift from the base branch.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --range main...feature --out packet --repo .
-python3 skills/recognitio/scripts/extract.py --range main..feature --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main..feature --out packet --repo .
 ```
 
 Extract a single commit against its parent.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --commit HEAD --out packet --repo .
 ```
 
 Re-review after new commits land. The since ref is a re-review input that rides along with any mode, and the packet gains a section with the new commits and a range diff against the previous series. Pass a findings file and the section also marks each prior finding addressed or unaddressed. The findings file holds one finding per line in the form `path:line: text`.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --out packet --repo .
 ```
 
 Set a token budget on a large change. The budget is an approximate token count taken as characters divided by four, and the accounting covers the whole packet, header and notes and re-review section included.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --range main...feature --budget 60000 --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --budget 60000 --out packet --repo .
 ```
 
 Choose tiers directly when a review only needs part of the packet. Triage and the change always stay in.
 
 ```bash
-python3 skills/recognitio/scripts/extract.py --range main...feature --tiers 0-1 --out packet --repo .
+python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --tiers 0-1 --out packet --repo .
 ```
 
 A run that builds a packet writes two files into the output directory. The packet file is the reading document, and its title calls it the pericope for the change. The manifest file is the receipt, with the resolved refs, the command that produced it, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A run that fails, at argument checking or later, removes any earlier packet from the directory first and leaves a manifest whose verified flag is false, so a stale packet can never stand as the result of the latest run, as long as the run named an output directory.

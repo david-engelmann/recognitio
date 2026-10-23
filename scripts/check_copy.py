@@ -42,18 +42,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Hidden directories whose files are authored prose the bar
+# reaches. Every other hidden directory holds tool or dependency
+# state and stays outside the fence.
+_PUBLIC_DOT_DIRS = (".github", ".agents", ".claude")
+
+
 def is_fence_excluded(root, path):
     """Whether a path stands outside the fence by the shared rule.
 
     Local dependency and tool directories are not authored prose,
     so a file under a hidden directory other than the GitHub
-    config directory, or under a node_modules directory, stays
-    outside the fence, and so does a symlink whose target leaves
-    the tree. The generated eval packets stay outside it for the
-    reason the module docstring records. Discovery and the fence
-    completeness walk in the gate tests both call this one
-    predicate, so the two can never encode opposite rules for
-    the same locations again.
+    config directory or the skill directories, or under a
+    node_modules directory, stays outside the fence, and so does
+    a symlink whose target leaves the tree. The skill directories
+    .agents/skills and .claude/skills hold authored skill prose
+    by design, so they stay inside the fence. The generated eval
+    packets stay outside it for the reason the module docstring
+    records. Discovery and the fence completeness walk in the
+    gate tests both call this one predicate, so the two can never
+    encode opposite rules for the same locations again.
     """
     try:
         rel = path.relative_to(root)
@@ -62,7 +70,7 @@ def is_fence_excluded(root, path):
     parts = rel.parts
     if any(
         part == "node_modules"
-        or (part.startswith(".") and part != ".github")
+        or (part.startswith(".") and part not in _PUBLIC_DOT_DIRS)
         for part in parts[:-1]
     ):
         return True
