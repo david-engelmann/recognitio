@@ -2521,7 +2521,7 @@ def parse_args(argv):
     )
     parser.add_argument(
         "--tiers", default=None,
-        help="tier selection such as 0-3 or 0,1; T0 and T1 always included",
+        help="tier selection such as 0-3 or 0,1. T0 and T1 always included",
     )
     parser.add_argument(
         "--findings", default=None,

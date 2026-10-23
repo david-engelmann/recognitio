@@ -170,6 +170,34 @@ This unreleased work carries version 1.3.0.
   from the template in REVIEW.md at
   `docs/reviews/round8-fix-review.md` with a real four way
   disposition count of its own findings.
+- A task-06 score re-derivation in the eval integrity gate,
+  which parses the planted grading rule, verifies that each
+  planted defect still stands in the head rebuilt from the
+  sources file, grades each transcript fence under the rule
+  and fails when the derived scores disagree with the
+  recorded sentences in the results file and the per pass
+  notes. Each task sources file is anchored under a digest
+  record at `evals/source-anchors.json` that stands apart
+  from the checksum refresh, and each corpus section is
+  pinned under a coverage record at
+  `evals/corpus-coverage.json` with the same standing. The
+  checksum record now covers the corpus index as well, loads
+  through a strict reader that refuses a repeated key, and
+  spells its keys with forward slashes on every host.
+  Sixteen pinning tests cover the new checks.
+- A round 9 section in the corpus index, mapping each
+  incident of that round to its covering tests by exact name
+  and recording the record only repairs of the round as
+  uncovered in the open, with the round 8 section completed
+  to cover the two repairs its first writing had missed.
+- A review report for the round 9 fix change itself, written
+  from the template in REVIEW.md at
+  `docs/reviews/round9-fix-review.md` with a real four way
+  disposition count of its own findings.
+- The agent conventions for the new shipping rule, with review
+  changes landing on `main` by direct push of their reviewed
+  commits and the coordinator checking the sign off trailers the
+  CI DCO job no longer sees on the push path.
 
 ### Fixed
 
@@ -496,3 +524,44 @@ This unreleased work carries version 1.3.0.
   exemption now names the one legacy key it exists for,
   and a test deletes a key from every entry to pin the
   narrower rule.
+- The totals check guarded sums and headlines only, so a
+  moved per task score distribution and an upgraded task-06
+  transcript each passed the gate after the documented
+  checksum refresh. The gate now re-derives the task-06 raw
+  and packet scores from its transcript fences, its planted
+  grading rule and its rebuilt artefacts, and fails when the
+  derived scores disagree with the recorded summaries. A
+  moved distribution over tasks 01 to 05 stands as a
+  deliberate residual in decision 8 of the decisions file,
+  because those passes survive only as curated notes.
+- The rebuild check anchored each task to its own sources
+  file, so tampering the sources and regenerating the
+  artefacts from them passed the gate after a checksum
+  refresh. The digest of each task sources file now stands
+  in the source anchor record apart from the refreshable
+  checksum record, the checksum refresh refuses to run while
+  an anchor is stale, and the task-06 check verifies that
+  each planted defect still stands in the rebuilt head.
+- A duplicate key in the checksum record silently overrode
+  the pin, because a plain JSON load keeps the last value of
+  a repeated key with no refresh step at all. Every record
+  the gate trusts now loads through a strict reader that
+  refuses a repeated key in any object.
+- The checksum record keys were built from the host path
+  spelling, so the gate failed on a pristine Windows tree
+  and the refresh path would have rewritten the record in
+  the local spelling. Record keys now use the forward slash
+  spelling on every host.
+- The corpus check named only cited test names the suite
+  lacks and the corpus index itself stood outside the
+  checksum record, so a dropped row or a quietly dropped
+  citation passed the gate. The checksum record now covers
+  the corpus index and a per section coverage record fails a
+  dropped row or citation even after a checksum refresh.
+- The round 8 corpus section stopped two repairs short of the
+  end of its own landing, leaving the fixture teardown repair
+  and the narrowed manifest key exemption with no row. Both
+  repairs are now mapped to their tests in that section.
+- The user facing tiers help text carried a semicolon no
+  gate reached. The string is rewritten with no banned marks
+  and a test scans the help output of the shipped scripts.

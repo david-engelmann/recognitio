@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 8, with each round
+found, from the first cycle through round 9, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -199,10 +199,19 @@ fence test set for its behaviour (R7-01).
 | --- | --- |
 | No gate guarded the eval artefacts, so a quiet edit to a transcript fence or a planted grading rule or a recorded results cell left the gate green (R8-RT-01) | `test_a_transcript_edit_fails_naming_its_file` and `test_a_planted_rule_edit_fails_naming_its_file` and `test_a_results_cell_edit_fails_the_totals_check` and `test_a_tampered_diff_fails_the_rebuild` and `test_the_checksum_record_regenerates_and_then_passes` in the gate script suite, with `test_the_real_eval_artefacts_pass` in the gate script suite pinning the pristine tree and `test_a_task_with_crlf_sources_rebuilds_byte_for_byte` and `test_a_manifest_entry_missing_a_key_fails_the_rebuild` and `test_a_non_object_manifest_is_a_problem_not_a_crash` in the gate script suite pinning the rebuild shapes the CodeRabbit answers on pull request 12 hardened |
 | No gate compared the corpus index against the suite, so a renamed test silently orphaned its rows (R8-RT-02) | `test_a_renamed_cited_test_fails_the_corpus_check` and `test_a_corpus_name_that_never_existed_fails` in the gate script suite, with `test_the_real_eval_artefacts_pass` in the gate script suite pinning the pristine index against the suite |
+| A fixture teardown that met a genuinely unremovable tree raised out of cleanup after a bounded retry instead of passing in silence (CodeRabbit repair on pull request 12) | `test_cleanup_retries_a_removal_that_fails_once` and `test_cleanup_retries_when_a_child_path_vanishes_mid_removal` and `test_cleanup_raises_after_the_bound_when_removal_always_fails` in the extractor suite and in the gate script suite |
+| The manifest entry comparison exempted a legacy key everywhere instead of only where no saved entry carries it (CodeRabbit repair on pull request 12) | `test_a_manifest_entry_key_missing_from_every_entry_fails` in the gate script suite |
 
-Three round 8 repairs stand as records only with no test
-of their own, and this section records them as uncovered
-in the open under the rule at the head of this file. The
+Two more round 8 repairs stood as records only when this
+section was first written and now map to tests in the table
+above. The fixture teardown repair and the narrowed manifest
+key exemption both landed as CodeRabbit answers on pull
+request 12 after the review record was written, and the round
+9 pass records them late rather than leaving the gap the
+round 9 spec lane raised. Four round 8 repairs still stand as
+records only with no test of their own, and this section
+records them as uncovered in the open under the rule at the
+head of this file. The
 gate description and the current state text in AGENTS.md
 gained their round 8 sentences in the same change. This
 round 8 section itself stands as a record of the change.
@@ -214,6 +223,27 @@ the original fixture commits stand in no sources file, so
 the gate covers the saved packets with the checksum record
 and with the section check of the packet checker and says
 so in the open in the gate script.
+
+## Round 9 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The totals check guarded sums and headlines only, so a moved per task distribution and an upgraded task-06 transcript each passed after the documented checksum refresh (R9-RT-01) | `test_task06_scores_rederive_from_its_transcripts` and `test_an_upgraded_task06_transcript_fails_the_derivation` and `test_a_moved_task06_results_cell_fails_the_derivation` and `test_an_unparseable_task06_planted_rule_fails_closed` in the gate script suite, with the moved distribution over tasks 01 to 05 standing as a deliberate residual in decision 8 of the decisions file |
+| The rebuild check anchored each task to its own sources file, so tampering the sources and regenerating the artefacts passed after a checksum refresh (R9-RT-02) | `test_tampered_sources_regeneration_fails_the_anchor` and `test_source_anchors_regenerate_and_then_pass` and `test_the_checksum_refresh_refuses_while_source_anchors_are_stale` in the gate script suite |
+| A duplicate key in the checksum record silently overrode the pin with no refresh step at all (R9-RT-03) | `test_a_duplicate_key_in_the_checksum_record_fails` and `test_a_duplicate_key_in_a_sources_file_fails_the_rebuild` and `test_a_duplicate_key_in_a_saved_manifest_fails` in the gate script suite |
+| The corpus check named only cited test names the suite lacks, and the corpus file itself stood outside the checksum record, so a dropped row or a quietly dropped citation passed the gate (R9-RT-04) | `test_a_dropped_corpus_row_fails_the_coverage_floor` and `test_a_dropped_corpus_citation_fails_the_coverage_floor` and `test_corpus_md_stands_in_the_checksum_record` and `test_corpus_coverage_regenerates_and_then_passes` in the gate script suite |
+| The round 8 corpus section stopped two repairs short of the end of its own landing (R9-SP-01) | the completed round 8 section in this same change, pinned by the corpus coverage floor |
+| A semicolon stood in the user facing tiers help text that no gate reached (R9-ST-01) | `test_help_output_carries_no_banned_marks` in the gate script suite |
+| The checksum record keys used the host path spelling, so the gate failed on a pristine Windows tree and the refresh path would have rewritten the record in the local spelling (R9-EX-01) | `test_record_keys_use_posix_spelling` in the gate script suite |
+
+Two round 9 repairs stand as records only with no test
+of their own, and this section records them as uncovered
+in the open under the rule at the head of this file. The
+round 9 fix review report stands in the reviews folder as a
+record of this change and no test pins it. The deliberate
+residual over the tasks 01 to 05 score distribution stands
+as decision 8 in the decisions file, and no test pins a
+prose decision.
 
 ## Disclosure incidents with no test of their own
 

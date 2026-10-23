@@ -30,14 +30,26 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
 `scripts/check_evals.py`, and an end to end extractor smoke that must
 produce a verified manifest. The eval integrity check reads the
-checksum record at `evals/checksums.json` over the eval artefacts
-and fails on the first file whose bytes moved. A deliberate eval
-update refreshes that record by running
+checksum record at `evals/checksums.json` over the eval artefacts,
+the results file, the per pass notes and the corpus index, and
+fails on the first file whose bytes moved. The record loads
+through a strict reader that refuses a repeated key, and its keys
+use the forward slash spelling on every host. The check also
+re-derives the task-06 scores from its transcripts and its planted
+grading rule, compares each task sources file against the source
+anchor record at `evals/source-anchors.json`, and compares each
+corpus section against the coverage record at
+`evals/corpus-coverage.json`. The anchor and coverage records stand
+apart from the checksum refresh. A deliberate eval update moves
+them first with the anchor and coverage write flags of the gate
+script, each as its own committed step, and then refreshes the
+checksum record by running
 `python3 scripts/check_evals.py --write-checksums` and committing
-the record beside the artefacts it covers. CI runs the gate word for word and
-adds one job with no local step. That job checks the Signed-off-by
+the record beside the artefacts it covers. The checksum refresh
+refuses to run while an anchor or the coverage is stale. CI runs the gate word for word and
+adds one job with no local step. The DCO job checks the Signed-off-by
 trailer on pull request commits, and a green local run says nothing
-about it. Green local gates first, then merge. CI is a backstop,
+about it. Green local gates first, then push. CI is a backstop,
 not a gate.
 
 ## Layout map
@@ -81,20 +93,23 @@ not a gate.
 
 ## Conventions
 
-- The default working branch is `main`. Branch off `main` under a
-  name of the form `kind/slug` and open the pull request against
-  `main`.
+- The default working branch is `main`. Review work branches off
+  `main` under a name of the form `kind/slug`, and the reviewed
+  change lands on `main` by direct push of its commits. Pull
+  requests are the exception for structurally large changes that
+  want a public review trail, not the cadence.
 - Release tags are cut from `main` by David alone.
 - The `dev` branch is vestigial. It carried the work until the
   promotion of October 2026 and no work branches from it or
   targets it any more.
-- Pull request titles follow Conventional Commits and become the
-  squash commit title. Merges are squash only.
+- Commit titles follow Conventional Commits. One round of review
+  fixes lands as one commit on `main`.
 - Every human commit carries a `Signed-off-by` trailer with the
   exact identity of David Engelmann. Sign commits with
-  `git commit -s` and let the DCO job in CI check the trailer. The
-  job requires that exact identity on every non-merge commit of a
-  pull request. Dependabot is exempt by actor, because its commits
+  `git commit -s`. The CI DCO job enforces the trailer on pull
+  request commits, and direct pushes to `main` carry the trailer
+  because the coordinator checks every trailer before the push.
+  Dependabot is exempt by actor, because its commits
   are machine made and cannot carry a sign-off, and the exemption
   lives in the workflow file next to the check. The exemption keys
   on the actor and not on the author of the commits. A re-run or a
@@ -112,24 +127,23 @@ CI cannot tell whether the docs are current, so reviewers check
 this map instead.
 
 - Extractor behaviour changes update SKILL.md and CHANGELOG.md in
-  the same pull request.
+  the same change.
 - Tier or manifest changes also update the tier model section of
-  README.md in the same pull request.
+  README.md in the same change.
 - A change to the description field in SKILL.md is a spec change,
-  and the pull request body says so and says why.
+  and the change notes say so and say why.
 - Gate changes update this file and the CI workflow together.
 - A version string change moves every surface that carries one in
-  the same pull request, and the gate checks that they agree.
-- A change to REVIEW.md updates CHANGELOG.md in the same pull
-  request.
+  the same change, and the gate checks that they agree.
+- A change to REVIEW.md updates CHANGELOG.md in the same change.
 - A change under evals/ updates the recorded results it touches
-  in the same pull request, and a change to the eval method also
+  in the same change, and a change to the eval method also
   updates the runner note in evals/README.md and CHANGELOG.md in
-  the same pull request. Packets saved as fixtures are regenerated
+  the same change. Packets saved as fixtures are regenerated
   with the shipped extractor and carry verified manifests.
 - A change to the plugin manifest or the marketplace listing
   beyond a version string updates the install section of
-  README.md and CHANGELOG.md in the same pull request, and the
+  README.md and CHANGELOG.md in the same change, and the
   gate tests that pin the manifest shape move with it.
 
 ## Current state
@@ -185,6 +199,14 @@ artefacts under a checksum record with a totals check on
 the recorded results and a rebuild of every task diff and
 manifest from its sources, and turned the corpus index
 discipline into a gate check that fails when a cited test
-name leaves the suite. The owner dropped
+name leaves the suite. The round 9 pass then re-derived the
+task-06 scores from its transcripts and its planted grading
+rule, anchored each task sources file under a digest record the
+checksum refresh cannot move, refused a repeated key in every
+record the gate trusts, spelled record keys with forward
+slashes on every host, brought the corpus index under the
+checksum record with a per section coverage floor, completed
+the round 8 corpus section, and pinned the shipped help output
+against banned marks. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

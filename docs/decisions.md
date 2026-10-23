@@ -134,3 +134,26 @@ cost an extra landing for every change and bought no safety the
 gate and the reviews do not already give, so the ceremony was
 dropped on the same evening the promotion it governed landed.
 This decision supersedes the branch flow the repo opened with.
+
+## 8. The eval gate re-derives the task-06 scores and leaves the tasks 01 to 05 distribution to the totals check
+
+Recorded on 2026-10-23. The eval integrity gate derives the
+task-06 raw and packet scores from the transcript fences, the
+planted grading rule and the rebuilt artefacts, and fails when
+the derived scores disagree with the recorded sentences in the
+results file and the per pass notes. The gate does not derive
+scores for tasks 01 to 05, because their passes survive only as
+curated notes and a parser over that prose would manufacture
+confidence the record does not carry. A moved score
+distribution over tasks 01 to 05 that keeps every total and
+every headline true still passes the gate after a checksum
+refresh, and that residual stands here in the open as the
+deliberate limit of the check rather than as a hidden gap.
+
+The reason is evidence. Task-06 is the one task with verbatim
+transcripts beside its summaries, so its scores can be tied leg
+by leg to the words the passes actually wrote. The earlier tasks
+have no transcript to tie to, and the round 9 red team proved
+the gap is real by moving two cells with the totals unchanged.
+Recording the limit beats pretending the totals check sees
+what it cannot see.

@@ -1,8 +1,10 @@
 import ast
+import hashlib
 import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -10,7 +12,7 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stderr
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1785,6 +1787,363 @@ class TestCheckEvals(unittest.TestCase):
             self.assertIn(
                 "test_a_name_that_never_existed", problems[0]
             )
+
+    def test_a_duplicate_key_in_the_checksum_record_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-06" / "transcripts.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(text + "\nTampered line.\n", encoding="utf-8")
+            tampered = hashlib.sha256(target.read_bytes()).hexdigest()
+            record_path = root / "evals" / "checksums.json"
+            lines = record_path.read_text(encoding="utf-8").splitlines(
+                keepends=True
+            )
+            key = '"evals/tasks/task-06/transcripts.md"'
+            out = []
+            inserted = False
+            for line in lines:
+                if key in line and not inserted:
+                    out.append('    %s: "%s",\n' % (key, tampered))
+                    inserted = True
+                out.append(line)
+            self.assertTrue(inserted)
+            record_path.write_text("".join(out), encoding="utf-8")
+            problems = self.mod.checksum_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("repeated key", problems[0])
+
+    def test_a_duplicate_key_in_a_sources_file_fails_the_rebuild(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-01" / "sources.json"
+            text = target.read_text(encoding="utf-8")
+            data = json.loads(text)
+            stripped = text.rstrip()
+            self.assertTrue(stripped.endswith("}"))
+            target.write_text(
+                stripped[:-1]
+                + ', "head": '
+                + json.dumps(data["head"])
+                + "}\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any(
+                    "task-01" in problem and "repeated key" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_duplicate_key_in_a_saved_manifest_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-01" / "manifest.json"
+            text = target.read_text(encoding="utf-8")
+            self.assertIn('"verified": true', text)
+            target.write_text(
+                text.replace(
+                    '"verified": true',
+                    '"verified": true, "verified": true',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any(
+                    "task-01" in problem and "repeated key" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_record_keys_use_posix_spelling(self):
+        root = PureWindowsPath("C:/repo")
+        path = PureWindowsPath(
+            "C:/repo/evals/tasks/task-01/diff.patch"
+        )
+        self.assertEqual(
+            self.mod.record_key(root, path),
+            "evals/tasks/task-01/diff.patch",
+        )
+
+    def test_task06_scores_rederive_from_its_transcripts(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            self.assertEqual(self.mod.task06_problems(root), [])
+
+    def test_an_upgraded_task06_transcript_fails_the_derivation(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-06" / "transcripts.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "Finding 2. The file is renamed from ledger.py to "
+                "book.py, so anything importing the old module name "
+                "will break. I cannot name an importer, because the "
+                "diff shows no other file. This is a warning, not a "
+                "placed finding.",
+                "Finding 2. report.py line 1 reads from ledger "
+                "import total, so that import names a module that "
+                "no longer exists and report.py breaks.",
+            )
+            self.assertIn("report.py line 1 reads", text)
+            target.write_text(text, encoding="utf-8")
+            self.mod.write_checksums(root)
+            self.assertEqual(self.mod.checksum_problems(root), [])
+            problems = self.mod.task06_problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("derives as 2 of 2" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_moved_task06_results_cell_fails_the_derivation(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "RESULTS.md"
+            text = target.read_text(encoding="utf-8")
+            text = re.sub(
+                r"The raw pass reported 1 of 2 on this\s+task",
+                "The raw pass reported 2 of 2 on this task",
+                text,
+                count=1,
+            )
+            self.assertIn(
+                "The raw pass reported 2 of 2 on this task", text
+            )
+            target.write_text(text, encoding="utf-8")
+            self.mod.write_checksums(root)
+            self.assertEqual(self.mod.checksum_problems(root), [])
+            problems = self.mod.task06_problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("record 2 of 2" in problem for problem in problems),
+                problems,
+            )
+
+    def test_an_unparseable_task06_planted_rule_fails_closed(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-06" / "planted.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "renames ledger.py to book.py", "renames one module"
+            )
+            self.assertNotIn("renames ledger.py", text)
+            target.write_text(text, encoding="utf-8")
+            problems = self.mod.task06_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("no longer parses", problems[0])
+
+    def test_tampered_sources_regeneration_fails_the_anchor(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            task = root / "evals" / "tasks" / "task-06"
+            sources_path = task / "sources.json"
+            sources = json.loads(sources_path.read_text(encoding="utf-8"))
+            sources["head"]["report.py"] = (
+                "from book import total\n\n\n"
+                "def grand(items):\n"
+                "    return total(items)\n"
+            )
+            sources_path.write_text(json.dumps(sources), encoding="utf-8")
+            work = Path(tmp) / "regen"
+            repo, base, head, diff = self.mod.build_fixture_repo(
+                str(work), sources
+            )
+            (task / "diff.patch").write_bytes(diff)
+            out = work / "out"
+            extract = (
+                root / "skills" / "recognitio" / "scripts" / "extract.py"
+            )
+            run = subprocess.run(
+                [sys.executable, str(extract), "--repo", str(repo),
+                 "--range", "%s..%s" % (base, head),
+                 "--out", str(out)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            shutil.copy2(out / "packet.md", task / "packet.md")
+            shutil.copy2(out / "manifest.json", task / "manifest.json")
+            original = self.mod.ROOT
+            self.mod.ROOT = root
+            try:
+                with redirect_stderr(io.StringIO()):
+                    self.assertEqual(
+                        self.mod.main(["--write-source-anchors"]), 0
+                    )
+                    self.assertEqual(
+                        self.mod.main(["--write-checksums"]), 0
+                    )
+            finally:
+                self.mod.ROOT = original
+            self.assertEqual(self.mod.checksum_problems(root), [])
+            self.assertEqual(self.mod.source_anchor_problems(root), [])
+            problems = self.mod.task06_problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("D1 defect" in problem for problem in problems),
+                problems,
+            )
+            self.assertTrue(self.mod.all_problems(root))
+
+    def test_source_anchors_regenerate_and_then_pass(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-01" / "sources.json"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(text + "\n", encoding="utf-8")
+            problems = self.mod.source_anchor_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("task-01", problems[0])
+            original = self.mod.ROOT
+            self.mod.ROOT = root
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main(["--write-source-anchors"])
+            finally:
+                self.mod.ROOT = original
+            self.assertEqual(code, 0)
+            self.assertEqual(self.mod.source_anchor_problems(root), [])
+
+    def test_the_checksum_refresh_refuses_while_source_anchors_are_stale(
+        self,
+    ):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-01" / "sources.json"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(text + "\n", encoding="utf-8")
+            original = self.mod.ROOT
+            self.mod.ROOT = root
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main(["--write-checksums"])
+            finally:
+                self.mod.ROOT = original
+            self.assertEqual(code, 2)
+
+    def test_a_dropped_corpus_row_fails_the_coverage_floor(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            lines = target.read_text(encoding="utf-8").splitlines(
+                keepends=True
+            )
+            start = next(
+                i
+                for i, line in enumerate(lines)
+                if line.startswith("## Round 1 incidents")
+            )
+            dropped = False
+            kept = []
+            for i, line in enumerate(lines):
+                if (
+                    not dropped
+                    and i > start
+                    and line.startswith("|")
+                    and not line.startswith("| Incident")
+                    and not line.startswith("| ---")
+                ):
+                    dropped = True
+                    continue
+                kept.append(line)
+            self.assertTrue(dropped)
+            target.write_text("".join(kept), encoding="utf-8")
+            self.mod.write_checksums(root)
+            self.assertEqual(self.mod.checksum_problems(root), [])
+            problems = self.mod.corpus_coverage_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("Round 1", problems[0])
+            self.assertIn("lost", problems[0])
+
+    def test_a_dropped_corpus_citation_fails_the_coverage_floor(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                " and `test_modify_without_a_copy_control_is_unchanged`",
+                "",
+                1,
+            )
+            self.assertNotIn(
+                "test_modify_without_a_copy_control_is_unchanged", text
+            )
+            target.write_text(text, encoding="utf-8")
+            self.mod.write_checksums(root)
+            self.assertEqual(self.mod.checksum_problems(root), [])
+            problems = self.mod.corpus_coverage_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("Round 6", problems[0])
+            self.assertIn(
+                "test_modify_without_a_copy_control_is_unchanged",
+                problems[0],
+            )
+
+    def test_corpus_md_stands_in_the_checksum_record(self):
+        self.assertIn("evals/corpus.md", self.mod.build_record(ROOT))
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA dropped row hides here.\n", encoding="utf-8"
+            )
+            problems = self.mod.checksum_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("evals/corpus.md", problems[0])
+
+    def test_corpus_coverage_regenerates_and_then_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                " and `test_modify_without_a_copy_control_is_unchanged`",
+                "",
+                1,
+            )
+            target.write_text(text, encoding="utf-8")
+            self.assertEqual(
+                len(self.mod.corpus_coverage_problems(root)), 1
+            )
+            original = self.mod.ROOT
+            self.mod.ROOT = root
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main(["--write-corpus-coverage"])
+            finally:
+                self.mod.ROOT = original
+            self.assertEqual(code, 0)
+            self.assertEqual(
+                self.mod.corpus_coverage_problems(root), []
+            )
+
+    def test_help_output_carries_no_banned_marks(self):
+        scripts = [
+            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
+            ROOT / "scripts" / "check_evals.py",
+            ROOT / "scripts" / "check_packet.py",
+        ]
+        for script in scripts:
+            run = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(run.returncode, 0, script.name)
+            for mark, name in (("\u2014", "em dash"), (";", "semicolon")):
+                self.assertNotIn(
+                    mark,
+                    run.stdout,
+                    "%s in the help output of %s" % (name, script.name),
+                )
 
 
 class TestRetryingTemporaryDirectory(unittest.TestCase):

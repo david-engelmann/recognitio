@@ -19,13 +19,29 @@ suite measures the extractor. These files measure the skill.
   what it reported.
 - `checksums.json` holds the checksum record the eval
   integrity gate reads. Every artefact file under `tasks/`
-  and the results file and the per pass notes stand in it by
-  digest, and a deliberate update refreshes the record with
-  the write flag of the gate script.
+  and the results file and the per pass notes and the corpus
+  index stand in it by digest, and a deliberate update
+  refreshes the record with the write flag of the gate script.
+  The record loads through a strict reader that refuses a
+  repeated key, and its keys use the forward slash spelling on
+  every host.
+- `source-anchors.json` holds a digest of each task sources
+  file. The anchor stands apart from the checksum refresh, so
+  a deliberate sources change moves the anchor first with the
+  anchor write flag of the gate script, as its own committed
+  step.
+- `corpus-coverage.json` holds the cited test names of each
+  corpus section. The coverage stands apart from the checksum
+  refresh, so a deliberate index change moves the coverage
+  first with the coverage write flag of the gate script, as
+  its own committed step.
 - `tasks/task-06/transcripts.md` holds the full verbatim
   transcripts of the two passes over the replay task, under
   the publication standard that every run from round 6 onward
-  keeps its transcript beside its summary.
+  keeps its transcript beside its summary. The eval integrity
+  gate re-derives the task-06 scores from these transcripts
+  and the planted grading rule and fails when the derived
+  scores disagree with the recorded summaries.
 - `trigger-set.md` holds the saved trigger queries and
   `TRIGGER-RESULTS.md` records how the shipped description
   scored against them.
