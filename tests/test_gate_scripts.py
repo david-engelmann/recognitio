@@ -440,6 +440,58 @@ class TestCheckCopy(unittest.TestCase):
                 ) = original
             self.assertEqual(code, 1)
 
+    def test_a_flow_mapping_value_is_structure_not_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "point: {x: 1, y: 2}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_a_nested_sequence_of_mappings_is_structure_not_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "items:\n"
+                "  - - name: alpha\n"
+                "    - name: beta\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_a_colon_inside_a_flow_mapping_value_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "point: {label: \"Read: now\"}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_colon_inside_a_list_item_flow_mapping_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "items:\n"
+                "  - {label: \"Read: now\"}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_prose_mapping_value_with_a_colon_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "note: see the guide for details: the long version\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_prose_value_in_a_nested_sequence_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "items:\n"
+                "  - - name: alpha: the first one\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
     def test_yaml_keys_and_directives_are_syntax(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_tmp(

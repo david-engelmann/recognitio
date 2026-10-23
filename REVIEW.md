@@ -51,6 +51,20 @@ signal for whether review findings earn their place, and every
 report that follows the template adds one more record of it.
 The template below is the shape a report follows in this repo.
 
+The counts aggregate in the checked records themselves. No
+separate ledger is kept, because a second home for the numbers
+would drift from the reports that carry them. A reader who
+wants the signal sums the four counts over every report in
+the tree that was written from this template. The counts are
+read as a signal together at each program refinement round,
+which is every fifth round of the audit program, and again at
+any release and at the close of the program. A single report
+is one observation and says little on its own. The summed
+record across the reports since the last reading is what gets
+judged, and a rising share of wrong or not worth it findings
+is the shape that says the review is spending effort in the
+wrong places.
+
 ```
 # Review of the change under review
 

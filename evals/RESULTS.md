@@ -140,6 +140,15 @@ lane that designed the task, which is the weakest form of the
 clean control measurement, and the file says so in the open so
 a later round can rerun it with fresh eyes.
 
+The round 4 rerun was run by the round 4 fix lane on
+2026-10-23, a lane that did not design any of the five tasks.
+The raw condition and the packet condition each ran over all
+five tasks, with the packets rebuilt from the sources files
+by the current extractor and every rebuilt packet verified.
+Its per pass notes stand at the end of PASS-NOTES.md. The
+rerun totals agree with the numbers above, so no number in
+this file moves on its evidence.
+
 ## Limits
 
 This is a small run and its limits are part of the result. Five

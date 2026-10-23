@@ -95,6 +95,23 @@ This unreleased work carries version 1.3.0.
   in REVIEW.md, sorting findings into fixed and wrong and
   intentional and not worth it, so reviews that follow the
   template produce the noise accounting signal.
+- A round 2 section in the corpus index, mapping every round
+  2 incident to its covering test or recording it as uncovered
+  in the open where the fix was prose or a record only.
+- An explicit trigger in decision 3 for lifting the corpus
+  index rows into a runnable suite, set at the first of a
+  standalone tool decision, a round that asks for findings per
+  tier per token, or the close of the audit program.
+- A statement in REVIEW.md of where the findings disposition
+  counts aggregate and when they are read as a signal, and the
+  first populated review report written from the template at
+  `docs/reviews/round4-fix-review.md` with a real four way
+  disposition count of its own findings.
+- A fresh eyes rerun of the paired eval by a lane that did not
+  design the tasks, covering the raw and packet conditions
+  over all five tasks with the clean control under both
+  conditions, recorded in the per pass notes with totals that
+  agree with the recorded results.
 
 ### Fixed
 
@@ -311,3 +328,28 @@ This unreleased work carries version 1.3.0.
   tell which description shipped. The test files dedupe keeps
   its hits in a set per file, so a test file with many matching
   lines no longer pays a growing list scan for each new hit.
+- A paired rename now contributes the old stem of the renamed
+  module to the companion search beside the new stem. A test
+  file that mentions the module only under its old name, for
+  example through a dynamic import of that name, is found and
+  named, and the test files section no longer prints a false
+  absence over it.
+- The copy fence now treats YAML structure as the syntax its
+  docstring always said it was. A flow mapping value is
+  skipped as structure and repeated list markers are stripped
+  before the key test, so a nested sequence of mappings is
+  read as structure, while plain prose values are judged in
+  full as before.
+- A findings entry written with a leading ./ is accounted
+  under the plain spelling of its path. The same finding
+  written both ways now counts once with one verdict instead
+  of standing as two findings with contradictory verdicts.
+- Three answers to review of the round 4 change itself. The
+  old stem search now runs only for a renamed entry and not
+  for a copied one, whose old module still exists under its
+  own name. The copy fence now yields the scalar values
+  inside a flow mapping for its scan, so a quoted prose value
+  carrying a colon inside flow braces is judged while the
+  braces and key marks stay exempt. The finding in the first
+  populated review report now names the line range of its
+  evidence, as the evidence rule in REVIEW.md requires.

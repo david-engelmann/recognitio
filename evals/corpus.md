@@ -1,8 +1,8 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 1 and the round 3
-incidents in their own section below, and maps each one to the
+found, from the first cycle through round 3, with each round
+in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
 incident is recorded here as uncovered, with the gap stated in
@@ -59,6 +59,40 @@ without reading three audit reports first.
 | Raw NUL bytes from the old binary blob landed in the packet | `test_transition_receipt_and_no_raw_nul_in_packet` in the extractor suite |
 | Generated packet prose carried banned marks from the extractor strings | `test_packet_over_binary_and_generated_changes_is_clean` and `test_packet_over_a_rereview_is_clean` in the extractor suite |
 
+## Round 2 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A cap note printed a raw path and a crafted filename forged a packet section again (R2-01) | `test_imports_cap_note_cannot_forge_a_section` in the extractor suite |
+| The companion search parser split NUL delimited output on lines and a newline in a filename moved its hits onto another file (R2-02) | `test_grep_lines_attribute_a_newline_named_file` and `test_packet_names_the_crafted_test_file_and_its_lines` in the extractor suite |
+| The version gate crashed with tracebacks on wrong typed JSON instead of naming the problem (R2-03) | `test_wrong_typed_versions_are_problems_not_crashes` and `test_main_reports_wrong_typed_shapes_without_a_traceback` in the gate script suite |
+| The version gate passed a marketplace listing that listed nothing and accepted a leading zero version (R2-04) | `test_an_empty_or_missing_plugins_list_is_a_problem` and `test_a_leading_zero_version_is_not_a_version` in the gate script suite |
+| The changelog version search was not scoped to the unreleased section (R2-05) | `test_a_decoy_carries_phrase_in_a_release_note_loses` in the gate script suite |
+| Duplicate findings entries counted as separate findings and could crowd a real finding past the cap (R2-06) | `test_duplicates_cannot_crowd_out_a_unique_finding` and `test_dedupe_findings_keeps_first_of_each` in the extractor suite |
+| Companion gathering grew faster than the change and a large packet took minutes (R2-07) | `test_build_t2_runs_one_grep_however_many_files` in the extractor suite |
+| The copy fence again sat narrower than its claim and the authored evals files and the manifest descriptions stood outside it (ST2-01) | `test_discovery_extends_to_a_new_markdown_file_by_rule` and `test_em_dash_in_a_manifest_description_is_caught` and `test_fence_covers_every_authored_prose_file_in_the_tree` in the gate script suite |
+| The marketplace entry lacked the researched skills list and the plugin manifest lacked an owner email (EX2-04) | `test_marketplace_lists_the_plugin_with_its_skill_path` in the gate script suite and `test_plugin_manifest_carries_the_owner_email` in the gate script suite |
+
+Eight round 2 fixes stand as records only with no test of
+their own, and this section records them as uncovered in the
+open under the rule at the head of this file. The two long
+extractor functions were split with no behaviour change
+(ST2-02). The docs update map gained pairings for the review
+guidance and the evals and the plugin listing (SP2-01). The
+corpus index recorded the round 1 branch convention finding
+as uncovered in its disclosure section (SP2-02). The
+corpus index gained its statement of the path to a runnable
+corpus and decision 3 recorded the remaining deferral
+(EX2-03). The paired eval gained its clean control task and
+its published run notes and its fair raw condition as records
+in the evals documents (EX2-01). The trigger set near misses
+were rewritten and scored in two passes as a record in the
+trigger results file (EX2-02). The review guidance gained
+its summary first report template (EX2-05) and the readme
+first screen gained its bare list of what the tool does
+(EX2-06). Each of those repairs is prose or a fixture or a
+record, and no test pins any of them.
+
 ## Round 3 incidents
 
 | Incident | Covered by |
@@ -96,4 +130,8 @@ The path is short today. Each row above names a regression test
 in the suite the gate runs, and running the gate runs the corpus
 in that form. A separate suite that replays the incidents as
 skill tasks is deferred, and decision 3 in the decisions file
-records the deferral and its reason in the open.
+records the deferral and its reason in the open. That decision
+now also names the trigger for the lift. The rows become a
+runnable suite at the first of a standalone tool decision, a
+round that asks for findings per tier per token, or the close
+of this audit program.
