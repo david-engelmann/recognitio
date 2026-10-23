@@ -92,15 +92,22 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
     component itself for the conflict to fire, and a live
     install probe in the round 6 fix lane confirmed that a
     metadata only manifest fails to load in this shape with
-    the same error the shipped pair once drew. Setting strict
-    to true makes the manifest the definition the host loads,
-    so the pair can both name the components and the manifest
-    stays self describing. The conflict set is the six
-    component fields the host names for this rule. The server
-    fields stand outside it, and the same probe confirmed an
-    mcpServers pair loads under strict false. Wrong typed
-    input is left to the version checks in this gate, which
-    already name it.
+    the same error the shipped pair once drew. An entry that
+    omits the strict key loads as if strict were true, because
+    the host treats a missing strict key as true, and a live
+    probe in the round 7 audit confirmed that a pair whose
+    entry names components with no strict key at all loads
+    with status enabled. Setting strict to true makes the
+    manifest the definition the host loads, so the pair can
+    both name the components and the manifest stays self
+    describing. The conflict set is the six component fields
+    the host names for this rule, and a field counts wherever
+    the entry declares it, at the top level of the entry or
+    under the experimental object of the entry, which is the
+    current home of themes. The server fields stand outside
+    the set, and the round 6 probe confirmed an mcpServers
+    pair loads under strict false. Wrong typed input is left
+    to the version checks in this gate, which already name it.
     """
     try:
         plugin = json.loads(plugin_text)
@@ -116,14 +123,24 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
     for entry in plugins:
         if not isinstance(entry, dict):
             continue
-        if entry.get("strict") is True:
+        # The conflict fires only when strict stands present
+        # and false. A missing strict key reads as true on the
+        # host, so an entry that omits it appends its components
+        # to the manifest and loads.
+        if entry.get("strict") is not False:
             continue
-        shared = [key for key in COMPONENT_KEYS if key in entry]
+        experimental = entry.get("experimental")
+        if not isinstance(experimental, dict):
+            experimental = {}
+        shared = [
+            key for key in COMPONENT_KEYS
+            if key in entry or key in experimental
+        ]
         if shared:
             problems.append(
                 "marketplace entry %r specifies components (%s) "
                 "while a plugin.json stands beside it and the "
-                "entry does not set strict to true, so the host "
+                "entry sets strict to false, so the host "
                 "refuses to load the plugin for conflicting "
                 "manifests"
                 % (

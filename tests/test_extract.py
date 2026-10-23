@@ -2451,6 +2451,95 @@ class TestRound6CopyRereview(unittest.TestCase):
             self.assertIn("Findings addressed: 1 of 2", packet)
 
 
+def build_ending_flip_rename_repo(tmp, with_edit=True):
+    body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 21))
+    repo = make_repo(tmp, [{"oldcalc.py": body}])
+    previous = git(repo, "rev-parse", "HEAD")
+    flipped = body
+    if with_edit:
+        flipped = body.replace("line05 = 5", "line05 = 55")
+    write_tree(repo, {
+        "newcalc.py": flipped.replace("\n", "\r\n").encode("utf-8"),
+    })
+    (repo / "oldcalc.py").unlink()
+    commit_all(repo, "rename the file and flip its line endings")
+    return repo, previous
+
+
+class TestRound7VerdictContent(unittest.TestCase):
+    """A verdict rests on content change, not hunk membership."""
+
+    def run_packet(self, tmp, repo, previous, findings_text):
+        findings = Path(tmp) / "findings.txt"
+        findings.write_text(findings_text)
+        out = Path(tmp) / "out"
+        result = run_extract_cli(
+            repo, out, "--range", "%s..HEAD" % previous,
+            "--since", previous, "--findings", str(findings),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(out)
+        self.assertTrue(manifest["verified"], manifest["discrepancies"])
+        statuses = {f["path"]: f["status"] for f in manifest["files"]}
+        return (out / "packet.md").read_text(), statuses
+
+    def test_a_line_endings_only_rename_leaves_findings_unaddressed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, previous = build_ending_flip_rename_repo(
+                tmp, with_edit=False
+            )
+            packet, statuses = self.run_packet(
+                tmp, repo, previous,
+                "oldcalc.py:3: the early line worry\n"
+                "oldcalc.py:20: the last line worry\n",
+            )
+            self.assertEqual(
+                statuses.get("newcalc.py"), "renamed", statuses
+            )
+            self.assertIn(
+                "oldcalc.py:3 the early line worry. unaddressed, "
+                "the anchored lines are unchanged", packet,
+            )
+            self.assertIn(
+                "oldcalc.py:20 the last line worry. unaddressed, "
+                "the anchored lines are unchanged", packet,
+            )
+            self.assertIn("Findings addressed: 0 of 2", packet)
+            head = git(repo, "rev-parse", "HEAD")
+            ranges, _moved, _head, _since = extract_mod.rereview_ranges(
+                repo, previous, head
+            )
+            self.assertEqual(ranges.get("oldcalc.py"), [], ranges)
+
+    def test_a_rename_with_a_real_change_still_counts_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, previous = build_ending_flip_rename_repo(
+                tmp, with_edit=True
+            )
+            packet, statuses = self.run_packet(
+                tmp, repo, previous,
+                "oldcalc.py:5: the edited line worry\n"
+                "oldcalc.py:20: the ending only worry\n",
+            )
+            self.assertEqual(
+                statuses.get("newcalc.py"), "renamed", statuses
+            )
+            self.assertIn(
+                "oldcalc.py:5 the edited line worry. addressed, "
+                "the anchored lines changed", packet,
+            )
+            self.assertIn(
+                "oldcalc.py:20 the ending only worry. unaddressed, "
+                "the anchored lines are unchanged", packet,
+            )
+            self.assertIn("Findings addressed: 1 of 2", packet)
+            head = git(repo, "rev-parse", "HEAD")
+            ranges, _moved, _head, _since = extract_mod.rereview_ranges(
+                repo, previous, head
+            )
+            self.assertEqual(ranges.get("oldcalc.py"), [(5, 1)], ranges)
+
+
 class TestRound6FindingsSpellings(unittest.TestCase):
     """Sibling findings spellings count once (R6-RT-02, R6-RT-03)."""
 
@@ -2635,6 +2724,70 @@ class TestRound6InstructionFiles(unittest.TestCase):
             )
             self.assertIn("- src/app.py (modified)", packet)
             self.assertNotIn("- src/app.py (modified, instruction", packet)
+
+    def test_path_specific_copilot_and_claude_rules_flag(self):
+        for path in (
+            ".github/instructions/review.instructions.md",
+            ".github/instructions/python.instructions.md",
+            ".claude/rules/review.md",
+            "project/.claude/rules/style.md",
+        ):
+            self.assertTrue(
+                extract_mod.is_instruction_path(path), path
+            )
+
+    def test_near_miss_instruction_names_do_not_flag(self):
+        for path in (
+            ".github/instructions/review.md",
+            "docs/review.instructions.md",
+            ".github/other/review.instructions.md",
+            ".claude/rules/notes.txt",
+            ".claude/other/review.md",
+            "claude/rules/review.md",
+        ):
+            self.assertFalse(
+                extract_mod.is_instruction_path(path), path
+            )
+
+    def test_packet_flags_the_new_instruction_surfaces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    ".github/instructions/review.instructions.md":
+                        "Review the change.\n",
+                    ".claude/rules/review.md": "Be plain.\n",
+                    "src/app.py": "x = 1\n",
+                },
+                {
+                    ".github/instructions/review.instructions.md":
+                        "Review the whole change.\n",
+                    ".claude/rules/review.md": "Be plain and short.\n",
+                    "src/app.py": "x = 2\n",
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            flags = {
+                f["path"]: f["instruction_file"] for f in manifest["files"]
+            }
+            self.assertTrue(
+                flags[".github/instructions/review.instructions.md"],
+                flags,
+            )
+            self.assertTrue(flags[".claude/rules/review.md"], flags)
+            self.assertFalse(flags["src/app.py"], flags)
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "- .github/instructions/review.instructions.md "
+                "(modified, instruction file)", packet,
+            )
+            self.assertIn(
+                "- .claude/rules/review.md "
+                "(modified, instruction file)", packet,
+            )
 
     def test_a_rename_to_or_from_an_instruction_name_flags(self):
         with tempfile.TemporaryDirectory() as tmp:

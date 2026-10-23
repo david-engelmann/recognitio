@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 6, with each round
+found, from the first cycle through round 7, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -150,8 +150,9 @@ checked rather than skipped.
 | Packets listed changed instruction files exactly like ordinary code, with no marker in the triage list and no field in the manifest (R6-RT-06) | `test_each_instruction_name_flags_and_an_ordinary_file_does_not` and `test_packet_flags_instruction_files_in_triage_and_manifest` and `test_a_rename_to_or_from_an_instruction_name_flags` in the extractor suite |
 | Findings path normalisation stopped at a leading dot slash, so sibling spellings and a decomposed Unicode spelling each recounted one worry with a second verdict (R6-RT-02 and R6-RT-03) | `test_normalize_finding_path_covers_each_spelling` and `test_each_spelling_pair_counts_once_with_one_verdict` and `test_space_before_the_anchor_colon_counts_once` and `test_decomposed_path_counts_once_with_the_composed_file` in the extractor suite, with `test_distinct_line_and_distinct_file_still_count_separately` in the extractor suite as the distinctness control |
 | No gate guarded the size of the skill file against host truncation (R6-RT-05) | `test_a_skill_file_past_the_size_limit_fails` and `test_a_skill_file_at_the_size_limit_passes` and `test_the_real_skill_package_is_valid` in the gate script suite |
+| Two fence shapes behind the CodeRabbit answers on pull request 10, an apostrophe inside a plain flow scalar read as an opening quote and text standing after a closed flow collection left unscanned | `test_an_apostrophe_in_a_plain_flow_scalar_is_not_a_quote` and `test_text_after_a_flow_collection_still_flags` in the gate script suite |
 
-Four round 6 repairs stand as records only with no test of
+Five round 6 repairs stand as records only with no test of
 their own, and this section records them as uncovered in the
 open under the rule at the head of this file. The stale
 changelog sentence about a flow mapping value was repaired
@@ -161,7 +162,36 @@ round 4 section in this same change beside this section
 gained the identifiers its template requires in its checked
 section (S6-02). The paired eval gained its replay task
 task-06 with verbatim transcripts as records in the evals
-documents, graded in the open as a designer run replay.
+documents, graded in the open as a designer run replay. The
+one finding of the round 6 fix review record, a changelog
+draft that claimed the review report before the report
+stood in the tree, was repaired in the same change as a
+record and no test pins it.
+
+## Round 7 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The manifest conflict gate failed a pair with no strict key that the host loads, because a missing key reads as true on the host (R7-RT-01) | `test_manifest_conflict_problems_follow_the_strict_states` in the gate script suite, with `test_manifest_conflict_problems_names_the_broken_pair` and `test_manifest_conflict_problems_accept_the_loadable_pairs` and `test_the_real_manifest_pair_has_no_conflict` in the gate script suite standing as they stood |
+| The manifest conflict gate missed components declared under the experimental object of an entry while the host refused that pair (R7-RT-02) | `test_manifest_conflict_problems_cover_the_experimental_home` in the gate script suite |
+| The instruction file flag missed the path specific Copilot instructions files and the Claude rules files that hosts load (R7-RT-03) | `test_path_specific_copilot_and_claude_rules_flag` and `test_near_miss_instruction_names_do_not_flag` and `test_packet_flags_the_new_instruction_surfaces` in the extractor suite |
+| The skill size gate counted characters only, so a multibyte skill file passed while standing past a byte counting host cut (R7-RT-04) | `test_a_multibyte_skill_file_past_the_byte_limit_fails` in the gate script suite, with `test_a_skill_file_past_the_size_limit_fails` and `test_a_skill_file_at_the_size_limit_passes` and `test_the_real_skill_package_is_valid` in the gate script suite standing as they stood |
+| A rename that flipped the line endings of a file marked every finding on it addressed in a verified packet (R7-RT-05) | `test_a_line_endings_only_rename_leaves_findings_unaddressed` and `test_a_rename_with_a_real_change_still_counts_it` in the extractor suite |
+
+Three round 7 repairs stand as records only with no test
+of their own, and this section records them as uncovered
+in the open under the rule at the head of this file. The
+changelog sentence about the manifest conflict check was
+rewritten to state the shipped rule in the same change
+(R7-02). The corpus index gained this round 7 section and
+completed its round 6 section in the same change (R7-E1).
+The round 7 fix review report stands in the reviews folder
+as a record of this change and no test pins it.
+The stateful YAML reader split into named helpers with no
+behaviour change stands covered by
+`test_no_function_in_check_copy_passes_the_length_ceiling`
+in the gate script suite for its ceiling and by the whole
+fence test set for its behaviour (R7-01).
 
 ## Disclosure incidents with no test of their own
 

@@ -164,6 +164,16 @@ than by key pattern, flagged instruction bearing files in the
 packet, completed findings path normalisation across its
 sibling spellings, guarded the skill file size in the gate,
 and added a replay eval task drawn from a real merged pull
-request with verbatim transcripts. The owner dropped
+request with verbatim transcripts. The round 7 pass then
+aligned the manifest conflict gate with the host on a
+missing strict key and on component fields declared under
+the experimental object of an entry, flagged the path
+specific Copilot instructions files and the Claude rules
+files in the packet, guarded the skill file size in bytes
+as well as characters, rested the re-review verdict on the
+content change of the anchored lines with line endings
+normalised away, and lifted the stateful YAML reader of
+the copy fence into named helpers under the recorded
+function ceiling. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

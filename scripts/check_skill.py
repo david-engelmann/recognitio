@@ -33,9 +33,15 @@ NAME_LIMIT = 64
 # The host reattaches each skill after a compaction cut at 20000
 # characters, so a skill that grows past that cut loses its tail
 # instructions for the rest of a session with no other signal.
-# The gate trips at 16000 characters, a 20 percent buffer under
-# the cut, while a move into a references file is still a small
-# edit rather than an emergency rewrite at the cliff edge.
+# The evidence behind the cut speaks in both units, because the
+# release notes that report the cut report it in characters
+# while the guard test in the same project fails at a byte
+# count, and no primary host source settles which unit the
+# host applies. The gate therefore guards both units at the
+# same limit, so the file stays safe under either reading. The
+# gate trips at 16000, a 20 percent buffer under the cut, while
+# a move into a references file is still a small edit rather
+# than an emergency rewrite at the cliff edge.
 SKILL_TEXT_LIMIT = 16000
 NAME_CHARS = re.compile(r"^[a-z0-9-]+$")
 
@@ -104,6 +110,13 @@ def main():
                 "SKILL.md runs %d characters, over the %d limit. "
                 "Move detail into a references file the skill "
                 "points at" % (len(skill_text), SKILL_TEXT_LIMIT)
+            )
+        byte_count = len(skill_text.encode("utf-8"))
+        if byte_count > SKILL_TEXT_LIMIT:
+            problems.append(
+                "SKILL.md runs %d bytes, over the %d limit. "
+                "Move detail into a references file the skill "
+                "points at" % (byte_count, SKILL_TEXT_LIMIT)
             )
         fields = parse_frontmatter(skill_text)
         if fields is None:
