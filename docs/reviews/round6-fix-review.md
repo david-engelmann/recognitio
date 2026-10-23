@@ -66,7 +66,7 @@ whose manifest reports verified true. The packet check
 command `python3 scripts/check_packet.py` run against
 that packet exited 0 and reported the packet verified for
 the current head. The full gate command `make check` run
-on the tree as this change was adopted exited 0 with 185
+on the tree as this change was adopted exited 0 with 188
 tests. The new extractor tests for the copy ranges ran in
 a scratch copy with the extractor fix reverted and exited
 1 with 7 failures across 8 tests while the no copy control
