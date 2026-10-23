@@ -85,6 +85,7 @@ DIFF_FLAGS = [
     "diff", "--histogram", "--find-renames", "--find-copies",
     "-W", "--no-ext-diff", "--no-textconv",
 ]
+LEGACY_ENTRY_KEYS = {"instruction_file"}
 
 
 def artefact_paths(root):
@@ -403,11 +404,13 @@ def entry_problems(task_name, saved, rebuilt):
     """Compare the saved manifest entries against the rebuilt ones.
 
     The rebuilt manifest sets the entry format, because the
-    current extractor writes it. A key that no saved entry of
-    the task carries at all marks a task recorded under an
-    older entry format and that key is set aside for the task.
-    A key missing from only some saved entries is drift and
-    the comparison catches it, because the saved side reads
+    current extractor writes it. One key stands exempt from
+    that rule. The instruction file key arrived after the
+    first tasks were recorded, so a task whose saved entries
+    carry it nowhere has that key set aside. Any other key
+    missing from the saved entries is drift and the
+    comparison catches it, whether the key is missing from
+    every entry or only some, because the saved side reads
     the missing key as no value against the rebuilt value.
     """
     saved_files = saved.get("files") if isinstance(saved, dict) else None
@@ -428,7 +431,8 @@ def entry_problems(task_name, saved, rebuilt):
     dated = {
         key
         for key in keys
-        if all(
+        if key in LEGACY_ENTRY_KEYS
+        and all(
             not isinstance(entry, dict) or key not in entry
             for entry in saved_files
         )

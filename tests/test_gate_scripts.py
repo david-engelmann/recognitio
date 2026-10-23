@@ -55,16 +55,18 @@ class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
         for attempt in range(self.cleanup_attempts):
             try:
                 shutil.rmtree(self.name)
-            except FileNotFoundError:
-                last_error = None
-                break
+            except FileNotFoundError as error:
+                if not os.path.exists(self.name):
+                    last_error = None
+                    break
+                last_error = error
             except OSError as error:
                 last_error = error
-                if attempt + 1 < self.cleanup_attempts:
-                    time.sleep(self.cleanup_delay_seconds)
             else:
                 last_error = None
                 break
+            if attempt + 1 < self.cleanup_attempts:
+                time.sleep(self.cleanup_delay_seconds)
         if last_error is not None:
             raise last_error
         self._finalizer.detach()
@@ -1661,7 +1663,31 @@ class TestCheckEvals(unittest.TestCase):
             target.write_text("[1, 2]\n", encoding="utf-8")
             problems = self.mod.packet_problems(root)
             self.assertTrue(
-                any("task-02" in problem for problem in problems),
+                any(
+                    "task-02" in problem
+                    and "does not hold a JSON object" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_manifest_entry_key_missing_from_every_entry_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = (
+                root / "evals" / "tasks" / "task-03" / "manifest.json"
+            )
+            manifest = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["files"]), 2)
+            for entry in manifest["files"]:
+                del entry["hunks"]
+            target.write_text(json.dumps(manifest), encoding="utf-8")
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any(
+                    "task-03" in problem and "entries" in problem
+                    for problem in problems
+                ),
                 problems,
             )
 
@@ -1775,6 +1801,24 @@ class TestRetryingTemporaryDirectory(unittest.TestCase):
             return real_rmtree(path, *args, **kwargs)
 
         with mock.patch.object(shutil, "rmtree", flaky):
+            with mock.patch.object(time, "sleep", lambda seconds: None):
+                holder.cleanup()
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(Path(holder.name).exists())
+
+    def test_cleanup_retries_when_a_child_path_vanishes_mid_removal(self):
+        holder = RetryingTemporaryDirectory()
+        Path(holder.name, "kept.txt").write_text("x", encoding="utf-8")
+        real_rmtree = shutil.rmtree
+        calls = []
+
+        def vanishing(path, *args, **kwargs):
+            calls.append(path)
+            if len(calls) == 1:
+                raise FileNotFoundError("a child path vanished")
+            return real_rmtree(path, *args, **kwargs)
+
+        with mock.patch.object(shutil, "rmtree", vanishing):
             with mock.patch.object(time, "sleep", lambda seconds: None):
                 holder.cleanup()
         self.assertEqual(len(calls), 2)

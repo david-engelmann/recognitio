@@ -489,3 +489,10 @@ This unreleased work carries version 1.3.0.
   removal a bounded number of times and raises when the
   tree still stands after the bound, and pinning tests
   cover both the retry and the raise.
+- The eval gate set aside any manifest entry key that no
+  saved entry of a task carried, so deleting a key from
+  every entry of a saved manifest passed the rebuild
+  comparison once the checksum record was refreshed. The
+  exemption now names the one legacy key it exists for,
+  and a test deletes a key from every entry to pin the
+  narrower rule.
