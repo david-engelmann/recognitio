@@ -76,6 +76,7 @@ class TestCheckCopy(unittest.TestCase):
         }
         for expected in (
             ".github/workflows/ci.yml",
+            ".github/dependabot.yml",
             "Makefile",
             ".gitignore",
         ):
@@ -105,7 +106,7 @@ class TestCheckCopy(unittest.TestCase):
                 "  check:\n"
                 "    steps:\n"
                 "      - run: |\n"
-                "          echo one; echo two\n",
+                "          echo one; echo two\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
 
@@ -143,6 +144,17 @@ class TestCheckCopy(unittest.TestCase):
                 tmp, ".gitignore",
                 "# Extractor output %s working papers.\n"
                 "packet/\n" % EM_DASH,
+            )
+            self.assertEqual(self.run_main_on([], [path]), 1)
+
+    def test_em_dash_in_a_dependabot_comment_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "dependabot.yml",
+                "# Keep the pinned actions current %s weekly.\n"
+                "version: 2\n"
+                "updates:\n"
+                "  - package-ecosystem: \"github-actions\"\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
 

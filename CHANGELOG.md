@@ -99,7 +99,10 @@ Semantic Versioning.
 - The range diff and the diff stat fallback in the re-review
   section carry the same pins as every other diff, and the range
   diff reads attributes from the empty tree, so a text conversion
-  driver in the reviewed tree cannot rewrite the re-review.
+  driver in the reviewed tree cannot rewrite the re-review. The
+  range diff also pairs commits at the maximum creation factor,
+  because a small commit pairs with nothing at the default factor
+  and its inner diff would vanish from the re-review.
 - The companion searches read attribute marked files as text. A
   tree that marks its sources binary can no longer hide its own
   call sites and leave the packet reporting that none exist.
@@ -133,8 +136,14 @@ Semantic Versioning.
   the packet and in the docs, and the receipt prose defines what
   the files per tier counts count.
 - The copy gate scans the issue template config file and the
-  comment prose of the workflow, the Makefile and the gitignore
-  file, so the coverage the gate claims is the coverage it has.
+  comment prose of the workflow, the dependabot config, the
+  Makefile and the gitignore file, so the coverage the gate
+  claims is the coverage it has.
+- The budget decision measures each candidate packet by
+  assembling it, the same fixed point the shipped packet is
+  measured at. A fixed allowance for the completeness section
+  undercounted it whenever the section grew, and packets the
+  budget accepted could land over the budget.
 - The pipeline is split into named stage functions, and the
   packet write fails in the same clean voice as every other run
   failure instead of escaping as a traceback.

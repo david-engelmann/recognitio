@@ -14,10 +14,11 @@ a line, never the whole line, so a banned mark hiding beside a link
 is still caught. The span ends at the link boundary, so punctuation
 sitting right after a link stays in the prose and is judged.
 
-Three files are mostly code with prose living in their comments.
-The workflow, the Makefile and the gitignore are scanned by comment
-span only, so their shell and pattern lines are never judged as
-prose while every sentence a contributor writes in them is.
+Four files are mostly code with prose living in their comments.
+The workflow, the dependabot config, the Makefile and the
+gitignore are scanned by comment span only, so their shell and
+pattern lines are never judged as prose while every sentence a
+contributor writes in them is.
 
 Exits nonzero and lists every violation when the bar is broken.
 """
@@ -48,6 +49,7 @@ PROSE_FILES = [
 # really stands there.
 COMMENT_FILES = [
     ROOT / ".github" / "workflows" / "ci.yml",
+    ROOT / ".github" / "dependabot.yml",
     ROOT / "Makefile",
     ROOT / ".gitignore",
 ]

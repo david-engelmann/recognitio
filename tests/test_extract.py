@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
@@ -690,7 +691,7 @@ class TestBudget(unittest.TestCase):
         both_out = Path(self.tmp.name) / "both"
         result = run_extract_cli(
             self.repo, both_out, "--range", "HEAD~1..HEAD",
-            "--budget", str(core_tokens + 40),
+            "--budget", str(core_tokens + 80),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         both = read_manifest(both_out)
@@ -701,7 +702,10 @@ class TestBudget(unittest.TestCase):
             ["T3", "T2"],
         )
         both_tokens = len((both_out / "packet.md").read_bytes()) // 4
-        self.assertLessEqual(both_tokens, core_tokens + 40)
+        self.assertLessEqual(both_tokens, core_tokens + 80)
+        # The manifest estimate is the emitted packet's own measure,
+        # so the budget the run accepted is the budget it kept.
+        self.assertEqual(both["budget"]["estimated_tokens"], both_tokens)
 
     def test_budget_below_the_change_itself_fails(self):
         out = Path(self.tmp.name) / "tiny"
@@ -1231,6 +1235,37 @@ class TestRereviewPins(unittest.TestCase):
             self.assertNotIn("CONSTANT-LIE", section)
             self.assertIn("v3 REAL", section)
 
+    def test_stat_fallback_and_range_diff_carry_the_pins(self):
+        calls = []
+
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            calls.append((list(args), list(global_flags)))
+            if args[0] == "merge-base":
+                return extract_mod.Proc(0, "a" * 40 + "\n", "")
+            if args[0] == "log":
+                return extract_mod.Proc(0, "abc1234 a commit\n", "")
+            if args[0] == "range-diff":
+                return extract_mod.Proc(1, "", "range diff unavailable")
+            return extract_mod.Proc(0, " fn.py | 1 +\n", "")
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git):
+            text = extract_mod.build_rereview(
+                Path("."), "b" * 40, "c" * 40, "d" * 40, []
+            )
+        range_call = next(c for c in calls if c[0][0] == "range-diff")
+        self.assertIn("--creation-factor=100", range_call[0])
+        self.assertIn("--no-textconv", range_call[0])
+        self.assertIn("--no-ext-diff", range_call[0])
+        self.assertIn(
+            "--attr-source=" + extract_mod.EMPTY_TREE, range_call[1]
+        )
+        stat_call = next(
+            c for c in calls if c[0][:2] == ["diff", "--stat"]
+        )
+        self.assertIn("--no-textconv", stat_call[0])
+        self.assertIn("--no-ext-diff", stat_call[0])
+        self.assertIn("fn.py | 1 +", text)
+
 
 class TestCompanionSearchText(unittest.TestCase):
     """Companion searches read attribute marked files as text (N5)."""
@@ -1485,14 +1520,21 @@ class TestFenceSafety(unittest.TestCase):
                 "title": "A change",
                 "body": body,
             })
+            # The payload travels through a file, not through echo.
+            # The body carries backslash escapes once encoded, and a
+            # shell echo that interprets them would corrupt the JSON
+            # before the extractor ever saw it, testing the shell
+            # instead of the fence.
+            view_path = Path(tmp) / "view.json"
+            view_path.write_text(view)
             env = install_gh_script(
                 tmp,
                 "#!/bin/sh\n"
                 "if [ \"$2\" = \"view\" ]; then\n"
-                "  echo '%s'\n"
+                "  cat '%s'\n"
                 "else\n"
                 "  echo '[]'\n"
-                "fi\n" % view,
+                "fi\n" % view_path,
             )
             out = Path(tmp) / "out"
             result = run_extract_cli(repo, out, "--pr", "7", env=env)

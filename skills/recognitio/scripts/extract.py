@@ -1688,10 +1688,14 @@ def build_rereview(repo, diff_base, head, since, findings,
     # attributes are also read from the empty tree for this one
     # invocation. No attribute in the reviewed tree can then assign
     # a text conversion or an external driver to the inner diffs,
-    # and the reviewed tree cannot rewrite its own re-review.
+    # and the reviewed tree cannot rewrite its own re-review. The
+    # creation factor is set to its maximum because pairing is the
+    # point of the section. At the default factor a small commit,
+    # a one line change above all, pairs with nothing and its inner
+    # diff vanishes from the re-review entirely.
     result = run_git(
         repo,
-        ["range-diff"] + DIFF_FLAGS
+        ["range-diff", "--creation-factor=100"] + DIFF_FLAGS
         + ["%s..%s" % (diff_base, since),
            "%s..%s" % (diff_base, head)],
         check=False,
@@ -2044,64 +2048,56 @@ def assemble_tiers(args, repo, resolved, diff_base, change, files,
     return tier_texts, tier_files, t2_notes + t3_notes, rereview
 
 
-def estimate_completeness(budget):
-    """The fixed allowance the completeness section is measured at."""
-    return estimate_tokens(
-        render_completeness(budget, 0, {
-            tier: {"state": "included", "estimated_tokens": 0, "files": 0}
-            for tier in ("T0", "T1", "T2", "T3")
-        }, [], True, [])
-    ) + 16
-
-
-def apply_budget(args, selected, tier_texts, rereview, header_provisional):
+def apply_budget(args, selected, tier_texts, tier_files, rereview,
+                 header_provisional):
     """Decide which optional tiers the budget sheds.
 
     Returns the drop list and, when T0 and T1 alone exceed the
     budget, the failure message instead. T3 sheds before T2, and
     the change itself is never truncated.
+
+    Each candidate drop set is measured by assembling the packet
+    it would emit and settling its token estimate, the same fixed
+    point the shipped packet is measured at, so a packet the
+    budget accepts is a packet that measures inside the budget.
+    A fixed allowance for the completeness section undercounted
+    it whenever the section grew, drop lines and all, and let
+    emitted packets land over the budget they were accepted
+    under. The measurement reads the verified form of the packet.
+    A packet that goes on to fail verification is a failure
+    artifact at exit 3, not a packet presented as ready, and its
+    discrepancy list can carry it past the budget.
     """
-    completeness_estimate = estimate_completeness(args.budget)
-
-    def total_with(dropped):
-        total = estimate_tokens(header_provisional)
-        total += estimate_tokens(tier_texts["T0"])
-        total += estimate_tokens(tier_texts["T1"])
-        total += estimate_tokens(rereview or "")
-        for tier in ("T2", "T3"):
-            if tier not in selected:
-                total += estimate_tokens(tier_placeholder(tier, "not selected"))
-            elif tier in dropped:
-                total += estimate_tokens(tier_placeholder(tier, "dropped"))
-            else:
-                total += estimate_tokens(tier_texts[tier])
-        return total
-
     dropped = []
     if args.budget is None:
         return dropped, None
-    optional = [tier for tier in ("T3", "T2") if tier in selected]
-    core = total_with(set(optional)) + completeness_estimate
-    if core > args.budget:
-        core_tokens = (
-            estimate_tokens(header_provisional)
-            + estimate_tokens(tier_texts["T0"])
-            + estimate_tokens(tier_texts["T1"])
-            + estimate_tokens(rereview or "")
-            + completeness_estimate
+
+    def measure(candidate):
+        info = tier_accounting(
+            selected,
+            {item["tier"] for item in candidate},
+            tier_texts,
+            tier_files,
         )
+        _packet, estimate = build_packet_text(
+            header_provisional, tier_texts, rereview, info,
+            candidate, args.budget, True, [],
+        )
+        return estimate
+
+    optional = [tier for tier in ("T3", "T2") if tier in selected]
+    reason = "budget of %d tokens" % args.budget
+    core = measure([{"tier": tier, "reason": reason} for tier in optional])
+    if core > args.budget:
         message = (
             "T0 and T1 alone need about %d tokens, over the budget of "
             "%d. The change itself is never truncated. Raise the budget "
-            "or split the change." % (core_tokens, args.budget)
+            "or split the change." % (core, args.budget)
         )
         return dropped, message
     for tier in optional:
-        dropped_so_far = {item["tier"] for item in dropped}
-        if total_with(dropped_so_far) + completeness_estimate > args.budget:
-            dropped.append(
-                {"tier": tier, "reason": "budget of %d tokens" % args.budget}
-            )
+        if measure(dropped) > args.budget:
+            dropped.append({"tier": tier, "reason": reason})
     return dropped, None
 
 
@@ -2250,7 +2246,8 @@ def run_pipeline(args, repo, out_dir, argv):
     selected = args.tiers_selected
     header_provisional = build_header(resolved, diff_base, True, exclusions)
     dropped, failure = apply_budget(
-        args, selected, tier_texts, rereview, header_provisional
+        args, selected, tier_texts, tier_files, rereview,
+        header_provisional
     )
     if failure is not None:
         write_failure_manifest(out_dir, argv, failure, resolved)
