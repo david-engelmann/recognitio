@@ -17,9 +17,6 @@ Semantic Versioning.
   companion call sites and test files, then history. A manifest
   records every changed file and hunk, and an independent recount
   must agree with the manifest before the packet is called verified.
-
-### Added
-
 - The pull request title, body and spec references in the triage
   tier, and the changed file list beside the numstat summary.
 - Imports of the changed files and definitions of the changed names
@@ -84,3 +81,60 @@ Semantic Versioning.
   path a finding was anchored under, ignores pure insertions, and
   the re-review section gates on a shared merge base, so a rebased
   head is re-reviewed instead of skipped.
+- Replace refs can no longer swap the content under review. Every
+  git invocation refuses replace objects, the child environment
+  pins the same refusal, and the packet check reads the head under
+  the same discipline.
+- The line recount parses hunks structurally, so a content line
+  whose text begins with two plus signs or two minus signs counts
+  as content instead of being skipped as a diff header. Ordinary
+  changes carrying SQL comments or TOML delimiters verify again.
+- Attribute marked files are measured from numstat read with the
+  text flag and cross checked against the diff body like every
+  other text file. Their counts can no longer rest on one counter.
+- Per file re-measurement diffs under literal pathspecs and under
+  both names of a rename. A renamed attribute marked file is
+  measured as its real delta, and a file named with glob
+  characters shows its own diff rather than a neighbour file's.
+- The range diff and the diff stat fallback in the re-review
+  section carry the same pins as every other diff, and the range
+  diff reads attributes from the empty tree, so a text conversion
+  driver in the reviewed tree cannot rewrite the re-review.
+- The companion searches read attribute marked files as text. A
+  tree that marks its sources binary can no longer hide its own
+  call sites and leave the packet reporting that none exist.
+- GitHub CLI failures of every shape now end in the failure
+  receipt and the exit code the contract promises. A missing CLI,
+  an unparseable answer and a wrongly shaped one no longer escape
+  as tracebacks.
+- A run rejected while its arguments are checked clears the output
+  directory and leaves the failure receipt like any other failed
+  run, so the standing promise about stale packets holds without
+  qualification.
+- A generated file marker withholds a diff only when the marker
+  already stood at the base revision. A marker that arrives in
+  the change is flagged in the packet header and the change is
+  shown in full.
+- The pull request body, the numstat block and the commit list
+  are fenced with a fence longer than any run of backticks inside
+  them. Reviewed text can no longer break out of its fence and
+  forge a packet section.
+- The manifest records the section headings it emitted and the
+  packet check verifies those sections are present and filled,
+  so a thin packet cannot wear a full packet's manifest.
+- Findings accounting reads the head tree once instead of once
+  per finding, is capped at one hundred findings with the cap
+  stated in the section, and names an empty findings file in the
+  re-review section instead of letting it vanish.
+- The exclusion receipt holds one entry per file. An attribute
+  marked lockfile is receipted once, as the lockfile it is shown
+  as, and never also as a file shown as text.
+- The prior pull request lookup states the window it covers in
+  the packet and in the docs, and the receipt prose defines what
+  the files per tier counts count.
+- The copy gate scans the issue template config file and the
+  comment prose of the workflow, the Makefile and the gitignore
+  file, so the coverage the gate claims is the coverage it has.
+- The pipeline is split into named stage functions, and the
+  packet write fails in the same clean voice as every other run
+  failure instead of escaping as a traceback.

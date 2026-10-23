@@ -10,10 +10,13 @@ disagreement fails closed.
 
 Every git invocation runs with its output format pinned, so ambient
 configuration in the clone or in the user's global config cannot reshape
-the diff under the packet. Path data moves through NUL delimited output,
-so quoted, spaced and Unicode paths survive end to end. All subprocess
-output is handled as bytes first, so binary files and non UTF-8 content
-cannot crash the run.
+the diff under the packet. Every invocation also refuses replace
+objects, so a replace ref planted in the clone cannot swap the objects
+the packet is built from while the packet keeps the real head's name.
+File paths reach git as literal pathspecs, never as patterns. Path data
+moves through NUL delimited output, so quoted, spaced and Unicode
+paths survive end to end. All subprocess output is handled as bytes
+first, so binary files and non UTF-8 content cannot crash the run.
 """
 
 import argparse
@@ -27,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-EXTRACTOR_VERSION = "1.1.0"
+EXTRACTOR_VERSION = "1.2.0"
 SOURCE_EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go"}
 MAX_CALL_SITES_PER_FUNCTION = 5
 MAX_TEST_FILES = 10
@@ -42,7 +45,9 @@ MAX_LOG_L_CHARS = 4000
 MAX_RANGE_DIFF_CHARS = 8000
 MAX_PR_BODY_CHARS = 4000
 MAX_PRIOR_PRS = 5
+MAX_PRIOR_PR_LIST = 30
 MAX_SPEC_REFERENCES = 5
+MAX_FINDINGS_ACCOUNTED = 100
 
 STATUS_NAMES = {
     "A": "added",
@@ -158,7 +163,12 @@ def decode_bytes(data):
 # exported GIT_DIR defeats git -C, so an extractor launched from a git
 # hook or a configured shell would silently read a different
 # repository, and the recount would read that same repository and
-# still agree with the packet.
+# still agree with the packet. The replace object controls are
+# scrubbed for the same reason and then pinned off outright in
+# run_process. A replace ref in the clone under review redirects
+# every object read to a different object, so assembly and recount
+# would agree perfectly about the wrong tree under the real head's
+# name, and no output pin can see it.
 GIT_LOCATION_VARS = (
     "GIT_DIR",
     "GIT_WORK_TREE",
@@ -167,6 +177,8 @@ GIT_LOCATION_VARS = (
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_COMMON_DIR",
     "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
 )
 
 # Every child process gets a timeout, the network calls to the GitHub
@@ -180,6 +192,10 @@ def run_process(argv, cwd=None):
         for key, value in os.environ.items()
         if key not in GIT_LOCATION_VARS
     }
+    # The second belt behind the --no-replace-objects flag every git
+    # invocation carries. Whichever layer a future call site forgets,
+    # the other still refuses replacement objects.
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
     try:
         return subprocess.run(
             list(argv), cwd=str(cwd) if cwd is not None else None,
@@ -193,6 +209,13 @@ def run_process(argv, cwd=None):
                 PROCESS_TIMEOUT_SECONDS,
                 " ".join(str(part) for part in argv),
             )
+        ) from exc
+    except OSError as exc:
+        # A missing executable, the GitHub CLI most often, is a run
+        # failure in the tool's own voice, never a raw traceback. The
+        # caller routes GitError to the failure receipt and exit 2.
+        raise GitError(
+            "could not run %s: %s" % (argv[0], exc)
         ) from exc
 
 
@@ -211,8 +234,17 @@ def run_argv(argv, cwd, check, label):
     return proc
 
 
-def run_git(repo, args, check=True):
-    argv = ["git", "-C", str(repo)] + GIT_PIN + list(args)
+def run_git(repo, args, check=True, global_flags=()):
+    # --no-replace-objects refuses replace refs, so the objects read
+    # are the objects the recorded refs name. --literal-pathspecs
+    # makes every pathspec in the invocation a literal path, so a
+    # file named with glob characters is measured as itself and never
+    # as a pattern that borrows a neighbour's diff.
+    argv = (
+        ["git", "--no-replace-objects", "--literal-pathspecs"]
+        + list(global_flags)
+        + ["-C", str(repo)] + GIT_PIN + list(args)
+    )
     return run_argv(argv, None, check, "git " + " ".join(args))
 
 
@@ -274,6 +306,11 @@ def resolve_pr(repo, args, since_sha):
         data = json.loads(view.stdout)
     except json.JSONDecodeError as exc:
         raise GitError("gh pr view returned unparseable JSON: %s" % exc)
+    if not isinstance(data, dict):
+        raise GitError(
+            "gh pr view returned JSON that is not an object, so pull "
+            "request %d cannot be resolved from it" % args.pr
+        )
     resolved_refs = {}
     for key, target in (("baseRefOid", "base"), ("headRefOid", "head")):
         oid = data.get(key)
@@ -477,13 +514,26 @@ def count_hunks(chunk):
 
 
 def count_chunk_lines(chunk):
-    """Count added and deleted lines in a zero context diff chunk."""
+    """Count added and deleted lines in a zero context diff chunk.
+
+    The chunk is parsed structurally. Lines count only inside a hunk,
+    so the +++ and --- file headers, which stand before the first hunk
+    header, are never mistaken for content, and a content line whose
+    own text begins with ++ or --, a SQL comment or a TOML delimiter,
+    counts as the content it is.
+    """
     adds = 0
     dels = 0
+    in_hunks = False
     for line in chunk.splitlines():
-        if line.startswith("+") and not line.startswith("+++"):
+        if line.startswith("@@ "):
+            in_hunks = True
+            continue
+        if not in_hunks:
+            continue
+        if line.startswith("+"):
             adds += 1
-        elif line.startswith("-") and not line.startswith("---"):
+        elif line.startswith("-"):
             dels += 1
     return adds, dels
 
@@ -541,7 +591,8 @@ def file_bytes(repo, ref, path):
     if ref is None or path is None:
         return None
     result = run_process(
-        ["git", "-C", str(repo)] + GIT_PIN
+        ["git", "--no-replace-objects", "--literal-pathspecs",
+         "-C", str(repo)] + GIT_PIN
         + ["show", "%s:%s" % (ref, path)]
     )
     if result.returncode != 0:
@@ -627,19 +678,76 @@ def fetch_change(repo, diff_base, head):
     }
 
 
-def per_file_text_diff(repo, diff_base, head, path, context_flag):
-    """Diff one path with the text flag, for attribute marked files."""
+def entry_paths(entry):
+    """Every path an entry answers to, oldest first."""
+    paths = []
+    if entry.get("old_path"):
+        paths.append(entry["old_path"])
+    paths.append(entry["path"])
+    return paths
+
+
+def per_file_text_diff(repo, diff_base, head, entry, context_flag):
+    """Diff one file with the text flag, for attribute marked files.
+
+    The diff runs over every path the file answers to, under literal
+    pathspecs, so rename detection pairs the two sides of a rename
+    and the chunk is the file's real delta rather than its whole new
+    size, and a path carrying glob characters names itself alone.
+    """
     result = run_git(
         repo,
-        ["diff", "--text", "--histogram", context_flag] + DIFF_FLAGS
-        + [diff_base, head, "--", path],
+        ["diff", "--text", "--histogram", "--find-renames",
+         "--find-copies", context_flag] + DIFF_FLAGS
+        + [diff_base, head, "--"] + entry_paths(entry),
     )
     chunks = split_diff(result.stdout)
     return chunks[0] if chunks else ""
 
 
+def per_file_text_numstat(repo, diff_base, head, entry):
+    """Git's own line counts for one file, read with the text flag.
+
+    Returns the (additions, deletions) pair numstat reports for the
+    entry's path, or None when git still reports the file as binary.
+    This is the independent second count for attribute marked files,
+    the same numstat source ordinary files are measured from.
+    """
+    result = run_git(
+        repo,
+        ["diff", "--text", "--numstat", "-z", "-M", "-C"] + DIFF_FLAGS
+        + [diff_base, head, "--"] + entry_paths(entry),
+    )
+    stats, binary_paths = parse_numstat_z(result.stdout)
+    if entry["path"] in binary_paths:
+        return None
+    return stats.get(entry["path"])
+
+
+def has_generated_marker(content):
+    """True when a file's first lines carry the do not edit marker."""
+    if content is None:
+        return False
+    for line in content.splitlines()[:5]:
+        lowered = line.lower()
+        if "code generated" in lowered and "do not edit" in lowered:
+            return True
+    return False
+
+
 def generated_reason(repo, diff_base, head, entry):
-    """Name the placeholder reason for generated files and lockfiles."""
+    """Name the placeholder reason for generated files and lockfiles.
+
+    Returns the reason, the string "marker arrived" when the head
+    version carries a generated marker the base version did not, or
+    None. A name based reason, a lockfile name or a generated suffix,
+    never depends on file content and always applies. The content
+    marker is different. It is asserted by the file itself, so it
+    withholds the diff only when the marker already stood at the
+    base revision. A marker that arrives in the very change under
+    review exempts nothing, and the caller flags its arrival while
+    showing the change in full.
+    """
     path = entry["path"]
     name = Path(path).name
     if name in LOCKFILE_NAMES:
@@ -652,13 +760,17 @@ def generated_reason(repo, diff_base, head, entry):
     # A deletion carries its path in path alone. old_path is set only
     # for renames and copies, so reading through it loses the file.
     content = show_file(repo, ref, path)
-    if content is None:
+    if not has_generated_marker(content):
         return None
-    for line in content.splitlines()[:5]:
-        lowered = line.lower()
-        if "code generated" in lowered and "do not edit" in lowered:
-            return "generated file"
-    return None
+    if entry["status"] == "deleted":
+        # The content just read is the base revision's own, so the
+        # marker predates the change by construction.
+        return "generated file"
+    base_path = entry["old_path"] or path
+    base_content = show_file(repo, diff_base, base_path)
+    if has_generated_marker(base_content):
+        return "generated file"
+    return "marker arrived"
 
 
 def enrich_files(repo, diff_base, head, change):
@@ -680,6 +792,11 @@ def enrich_files(repo, diff_base, head, change):
         entry["attribute_text"] = False
         entry["placeholder"] = None
         entry["head_bytes"] = None
+        # One receipt entry per file, decided last. An attribute
+        # marked lockfile is a lockfile in the packet, not a file
+        # shown as text, and the receipt must say what the packet
+        # does, once, in one voice.
+        receipt = None
         if path in binary_paths:
             side_ref = head if entry["status"] != "deleted" else diff_base
             # The entry path names the file on both sides of a deletion.
@@ -689,21 +806,30 @@ def enrich_files(repo, diff_base, head, change):
                 # attributes file, but the content is plain text. Count
                 # it and show it as text, and name it in the receipt.
                 text_chunk = per_file_text_diff(
-                    repo, diff_base, head, path, "-W"
+                    repo, diff_base, head, entry, "-W"
                 )
                 zero_chunk = per_file_text_diff(
-                    repo, diff_base, head, path, "-U0"
+                    repo, diff_base, head, entry, "-U0"
                 )
                 chunks[path] = text_chunk
                 precise[path] = zero_chunk
-                adds, dels = count_chunk_lines(zero_chunk)
+                # Git's own count, read with the text flag, is the
+                # primary measure, and the recount cross checks it
+                # against the diff body like any other text file.
+                measured = per_file_text_numstat(
+                    repo, diff_base, head, entry
+                )
+                if measured is not None:
+                    adds, dels = measured
+                else:
+                    adds, dels = count_chunk_lines(zero_chunk)
                 entry["attribute_text"] = True
-                exclusions.append({
+                receipt = {
                     "path": path,
                     "reason": "marked binary by repository attributes, "
                               "counted and shown as text",
                     "shown_as_text": True,
-                })
+                }
             elif data is not None:
                 entry["binary"] = True
                 entry["head_bytes"] = len(data)
@@ -713,11 +839,11 @@ def enrich_files(repo, diff_base, head, change):
                     "diff)" % (len(data), "head" if entry["status"] != "deleted"
                                else "base")
                 )
-                exclusions.append({
+                receipt = {
                     "path": path,
                     "reason": "binary file of %d bytes" % len(data),
                     "shown_as_text": False,
-                })
+                }
             # When no bytes exist on either side the entry is a gitlink
             # or similar, and the diff chunk already speaks for itself.
         entry["additions"] = adds
@@ -725,18 +851,32 @@ def enrich_files(repo, diff_base, head, change):
         entry["hunks"] = count_hunks(chunks.get(path, ""))
         if not entry["binary"] and entry["placeholder"] is None:
             reason = generated_reason(repo, diff_base, head, entry)
-            if reason is not None:
+            if reason == "marker arrived":
+                # The marker is new in this change, so it exempts
+                # nothing. The change is shown in full and the
+                # receipt flags the arrival where a reviewer reads
+                # the exclusions.
+                receipt = {
+                    "path": path,
+                    "reason": "carries a generated file marker that "
+                              "arrived in this change, counted and "
+                              "shown in full",
+                    "shown_as_text": True,
+                }
+            elif reason is not None:
                 entry["placeholder"] = (
                     "(%s; the diff is withheld from the packet and its %d "
                     "additions and %d deletions across %d hunks are counted "
                     "in the manifest)"
                     % (reason, adds, dels, entry["hunks"])
                 )
-                exclusions.append({
+                receipt = {
                     "path": path,
                     "reason": reason,
                     "shown_as_text": False,
-                })
+                }
+        if receipt is not None:
+            exclusions.append(receipt)
     return exclusions
 
 
@@ -773,6 +913,22 @@ def build_header(resolved, diff_base, verified, exclusions):
     return "\n".join(lines)
 
 
+def fence_for(text):
+    """A fence longer than any run of backticks inside the text.
+
+    Untrusted text, a pull request body above all, is written by the
+    author of the change under review. Inside a plain fence it can
+    close the fence early and print forged packet sections in its
+    own voice. A fence one backtick longer than the longest run
+    inside the text cannot be closed from inside, so the text stays
+    text and the packet's own headings stay the only headings.
+    """
+    longest = 0
+    for match in re.finditer(r"`+", text):
+        longest = max(longest, len(match.group(0)))
+    return "`" * max(3, longest + 1)
+
+
 def build_t0(files, commit_log, pr_info):
     lines = []
     lines.append("## T0 Triage")
@@ -785,9 +941,10 @@ def build_t0(files, commit_log, pr_info):
         body = pr_info["body"].strip()
         if body:
             shown, capped = cap_text(body, MAX_PR_BODY_CHARS, "pull request body")
-            lines.append("```")
+            fence = fence_for(shown)
+            lines.append(fence)
             lines.append(shown)
-            lines.append("```")
+            lines.append(fence)
             if capped:
                 lines.append("")
                 lines.append(
@@ -819,7 +976,6 @@ def build_t0(files, commit_log, pr_info):
     lines.append("")
     lines.append("### Numstat")
     lines.append("")
-    lines.append("```")
     numstat_lines = []
     for entry in files:
         if entry["binary"]:
@@ -829,14 +985,19 @@ def build_t0(files, commit_log, pr_info):
                 "%d\t%d\t%s"
                 % (entry["additions"], entry["deletions"], entry["path"])
             )
-    lines.append("\n".join(numstat_lines) if numstat_lines else "(no changes)")
-    lines.append("```")
+    numstat_text = "\n".join(numstat_lines) if numstat_lines else "(no changes)"
+    fence = fence_for(numstat_text)
+    lines.append(fence)
+    lines.append(numstat_text)
+    lines.append(fence)
     lines.append("")
     lines.append("### Commits")
     lines.append("")
-    lines.append("```")
-    lines.append(commit_log.rstrip() if commit_log.strip() else "(no commits)")
-    lines.append("```")
+    commit_text = commit_log.rstrip() if commit_log.strip() else "(no commits)"
+    fence = fence_for(commit_text)
+    lines.append(fence)
+    lines.append(commit_text)
+    lines.append(fence)
     lines.append("")
     return "\n".join(lines)
 
@@ -873,11 +1034,14 @@ def git_grep_lines(repo, head, term, fixed=True):
     """Return (path, line number, content) hits for a term at a head.
 
     Output is NUL delimited, so paths containing colons or spaces parse
-    exactly. Terms are fixed strings by default, never patterns.
+    exactly. Terms are fixed strings by default, never patterns. The
+    text flag makes the search read files the tree marks binary as
+    text, so an attributes line cannot hide a caller from this tier
+    and leave the section reporting that no call sites exist.
     """
-    args = ["grep", "-n", "-z", "-w", "-e", term, head]
+    args = ["grep", "--text", "-n", "-z", "-w", "-e", term, head]
     if fixed:
-        args = ["grep", "-n", "-z", "-w", "-F", "-e", term, head]
+        args = ["grep", "--text", "-n", "-z", "-w", "-F", "-e", term, head]
     result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
         return []
@@ -1288,29 +1452,49 @@ def prior_prs(repo, paths):
         view = run_cmd(
             repo,
             [
-                "gh", "pr", "list", "--state", "all", "--limit", "30",
+                "gh", "pr", "list", "--state", "all",
+                "--limit", str(MAX_PRIOR_PR_LIST),
                 "--json", "number,title,state,files",
             ],
         )
         data = json.loads(view.stdout)
-    except (GitError, json.JSONDecodeError):
+        if not isinstance(data, list):
+            return None
+        wanted = set(paths)
+        found = []
+        for pr in data:
+            if not isinstance(pr, dict):
+                continue
+            pr_files = {
+                item.get("path")
+                for item in pr.get("files") or []
+                if isinstance(item, dict)
+            }
+            if pr_files & wanted:
+                found.append({
+                    "number": pr.get("number"),
+                    "title": pr.get("title") or "",
+                    "state": pr.get("state") or "",
+                })
+    except (GitError, json.JSONDecodeError, AttributeError, TypeError):
+        # Metadata from the GitHub CLI is a convenience, never a
+        # load bearing input. Any shape it arrives in that the code
+        # cannot read degrades to the honest unavailable answer.
         return None
-    wanted = set(paths)
-    found = []
-    for pr in data:
-        pr_files = {item.get("path") for item in pr.get("files") or []}
-        if pr_files & wanted:
-            found.append({
-                "number": pr.get("number"),
-                "title": pr.get("title") or "",
-                "state": pr.get("state") or "",
-            })
     return found
 
 
 def prior_prs_section(repo, top_files):
     lines = []
     lines.append("### Prior pull requests touching these files")
+    lines.append("")
+    lines.append(
+        "Scope of the lookup: the %d most changed files, checked "
+        "against the %d most recent pull requests, with at most %d "
+        "matches shown. A pull request outside that window is not "
+        "reported here."
+        % (MAX_HISTORY_FILES, MAX_PRIOR_PR_LIST, MAX_PRIOR_PRS)
+    )
     lines.append("")
     paths = [entry["path"] for entry in top_files]
     found = prior_prs(repo, paths) if paths else []
@@ -1328,9 +1512,15 @@ def prior_prs_section(repo, top_files):
         )
         lines.append("")
         return lines
-    for pr in found[:MAX_PRIOR_PRS]:
+    shown = found[:MAX_PRIOR_PRS]
+    for pr in shown:
         lines.append(
             "- #%s %s (%s)" % (pr["number"], pr["title"], pr["state"].lower())
+        )
+    if len(found) > len(shown):
+        lines.append(
+            "Showing %d of %d matching pull requests."
+            % (len(shown), len(found))
         )
     lines.append("")
     return lines
@@ -1383,7 +1573,13 @@ def findings_accounting(repo, diff_base, since, head, findings):
     when the lines it anchors to sit inside a hunk of the diff between
     the previous reviewed head and this head. When the anchored lines
     survive that diff untouched, the finding is unaddressed.
+
+    Existence at the head is read once, from a single listing of the
+    head tree, however many findings there are, and the accounting
+    itself is capped like every other surface in the tool.
     """
+    total_findings = len(findings)
+    findings = findings[:MAX_FINDINGS_ACCOUNTED]
     precise = run_git(
         repo,
         ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
@@ -1393,6 +1589,10 @@ def findings_accounting(repo, diff_base, since, head, findings):
         repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
         + [since, head]
     ).stdout
+    tree_text = run_git(
+        repo, ["ls-tree", "-r", "-z", "--name-only", head]
+    ).stdout
+    head_paths = {field for field in tree_text.split("\0") if field}
     since_files = parse_name_status_z(status_text)
     chunks = split_diff(precise)
     # Findings anchor at the since revision, so their paths are the
@@ -1414,7 +1614,7 @@ def findings_accounting(repo, diff_base, since, head, findings):
     for finding in findings:
         path = finding["path"]
         anchor = finding["line"]
-        if file_bytes(repo, head, moved_to.get(path, path)) is None:
+        if moved_to.get(path, path) not in head_paths:
             verdict = "addressed, the file is gone at the head"
             addressed += 1
         else:
@@ -1440,11 +1640,18 @@ def findings_accounting(repo, diff_base, since, head, findings):
         "Findings addressed: %d of %d. Findings unaddressed: %d."
         % (addressed, len(findings), len(findings) - addressed)
     )
+    if total_findings > len(findings):
+        lines.append(
+            "Findings capped at %d of %d. The remaining findings were "
+            "not accounted."
+            % (MAX_FINDINGS_ACCOUNTED, total_findings)
+        )
     lines.append("")
     return lines
 
 
-def build_rereview(repo, diff_base, head, since, findings):
+def build_rereview(repo, diff_base, head, since, findings,
+                   findings_given=False):
     lines = []
     lines.append("## Re-review")
     lines.append("")
@@ -1476,11 +1683,19 @@ def build_rereview(repo, diff_base, head, since, findings):
     lines.append("")
     lines.append("### Range diff against the previous review")
     lines.append("")
+    # The range diff carries the same pins as every other diff. Its
+    # inner diffs do not take the flags in every git version, so the
+    # attributes are also read from the empty tree for this one
+    # invocation. No attribute in the reviewed tree can then assign
+    # a text conversion or an external driver to the inner diffs,
+    # and the reviewed tree cannot rewrite its own re-review.
     result = run_git(
         repo,
-        ["range-diff", "%s..%s" % (diff_base, since),
-         "%s..%s" % (diff_base, head)],
+        ["range-diff"] + DIFF_FLAGS
+        + ["%s..%s" % (diff_base, since),
+           "%s..%s" % (diff_base, head)],
         check=False,
+        global_flags=["--attr-source=" + EMPTY_TREE],
     )
     lines.append("```")
     if result.returncode == 0 and result.stdout.strip():
@@ -1491,7 +1706,7 @@ def build_rereview(repo, diff_base, head, since, findings):
     else:
         delta = run_git(
             repo,
-            ["diff", "--stat", "%s...%s" % (since, head)],
+            ["diff", "--stat"] + DIFF_FLAGS + ["%s...%s" % (since, head)],
         ).stdout
         lines.append(
             "Range diff was not available. Diff stat since the previous review:"
@@ -1503,6 +1718,16 @@ def build_rereview(repo, diff_base, head, since, findings):
         lines.extend(
             findings_accounting(repo, diff_base, since, head, findings)
         )
+    elif findings_given:
+        # A findings file was supplied and held nothing. Say so, so
+        # a reader can tell that case apart from no file at all.
+        lines.append("### Prior findings accounting")
+        lines.append("")
+        lines.append(
+            "A findings file was given for this run and it contained "
+            "no findings, so there is nothing to account for."
+        )
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -1556,7 +1781,11 @@ def verify_counts(repo, diff_base, head, manifest_files):
                     theirs["deletions"],
                 )
             )
-        if not theirs["binary"] and not theirs["attribute_text"]:
+        if not theirs["binary"]:
+            # Attribute marked files take part like any other text
+            # file. Their manifest counts come from numstat read with
+            # the text flag, and this recount of the diff body is the
+            # independent second way that must agree with them.
             counted = count_chunk_lines(
                 change["precise_chunks"].get(path, "")
             )
@@ -1756,34 +1985,29 @@ def parse_args(argv):
     return args
 
 
-def run_pipeline(args, repo, out_dir, argv):
-    resolved = resolve_inputs(repo, args)
-    diff_base = resolved["merge_base"]
-    if diff_base is None:
-        diff_base = EMPTY_TREE
+def load_findings(args):
+    """Read and parse the findings file, or an empty list without one."""
+    if not args.findings:
+        return []
+    try:
+        findings_text = Path(args.findings).read_text(
+            encoding="utf-8", errors="surrogateescape"
+        )
+    except OSError as exc:
+        raise GitError("cannot read the findings file: %s" % exc)
+    return parse_findings(findings_text)
+
+
+def assemble_tiers(args, repo, resolved, diff_base, change, files,
+                   findings):
+    """Build the tier texts for one run.
+
+    Returns the tier texts keyed by tier, the files each tier worked
+    over, the cap notes in tier order, and the re-review text, which
+    is None when the run carries no since ref.
+    """
     head = resolved["head"]
-
-    findings = []
-    if args.findings:
-        try:
-            findings_text = Path(args.findings).read_text(
-                encoding="utf-8", errors="surrogateescape"
-            )
-        except OSError as exc:
-            raise GitError("cannot read the findings file: %s" % exc)
-        findings = parse_findings(findings_text)
-
-    change = fetch_change(repo, diff_base, head)
-    files = change["files"]
-    if not files:
-        message = "the resolved change is empty, no packet was built"
-        write_failure_manifest(out_dir, argv, message, resolved)
-        print("recognitio: %s" % message, file=sys.stderr)
-        return 2
-    exclusions = enrich_files(repo, diff_base, head, change)
     chunks = change["chunks"]
-    stats = change["stats"]
-
     functions_by_file = {
         entry["path"]: extract_function_names(chunks.get(entry["path"], ""))
         for entry in files
@@ -1793,34 +2017,57 @@ def run_pipeline(args, repo, out_dir, argv):
             entry["path"], ""))
         for entry in files
     }
-
     selected = args.tiers_selected
-    t0 = build_t0(files, change["commit_log"], resolved["pr"])
-    t1 = build_t1(files, chunks)
-    t2, t2_notes, t2_files = "", [], 0
+    tier_texts = {
+        "T0": build_t0(files, change["commit_log"], resolved["pr"]),
+        "T1": build_t1(files, chunks),
+        "T2": "",
+        "T3": "",
+    }
+    tier_files = {"T0": len(files), "T1": len(files), "T2": 0, "T3": 0}
+    t2_notes, t3_notes = [], []
     if "T2" in selected:
-        t2, t2_notes, t2_files = build_t2(repo, head, files, functions_by_file)
-    t3, t3_notes, t3_files = "", [], 0
-    if "T3" in selected:
-        t3, t3_notes, t3_files = build_t3(
-            repo, head, files, stats, ranges_by_file, functions_by_file
+        tier_texts["T2"], t2_notes, tier_files["T2"] = build_t2(
+            repo, head, files, functions_by_file
         )
-    rereview = ""
+    if "T3" in selected:
+        tier_texts["T3"], t3_notes, tier_files["T3"] = build_t3(
+            repo, head, files, change["stats"], ranges_by_file,
+            functions_by_file,
+        )
+    rereview = None
     if resolved["since"]:
         rereview = build_rereview(
-            repo, diff_base, head, resolved["since"], findings
+            repo, diff_base, head, resolved["since"], findings,
+            findings_given=args.findings is not None,
         )
+    return tier_texts, tier_files, t2_notes + t3_notes, rereview
 
-    tier_texts = {"T0": t0, "T1": t1, "T2": t2, "T3": t3}
-    tier_files = {
-        "T0": len(files), "T1": len(files), "T2": t2_files, "T3": t3_files,
-    }
-    header_provisional = build_header(resolved, diff_base, True, exclusions)
+
+def estimate_completeness(budget):
+    """The fixed allowance the completeness section is measured at."""
+    return estimate_tokens(
+        render_completeness(budget, 0, {
+            tier: {"state": "included", "estimated_tokens": 0, "files": 0}
+            for tier in ("T0", "T1", "T2", "T3")
+        }, [], True, [])
+    ) + 16
+
+
+def apply_budget(args, selected, tier_texts, rereview, header_provisional):
+    """Decide which optional tiers the budget sheds.
+
+    Returns the drop list and, when T0 and T1 alone exceed the
+    budget, the failure message instead. T3 sheds before T2, and
+    the change itself is never truncated.
+    """
+    completeness_estimate = estimate_completeness(args.budget)
 
     def total_with(dropped):
         total = estimate_tokens(header_provisional)
-        total += estimate_tokens(t0) + estimate_tokens(t1)
-        total += estimate_tokens(rereview)
+        total += estimate_tokens(tier_texts["T0"])
+        total += estimate_tokens(tier_texts["T1"])
+        total += estimate_tokens(rereview or "")
         for tier in ("T2", "T3"):
             if tier not in selected:
                 total += estimate_tokens(tier_placeholder(tier, "not selected"))
@@ -1830,61 +2077,36 @@ def run_pipeline(args, repo, out_dir, argv):
                 total += estimate_tokens(tier_texts[tier])
         return total
 
-    completeness_estimate = estimate_tokens(
-        render_completeness(args.budget, 0, {
-            tier: {"state": "included", "estimated_tokens": 0, "files": 0}
-            for tier in ("T0", "T1", "T2", "T3")
-        }, [], True, [])
-    ) + 16
-
     dropped = []
-    if args.budget is not None:
-        optional = [tier for tier in ("T3", "T2") if tier in selected]
-        core = total_with(set(optional)) + completeness_estimate
-        if core > args.budget:
-            core_tokens = (
-                estimate_tokens(header_provisional) + estimate_tokens(t0)
-                + estimate_tokens(t1) + estimate_tokens(rereview)
-                + completeness_estimate
+    if args.budget is None:
+        return dropped, None
+    optional = [tier for tier in ("T3", "T2") if tier in selected]
+    core = total_with(set(optional)) + completeness_estimate
+    if core > args.budget:
+        core_tokens = (
+            estimate_tokens(header_provisional)
+            + estimate_tokens(tier_texts["T0"])
+            + estimate_tokens(tier_texts["T1"])
+            + estimate_tokens(rereview or "")
+            + completeness_estimate
+        )
+        message = (
+            "T0 and T1 alone need about %d tokens, over the budget of "
+            "%d. The change itself is never truncated. Raise the budget "
+            "or split the change." % (core_tokens, args.budget)
+        )
+        return dropped, message
+    for tier in optional:
+        dropped_so_far = {item["tier"] for item in dropped}
+        if total_with(dropped_so_far) + completeness_estimate > args.budget:
+            dropped.append(
+                {"tier": tier, "reason": "budget of %d tokens" % args.budget}
             )
-            message = (
-                "T0 and T1 alone need about %d tokens, over the budget of "
-                "%d. The change itself is never truncated. Raise the budget "
-                "or split the change." % (core_tokens, args.budget)
-            )
-            write_failure_manifest(out_dir, argv, message, resolved)
-            print("recognitio: %s" % message, file=sys.stderr)
-            return 2
-        for tier in optional:
-            dropped_so_far = {item["tier"] for item in dropped}
-            if total_with(dropped_so_far) + completeness_estimate > args.budget:
-                dropped.append(
-                    {"tier": tier, "reason": "budget of %d tokens" % args.budget}
-                )
-    dropped_names = {item["tier"] for item in dropped}
+    return dropped, None
 
-    manifest_files = [
-        {
-            "path": entry["path"],
-            "old_path": entry["old_path"],
-            "status": entry["status"],
-            "status_code": entry["status_code"],
-            "additions": entry["additions"],
-            "deletions": entry["deletions"],
-            "hunks": entry["hunks"],
-            "binary": entry["binary"],
-            "attribute_text": entry["attribute_text"],
-            "placeholder": entry["placeholder"],
-        }
-        for entry in files
-    ]
 
-    try:
-        discrepancies = verify_counts(repo, diff_base, head, manifest_files)
-    except GitError as exc:
-        discrepancies = ["verification could not run: %s" % exc]
-    verified = not discrepancies
-
+def tier_accounting(selected, dropped_names, tier_texts, tier_files):
+    """The per tier receipt the manifest and the packet both carry."""
     tier_info = {}
     for tier in ("T0", "T1", "T2", "T3"):
         if tier in dropped_names:
@@ -1908,9 +2130,16 @@ def run_pipeline(args, repo, out_dir, argv):
             "emitted_tokens": emitted,
             "files": tier_files[tier],
         }
+    return tier_info
 
-    header = build_header(resolved, diff_base, verified, exclusions)
-    sections = [header, t0, t1]
+
+def build_packet_text(header, tier_texts, rereview, tier_info, dropped,
+                      budget, verified, discrepancies):
+    """Join the sections and settle the completeness fixed point.
+
+    Returns the packet text and its settled token estimate.
+    """
+    sections = [header, tier_texts["T0"], tier_texts["T1"]]
     for tier in ("T2", "T3"):
         if tier_info[tier]["state"] == "included":
             sections.append(tier_texts[tier])
@@ -1918,14 +2147,13 @@ def run_pipeline(args, repo, out_dir, argv):
             sections.append(
                 tier_placeholder(tier, tier_info[tier]["state"])
             )
-    if resolved["since"]:
+    if rereview is not None:
         sections.append(rereview)
-
     packet_estimate = 0
     packet = ""
     for _round in range(5):
         completeness = render_completeness(
-            args.budget, packet_estimate, tier_info, dropped,
+            budget, packet_estimate, tier_info, dropped,
             verified, discrepancies,
         )
         packet = "\n".join(sections + [completeness])
@@ -1933,7 +2161,32 @@ def run_pipeline(args, repo, out_dir, argv):
         if new_estimate == packet_estimate:
             break
         packet_estimate = new_estimate
+    return packet, packet_estimate
 
+
+def manifest_file_records(files):
+    return [
+        {
+            "path": entry["path"],
+            "old_path": entry["old_path"],
+            "status": entry["status"],
+            "status_code": entry["status_code"],
+            "additions": entry["additions"],
+            "deletions": entry["deletions"],
+            "hunks": entry["hunks"],
+            "binary": entry["binary"],
+            "attribute_text": entry["attribute_text"],
+            "placeholder": entry["placeholder"],
+        }
+        for entry in files
+    ]
+
+
+def assemble_manifest(argv, args, resolved, head, manifest_files,
+                      exclusions, selected, tier_info, packet,
+                      packet_estimate, dropped, cap_notes, verified,
+                      discrepancies):
+    """The manifest receipt for a built packet."""
     manifest = base_manifest(argv)
     manifest.update({
         "mode": resolved["mode"],
@@ -1954,20 +2207,88 @@ def run_pipeline(args, repo, out_dir, argv):
         "exclusions": exclusions,
         "selected_tiers": sorted(selected),
         "tiers": tier_info,
+        # The section headings this packet carries, in order. The
+        # packet check compares them against the packet itself, so
+        # a thin packet cannot wear a full packet's manifest.
+        "sections": [
+            line for line in packet.splitlines()
+            if line.startswith("## ")
+        ],
         "budget": {
             "budget_tokens": args.budget,
             "estimated_tokens": packet_estimate,
             "dropped": dropped,
         },
-        "cap_notes": t2_notes + t3_notes,
+        "cap_notes": cap_notes,
         "verified": verified,
         "discrepancies": discrepancies,
     })
+    return manifest
 
-    (out_dir / "packet.md").write_bytes(
-        packet.encode("utf-8", "surrogateescape")
+
+def run_pipeline(args, repo, out_dir, argv):
+    resolved = resolve_inputs(repo, args)
+    diff_base = resolved["merge_base"]
+    if diff_base is None:
+        diff_base = EMPTY_TREE
+    head = resolved["head"]
+
+    findings = load_findings(args)
+
+    change = fetch_change(repo, diff_base, head)
+    files = change["files"]
+    if not files:
+        message = "the resolved change is empty, no packet was built"
+        write_failure_manifest(out_dir, argv, message, resolved)
+        print("recognitio: %s" % message, file=sys.stderr)
+        return 2
+    exclusions = enrich_files(repo, diff_base, head, change)
+
+    tier_texts, tier_files, cap_notes, rereview = assemble_tiers(
+        args, repo, resolved, diff_base, change, files, findings
     )
-    write_manifest(out_dir, manifest)
+    selected = args.tiers_selected
+    header_provisional = build_header(resolved, diff_base, True, exclusions)
+    dropped, failure = apply_budget(
+        args, selected, tier_texts, rereview, header_provisional
+    )
+    if failure is not None:
+        write_failure_manifest(out_dir, argv, failure, resolved)
+        print("recognitio: %s" % failure, file=sys.stderr)
+        return 2
+    dropped_names = {item["tier"] for item in dropped}
+
+    manifest_files = manifest_file_records(files)
+
+    try:
+        discrepancies = verify_counts(repo, diff_base, head, manifest_files)
+    except GitError as exc:
+        discrepancies = ["verification could not run: %s" % exc]
+    verified = not discrepancies
+
+    tier_info = tier_accounting(
+        selected, dropped_names, tier_texts, tier_files
+    )
+    header = build_header(resolved, diff_base, verified, exclusions)
+    packet, packet_estimate = build_packet_text(
+        header, tier_texts, rereview, tier_info, dropped,
+        args.budget, verified, discrepancies,
+    )
+    manifest = assemble_manifest(
+        argv, args, resolved, head, manifest_files, exclusions,
+        selected, tier_info, packet, packet_estimate, dropped,
+        cap_notes, verified, discrepancies,
+    )
+
+    try:
+        (out_dir / "packet.md").write_bytes(
+            packet.encode("utf-8", "surrogateescape")
+        )
+        write_manifest(out_dir, manifest)
+    except OSError as exc:
+        # A failed write is a run failure in the same voice as every
+        # other one, so main can leave the failure receipt.
+        raise GitError("cannot write the packet files: %s" % exc) from exc
 
     if not verified:
         for item in discrepancies:
@@ -1985,20 +2306,55 @@ def run_pipeline(args, repo, out_dir, argv):
     return 0
 
 
-def main(argv=None):
-    args = parse_args(argv)
-    raw_argv = list(sys.argv[1:]) if argv is None else list(argv)
-    repo = Path(args.repo).resolve()
-    out_dir = Path(args.out)
+def prepare_out_dir(out_dir):
+    """Create the output directory and clear any earlier packet."""
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         for name in ("packet.md", "manifest.json"):
             stale = out_dir / name
             if stale.exists():
                 stale.unlink()
-    except OSError as exc:
+    except OSError:
+        return False
+    return True
+
+
+def find_out_dir(raw_argv):
+    """The --out value in a raw argument list, or None when absent."""
+    for index, token in enumerate(raw_argv):
+        if token == "--out" and index + 1 < len(raw_argv):
+            return Path(raw_argv[index + 1])
+        if token.startswith("--out="):
+            return Path(token[len("--out="):])
+    return None
+
+
+def main(argv=None):
+    raw_argv = list(sys.argv[1:]) if argv is None else list(argv)
+    try:
+        args = parse_args(argv)
+    except SystemExit as exc:
+        # Argument checking rejects the run before the pipeline ever
+        # starts, and it still named an output directory. No earlier
+        # verified packet may stand as the apparent result of this
+        # run, so the directory is cleared and the failure receipt is
+        # written here too, and the exit code passes through.
+        code = exc.code if isinstance(exc.code, int) else 2
+        if code != 0:
+            out_dir = find_out_dir(raw_argv)
+            if out_dir is not None and prepare_out_dir(out_dir):
+                write_failure_manifest(
+                    out_dir, raw_argv,
+                    "the run was rejected while its arguments were "
+                    "checked, and no packet was built",
+                )
+                return code
+        raise
+    repo = Path(args.repo).resolve()
+    out_dir = Path(args.out)
+    if not prepare_out_dir(out_dir):
         print(
-            "recognitio: cannot prepare the output directory: %s" % exc,
+            "recognitio: cannot prepare the output directory %s" % out_dir,
             file=sys.stderr,
         )
         return 2

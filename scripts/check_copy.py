@@ -14,6 +14,11 @@ a line, never the whole line, so a banned mark hiding beside a link
 is still caught. The span ends at the link boundary, so punctuation
 sitting right after a link stays in the prose and is judged.
 
+Three files are mostly code with prose living in their comments.
+The workflow, the Makefile and the gitignore are scanned by comment
+span only, so their shell and pattern lines are never judged as
+prose while every sentence a contributor writes in them is.
+
 Exits nonzero and lists every violation when the bar is broken.
 """
 
@@ -32,7 +37,19 @@ PROSE_FILES = [
     ROOT / ".github" / "pull_request_template.md",
     ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md",
     ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.md",
+    ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
     ROOT / ".coderabbit.yaml",
+]
+
+# Files whose prose lives in hash comments. Only the comment spans
+# are scanned. A hash opens a comment at the start of a line or
+# after whitespace, which is where these formats put comments, and
+# run block bodies and patterns carry no such span unless a comment
+# really stands there.
+COMMENT_FILES = [
+    ROOT / ".github" / "workflows" / "ci.yml",
+    ROOT / "Makefile",
+    ROOT / ".gitignore",
 ]
 
 EM_DASH = "\u2014"
@@ -140,11 +157,37 @@ def yaml_prose_lines(lines):
         yield number, clean(raw)
 
 
+def comment_spans(path):
+    """Yield (number, text) pairs for the comment spans of a file."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for number, raw in enumerate(lines, start=1):
+        for index, char in enumerate(raw):
+            if char == "#" and (index == 0 or raw[index - 1] in " \t"):
+                body = raw[index + 1:].strip()
+                # Editor directives are machine syntax, not prose.
+                if body.startswith("yaml-language-server"):
+                    break
+                if body:
+                    yield number, clean(body)
+                break
+
+
 def display_name(path):
     try:
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+def scan(violations, path, spans):
+    for number, text in spans:
+        where = "%s line %d" % (display_name(path), number)
+        if EM_DASH in text:
+            violations.append("%s has an em dash" % where)
+        if ";" in text:
+            violations.append("%s has a semicolon" % where)
+        if ":" in text:
+            violations.append("%s has a colon in prose" % where)
 
 
 def main():
@@ -153,19 +196,21 @@ def main():
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
-        for number, text in prose_lines(path):
-            where = "%s line %d" % (display_name(path), number)
-            if EM_DASH in text:
-                violations.append("%s has an em dash" % where)
-            if ";" in text:
-                violations.append("%s has a semicolon" % where)
-            if ":" in text:
-                violations.append("%s has a colon in prose" % where)
+        scan(violations, path, prose_lines(path))
+    for path in COMMENT_FILES:
+        if not path.is_file():
+            violations.append("%s is missing" % display_name(path))
+            continue
+        scan(violations, path, comment_spans(path))
     if violations:
         for violation in violations:
             print("check_copy: %s" % violation, file=sys.stderr)
         return 1
-    print("check_copy: copy bar holds on %d prose files" % len(PROSE_FILES))
+    print(
+        "check_copy: copy bar holds on %d prose files and the "
+        "comment prose of %d config files"
+        % (len(PROSE_FILES), len(COMMENT_FILES))
+    )
     return 0
 
 
