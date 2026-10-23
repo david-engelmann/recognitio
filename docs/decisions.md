@@ -61,6 +61,26 @@ and published run notes. A future round that needs findings per
 tier per token can lift the incidents into tasks then, using the
 tests and fixtures the index rows point at.
 
+A further note recorded on 2026-10-23 in round 4. The deferral
+above now carries an explicit trigger instead of an open ended
+one. The incident rows lift into a runnable suite at the first
+of three events. The first event is a decision to publish the
+extractor and the packet checker as a standalone tool that
+other agents or skills can delegate to, because such a tool
+needs the suite as its own regression evidence and gains a
+consumer that runs it on purpose. The second event is the
+opening of any round whose brief asks for findings measured
+per tier per token, because that measurement needs tasks to
+run the skill against and the index rows are those tasks in
+waiting. The third event is the close of this audit program
+under its stopping rule, if neither earlier event has fired
+by then, because a deferral that outlives the program that
+recorded it would leave the lift to chance. The reason for an
+event based trigger rather than a date is that the cost the
+round 2 note names is duplication, and duplication is only
+worth paying when a consumer exists or when the program ends
+and the record must stand on its own.
+
 ## 4. Enforcement ships as a script and as prose
 
 Packet enforcement ships as the packet check script in this repo

@@ -2189,5 +2189,177 @@ class TestRound3BulkBoundaries(unittest.TestCase):
                 self.assertTrue(per_term, term)
 
 
+OLD_CALC = (
+    "def compute():\n"
+    "    a = 1\n"
+    "    b = 2\n"
+    "    c = 3\n"
+    "    d = 4\n"
+    "    e = 5\n"
+    "    f = 6\n"
+    "    g = 7\n"
+    "    h = 8\n"
+    "    i = 9\n"
+    "    j = 10\n"
+    "    return a + b\n"
+)
+
+
+def build_rename_repo(tmp, test_name, test_text):
+    repo = make_repo(tmp, [
+        {"oldcalc.py": OLD_CALC, test_name: test_text},
+    ])
+    (repo / "oldcalc.py").rename(repo / "newcalc.py")
+    write_tree(repo, {
+        "newcalc.py": OLD_CALC.replace(
+            "return a + b", "return a + b + 1"
+        ),
+    })
+    commit_all(repo, "rename oldcalc to newcalc and edit one line")
+    return repo
+
+
+class TestRound4RenameCompanion(unittest.TestCase):
+    """A paired rename is searched under its old stem too (R4-01)."""
+
+    def test_companion_terms_include_old_stem_only_for_renames(self):
+        renamed = [{
+            "path": "newcalc.py", "status": "renamed",
+            "old_path": "oldcalc.py",
+        }]
+        self.assertEqual(
+            extract_mod.companion_terms(renamed, {"newcalc.py": ["compute"]}),
+            ["newcalc", "oldcalc", "compute"],
+        )
+        plain = [{
+            "path": "util.py", "status": "modified", "old_path": None,
+        }]
+        self.assertEqual(
+            extract_mod.companion_terms(plain, {"util.py": ["add"]}),
+            ["util", "add"],
+        )
+
+    def test_old_name_only_importlib_line_is_found_after_a_rename(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = build_rename_repo(
+                tmp, "test_calc.py",
+                "import importlib\n"
+                "calc = importlib.import_module(\"oldcalc\")\n",
+            )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            entry = manifest["files"][0]
+            self.assertEqual(entry["status"], "renamed", manifest["files"])
+            self.assertEqual(entry["old_path"], "oldcalc.py")
+            packet = (out / "packet.md").read_text()
+            section = packet.split(
+                "### Test files that mention the changed code", 1
+            )[1].split("## T3 History", 1)[0]
+            self.assertIn(
+                "calc = importlib.import_module(\"oldcalc\")", section
+            )
+            self.assertNotIn(
+                "No test files mention the changed modules or functions.",
+                packet,
+            )
+
+    def test_cap_note_names_the_test_file_for_old_stem_hits(self):
+        test_text = "".join(
+            "value%d = \"oldcalc\"\n" % i for i in range(1, 8)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = build_rename_repo(tmp, "test_legacy.py", test_text)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("#### test_legacy.py", packet)
+            self.assertIn(
+                "matches in test_legacy.py capped at 5 of 7", packet
+            )
+            self.assertIn("value5 = \"oldcalc\"", packet)
+            self.assertNotIn("value6 = \"oldcalc\"", packet)
+
+    def test_ordinary_change_still_finds_its_test_mentions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "util.py": "def add(a, b):\n    return a + b\n",
+                    "test_util.py": "from util import add\n",
+                },
+                {"util.py": "def add(a, b):\n    return a + b + 0\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            self.assertEqual(
+                manifest["files"][0]["status"], "modified"
+            )
+            packet = (out / "packet.md").read_text()
+            section = packet.split(
+                "### Test files that mention the changed code", 1
+            )[1].split("## T3 History", 1)[0]
+            self.assertIn("from util import add", section)
+            self.assertNotIn(
+                "No test files mention the changed modules or functions.",
+                packet,
+            )
+
+
+class TestRound4FindingsSpelling(unittest.TestCase):
+    """A dotted findings path is the same finding (R4-03)."""
+
+    def test_parse_and_dedupe_normalise_a_leading_dot_slash(self):
+        parsed = extract_mod.parse_findings("./mod.py:5: the worry\n")
+        self.assertEqual(parsed[0]["path"], "mod.py")
+        findings = [
+            {"path": "mod.py", "line": 5, "text": "the worry"},
+            {"path": "./mod.py", "line": 5, "text": "the worry"},
+            {"path": "other.py", "line": 5, "text": "the worry"},
+            {"path": "./mod.py", "line": 6, "text": "the worry"},
+        ]
+        unique, duplicates = extract_mod.dedupe_findings(findings)
+        self.assertEqual(duplicates, 1)
+        self.assertEqual(
+            [(f["path"], f["line"]) for f in unique],
+            [("mod.py", 5), ("other.py", 5), ("mod.py", 6)],
+        )
+
+    def test_dotted_pair_counts_once_with_one_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
+            repo = make_repo(tmp, [{"mod.py": body}])
+            previous = git(repo, "rev-parse", "HEAD")
+            write_tree(repo, {
+                "mod.py": body.replace("line01 = 1", "line01 = 11")
+            })
+            commit_all(repo, "change the first line")
+            findings = Path(tmp) / "findings.txt"
+            findings.write_text(
+                "mod.py:1: the worry\n"
+                "./mod.py:1: the worry\n"
+            )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "%s..HEAD" % previous,
+                "--since", previous, "--findings", str(findings),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Findings addressed: 1 of 1", packet)
+            self.assertEqual(packet.count("the worry"), 1, packet)
+            self.assertNotIn("never existed", packet)
+            self.assertIn(
+                "1 duplicate finding entries were removed", packet
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

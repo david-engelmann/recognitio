@@ -253,14 +253,30 @@ def yaml_prose_lines(lines):
         if YAML_BLOCK.search(raw):
             block_indent = indent
             continue
-        candidate = stripped[2:] if stripped.startswith("- ") else stripped
+        candidate = stripped
+        while candidate.startswith("- "):
+            # Repeated list markers are structure too. A nested
+            # sequence of mappings opens with two or more markers
+            # and stripping only one leaves the inner key standing
+            # as if it were prose.
+            candidate = candidate[2:].lstrip()
+        if candidate.startswith("{"):
+            # A flow mapping standing as a value or as a list item
+            # is structure in the same way its keys are.
+            continue
         match = YAML_KEY.match(candidate)
         if match:
             value = match.group(2)
             if value:
+                if value.lstrip().startswith("{"):
+                    # A flow mapping value is structure. Its inner
+                    # key marks are syntax and not prose, while a
+                    # plain or quoted prose value beside it is still
+                    # judged in full below.
+                    continue
                 yield number, clean(value)
             continue
-        yield number, clean(raw)
+        yield number, clean(candidate)
 
 
 def comment_spans(path):

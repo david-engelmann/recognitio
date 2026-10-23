@@ -1327,6 +1327,15 @@ def companion_terms(files, functions_by_file):
     terms = []
     for entry in source_entries(files):
         terms.append(Path(entry["path"]).stem)
+        if entry.get("old_path"):
+            # A paired rename carries its old name only in the old
+            # path field of its single entry. The old stem is a
+            # search term beside the new stem, in the same way the
+            # findings accounting keys its ranges by the old side,
+            # or a test file that still mentions the module under
+            # its old name is never found and the test files section
+            # can print a false absence over it.
+            terms.append(Path(entry["old_path"]).stem)
         terms.extend(functions_by_file.get(entry["path"], []))
     return terms
 
@@ -1503,7 +1512,10 @@ def test_files_section(repo, head, files, functions_by_file, notes,
         )
     for entry in source_entries(files):
         stem = Path(entry["path"]).stem
-        terms = [stem] + functions_by_file.get(entry["path"], [])
+        terms = [stem]
+        if entry.get("old_path"):
+            terms.append(Path(entry["old_path"]).stem)
+        terms.extend(functions_by_file.get(entry["path"], []))
         for term in terms:
             for hit_path, hit_line, content in hits_by_term.get(term, []):
                 if is_test_path(hit_path) and hit_path not in changed_paths:
@@ -1837,6 +1849,18 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
     return "\n".join(lines), notes, len(top_files)
 
 
+def normalize_finding_path(path):
+    """The one spelling a findings path is accounted under.
+
+    A leading ./ names the same file as the plain spelling, so
+    identity and verdicts share the plain spelling and one worry
+    written both ways counts once with one verdict.
+    """
+    while path.startswith("./"):
+        path = path[2:]
+    return path
+
+
 def parse_findings(text):
     """Parse a findings file of one finding per line, anchored path:line."""
     findings = []
@@ -1850,7 +1874,7 @@ def parse_findings(text):
                 "findings line does not carry a path:line anchor: %r" % raw
             )
         findings.append({
-            "path": match.group(1),
+            "path": normalize_finding_path(match.group(1)),
             "line": int(match.group(2)),
             "text": match.group(3),
         })
@@ -1871,7 +1895,13 @@ def dedupe_findings(findings):
     unique = []
     duplicates = 0
     for finding in findings:
-        key = (finding["path"], finding["line"], finding["text"])
+        path = normalize_finding_path(finding["path"])
+        if path != finding["path"]:
+            # Keep the first object untouched when its spelling is
+            # already plain, and account a dotted spelling under
+            # the plain one so its verdict lookup shares it too.
+            finding = dict(finding, path=path)
+        key = (path, finding["line"], finding["text"])
         if key in seen:
             duplicates += 1
             continue

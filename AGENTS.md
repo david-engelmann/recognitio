@@ -48,6 +48,8 @@ not a gate.
   review is stamped on it.
 - `docs/decisions.md` records the design decisions that depart from
   the research sketch, with the reason for each one.
+- `docs/reviews/` holds review reports written from the template
+  in `REVIEW.md`, with their findings disposition counts.
 - `evals/` holds the paired eval tasks, the trigger set, the
   corpus index and their recorded results.
 - `.claude-plugin/` holds the plugin manifest and the marketplace
@@ -147,6 +149,12 @@ brought the bulk matcher under the same boundary rule as the per
 term search, restricted the version shape to ASCII digits, made
 the YAML half of the copy fence discover by the same rule as the
 Markdown half with one shared exclusion predicate, and settled the
-skill description on a held out trigger run. The owner dropped
+skill description on a held out trigger run. The round 4 pass
+then searched a renamed module under its old stem as well as
+its new one, exempted YAML structure from the copy fence while
+keeping prose values under it, normalised a leading ./ in
+findings paths, completed the corpus index with its round 2
+section, and gave decision 3 an explicit trigger for a runnable
+incident suite. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.
