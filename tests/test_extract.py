@@ -2731,6 +2731,7 @@ class TestRound6InstructionFiles(unittest.TestCase):
             ".github/instructions/python.instructions.md",
             ".claude/rules/review.md",
             "project/.claude/rules/style.md",
+            ".claude/rules/frontend/react.md",
         ):
             self.assertTrue(
                 extract_mod.is_instruction_path(path), path

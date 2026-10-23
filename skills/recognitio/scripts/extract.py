@@ -1100,8 +1100,10 @@ def is_instruction_path(path):
             and parts[-2] == "instructions" \
             and name.endswith(".instructions.md"):
         return True
-    if len(parts) >= 3 and parts[-3] == ".claude" \
-            and parts[-2] == "rules" and name.endswith(".md"):
+    if name.endswith(".md") and any(
+        parts[index] == ".claude" and parts[index + 1] == "rules"
+        for index in range(len(parts) - 2)
+    ):
         return True
     return False
 
