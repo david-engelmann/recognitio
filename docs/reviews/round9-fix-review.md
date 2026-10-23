@@ -17,8 +17,11 @@ help string as two plain sentences, and a test pinning the
 shipped help output against banned marks. It also records
 decision 8 in the decisions file, which names the tasks 01 to
 05 score distribution as a deliberate residual because those
-passes survive only as curated notes. Verdict is APPROVE. The
-gate holds at 217 tests with 16 new pinning tests, and every
+passes survive only as curated notes. The agent conventions in
+AGENTS.md are updated for the new shipping rule, with review
+changes landing on main by direct push of their reviewed
+commits. Verdict is APPROVE. The
+gate holds at 233 tests with 16 new pinning tests, and every
 finding of the round is closed in the tree or recorded as an
 open deliberate decision.
 
@@ -59,15 +62,16 @@ agree at 1.3.0 unreleased.
 ## What was checked
 
 The packet under review is the round 9 fix set on branch
-fix/round9-findings. Base is 0d054c1e69efe42d262b23bb0ecd97ccf22eed0e,
-the five fix commits run a9af2d6 through f3ecc19, the
-CHANGELOG entries land in the commit this review names, and
-this review file is the only addition after that commit.
-The commands run were `make check` with exit 0 and a suite
-line of 217 tests with OK, the eval integrity step green with
-the new checks named, and the copy scan over the changed
-prose files with zero banned marks. The gate run happened on
-the final head of this change.
+fix/round9-findings. Base is 0d054c1e69efe42d262b23bb0ecd97ccf22eed0e.
+The seven fix commits run a9af2d6, dde6683, eda0eee, 2ab25ee,
+f3ecc19, 8dbbded and 67ceac2, covering the gate hardening, the
+corpus work, the help text fix, the changelog entries, this
+review file and the shipping rule conventions. The gate ran on
+67ceac299d88a42573cf801ba2ee29657b3b6ded with `make check`
+exiting 0 and a suite line of 233 tests with OK, the eval
+integrity step green with the new checks named, and the copy
+scan over the changed prose files with zero banned marks.
+This review file is the only change after that head.
 
 Findings disposition. Fixed 0. Wrong 0. Intentional 0. Not
 worth it 0.

@@ -102,7 +102,11 @@ not a gate.
 - The `dev` branch is vestigial. It carried the work until the
   promotion of October 2026 and no work branches from it or
   targets it any more.
-- Commit titles follow Conventional Commits. One round of review
+- Commit titles follow Conventional Commits on every commit pushed
+  to `main`, including the machine-made mode-only follow-ups the
+  Data API path needs. Content commits take `fix:`, `feat:`,
+  `docs:` or `test:` as fits, post-gate repair commits take `fix:`,
+  and mode-only follow-ups take `chore:`. One round of review
   fixes lands as one commit on `main`.
 - Every human commit carries a `Signed-off-by` trailer with the
   exact identity of David Engelmann. Sign commits with
