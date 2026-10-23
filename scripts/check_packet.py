@@ -7,27 +7,137 @@ and holds content, that the manifest exists and holds a JSON object,
 that its verified flag is true, and that the head recorded in the
 manifest is the head of the repository the review is being stamped
 against. A packet extracted from an older head is stale evidence,
-however green it once was.
+however green it once was. The check also reads the packet against
+the section headings the manifest records, and a manifest that
+records none cannot be checked against its packet at all, so a
+thin packet cannot wear a full packet's manifest and a manifest
+without the record is not evidence either.
 
 Exits nonzero and lists every problem when the packet cannot be used.
 """
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+# The same discipline the extractor runs under. Git location
+# variables are scrubbed from the child environment, replace objects
+# are refused twice over, and the child gets a timeout, because this
+# script reads the head a review is being stamped against and a
+# redirected or swapped read would stamp against the wrong head and
+# still print verified.
+GIT_SCRUB_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+)
+PROCESS_TIMEOUT_SECONDS = 120
+
 
 def current_head(repo):
-    result = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    )
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_SCRUB_VARS
+    }
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    try:
+        result = subprocess.run(
+            ["git", "--no-replace-objects", "-C", str(repo),
+             "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=PROCESS_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
     if result.returncode != 0:
         return None
     return result.stdout.strip()
+
+
+def outside_fence(lines):
+    """Flag each line that stands outside every code fence.
+
+    A fence opens on a run of three or more backticks with no
+    backtick in the rest of the line and closes on a run at least
+    as long standing alone. The rule the extractor writes its
+    fences under, read back, so the two sides agree on what a
+    heading is.
+    """
+    flags = []
+    open_len = None
+    for line in lines:
+        stripped = line.strip()
+        ticks = len(stripped) - len(stripped.lstrip("`"))
+        rest = stripped[ticks:]
+        if open_len is None:
+            flags.append(True)
+            if ticks >= 3 and "`" not in rest:
+                open_len = ticks
+        else:
+            flags.append(False)
+            if ticks >= open_len and rest == "":
+                open_len = None
+    return flags
+
+
+def section_problems(packet_text, recorded):
+    """Check the packet carries the sections its manifest records.
+
+    Every recorded heading must appear in the packet outside its
+    fences, and each must hold at least one non blank line before
+    the next heading, so a section that was promised and gutted is
+    still caught. A heading inside a fence is quoted text the
+    reviewed party wrote, and it satisfies nothing.
+    """
+    problems = []
+    if not isinstance(recorded, list):
+        return [
+            "the manifest records its sections in a shape that "
+            "cannot be checked"
+        ]
+    lines = packet_text.splitlines()
+    outside = outside_fence(lines)
+    positions = {}
+    for index, line in enumerate(lines):
+        if outside[index] and line.startswith("## ") \
+                and line not in positions:
+            positions[line] = index
+    for heading in recorded:
+        if not isinstance(heading, str):
+            problems.append("a recorded section heading is not text")
+            continue
+        if heading not in positions:
+            problems.append(
+                "the manifest records a section the packet does not "
+                "hold: %s" % heading
+            )
+            continue
+        start = positions[heading] + 1
+        filled = False
+        for position in range(start, len(lines)):
+            if outside[position] and lines[position].startswith("## "):
+                break
+            if lines[position].strip():
+                filled = True
+                break
+        if not filled:
+            problems.append(
+                "the section %s stands in the packet with no content "
+                "under it" % heading
+            )
+    return problems
 
 
 def main(argv=None):
@@ -88,6 +198,24 @@ def main(argv=None):
                     "the manifest records head %s but the repository "
                     "head is %s. The packet is stale" % (recorded, head)
                 )
+            if "sections" not in manifest:
+                problems.append(
+                    "the manifest records no sections, so the packet "
+                    "cannot be checked against it"
+                )
+            elif packet_path.is_file():
+                try:
+                    packet_text = packet_path.read_text(
+                        encoding="utf-8", errors="surrogateescape"
+                    )
+                except OSError as exc:
+                    problems.append(
+                        "packet.md cannot be read: %s" % exc
+                    )
+                else:
+                    problems.extend(
+                        section_problems(packet_text, manifest["sections"])
+                    )
 
     if problems:
         for problem in problems:

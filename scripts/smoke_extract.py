@@ -11,6 +11,7 @@ runs against real git objects rather than only inside the unit suite.
 """
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,8 +20,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
 CHECK_PACKET = ROOT / "scripts" / "check_packet.py"
-
-import os
 
 GIT_ENV = dict(
     os.environ,
