@@ -1,0 +1,12 @@
+{
+  "base": {
+    "util.py": "def add(a, b):\n    return a + b\n",
+    "page.py": "from util import add\n\n\ndef heading_total(qty, rate):\n    return add(qty, rate)\n",
+    "test_util.py": "from util import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n"
+  },
+  "head": {
+    "util.py": "def add(a, b):\n    return a + b\n\n\ndef add_tax(amount, tax):\n    return add(amount, tax)\n",
+    "page.py": "from util import add_tax\n\n\ndef heading_total(qty, rate):\n    return add_tax(qty, rate)\n",
+    "test_util.py": "from util import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n"
+  }
+}

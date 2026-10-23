@@ -38,6 +38,54 @@ what breaks because of it. A concern that cannot point at a
 line is a question for the author and it is posted as one, not
 as a finding.
 
+## The review report shape
+
+A review report opens with a summary and groups its findings by
+severity. Every finding carries its evidence and its impact and
+closes with an action item. The template below is the shape a
+report follows in this repo.
+
+```
+# Review of the change under review
+
+## Summary
+
+What the change does and the scope it touches, in plain words.
+The verdict, and the one reason that carries it.
+
+## Findings by severity
+
+### P1
+
+- The finding in one line.
+  Evidence. The file and line the finding rests on.
+  Impact. What breaks because of it.
+  Action. The fix, or the decision owed and who owes it.
+
+### P2
+
+- The finding in one line.
+  Evidence. The file and line the finding rests on.
+  Impact. What breaks because of it.
+  Action. The fix, or the decision owed and who owes it.
+
+### P3
+
+- The finding in one line.
+  Evidence. The file and line the finding rests on.
+  Impact. What breaks because of it.
+  Action. The fix, or the decision owed and who owes it.
+
+## Nits
+
+At most three, under the nit cap above.
+
+## What was checked
+
+The packet the review ran on, with its base and head, and the
+commands that were run and their exit codes.
+```
+
 ## The stopping rule
 
 Audit rounds run until two consecutive rounds come back dry,

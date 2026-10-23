@@ -60,11 +60,28 @@ without reading three audit reports first.
 
 ## Disclosure incidents with no test of their own
 
-Three spec findings from the cycles were disclosure defects
-rather than behaviour defects. The prior pull request lookup now
-states its window in the packet and in the docs, the changelog
-carries one Added group under its unreleased heading, and the
-receipt prose defines what the files per tier counts count. No
-test pins any of the three, and this index says so plainly
-instead of inventing coverage. A future round can close the gap
-with a docs test if the gap starts to matter.
+Four prose only fixes stand in this position. Three spec
+findings from the cycles were disclosure defects rather than
+behaviour defects. The prior pull request lookup now states its
+window in the packet and in the docs, the changelog carries one
+Added group under its unreleased heading, and the receipt prose
+defines what the files per tier counts count. No test pins any
+of the three, and this index says so plainly instead of
+inventing coverage. A future round can close the gap with a
+docs test if the gap starts to matter.
+
+The fourth is the round 1 branch convention finding, recorded
+in the round 1 fix report as SP-R1-01. Its repair was prose and
+a decision entry, the conventions in AGENTS.md and decision 7 in
+the decisions file, and no test pins the branch conventions or
+the vestigial standing of the dev branch. It is recorded here
+as uncovered in the open, as the rule at the head of this file
+requires.
+
+## The path from this index to a runnable corpus
+
+The path is short today. Each row above names a regression test
+in the suite the gate runs, and running the gate runs the corpus
+in that form. A separate suite that replays the incidents as
+skill tasks is deferred, and decision 3 in the decisions file
+records the deferral and its reason in the open.

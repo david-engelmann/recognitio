@@ -47,6 +47,20 @@ The paired evidence the sketch called for lives at
 `evals/RESULTS.md`. A corpus that runs as its own suite can still
 follow when a round needs one.
 
+A further note recorded on 2026-10-23 in round 2. The concrete
+path from the index to a runnable corpus runs from any index row
+to the regression test it names, and that test is part of the
+suite the gate runs, so the corpus already runs on every gate
+invocation in that form. A separate runnable incident suite that
+replays the incidents as skill tasks stays deferred, and its
+reason is duplication. Such a suite would rebuild the same
+fixture histories the regression tests already build and grade
+the extractor a second time, while the skill outcome measurement
+belongs to the paired eval layer that now carries a clean task
+and published run notes. A future round that needs findings per
+tier per token can lift the incidents into tasks then, using the
+tests and fixtures the index rows point at.
+
 ## 4. Enforcement ships as a script and as prose
 
 Packet enforcement ships as the packet check script in this repo

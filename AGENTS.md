@@ -112,6 +112,17 @@ this map instead.
 - Gate changes update this file and the CI workflow together.
 - A version string change moves every surface that carries one in
   the same pull request, and the gate checks that they agree.
+- A change to REVIEW.md updates CHANGELOG.md in the same pull
+  request.
+- A change under evals/ updates the recorded results it touches
+  in the same pull request, and a change to the eval method also
+  updates the runner note in evals/README.md and CHANGELOG.md in
+  the same pull request. Packets saved as fixtures are regenerated
+  with the shipped extractor and carry verified manifests.
+- A change to the plugin manifest or the marketplace listing
+  beyond a version string updates the install section of
+  README.md and CHANGELOG.md in the same pull request, and the
+  gate tests that pin the manifest shape move with it.
 
 ## Current state
 
@@ -127,6 +138,10 @@ failure paths at the argument checking boundary. The round 1 pass
 then closed the crafted filename and never existed findings and
 binary transition findings, banned marks left the generated
 packet prose, and the plugin packaging and the eval layer landed.
+The round 2 pass then escaped the cap notes, rebuilt the companion
+search on its NUL delimited records and one bulk search, deduped
+the findings accounting, hardened the version gate against wrong
+typed JSON, and made the copy fence discover its surfaces by rule.
 The owner dropped the branch ceremony on 2026-10-22 and `main`
 became the working branch the same evening. No release has been
 tagged yet.

@@ -59,6 +59,28 @@ This unreleased work carries version 1.3.0.
 - A trust and limits section in the readme, with a short mirror
   in the skill text, stating what the extractor does and does
   not do and what a verified packet does not prove.
+- The skills list of the official marketplace shape on the
+  marketplace entry, naming the same skill path the plugin
+  manifest names, and the owner email on the plugin manifest
+  author and the marketplace owner.
+- A fifth paired eval task with no planted defects, so a false
+  lead rate is measurable, with run notes in the results file
+  naming who ran each pass and when and by what method, and a
+  fairer raw pass that holds the diff plus the changed file list
+  with both sets of numbers reported.
+- A strengthened trigger set whose near misses are genuinely
+  confusable with the work the skill does, scored by a second
+  independent pass with the agreement between the passes
+  recorded in the trigger results.
+- A review report template in REVIEW.md, with a summary first
+  and findings grouped by severity and every finding carrying
+  its evidence and its impact and an action item.
+- A bare list of what the tool does and the named review
+  workflow on the first screen of the readme.
+- The round 1 branch convention finding recorded as uncovered
+  in the corpus index, and the path from that index to a
+  runnable corpus stated in the index and in the decisions
+  file with the remaining deferral and its reason.
 
 ### Fixed
 
@@ -190,3 +212,48 @@ This unreleased work carries version 1.3.0.
 - The skill validator now enforces the frontmatter name
   character rules of the specification, so a rename or a second
   skill cannot break them without the gate noticing.
+- Cap notes in the companion and history tiers now print escaped
+  paths like every other packet surface. A crafted filename
+  combined with a capped companion surface could previously
+  print a forged budget and completeness heading inside a
+  verified packet, and the manifest recorded the forged heading
+  and the packet check stamped the pair verified.
+- The companion search parser now reads its NUL delimited
+  records in order instead of splitting the output on lines. A
+  newline inside a filename previously truncated its hit paths,
+  and a verified packet printed one file lines as call site
+  context for another and reported that no test files mention
+  the changed code when a crafted test file did.
+- Duplicate findings entries are removed before the findings
+  cap is applied, and the accounting section states how many
+  were removed. Repeated copies previously counted as separate
+  findings and could crowd a distinct finding past the cap.
+- Companion gathering runs one bulk search over the tree for
+  every term it needs instead of one whole tree search per
+  changed function and per changed file stem, so its cost no
+  longer grows with the product of the change size and the tree
+  size, and its output is unchanged.
+- The version gate now reports wrong typed but valid JSON as
+  named problems in its own voice instead of dying with a
+  traceback, requires a non-empty plugins list in the
+  marketplace listing, accepts only a strict version shape
+  with no leading zero in any component, and scopes its
+  changelog search to the unreleased section so a carries
+  phrase inside an old release note cannot hijack the compared
+  version.
+- The copy gate discovers its prose surfaces by rule instead of
+  holding a list kept by hand. Every authored Markdown file in
+  the tree outside the generated eval packets, the description
+  fields of the plugin manifests, the issue templates and the
+  config comment spans stand inside the fence by construction,
+  and a fence completeness test walks the tree and fails when
+  an authored prose file exists that the scanner does not
+  cover.
+- Three answers to review of the round 2 change itself. A
+  companion search that fails now ends the run with a failure
+  receipt instead of reporting that nothing was found. A
+  malformed version declaration in the unreleased section of
+  this changelog now governs instead of falling back to a
+  released heading. The copy discovery skips dependency
+  directories and symlinks that leave the tree, and a missing
+  plugin manifest is reported instead of passing unscanned.

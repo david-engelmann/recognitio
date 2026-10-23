@@ -23,12 +23,12 @@ the outcome.
 ## Should not trigger
 
 11. Review pull request 123 and tell me whether it is safe to merge.
-12. Fix the findings from the last review.
-13. Write unit tests for the changed function.
-14. Explain what a merge base is.
-15. Merge the pull request once CI is green.
-16. Summarise this pull request in one sentence for the changelog.
+12. Use the packet from the last review and fix the findings it lists.
+13. Write unit tests for the changed function named in this packet.
+14. Explain in plain words what changed between main and this branch for a reader who will not see the diff.
+15. Check the packet is verified, then merge the pull request.
+16. Summarise this pull request in one sentence for the changelog, using its packet.
 17. Review the packet and rank its findings by severity.
-18. Open a pull request for this branch.
+18. Open a pull request for this branch and attach its diff as a comment.
 19. Extract the text from this PDF.
-20. Prepare a slide deck for the design review.
+20. Prepare a slide deck reviewing the design held in this packet.

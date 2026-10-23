@@ -23,14 +23,19 @@ MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
 EXTRACT_PY = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
 
-VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+VERSION_SHAPE = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+VERSION_RE = re.compile(VERSION_SHAPE)
 EXTRACTOR_RE = re.compile(r'^EXTRACTOR_VERSION\s*=\s*"([^"]+)"', re.M)
-RELEASED_RE = re.compile(r"^## \[(\d+\.\d+\.\d+)\]", re.M)
-CARRIES_RE = re.compile(r"carries version (\d+\.\d+\.\d+)")
+RELEASED_RE = re.compile(r"^## \[(%s)\]" % VERSION_SHAPE, re.M)
+CARRIES_DECLARATION_RE = re.compile(r"carries version\s+(\S+)")
+UNRELEASED_RE = re.compile(r"^## \[Unreleased\]", re.M)
+SECTION_RE = re.compile(r"^## \[", re.M)
 
 
 def plugin_version(text):
     data = json.loads(text)
+    if not isinstance(data, dict):
+        return None
     return data.get("version")
 
 
@@ -41,13 +46,22 @@ def marketplace_versions(text):
     required fields of this listing, so a missing one is recorded
     as None rather than silently dropped. Dropping it would let
     the remaining values agree and pass a listing that lost a
-    version it must carry.
+    version it must carry. A listing that carries no plugin entry
+    at all certifies nothing, so that shape raises instead and
+    the caller records it as a problem in the gate voice.
     """
     data = json.loads(text)
+    if not isinstance(data, dict):
+        return [None]
     versions = []
-    metadata = data.get("metadata") or {}
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
     versions.append(metadata.get("version"))
-    for entry in data.get("plugins") or []:
+    plugins = data.get("plugins")
+    if not isinstance(plugins, list) or not plugins:
+        raise ValueError("marketplace.json lists no plugins")
+    for entry in plugins:
         if isinstance(entry, dict):
             versions.append(entry.get("version"))
         else:
@@ -67,12 +81,26 @@ def changelog_version(text):
     declares one, because after the first release the changelog
     holds a released heading and a newer unreleased declaration
     at once, and the unreleased work is what the other surfaces
-    are being checked against. The newest released heading is
-    the fallback when no unreleased version is declared.
+    are being checked against. The declaration search is scoped
+    to the unreleased section, so a carries phrase inside an old
+    release note can never hijack the compared version. The
+    newest released heading is the fallback when the unreleased
+    section declares nothing.
     """
-    match = CARRIES_RE.search(text)
-    if match:
-        return match.group(1)
+    unreleased = UNRELEASED_RE.search(text)
+    if unreleased:
+        rest = text[unreleased.end():]
+        following = SECTION_RE.search(rest)
+        section = rest[:following.start()] if following else rest
+        declaration = CARRIES_DECLARATION_RE.search(section)
+        if declaration:
+            # A declaration stands in the unreleased section, so
+            # its word governs. A value that is not a strict
+            # version is a broken declaration, not an absence, and
+            # it must never fall back to a released heading and
+            # pass beside surfaces that carry the real version.
+            candidate = declaration.group(1).rstrip(".,;:!?)]}")
+            return candidate if VERSION_RE.fullmatch(candidate) else None
     match = RELEASED_RE.search(text)
     return match.group(1) if match else None
 
@@ -88,7 +116,7 @@ def coherence_problems(versions):
     for surface, version in versions.items():
         if version is None:
             problems.append("%s carries no version" % surface)
-        elif not VERSION_RE.fullmatch(version):
+        elif not isinstance(version, str) or not VERSION_RE.fullmatch(version):
             problems.append(
                 "%s carries %r, which is not a version of the form "
                 "major.minor.patch" % (surface, version)
@@ -123,7 +151,7 @@ def main():
     else:
         try:
             versions["plugin.json"] = plugin_version(text)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
             problems.append("plugin.json does not parse: %s" % exc)
             versions["plugin.json"] = None
 
@@ -135,13 +163,14 @@ def main():
     else:
         try:
             found = marketplace_versions(text)
-        except json.JSONDecodeError as exc:
-            problems.append("marketplace.json does not parse: %s" % exc)
-            found = []
-        if not found:
-            problems.append("marketplace.json carries no version")
-        for index, version in enumerate(found):
-            versions["marketplace.json entry %d" % (index + 1)] = version
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append("marketplace.json problem: %s" % exc)
+            found = None
+        if found is not None:
+            if not found:
+                problems.append("marketplace.json carries no version")
+            for index, version in enumerate(found):
+                versions["marketplace.json entry %d" % (index + 1)] = version
 
     text = read(EXTRACT_PY)
     versions["EXTRACTOR_VERSION"] = (
