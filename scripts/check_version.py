@@ -75,24 +75,32 @@ def marketplace_versions(text):
 
 
 COMPONENT_KEYS = (
-    "skills", "commands", "agents", "hooks", "mcpServers",
-    "lspServers", "outputStyles",
+    "skills", "commands", "agents", "hooks", "outputStyles",
+    "themes",
 )
 
 
 def manifest_conflict_problems(plugin_text, marketplace_text):
     """Problems in the manifest pair that stop the plugin loading.
 
-    The host refuses to load a plugin when both its plugin
-    manifest and its marketplace entry specify components while
-    the entry sets strict to false, because under a strict false
-    entry the entry itself is the plugin definition and a second
-    definition in the manifest conflicts with it. Setting strict
-    to true makes the manifest the definition the host loads, so
-    the pair can both name the components and the manifest stays
-    self describing. A pair that specifies components in only
-    one place never conflicts. Wrong typed input is left to the
-    version checks in this gate, which already name it.
+    The host refuses to load a plugin when its marketplace
+    entry specifies components while the entry sets strict to
+    false and a plugin manifest stands beside the entry,
+    because under a strict false entry the entry itself is the
+    plugin definition and the manifest beside it is a second
+    definition. The manifest does not have to specify any
+    component itself for the conflict to fire, and a live
+    install probe in the round 6 fix lane confirmed that a
+    metadata only manifest fails to load in this shape with
+    the same error the shipped pair once drew. Setting strict
+    to true makes the manifest the definition the host loads,
+    so the pair can both name the components and the manifest
+    stays self describing. The conflict set is the six
+    component fields the host names for this rule. The server
+    fields stand outside it, and the same probe confirmed an
+    mcpServers pair loads under strict false. Wrong typed
+    input is left to the version checks in this gate, which
+    already name it.
     """
     try:
         plugin = json.loads(plugin_text)
@@ -100,9 +108,6 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
     except (json.JSONDecodeError, TypeError):
         return []
     if not isinstance(plugin, dict) or not isinstance(market, dict):
-        return []
-    plugin_components = [key for key in COMPONENT_KEYS if key in plugin]
-    if not plugin_components:
         return []
     plugins = market.get("plugins")
     if not isinstance(plugins, list):
@@ -117,14 +122,13 @@ def manifest_conflict_problems(plugin_text, marketplace_text):
         if shared:
             problems.append(
                 "marketplace entry %r specifies components (%s) "
-                "while plugin.json also specifies components (%s) "
-                "and the entry does not set strict to true, so the "
-                "host refuses to load the plugin for conflicting "
+                "while a plugin.json stands beside it and the "
+                "entry does not set strict to true, so the host "
+                "refuses to load the plugin for conflicting "
                 "manifests"
                 % (
                     entry.get("name"),
                     ", ".join(shared),
-                    ", ".join(plugin_components),
                 )
             )
     return problems

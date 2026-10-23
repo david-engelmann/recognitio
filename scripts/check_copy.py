@@ -191,6 +191,20 @@ def _quoted_end(text, start=0):
     return None
 
 
+def _opens_quote(text, index):
+    """Whether the quote character at index opens a quoted scalar.
+
+    A quote opens a scalar only where a scalar can start, at
+    the start of the text or after a space or a flow delimiter
+    or a key colon. An apostrophe standing inside a plain
+    scalar, as in a word like don't, is text and not a quote,
+    and treating it as one would leave the scanner waiting
+    for a close that never comes and swallow the lines after
+    it into the wrong span.
+    """
+    return index == 0 or text[index - 1] in " \t,[{:"
+
+
 def _split_key(candidate, flow=False):
     """Split one YAML line into its key and value, or return None.
 
@@ -211,7 +225,7 @@ def _split_key(candidate, flow=False):
             return None
         rest = candidate[end:].lstrip()
         if rest.startswith(":") and (
-            len(rest) == 1 or rest[1] in " \t"
+            flow or len(rest) == 1 or rest[1] in " \t"
         ):
             return candidate[:end], rest[1:].strip()
         return None
@@ -225,7 +239,7 @@ def _split_key(candidate, flow=False):
                 index += 1
             elif char == quote:
                 quote = None
-        elif char in "\"'":
+        elif char in "\"'" and _opens_quote(candidate, index):
             quote = char
         elif char in "{[":
             depth += 1
@@ -294,7 +308,7 @@ def _flow_scan(text):
                     index += 1
                 else:
                     quote = None
-        elif char in "\"'":
+        elif char in "\"'" and _opens_quote(text, index):
             quote = char
         elif char in "{[":
             depth += 1
@@ -324,7 +338,7 @@ def _flow_close_index(text):
                     index += 1
                 else:
                     quote = None
-        elif char in "\"'":
+        elif char in "\"'" and _opens_quote(text, index):
             quote = char
         elif char in "{[":
             depth += 1
@@ -410,7 +424,7 @@ def _flow_parts(text):
                 index += 1
             elif char == quote:
                 quote = None
-        elif char in "\"'":
+        elif char in "\"'" and _opens_quote(text, index):
             quote = char
         elif char in "{[":
             depth += 1
@@ -456,6 +470,12 @@ def flow_prose_values(text):
             split = _split_key(part, flow=True)
             if split:
                 yield from _flow_value_values(split[1])
+        trailing = text[close + 1:].strip()
+        if trailing:
+            # Text standing after the collection on its line,
+            # a trailing comment above all, is prose the reader
+            # meets and it is judged like any other comment.
+            yield trailing
         return
     if text.startswith("["):
         close = _flow_close_index(text)
@@ -471,6 +491,9 @@ def flow_prose_values(text):
                 yield from _flow_value_values(split[1])
             else:
                 yield part
+        trailing = text[close + 1:].strip()
+        if trailing:
+            yield trailing
         return
     yield text
 

@@ -549,11 +549,41 @@ class TestCheckCopy(unittest.TestCase):
             "points: [{label: \"Read: now\"}]\n",
             "items:\n  - [{label: \"Read: now\"}]\n",
             "point: &anchor {label: \"Read: now\"}\n",
+            "point: {\"label\":\"Read: now\"}\n",
         )
         for text in shapes:
             with tempfile.TemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
+
+    def test_an_apostrophe_in_a_plain_flow_scalar_is_not_a_quote(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "tags: [don't, ok]\n"
+                "next: value\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "tags: [don't, \"Read: now\"]\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_text_after_a_flow_collection_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "ports: [80, 443] # Open: web\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "ports: [80, 443] # Open web\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
 
     def test_a_key_shaped_continuation_of_a_quoted_scalar_still_flags(self):
         shapes = (
@@ -923,6 +953,30 @@ class TestCheckVersion(unittest.TestCase):
         problems = self.mod.manifest_conflict_problems(plugin, broken)
         self.assertEqual(len(problems), 1, problems)
         self.assertIn("strict", problems[0])
+        # A plugin manifest that declares no components at all
+        # still conflicts, because the host treats the entry
+        # components under strict false as a conflict whenever a
+        # plugin manifest stands beside the entry at all. A live
+        # install probe in the round 6 fix lane confirmed the
+        # metadata only pair fails to load with the same error.
+        entry_only = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x"}', entry_only
+        )
+        self.assertEqual(len(problems), 1, problems)
+        # The host conflict set is the six component fields the
+        # host names, so a themes pair conflicts in the same way.
+        themes = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"themes": ["./themes/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x", "themes": ["./themes/"]}', themes
+        )
+        self.assertEqual(len(problems), 1, problems)
 
     def test_manifest_conflict_problems_accept_the_loadable_pairs(self):
         plugin = '{"name": "x", "skills": ["./skills/x/"]}'
@@ -933,19 +987,22 @@ class TestCheckVersion(unittest.TestCase):
         self.assertEqual(
             self.mod.manifest_conflict_problems(plugin, strict_true), []
         )
-        entry_only = (
-            '{"plugins": [{"name": "x", "strict": false, '
-            '"skills": ["./skills/x/"]}]}'
-        )
-        self.assertEqual(
-            self.mod.manifest_conflict_problems(
-                '{"name": "x"}', entry_only
-            ),
-            [],
-        )
         manifest_only = '{"plugins": [{"name": "x", "strict": false}]}'
         self.assertEqual(
             self.mod.manifest_conflict_problems(plugin, manifest_only),
+            [],
+        )
+        # The server fields stand outside the host conflict set,
+        # and a live install probe in the round 6 fix lane
+        # confirmed an mcpServers pair loads under strict false.
+        mcp = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"mcpServers": {}}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(
+                '{"name": "x", "mcpServers": {}}', mcp
+            ),
             [],
         )
 

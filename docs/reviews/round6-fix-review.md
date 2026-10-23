@@ -35,10 +35,11 @@ No findings at this severity.
 
 - The changelog draft claimed a review report that did not
   stand in the tree yet.
-  Evidence. The Added list in `CHANGELOG.md` named this
-  report at `docs/reviews/round6-fix-review.md` while the
-  reviews folder held only the round 4 report at the audit
-  that opened this change.
+  Evidence. The Added list in `CHANGELOG.md` at lines
+  136 to 139 named this report at
+  `docs/reviews/round6-fix-review.md` while the reviews
+  folder held only the round 4 report at the audit that
+  opened this change.
   Impact. A reader trusting the changelog would look for a
   record that did not exist, and the change would carry the
   same kind of unbacked claim this program exists to catch.

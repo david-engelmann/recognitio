@@ -129,6 +129,16 @@ that report raised, a miscount and an omission in the new
 round 2 section of this index, was fixed in the same change
 as a record and no test pins it.
 
+## Round 5 incidents
+
+Round 5 was a planning round and raised no code incidents
+of its own. Its two handoff findings were adjudicated in
+round 6 and stand in the round 6 section as the skill size
+guard row and the instruction file flag row. This section
+stands so the head of this index can say that each round
+has its own section and a reader can tell that round 5 was
+checked rather than skipped.
+
 ## Round 6 incidents
 
 | Incident | Covered by |
