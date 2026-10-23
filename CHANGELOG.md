@@ -344,3 +344,12 @@ This unreleased work carries version 1.3.0.
   under the plain spelling of its path. The same finding
   written both ways now counts once with one verdict instead
   of standing as two findings with contradictory verdicts.
+- Three answers to review of the round 4 change itself. The
+  old stem search now runs only for a renamed entry and not
+  for a copied one, whose old module still exists under its
+  own name. The copy fence now yields the scalar values
+  inside a flow mapping for its scan, so a quoted prose value
+  carrying a colon inside flow braces is judged while the
+  braces and key marks stay exempt. The finding in the first
+  populated review report now names the line range of its
+  evidence, as the evidence rule in REVIEW.md requires.

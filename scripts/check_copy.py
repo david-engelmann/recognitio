@@ -224,11 +224,95 @@ def prose_lines(path):
         yield number, clean(raw)
 
 
+def _flow_parts(text):
+    """Split a flow body on its top level commas.
+
+    Commas inside quotes or inside a nested flow collection do
+    not split, so a quoted prose value keeps its shape whole.
+    """
+    parts = []
+    depth = 0
+    quote = None
+    start = 0
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is not None:
+            if char == "\\" and quote == '"':
+                index += 1
+            elif char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "{[":
+            depth += 1
+        elif char in "}]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+        index += 1
+    parts.append(text[start:])
+    return parts
+
+
+def flow_prose_values(text):
+    """Yield the scalar values inside a flow mapping.
+
+    The braces and the key marks of a flow mapping are structure
+    and stay exempt. A value standing inside one can still be a
+    prose sentence a reader meets, quoted or plain, so each value
+    is yielded for the scan in the same way a block value is. A
+    nested flow collection yields the values inside it.
+    """
+    text = text.strip()
+    if not text.startswith("{"):
+        yield text
+        return
+    depth = 0
+    quote = None
+    close = len(text)
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is not None:
+            if char == "\\" and quote == '"':
+                index += 1
+            elif char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                close = index
+                break
+        index += 1
+    for part in _flow_parts(text[1:close]):
+        part = part.strip()
+        if not part:
+            continue
+        match = YAML_KEY.match(part)
+        value = match.group(2) if match and match.group(2) else part
+        value = value.strip()
+        if value.startswith("{") or value.startswith("["):
+            if value.startswith("[") and value.endswith("]"):
+                for item in _flow_parts(value[1:-1]):
+                    yield from flow_prose_values(item)
+            else:
+                yield from flow_prose_values(value)
+        else:
+            yield value
+
+
 def yaml_prose_lines(lines):
     """Yield the prose of a YAML file.
 
     Comments are prose. So are block scalar bodies and the plain or
-    quoted values on key lines. Keys and structure are syntax.
+    quoted values on key lines and the scalar values inside flow
+    mappings. Keys and structure are syntax.
     """
     block_indent = None
     for number, raw in enumerate(lines, start=1):
@@ -261,18 +345,23 @@ def yaml_prose_lines(lines):
             # as if it were prose.
             candidate = candidate[2:].lstrip()
         if candidate.startswith("{"):
-            # A flow mapping standing as a value or as a list item
-            # is structure in the same way its keys are.
+            # A flow mapping standing as a list item is structure
+            # in its braces and its key marks, and its values are
+            # yielded for the scan by the flow reader.
+            for value in flow_prose_values(candidate):
+                yield number, clean(value)
             continue
         match = YAML_KEY.match(candidate)
         if match:
             value = match.group(2)
             if value:
                 if value.lstrip().startswith("{"):
-                    # A flow mapping value is structure. Its inner
-                    # key marks are syntax and not prose, while a
-                    # plain or quoted prose value beside it is still
-                    # judged in full below.
+                    # A flow mapping value is structure in its
+                    # braces and its key marks, while the values
+                    # inside it can still be prose, so the flow
+                    # reader yields those values for the scan.
+                    for inner in flow_prose_values(value):
+                        yield number, clean(inner)
                     continue
                 yield number, clean(value)
             continue

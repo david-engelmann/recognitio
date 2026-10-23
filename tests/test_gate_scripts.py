@@ -458,6 +458,23 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertEqual(self.run_main_on([path]), 0)
 
+    def test_a_colon_inside_a_flow_mapping_value_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "point: {label: \"Read: now\"}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_colon_inside_a_list_item_flow_mapping_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "items:\n"
+                "  - {label: \"Read: now\"}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
     def test_a_prose_mapping_value_with_a_colon_still_flags(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_tmp(

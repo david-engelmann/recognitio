@@ -2238,6 +2238,14 @@ class TestRound4RenameCompanion(unittest.TestCase):
             extract_mod.companion_terms(plain, {"util.py": ["add"]}),
             ["util", "add"],
         )
+        copied = [{
+            "path": "newcalc.py", "status": "copied",
+            "old_path": "oldcalc.py",
+        }]
+        self.assertEqual(
+            extract_mod.companion_terms(copied, {"newcalc.py": ["compute"]}),
+            ["newcalc", "compute"],
+        )
 
     def test_old_name_only_importlib_line_is_found_after_a_rename(self):
         with tempfile.TemporaryDirectory() as tmp:

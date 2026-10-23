@@ -1327,14 +1327,17 @@ def companion_terms(files, functions_by_file):
     terms = []
     for entry in source_entries(files):
         terms.append(Path(entry["path"]).stem)
-        if entry.get("old_path"):
+        if entry.get("old_path") and entry.get("status") == "renamed":
             # A paired rename carries its old name only in the old
             # path field of its single entry. The old stem is a
             # search term beside the new stem, in the same way the
             # findings accounting keys its ranges by the old side,
             # or a test file that still mentions the module under
             # its old name is never found and the test files section
-            # can print a false absence over it.
+            # can print a false absence over it. A copied entry
+            # carries an old path too, and its old module still
+            # exists under that name, so its mentions are not
+            # evidence about the copy and no old stem is searched.
             terms.append(Path(entry["old_path"]).stem)
         terms.extend(functions_by_file.get(entry["path"], []))
     return terms
@@ -1513,7 +1516,7 @@ def test_files_section(repo, head, files, functions_by_file, notes,
     for entry in source_entries(files):
         stem = Path(entry["path"]).stem
         terms = [stem]
-        if entry.get("old_path"):
+        if entry.get("old_path") and entry.get("status") == "renamed":
             terms.append(Path(entry["old_path"]).stem)
         terms.extend(functions_by_file.get(entry["path"], []))
         for term in terms:

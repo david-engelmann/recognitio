@@ -30,9 +30,10 @@ No findings at this severity.
 - The round 2 section of the corpus index miscounted its own
   records only rows and dropped one incident.
   Evidence. The records only paragraph in `evals/corpus.md`
-  opened with the word six while the sentences after it named
-  seven fixes, and the round 2 spec finding on the corpus
-  disclosure stood in neither the table nor the paragraph.
+  at lines 76 to 94 opened with the word six while the
+  sentences after it named seven fixes, and the round 2 spec
+  finding on the corpus disclosure stood in neither the
+  table nor the paragraph.
   Impact. A reader trusting the count would miss one round 2
   incident and the section would fail the completeness claim
   the index exists to carry.
