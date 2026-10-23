@@ -1916,6 +1916,18 @@ class TestCheckEvals(unittest.TestCase):
                 "The raw pass reported 2 of 2 on this task", text
             )
             target.write_text(text, encoding="utf-8")
+            notes = root / "evals" / "PASS-NOTES.md"
+            notes_text = notes.read_text(encoding="utf-8")
+            notes_text = re.sub(
+                r"The raw pass reported 1 of 2 planted",
+                "The raw pass reported 2 of 2 planted",
+                notes_text,
+                count=1,
+            )
+            self.assertIn(
+                "The raw pass reported 2 of 2 planted", notes_text
+            )
+            notes.write_text(notes_text, encoding="utf-8")
             self.mod.write_checksums(root)
             self.assertEqual(self.mod.checksum_problems(root), [])
             problems = self.mod.task06_problems(root)
