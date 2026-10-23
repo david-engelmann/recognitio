@@ -217,6 +217,74 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertEqual(self.run_main_on([path]), 1)
 
+    def test_fence_covers_every_authored_prose_file_in_the_tree(self):
+        covered = {str(p.relative_to(ROOT)) for p in self.mod.PROSE_FILES}
+        authored = set()
+        for path in ROOT.rglob("*.md"):
+            if ".git" in path.parts:
+                continue
+            rel = path.relative_to(ROOT)
+            if len(rel.parts) == 4 and rel.parts[:2] == ("evals", "tasks") \
+                    and rel.parts[3] == "packet.md":
+                continue
+            authored.add(str(rel))
+        self.assertTrue(authored)
+        self.assertEqual(authored - covered, set())
+        manifests = {
+            str(p.relative_to(ROOT)) for p in self.mod.MANIFEST_FILES
+        }
+        self.assertEqual(
+            manifests,
+            {".claude-plugin/plugin.json",
+             ".claude-plugin/marketplace.json"},
+        )
+
+    def test_discovery_extends_to_a_new_markdown_file_by_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            note = root / "docs" / "new-note.md"
+            note.write_text("A new note.\n", encoding="utf-8")
+            tasks = root / "evals" / "tasks" / "task-99"
+            tasks.mkdir(parents=True)
+            (tasks / "packet.md").write_text(
+                "Generated output.\n", encoding="utf-8"
+            )
+            (tasks / "planted.md").write_text(
+                "Authored grading notes.\n", encoding="utf-8"
+            )
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertIn("docs/new-note.md", found)
+            self.assertIn("evals/tasks/task-99/planted.md", found)
+            self.assertNotIn("evals/tasks/task-99/packet.md", found)
+
+    def test_em_dash_in_a_manifest_description_is_caught(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "description": "Does a thing %s '
+                'in plain words."}\n' % EM_DASH,
+            )
+            original = (
+                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                self.mod.MANIFEST_FILES,
+            )
+            self.mod.PROSE_FILES = []
+            self.mod.COMMENT_FILES = []
+            self.mod.MANIFEST_FILES = [path]
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main()
+            finally:
+                (
+                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                    self.mod.MANIFEST_FILES,
+                ) = original
+            self.assertEqual(code, 1)
+
     def test_yaml_keys_and_directives_are_syntax(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_tmp(
@@ -372,6 +440,120 @@ class TestCheckVersion(unittest.TestCase):
             any("not a version" in p for p in problems), problems
         )
 
+    def test_wrong_typed_versions_are_problems_not_crashes(self):
+        self.assertIsNone(self.mod.plugin_version("[1, 2]"))
+        self.assertEqual(self.mod.plugin_version('{"version": 1.3}'), 1.3)
+        problems = self.mod.coherence_problems({
+            "plugin.json": 1.3,
+            "EXTRACTOR_VERSION": "1.3.0",
+        })
+        self.assertTrue(
+            any("not a version" in p for p in problems), problems
+        )
+        found = self.mod.marketplace_versions(
+            '{"metadata": "oops", "plugins": [{"version": "1.3.0"}]}'
+        )
+        self.assertEqual(found, [None, "1.3.0"])
+        self.assertEqual(self.mod.marketplace_versions("[1, 2]"), [None])
+        found = self.mod.marketplace_versions(
+            '{"metadata": {"version": 130}, '
+            '"plugins": [{"version": "1.3.0"}]}'
+        )
+        self.assertEqual(found, [130, "1.3.0"])
+
+    def test_an_empty_or_missing_plugins_list_is_a_problem(self):
+        for text in (
+            '{"metadata": {"version": "1.3.0"}, "plugins": []}',
+            '{"metadata": {"version": "1.3.0"}}',
+        ):
+            with self.assertRaises(ValueError) as caught:
+                self.mod.marketplace_versions(text)
+            self.assertIn("no plugins", str(caught.exception))
+
+    def test_a_leading_zero_version_is_not_a_version(self):
+        problems = self.mod.coherence_problems({
+            "plugin.json": "01.3.0",
+            "EXTRACTOR_VERSION": "01.3.0",
+        })
+        self.assertTrue(
+            any("not a version" in p for p in problems), problems
+        )
+
+    def test_a_decoy_carries_phrase_in_a_release_note_loses(self):
+        text = (
+            "## [Unreleased]\n\nWork in progress.\n\n"
+            "## [1.3.0] - 2026-01-01\n\n"
+            "This release carries version 9.9.9 in its notes.\n"
+        )
+        self.assertEqual(self.mod.changelog_version(text), "1.3.0")
+
+    def run_main_on_texts(self, plugin_text, marketplace_text,
+                          changelog_text):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plugin = root / "plugin.json"
+            plugin.write_text(plugin_text, encoding="utf-8")
+            market = root / "marketplace.json"
+            market.write_text(marketplace_text, encoding="utf-8")
+            extract = root / "extract.py"
+            extract.write_text(
+                'EXTRACTOR_VERSION = "1.3.0"\n', encoding="utf-8"
+            )
+            log = root / "CHANGELOG.md"
+            log.write_text(changelog_text, encoding="utf-8")
+            original = (
+                self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
+                self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+            )
+            self.mod.PLUGIN_JSON = plugin
+            self.mod.MARKETPLACE_JSON = market
+            self.mod.EXTRACT_PY = extract
+            self.mod.CHANGELOG_MD = log
+            try:
+                with redirect_stderr(io.StringIO()) as captured:
+                    code = self.mod.main()
+            finally:
+                (
+                    self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
+                    self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+                ) = original
+            return code, captured.getvalue()
+
+    def test_main_reports_wrong_typed_shapes_without_a_traceback(self):
+        good_market = (
+            '{"metadata": {"version": "1.3.0"}, "plugins": '
+            '[{"name": "recognitio", "version": "1.3.0"}]}'
+        )
+        good_log = "## [Unreleased]\n\nThis work carries version 1.3.0.\n"
+        cases = (
+            ('{"version": 1.3}', good_market, good_log),
+            ("[1, 2]", good_market, good_log),
+            (
+                '{"version": "1.3.0"}',
+                '{"metadata": "oops", "plugins": '
+                '[{"version": "1.3.0"}]}',
+                good_log,
+            ),
+            (
+                '{"version": "1.3.0"}',
+                '{"metadata": {"version": 130}, "plugins": '
+                '[{"version": "1.3.0"}]}',
+                good_log,
+            ),
+            (
+                '{"version": "1.3.0"}',
+                '{"metadata": {"version": "1.3.0"}, "plugins": []}',
+                good_log,
+            ),
+        )
+        for plugin_text, market_text, log_text in cases:
+            code, err = self.run_main_on_texts(
+                plugin_text, market_text, log_text
+            )
+            self.assertEqual(code, 1, (plugin_text, err))
+            self.assertIn("check_version:", err)
+            self.assertNotIn("Traceback", err)
+
 
 class TestPluginPackaging(unittest.TestCase):
     def test_plugin_manifest_names_the_skill_and_its_path(self):
@@ -384,6 +566,17 @@ class TestPluginPackaging(unittest.TestCase):
         self.assertEqual(data["skills"], ["./skills/recognitio/"])
         self.assertTrue(data["version"])
 
+    def test_plugin_manifest_carries_the_owner_email(self):
+        data = json.loads(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            data["author"]["email"],
+            "81196676+david-engelmann@users.noreply.github.com",
+        )
+
     def test_marketplace_lists_the_plugin_with_its_skill_path(self):
         data = json.loads(
             (ROOT / ".claude-plugin" / "marketplace.json").read_text(
@@ -394,11 +587,11 @@ class TestPluginPackaging(unittest.TestCase):
         self.assertEqual(len(entries), 1, data["plugins"])
         self.assertEqual(entries[0]["source"], "./")
         self.assertFalse(entries[0]["strict"])
-        # The entry carries no skills field of its own. The plugin
-        # manifest lists the skill path, and a marketplace entry
-        # that also declares skills beside strict false conflicts
-        # with that manifest and stops the plugin loading.
-        self.assertNotIn("skills", entries[0])
+        # The entry carries the skills list of the researched
+        # official shape, naming the same path the plugin manifest
+        # names, so a marketplace reader sees the skill the entry
+        # installs without opening the manifest first.
+        self.assertEqual(entries[0]["skills"], ["./skills/recognitio/"])
 
 
 class TestCheckPacket(unittest.TestCase):

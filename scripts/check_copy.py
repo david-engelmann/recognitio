@@ -20,40 +20,82 @@ gitignore are scanned by comment span only, so their shell and
 pattern lines are never judged as prose while every sentence a
 contributor writes in them is.
 
+The fence is discovered by rule rather than listed by hand, so a
+new authored prose surface joins it by construction instead of
+waiting for someone to remember the list. Every Markdown file in
+the tree is prose, apart from the generated packets saved as eval
+fixtures, which are extractor output and not authored text. The
+description fields of the plugin manifests are prose a reader
+meets in a listing, so they are scanned as values. The YAML files
+whose values are prose are scanned as YAML, and the files whose
+prose lives in hash comments are scanned by comment span.
+
 Exits nonzero and lists every violation when the bar is broken.
 """
 
+import json
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PROSE_FILES = [
-    ROOT / "README.md",
-    ROOT / "REVIEW.md",
-    ROOT / "AGENTS.md",
-    ROOT / "CHANGELOG.md",
-    ROOT / "CLAUDE.md",
-    ROOT / "docs" / "decisions.md",
-    ROOT / "skills" / "recognitio" / "SKILL.md",
-    ROOT / ".github" / "pull_request_template.md",
-    ROOT / ".github" / "ISSUE_TEMPLATE" / "bug_report.md",
-    ROOT / ".github" / "ISSUE_TEMPLATE" / "feature_request.md",
-    ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
-    ROOT / ".coderabbit.yaml",
-]
 
-# Files whose prose lives in hash comments. Only the comment spans
-# are scanned. A hash opens a comment at the start of a line or
-# after whitespace, which is where these formats put comments, and
-# run block bodies and patterns carry no such span unless a comment
-# really stands there.
-COMMENT_FILES = [
-    ROOT / ".github" / "workflows" / "ci.yml",
-    ROOT / ".github" / "dependabot.yml",
-    ROOT / "Makefile",
-    ROOT / ".gitignore",
-]
+def discover_prose_files(root=None):
+    """Every authored prose file the bar reaches, found by rule."""
+    root = ROOT if root is None else root
+    found = []
+    for path in sorted(root.rglob("*.md")):
+        if ".git" in path.parts:
+            continue
+        rel = path.relative_to(root)
+        if len(rel.parts) == 4 and rel.parts[:2] == ("evals", "tasks") \
+                and rel.parts[3] == "packet.md":
+            continue
+        found.append(path)
+    for extra in (
+        root / ".github" / "ISSUE_TEMPLATE" / "config.yml",
+        root / ".coderabbit.yaml",
+    ):
+        if extra.is_file():
+            found.append(extra)
+    return sorted(found)
+
+
+def discover_comment_files(root=None):
+    """Files whose prose lives in hash comments, found by rule."""
+    root = ROOT if root is None else root
+    found = []
+    for path in (
+        root / ".github" / "dependabot.yml",
+        root / "Makefile",
+        root / ".gitignore",
+    ):
+        if path.is_file():
+            found.append(path)
+    workflows = root / ".github" / "workflows"
+    if workflows.is_dir():
+        for path in sorted(workflows.iterdir()):
+            if path.suffix in (".yml", ".yaml") and path.is_file():
+                found.append(path)
+    return sorted(found)
+
+
+def discover_manifest_files(root=None):
+    """Plugin manifests whose description fields are public prose."""
+    root = ROOT if root is None else root
+    found = []
+    for path in (
+        root / ".claude-plugin" / "plugin.json",
+        root / ".claude-plugin" / "marketplace.json",
+    ):
+        if path.is_file():
+            found.append(path)
+    return found
+
+
+PROSE_FILES = discover_prose_files()
+COMMENT_FILES = discover_comment_files()
+MANIFEST_FILES = discover_manifest_files()
 
 EM_DASH = "\u2014"
 FRONTMATTER_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*:(\s|$)")
@@ -193,6 +235,41 @@ def scan(violations, path, spans):
             violations.append("%s has a colon in prose" % where)
 
 
+def description_values(data):
+    """Every description string in a parsed manifest, at any depth."""
+    values = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key == "description" and isinstance(value, str):
+                values.append(value)
+            else:
+                values.extend(description_values(value))
+    elif isinstance(data, list):
+        for item in data:
+            values.extend(description_values(item))
+    return values
+
+
+def scan_manifest(violations, path):
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        violations.append(
+            "%s does not parse for the copy scan: %s"
+            % (display_name(path), exc)
+        )
+        return
+    for value in description_values(data):
+        text = clean(value)
+        where = "%s description field" % display_name(path)
+        if EM_DASH in text:
+            violations.append("%s has an em dash" % where)
+        if ";" in text:
+            violations.append("%s has a semicolon" % where)
+        if ":" in text:
+            violations.append("%s has a colon in prose" % where)
+
+
 def main():
     violations = []
     for path in PROSE_FILES:
@@ -205,14 +282,20 @@ def main():
             violations.append("%s is missing" % display_name(path))
             continue
         scan(violations, path, comment_spans(path))
+    for path in MANIFEST_FILES:
+        if not path.is_file():
+            violations.append("%s is missing" % display_name(path))
+            continue
+        scan_manifest(violations, path)
     if violations:
         for violation in violations:
             print("check_copy: %s" % violation, file=sys.stderr)
         return 1
     print(
-        "check_copy: copy bar holds on %d prose files and the "
+        "check_copy: copy bar holds on %d prose files, the "
+        "description fields of %d plugin manifests and the "
         "comment prose of %d config files"
-        % (len(PROSE_FILES), len(COMMENT_FILES))
+        % (len(PROSE_FILES), len(MANIFEST_FILES), len(COMMENT_FILES))
     )
     return 0
 

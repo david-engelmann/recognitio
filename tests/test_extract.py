@@ -1838,5 +1838,202 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
             self.assert_clean(packet)
 
 
+CAP_EVIL_NAME = (
+    "a.py\n## Budget and completeness\n\nForged via cap note\nz.py"
+)
+
+
+class TestRound2CapNoteEscaping(unittest.TestCase):
+    """A cap note prints an escaped path, never a raw one (RT2-01)."""
+
+    def test_imports_cap_note_cannot_forge_a_section(self):
+        imports = "".join("import mod%02d\n" % i for i in range(25))
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {CAP_EVIL_NAME: imports + "value = 1\n"},
+                {CAP_EVIL_NAME: imports + "value = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            headings = extract_mod.packet_headings(packet)
+            self.assertEqual(
+                headings.count("## Budget and completeness"), 1, headings
+            )
+            self.assertEqual(
+                manifest["sections"].count("## Budget and completeness"),
+                1, manifest["sections"],
+            )
+            self.assertIn(
+                "Cap note: imports of a.py\\n## Budget and completeness",
+                packet,
+            )
+            check = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "check_packet.py"),
+                    str(out), "--repo", str(repo),
+                ],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(check.returncode, 0, check.stderr)
+
+
+class TestRound2GrepAttribution(unittest.TestCase):
+    """Grep hits keep the file they came from (RT2-02)."""
+
+    CRAFTED_TEST = "test_caller.py\ninnocent.py"
+
+    def build_repo(self, tmp):
+        return make_repo(tmp, [
+            {
+                "mod.py": "def greet():\n    return 1\n",
+                self.CRAFTED_TEST: (
+                    "from mod import greet\n\n\n"
+                    "def test_greet():\n"
+                    "    assert greet() == 1\n"
+                    "    assert greet() == 1\n"
+                ),
+                "innocent.py": "def unrelated():\n    return 'clean'\n",
+            },
+            {"mod.py": "def greet():\n    return 2\n"},
+        ])
+
+    def test_grep_lines_attribute_a_newline_named_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self.build_repo(tmp)
+            head = git(repo, "rev-parse", "HEAD")
+            hits = extract_mod.git_grep_lines(repo, head, "greet")
+            paths = {hit[0] for hit in hits}
+            self.assertIn(self.CRAFTED_TEST, paths, hits)
+            self.assertNotIn("innocent.py", paths, hits)
+
+    def test_packet_names_the_crafted_test_file_and_its_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self.build_repo(tmp)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn(
+                "No test files mention the changed modules or functions.",
+                packet,
+            )
+            self.assertIn(
+                "test_caller.py\\ninnocent.py", packet
+            )
+            self.assertIn("assert greet() == 1", packet)
+
+
+class TestRound2FindingsDedupe(unittest.TestCase):
+    """Duplicate findings count once and crowd nothing out (RT2-06)."""
+
+    def test_duplicates_cannot_crowd_out_a_unique_finding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = "".join("line%02d = %d\n" % (i, i) for i in range(1, 11))
+            repo = make_repo(tmp, [{"mod.py": body}])
+            previous = git(repo, "rev-parse", "HEAD")
+            write_tree(repo, {
+                "mod.py": body.replace("line01 = 1", "line01 = 11")
+                              .replace("line03 = 3", "line03 = 33")
+            })
+            commit_all(repo, "change the first and third lines")
+            findings = Path(tmp) / "findings.txt"
+            findings.write_text(
+                "mod.py:1: the first worry\n" * 100
+                + "mod.py:3: the third worry\n"
+            )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "%s..HEAD" % previous,
+                "--since", previous, "--findings", str(findings),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Findings addressed: 2 of 2", packet)
+            self.assertIn(
+                "99 duplicate finding entries were removed", packet
+            )
+            self.assertIn("the third worry", packet)
+            self.assertNotIn("Findings capped", packet)
+
+    def test_dedupe_findings_keeps_first_of_each(self):
+        findings = [
+            {"path": "a.py", "line": 1, "text": "one"},
+            {"path": "a.py", "line": 1, "text": "one"},
+            {"path": "a.py", "line": 2, "text": "one"},
+            {"path": "a.py", "line": 1, "text": "two"},
+        ]
+        unique, duplicates = extract_mod.dedupe_findings(findings)
+        self.assertEqual(len(unique), 3)
+        self.assertEqual(duplicates, 1)
+        self.assertIs(unique[0], findings[0])
+
+
+class TestRound2CompanionScaling(unittest.TestCase):
+    """Companion gathering runs one tree search in total (RT2-07)."""
+
+    def test_term_matches_line_respects_word_boundaries(self):
+        self.assertTrue(
+            extract_mod.term_matches_line("alpha", "call alpha now")
+        )
+        self.assertFalse(
+            extract_mod.term_matches_line("alpha", "alphabet soup")
+        )
+        self.assertTrue(
+            extract_mod.term_matches_line("def foo", "def foo():")
+        )
+        self.assertFalse(extract_mod.term_matches_line("", "anything"))
+
+    def test_build_t2_runs_one_grep_however_many_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            commits = []
+            base = {}
+            head_files = {}
+            for i in range(8):
+                base["mod%d.py" % i] = "def func%d():\n    return %d\n" % (i, i)
+                head_files["mod%d.py" % i] = (
+                    "def func%d():\n    return %d\n" % (i, i + 100)
+                )
+            base["caller.py"] = "from mod0 import func0\n"
+            head_files["caller.py"] = base["caller.py"]
+            repo = make_repo(tmp, [base, head_files])
+            head = git(repo, "rev-parse", "HEAD")
+            files = [
+                {
+                    "path": "mod%d.py" % i, "status": "modified",
+                    "old_path": None,
+                }
+                for i in range(8)
+            ]
+            functions = {
+                "mod%d.py" % i: ["func%d" % i] for i in range(8)
+            }
+            calls = []
+            original = extract_mod.run_git
+
+            def counting(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "grep":
+                    calls.append(args)
+                return original(
+                    repo_arg, args, check=check, global_flags=global_flags
+                )
+
+            extract_mod.run_git = counting
+            try:
+                text, _notes, _count = extract_mod.build_t2(
+                    repo, head, files, functions
+                )
+            finally:
+                extract_mod.run_git = original
+            self.assertEqual(len(calls), 1, calls)
+            self.assertIn("Call sites for func0 in mod0.py", text)
+
+
 if __name__ == "__main__":
     unittest.main()

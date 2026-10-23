@@ -2,6 +2,15 @@
 
 Recognitio is an agent skill that pulls the relevant changes out of a pull request or a commit range and assembles them into a verified review packet. The packet holds the change plus the context a careful human reviewer would go and find, and it proves that nothing was left behind.
 
+Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
+
+What it does
+
+- Pulls the change out of a pull request, a commit range or a single commit from the local clone
+- Gathers the call sites, imports, definitions and test files that belong with the change
+- Adds the history of the most changed files, with blame and earlier pull requests
+- Counts every file, hunk and line twice by separate git invocations and calls the packet verified only when both counts agree
+
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed.
 
 ## Why

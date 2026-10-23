@@ -70,12 +70,6 @@ FUNC_PATTERNS = [
 
 CLASS_PATTERN = re.compile(r"class\s+([A-Za-z_][A-Za-z0-9_]*)")
 
-# Literal prefixes searched when looking for a definition of a changed
-# name outside the changed files. The hit line still has to match one of
-# the function patterns or the class pattern for that exact name before
-# it counts as a definition.
-DEFINITION_PREFIXES = ("def ", "function ", "fn ", "func ", "class ")
-
 IMPORT_PATTERNS = {
     ".py": re.compile(r"^\s*(import\s+\S|from\s+\S+\s+import)"),
     ".js": re.compile(r"^\s*(import\s|const\s+.*=\s*require\(|let\s+.*=\s*require\(|var\s+.*=\s*require\()"),
@@ -827,6 +821,116 @@ def generated_reason(repo, diff_base, head, entry):
     return "marker arrived"
 
 
+def measure_binary_entry(repo, diff_base, head, entry, chunks, precise):
+    """Measure one entry git reported with the binary marker.
+
+    Returns the counts to record and the receipt entry for the
+    file, or the incoming counts and no receipt when no bytes exist
+    on either side, where the entry is a gitlink or similar and the
+    diff chunk already speaks for itself. Two very different cases
+    sit behind the marker and the receipt must not confuse them.
+    When the old side holds real binary content and the head side
+    is plain text, the file changed from binary to text in this
+    change and no attributes file need exist. When both sides are
+    plain text, git only calls the file binary because the tree
+    marks it so through its attributes file. Count and show both
+    as text, and name each one in the receipt by its real reason.
+    """
+    path = entry["path"]
+    side_ref = head if entry["status"] != "deleted" else diff_base
+    # The entry path names the file on both sides of a deletion.
+    data = file_bytes(repo, side_ref, path)
+    if data is None:
+        return None, None
+    if not looks_textual(data):
+        entry["binary"] = True
+        entry["head_bytes"] = len(data)
+        entry["placeholder"] = (
+            "(binary file of %d bytes at the %s revision. No "
+            "textual diff is shown.)"
+            % (len(data), "head" if entry["status"] != "deleted"
+               else "base")
+        )
+        receipt = {
+            "path": path,
+            "reason": "binary file of %d bytes" % len(data),
+            "shown_as_text": False,
+        }
+        return (0, 0), receipt
+    text_chunk = sanitize_packet_text(
+        per_file_text_diff(repo, diff_base, head, entry, "-W")
+    )
+    zero_chunk = sanitize_packet_text(
+        per_file_text_diff(repo, diff_base, head, entry, "-U0")
+    )
+    chunks[path] = text_chunk
+    precise[path] = zero_chunk
+    # Git's own count, read with the text flag, is the
+    # primary measure, and the recount cross checks it
+    # against the diff body like any other text file.
+    measured = per_file_text_numstat(repo, diff_base, head, entry)
+    if measured is not None:
+        counts = measured
+    else:
+        counts = count_chunk_lines(zero_chunk)
+    base_path = entry["old_path"] or path
+    base_data = None
+    if entry["status"] not in ("added", "deleted"):
+        base_data = file_bytes(repo, diff_base, base_path)
+    if base_data is not None and not looks_textual(base_data):
+        entry["binary_transition"] = True
+        receipt = {
+            "path": path,
+            "reason": "changed from binary content to text "
+                      "in this change, counted and shown "
+                      "as text",
+            "shown_as_text": True,
+        }
+    else:
+        entry["attribute_text"] = True
+        receipt = {
+            "path": path,
+            "reason": "marked binary by repository attributes, "
+                      "counted and shown as text",
+            "shown_as_text": True,
+        }
+    return counts, receipt
+
+
+def generated_placeholder(repo, diff_base, head, entry, adds, dels):
+    """The placeholder and receipt for a generated or lockfile entry.
+
+    A marker that is new in this change exempts nothing. The change
+    is shown in full and the receipt flags the arrival where a
+    reviewer reads the exclusions. A marker that already stood at
+    the base withholds the diff behind a named placeholder whose
+    counts stay in the manifest.
+    """
+    path = entry["path"]
+    reason = generated_reason(repo, diff_base, head, entry)
+    if reason is None:
+        return None
+    if reason == "marker arrived":
+        return {
+            "path": path,
+            "reason": "carries a generated file marker that "
+                      "arrived in this change, counted and "
+                      "shown in full",
+            "shown_as_text": True,
+        }
+    entry["placeholder"] = (
+        "(%s. The diff is withheld from the packet and its "
+        "%d additions and %d deletions across %d hunks are "
+        "counted in the manifest)"
+        % (reason, adds, dels, entry["hunks"])
+    )
+    return {
+        "path": path,
+        "reason": reason,
+        "shown_as_text": False,
+    }
+
+
 def enrich_files(repo, diff_base, head, change):
     """Fill in counts and placeholder state for every file entry.
 
@@ -853,106 +957,20 @@ def enrich_files(repo, diff_base, head, change):
         # does, once, in one voice.
         receipt = None
         if path in binary_paths:
-            side_ref = head if entry["status"] != "deleted" else diff_base
-            # The entry path names the file on both sides of a deletion.
-            data = file_bytes(repo, side_ref, path)
-            if data is not None and looks_textual(data):
-                # Git reports this file with the binary marker. Two
-                # very different cases sit behind that marker and the
-                # receipt must not confuse them. When the old side
-                # holds real binary content and the head side is
-                # plain text, the file changed from binary to text
-                # in this change and no attributes file need exist.
-                # When both sides are plain text, git only calls the
-                # file binary because the tree marks it so through
-                # its attributes file. Count and show both as text,
-                # and name each one in the receipt by its real
-                # reason.
-                text_chunk = sanitize_packet_text(
-                    per_file_text_diff(repo, diff_base, head, entry, "-W")
-                )
-                zero_chunk = sanitize_packet_text(
-                    per_file_text_diff(repo, diff_base, head, entry, "-U0")
-                )
-                chunks[path] = text_chunk
-                precise[path] = zero_chunk
-                # Git's own count, read with the text flag, is the
-                # primary measure, and the recount cross checks it
-                # against the diff body like any other text file.
-                measured = per_file_text_numstat(
-                    repo, diff_base, head, entry
-                )
-                if measured is not None:
-                    adds, dels = measured
-                else:
-                    adds, dels = count_chunk_lines(zero_chunk)
-                base_path = entry["old_path"] or path
-                base_data = None
-                if entry["status"] not in ("added", "deleted"):
-                    base_data = file_bytes(repo, diff_base, base_path)
-                if base_data is not None and not looks_textual(base_data):
-                    entry["binary_transition"] = True
-                    receipt = {
-                        "path": path,
-                        "reason": "changed from binary content to text "
-                                  "in this change, counted and shown "
-                                  "as text",
-                        "shown_as_text": True,
-                    }
-                else:
-                    entry["attribute_text"] = True
-                    receipt = {
-                        "path": path,
-                        "reason": "marked binary by repository attributes, "
-                                  "counted and shown as text",
-                        "shown_as_text": True,
-                    }
-            elif data is not None:
-                entry["binary"] = True
-                entry["head_bytes"] = len(data)
-                adds, dels = 0, 0
-                entry["placeholder"] = (
-                    "(binary file of %d bytes at the %s revision. No "
-                    "textual diff is shown.)"
-                    % (len(data), "head" if entry["status"] != "deleted"
-                       else "base")
-                )
-                receipt = {
-                    "path": path,
-                    "reason": "binary file of %d bytes" % len(data),
-                    "shown_as_text": False,
-                }
-            # When no bytes exist on either side the entry is a gitlink
-            # or similar, and the diff chunk already speaks for itself.
+            counts, receipt = measure_binary_entry(
+                repo, diff_base, head, entry, chunks, precise
+            )
+            if counts is not None:
+                adds, dels = counts
         entry["additions"] = adds
         entry["deletions"] = dels
         entry["hunks"] = count_hunks(chunks.get(path, ""))
         if not entry["binary"] and entry["placeholder"] is None:
-            reason = generated_reason(repo, diff_base, head, entry)
-            if reason == "marker arrived":
-                # The marker is new in this change, so it exempts
-                # nothing. The change is shown in full and the
-                # receipt flags the arrival where a reviewer reads
-                # the exclusions.
-                receipt = {
-                    "path": path,
-                    "reason": "carries a generated file marker that "
-                              "arrived in this change, counted and "
-                              "shown in full",
-                    "shown_as_text": True,
-                }
-            elif reason is not None:
-                entry["placeholder"] = (
-                    "(%s. The diff is withheld from the packet and its "
-                    "%d additions and %d deletions across %d hunks are "
-                    "counted in the manifest)"
-                    % (reason, adds, dels, entry["hunks"])
-                )
-                receipt = {
-                    "path": path,
-                    "reason": reason,
-                    "shown_as_text": False,
-                }
+            found = generated_placeholder(
+                repo, diff_base, head, entry, adds, dels
+            )
+            if found is not None:
+                receipt = found
         if receipt is not None:
             exclusions.append(receipt)
     return exclusions
@@ -1152,6 +1170,51 @@ def build_t1(files, chunks):
 
 
 
+def parse_grep_z(stdout, rev):
+    """Parse NUL delimited grep output into (path, line, content) hits.
+
+    Each record is the revision and path, a NUL, the line number, a
+    NUL, and the line content ending in a newline. The path field
+    itself may carry a newline, so records are read by scanning for
+    the NUL fields in order, never by splitting the output into
+    lines. Splitting on lines first truncates a crafted path at its
+    newline and hands every hit in that file to the fragment that
+    follows the newline, which is a different file or no file at all.
+    """
+    out = []
+    prefix = rev + ":"
+    pos = 0
+    total = len(stdout)
+    while pos < total:
+        if not stdout.startswith(prefix, pos):
+            nxt = stdout.find("\n", pos)
+            if nxt == -1:
+                break
+            pos = nxt + 1
+            continue
+        pos += len(prefix)
+        end = stdout.find("\0", pos)
+        if end == -1:
+            break
+        path = stdout[pos:end]
+        pos = end + 1
+        end = stdout.find("\0", pos)
+        if end == -1:
+            break
+        lineno = stdout[pos:end]
+        pos = end + 1
+        end = stdout.find("\n", pos)
+        if end == -1:
+            content = stdout[pos:]
+            pos = total
+        else:
+            content = stdout[pos:end]
+            pos = end + 1
+        if lineno.isdigit():
+            out.append((path, int(lineno), content))
+    return out
+
+
 def git_grep_lines(repo, head, term, fixed=True):
     """Return (path, line number, content) hits for a term at a head.
 
@@ -1167,17 +1230,71 @@ def git_grep_lines(repo, head, term, fixed=True):
     result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
         return []
-    out = []
-    for line in result.stdout.splitlines():
-        fields = line.split("\0")
-        if len(fields) < 3:
-            continue
-        revpath, lineno = fields[0], fields[1]
-        content = "\0".join(fields[2:])
-        path = revpath.split(":", 1)[1] if ":" in revpath else revpath
-        if lineno.isdigit():
-            out.append((path, int(lineno), content))
-    return out
+    return parse_grep_z(result.stdout, head)
+
+
+_WORD_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+)
+
+
+def term_matches_line(term, content):
+    """Whether a fixed term word matches inside one line of content.
+
+    This mirrors the word match the grep flags ask git for, so a
+    bulk search can hand each candidate line to the terms it truly
+    matches. A match must sit between two non word characters or
+    the edges of the line, at each end where the term itself ends
+    in a word character.
+    """
+    if not term:
+        return False
+    start = 0
+    while True:
+        index = content.find(term, start)
+        if index == -1:
+            return False
+        before_ok = True
+        if term[0] in _WORD_CHARS and index > 0:
+            before_ok = content[index - 1] not in _WORD_CHARS
+        after = index + len(term)
+        after_ok = True
+        if term[-1] in _WORD_CHARS and after < len(content):
+            after_ok = content[after] not in _WORD_CHARS
+        if before_ok and after_ok:
+            return True
+        start = index + 1
+
+
+def git_grep_bulk(repo, head, terms):
+    """Return hits per term from one search over the whole tree.
+
+    The companion tier once ran one whole tree search per changed
+    function and per changed file stem, so its work grew with the
+    product of the change size and the tree size. One search that
+    carries every term at once, with each returned line handed to
+    the terms it word matches, keeps the same hits in an order
+    that matches the per term searches while the search count
+    stays at one however large the change grows.
+    """
+    unique = sorted(set(terms))
+    if not unique:
+        return {}
+    if len(unique) == 1:
+        return {unique[0]: git_grep_lines(repo, head, unique[0])}
+    args = ["grep", "--text", "-n", "-z", "-w", "-F"]
+    for term in unique:
+        args.extend(["-e", term])
+    args.append(head)
+    result = run_git(repo, args, check=False)
+    if result.returncode not in (0, 1):
+        return {term: [] for term in unique}
+    hits = {term: [] for term in unique}
+    for path, lineno, content in parse_grep_z(result.stdout, head):
+        for term in unique:
+            if term_matches_line(term, content):
+                hits[term].append((path, lineno, content))
+    return hits
 
 
 def is_test_path(path):
@@ -1197,9 +1314,23 @@ def source_entries(files):
     return [entry for entry in files if Path(entry["path"]).suffix in SOURCE_EXTS]
 
 
-def call_sites_section(repo, head, files, functions_by_file, notes):
+def companion_terms(files, functions_by_file):
+    """Every search term the companion tier needs, gathered once."""
+    terms = []
+    for entry in source_entries(files):
+        terms.append(Path(entry["path"]).stem)
+        terms.extend(functions_by_file.get(entry["path"], []))
+    return terms
+
+
+def call_sites_section(repo, head, files, functions_by_file, notes,
+                       hits_by_term=None):
     lines = []
     content_cache = {}
+    if hits_by_term is None:
+        hits_by_term = git_grep_bulk(
+            repo, head, companion_terms(files, functions_by_file)
+        )
 
     def context_block(path, lineno):
         if path not in content_cache:
@@ -1219,7 +1350,7 @@ def call_sites_section(repo, head, files, functions_by_file, notes):
         path = entry["path"]
         for name in functions_by_file.get(path, []):
             hits = [
-                hit for hit in git_grep_lines(repo, head, name) if hit[0] != path
+                hit for hit in hits_by_term.get(name, []) if hit[0] != path
             ]
             lines.append("### Call sites for %s in %s" % (name, display_path(path)))
             lines.append("")
@@ -1281,7 +1412,7 @@ def imports_section(repo, head, files, notes):
         if len(found) > len(shown):
             notes.append(
                 "imports of %s capped at %d of %d"
-                % (path, len(shown), len(found))
+                % (display_path(path), len(shown), len(found))
             )
         lines.append("#### %s" % display_path(path))
         lines.append("")
@@ -1305,21 +1436,28 @@ def line_defines(line, name):
     return bool(match and match.group(1) == name)
 
 
-def definitions_section(repo, head, files, functions_by_file, notes):
+def definitions_section(repo, head, files, functions_by_file, notes,
+                        hits_by_term=None):
     lines = []
     lines.append("### Definitions of changed names elsewhere")
     lines.append("")
     changed_paths = {entry["path"] for entry in files}
+    if hits_by_term is None:
+        hits_by_term = git_grep_bulk(
+            repo, head, companion_terms(files, functions_by_file)
+        )
     any_found = False
     for entry in source_entries(files):
         for name in functions_by_file.get(entry["path"], []):
+            # One search per name replaces the five prefix searches
+            # this section once ran. A line that defines the name
+            # carries the name as a word, so the name search returns
+            # every candidate the prefix searches could return, and
+            # the definition check below keeps the same lines.
             hits = []
-            for prefix in DEFINITION_PREFIXES:
-                for hit in git_grep_lines(
-                    repo, head, prefix + name, fixed=True
-                ):
-                    if hit[0] not in changed_paths and line_defines(hit[2], name):
-                        hits.append(hit)
+            for hit in hits_by_term.get(name, []):
+                if hit[0] not in changed_paths and line_defines(hit[2], name):
+                    hits.append(hit)
             hits = sorted(set(hits))
             if not hits:
                 continue
@@ -1346,15 +1484,20 @@ def definitions_section(repo, head, files, functions_by_file, notes):
     return lines
 
 
-def test_files_section(repo, head, files, functions_by_file, notes):
+def test_files_section(repo, head, files, functions_by_file, notes,
+                       hits_by_term=None):
     lines = []
     test_hits = {}
     changed_paths = [entry["path"] for entry in files]
+    if hits_by_term is None:
+        hits_by_term = git_grep_bulk(
+            repo, head, companion_terms(files, functions_by_file)
+        )
     for entry in source_entries(files):
         stem = Path(entry["path"]).stem
         terms = [stem] + functions_by_file.get(entry["path"], [])
         for term in terms:
-            for hit_path, hit_line, content in git_grep_lines(repo, head, term):
+            for hit_path, hit_line, content in hits_by_term.get(term, []):
                 if is_test_path(hit_path) and hit_path not in changed_paths:
                     test_hits.setdefault(hit_path, []).append(
                         (hit_line, content)
@@ -1379,7 +1522,7 @@ def test_files_section(repo, head, files, functions_by_file, notes):
         if len(hits) > len(shown):
             notes.append(
                 "matches in %s capped at %d of %d"
-                % (test_path, len(shown), len(hits))
+                % (display_path(test_path), len(shown), len(hits))
             )
         lines.append("```")
         for hit_line, content in shown:
@@ -1405,12 +1548,21 @@ def build_t2(repo, head, files, functions_by_file):
         lines.append("No changed source files, so no companions were gathered.")
         lines.append("")
         return "\n".join(lines), notes, 0
-    lines.extend(call_sites_section(repo, head, files, functions_by_file, notes))
+    hits_by_term = git_grep_bulk(
+        repo, head, companion_terms(files, functions_by_file)
+    )
+    lines.extend(call_sites_section(
+        repo, head, files, functions_by_file, notes, hits_by_term
+    ))
     lines.extend(imports_section(repo, head, files, notes))
     lines.extend(
-        definitions_section(repo, head, files, functions_by_file, notes)
+        definitions_section(
+            repo, head, files, functions_by_file, notes, hits_by_term
+        )
     )
-    lines.extend(test_files_section(repo, head, files, functions_by_file, notes))
+    lines.extend(test_files_section(
+        repo, head, files, functions_by_file, notes, hits_by_term
+    ))
     lines.extend(render_notes(notes))
     return "\n".join(lines), notes, len(sources)
 
@@ -1504,7 +1656,7 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
         if len(summary) > MAX_BLAME_SUMMARY_LINES:
             notes.append(
                 "blame summary for %s capped at %d entries"
-                % (path, MAX_BLAME_SUMMARY_LINES)
+                % (display_path(path), MAX_BLAME_SUMMARY_LINES)
             )
             summary = summary[:MAX_BLAME_SUMMARY_LINES]
         lines.append("```")
@@ -1688,20 +1840,40 @@ def parse_findings(text):
     return findings
 
 
-def findings_accounting(repo, diff_base, since, head, findings):
-    """Mark each prior finding addressed or unaddressed.
+def dedupe_findings(findings):
+    """Drop repeated copies of one finding, keeping the first.
 
-    A finding counts as addressed when the file is gone at the head or
-    when the lines it anchors to sit inside a hunk of the diff between
-    the previous reviewed head and this head. When the anchored lines
-    survive that diff untouched, the finding is unaddressed.
-
-    Existence at the head is read once, from a single listing of the
-    head tree, however many findings there are, and the accounting
-    itself is capped like every other surface in the tool.
+    A findings file is reviewer supplied input, and the same line
+    can stand in it many times by accident or by padding. Counting
+    each copy as its own finding inflates the summary, and a run of
+    copies ahead of a distinct finding can push that finding past
+    the accounting cap and out of the packet. Identity is the whole
+    anchored entry, its path and line and text together.
     """
-    total_findings = len(findings)
-    findings = findings[:MAX_FINDINGS_ACCOUNTED]
+    seen = set()
+    unique = []
+    duplicates = 0
+    for finding in findings:
+        key = (finding["path"], finding["line"], finding["text"])
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
+        unique.append(finding)
+    return unique, duplicates
+
+
+def rereview_ranges(repo, since, head):
+    """The diff ranges and tree listings one accounting runs over.
+
+    Existence at either revision is read once, from a single
+    listing of each tree, however many findings there are.
+    Findings anchor at the since revision, so their paths are the
+    paths the files carried there. The ranges are keyed by that
+    side and the rename map remembers where each file moved, or
+    every finding on a renamed file reads addressed because its
+    old path is gone.
+    """
     precise = run_git(
         repo,
         ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
@@ -1721,10 +1893,6 @@ def findings_accounting(repo, diff_base, since, head, findings):
     since_paths = {field for field in since_text.split("\0") if field}
     since_files = parse_name_status_z(status_text)
     chunks = split_diff(precise)
-    # Findings anchor at the since revision, so their paths are the
-    # paths the files carried there. Key the ranges by that side and
-    # remember where a rename moved each file, or every finding on a
-    # renamed file reads addressed because its old path is gone.
     ranges_by_path = {}
     moved_to = {}
     for position, entry in enumerate(since_files):
@@ -1733,53 +1901,88 @@ def findings_accounting(repo, diff_base, since, head, findings):
         ranges_by_path[since_path] = old_side_ranges(chunk)
         if entry["status"] == "renamed":
             moved_to[since_path] = entry["path"]
+    return ranges_by_path, moved_to, head_paths, since_paths
+
+
+def finding_verdict(finding, ranges_by_path, moved_to, head_paths,
+                    since_paths):
+    """The verdict for one finding and whether it counts addressed."""
+    path = finding["path"]
+    anchor = finding["line"]
+    target = moved_to.get(path, path)
+    if path not in since_paths and target not in head_paths \
+            and path not in head_paths:
+        # The path never existed at the previous reviewed
+        # revision and it does not exist at the head either. A
+        # mistyped or crafted path, a traversal path above
+        # all, is not a file that went away. Counting it as
+        # addressed would inflate the summary with work that
+        # was never done, so it reads unaddressed in plain
+        # words.
+        return (
+            "unaddressed, the file never existed at the previous "
+            "reviewed revision or at the head"
+        ), False
+    if path not in since_paths:
+        return (
+            "unaddressed, the file did not exist at the previous "
+            "reviewed revision, so no anchored line was reviewed then"
+        ), False
+    if target not in head_paths:
+        return "addressed, the file is gone at the head", True
+    for start, count in ranges_by_path.get(path, []):
+        if count == 0:
+            # A pure insertion touches no old side line. Its
+            # start names the line before the inserted text.
+            continue
+        if start <= anchor <= start + count - 1:
+            return "addressed, the anchored lines changed", True
+    return "unaddressed, the anchored lines are unchanged", False
+
+
+def findings_accounting(repo, diff_base, since, head, findings):
+    """Mark each prior finding addressed or unaddressed.
+
+    A finding counts as addressed when the file is gone at the head or
+    when the lines it anchors to sit inside a hunk of the diff between
+    the previous reviewed head and this head. When the anchored lines
+    survive that diff untouched, the finding is unaddressed.
+
+    Repeated copies of one finding are removed before the cap is
+    applied, so the summary counts unique findings and duplicates
+    can never crowd a distinct finding out of the accounting. The
+    accounting itself is capped like every other surface in the
+    tool, and the section states both the dedupe and the cap.
+    """
+    findings, duplicates = dedupe_findings(findings)
+    total_findings = len(findings)
+    findings = findings[:MAX_FINDINGS_ACCOUNTED]
+    ranges_by_path, moved_to, head_paths, since_paths = rereview_ranges(
+        repo, since, head
+    )
     lines = []
     lines.append("### Prior findings accounting")
     lines.append("")
+    if duplicates:
+        lines.append(
+            "%d duplicate finding entries were removed before "
+            "accounting, so every finding below is one unique "
+            "anchored finding." % duplicates
+        )
+        lines.append("")
     addressed = 0
     for finding in findings:
-        path = finding["path"]
-        anchor = finding["line"]
-        target = moved_to.get(path, path)
-        if path not in since_paths and target not in head_paths \
-                and path not in head_paths:
-            # The path never existed at the previous reviewed
-            # revision and it does not exist at the head either. A
-            # mistyped or crafted path, a traversal path above
-            # all, is not a file that went away. Counting it as
-            # addressed would inflate the summary with work that
-            # was never done, so it reads unaddressed in plain
-            # words.
-            verdict = (
-                "unaddressed, the file never existed at the previous "
-                "reviewed revision or at the head"
-            )
-        elif path not in since_paths:
-            verdict = (
-                "unaddressed, the file did not exist at the previous "
-                "reviewed revision, so no anchored line was reviewed then"
-            )
-        elif target not in head_paths:
-            verdict = "addressed, the file is gone at the head"
+        verdict, counted = finding_verdict(
+            finding, ranges_by_path, moved_to, head_paths, since_paths
+        )
+        if counted:
             addressed += 1
-        else:
-            touched = False
-            for start, count in ranges_by_path.get(path, []):
-                if count == 0:
-                    # A pure insertion touches no old side line. Its
-                    # start names the line before the inserted text.
-                    continue
-                if start <= anchor <= start + count - 1:
-                    touched = True
-                    break
-            if touched:
-                verdict = "addressed, the anchored lines changed"
-                addressed += 1
-            else:
-                verdict = "unaddressed, the anchored lines are unchanged"
         lines.append(
             "- %s:%d %s. %s"
-            % (display_path(path), anchor, finding["text"], verdict)
+            % (
+                display_path(finding["path"]), finding["line"],
+                finding["text"], verdict,
+            )
         )
     lines.append("")
     lines.append(
