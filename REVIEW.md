@@ -27,7 +27,7 @@ otherwise, and it gets reported as one.
 ## The nit cap
 
 A review carries at most three nits. A fourth nit means the
-weaker ones get dropped, and style only findings are dropped
+weaker ones get dropped, and style-only findings are dropped
 rather than posted at all. Nits never outrank a correctness
 finding in the report.
 

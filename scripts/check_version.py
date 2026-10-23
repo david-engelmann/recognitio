@@ -35,14 +35,23 @@ def plugin_version(text):
 
 
 def marketplace_versions(text):
+    """Every version the listing is required to carry.
+
+    The metadata version and one version per plugin entry are
+    required fields of this listing, so a missing one is recorded
+    as None rather than silently dropped. Dropping it would let
+    the remaining values agree and pass a listing that lost a
+    version it must carry.
+    """
     data = json.loads(text)
     versions = []
     metadata = data.get("metadata") or {}
-    if metadata.get("version"):
-        versions.append(metadata["version"])
+    versions.append(metadata.get("version"))
     for entry in data.get("plugins") or []:
-        if isinstance(entry, dict) and entry.get("version"):
-            versions.append(entry["version"])
+        if isinstance(entry, dict):
+            versions.append(entry.get("version"))
+        else:
+            versions.append(None)
     return versions
 
 
@@ -54,14 +63,17 @@ def extractor_version(text):
 def changelog_version(text):
     """The version the changelog speaks for.
 
-    A released heading wins when one exists. Until the first
-    release is tagged the unreleased section names the version
-    its work carries, and that sentence is the string of record.
+    The version the unreleased work declares wins when it
+    declares one, because after the first release the changelog
+    holds a released heading and a newer unreleased declaration
+    at once, and the unreleased work is what the other surfaces
+    are being checked against. The newest released heading is
+    the fallback when no unreleased version is declared.
     """
-    match = RELEASED_RE.search(text)
+    match = CARRIES_RE.search(text)
     if match:
         return match.group(1)
-    match = CARRIES_RE.search(text)
+    match = RELEASED_RE.search(text)
     return match.group(1) if match else None
 
 

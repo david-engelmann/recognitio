@@ -42,8 +42,8 @@ This unreleased work carries version 1.3.0.
 - Tests for the gate scripts themselves, for pull request mode with
   a stand in GitHub CLI, and for all three budget outcomes.
 - Plugin packaging. A plugin manifest and a marketplace listing
-  live under `.claude-plugin/` and list the skill by its explicit
-  path, and a version coherence gate keeps the version strings of
+  live under `.claude-plugin/`, the plugin manifest lists the
+  skill by its explicit path, and a version coherence gate keeps the version strings of
   the plugin manifest, the marketplace listing, the extractor and
   the changelog in agreement.
 - An eval layer under `evals/`. A paired run over four fixture

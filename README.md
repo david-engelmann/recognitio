@@ -12,12 +12,13 @@ Recognitio takes the other path. Extraction runs against the local clone, where 
 
 ## Install
 
-Take one install route only. Installing through two routes installs the skill twice and the agent loads both copies.
+Take one install route only. Installing through two routes installs the skill twice.
 
 The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers.
 
 ```bash
 /plugin marketplace add david-engelmann/recognitio
+/plugin install recognitio@recognitio-marketplace
 ```
 
 The generic route works with any agent that reads the skill format.

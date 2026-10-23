@@ -1,0 +1,12 @@
+{
+  "base": {
+    "calc.py": "def price(qty, rate):\n    return qty * rate\n",
+    "shop.py": "from calc import price\n\n\ndef total():\n    return price(2, 3)\n",
+    "test_calc.py": "from calc import price\n\n\ndef test_price():\n    assert price(2, 3) == 6\n"
+  },
+  "head": {
+    "calc.py": "def price(qty, rate, tax):\n    return qty * rate + tax + tax\n",
+    "shop.py": "from calc import price\n\n\ndef total():\n    return price(2, 3)\n",
+    "test_calc.py": "from calc import price\n\n\ndef test_price():\n    assert price(2, 3) == 6\n"
+  }
+}

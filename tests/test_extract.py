@@ -1705,6 +1705,14 @@ class TestRound1FilenameSafety(unittest.TestCase):
             )
 
 
+class TestDisplayPathSeparators(unittest.TestCase):
+    def test_unicode_line_separators_are_escaped(self):
+        for sep in ("", " ", " "):
+            shown = extract_mod.display_path("a.py%s## Forged" % sep)
+            self.assertNotIn(sep, shown)
+            self.assertEqual(len(shown.splitlines()), 1, shown)
+
+
 class TestRound1FindingsExistence(unittest.TestCase):
     """Findings on paths that never existed are not addressed."""
 

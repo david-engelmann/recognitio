@@ -345,6 +345,24 @@ class TestCheckVersion(unittest.TestCase):
         })
         self.assertTrue(any("no version" in p for p in problems), problems)
 
+    def test_a_missing_marketplace_version_is_recorded(self):
+        found = self.mod.marketplace_versions(
+            '{"metadata": {}, "plugins": [{"name": "x", "version": "1.3.0"}]}'
+        )
+        self.assertEqual(found, [None, "1.3.0"])
+        problems = self.mod.coherence_problems({
+            "marketplace.json entry 1": found[0],
+            "EXTRACTOR_VERSION": "1.3.0",
+        })
+        self.assertTrue(any("no version" in p for p in problems), problems)
+
+    def test_an_unreleased_declaration_wins_over_a_release(self):
+        text = (
+            "## [Unreleased]\n\nThis work carries version 1.4.0.\n\n"
+            "## [1.3.0] - 2026-01-01\n"
+        )
+        self.assertEqual(self.mod.changelog_version(text), "1.4.0")
+
     def test_a_malformed_version_is_a_problem(self):
         problems = self.mod.coherence_problems({
             "plugin.json": "1.3",
@@ -374,9 +392,13 @@ class TestPluginPackaging(unittest.TestCase):
         )
         entries = [p for p in data["plugins"] if p["name"] == "recognitio"]
         self.assertEqual(len(entries), 1, data["plugins"])
-        self.assertEqual(entries[0]["skills"], ["./skills/recognitio/"])
         self.assertEqual(entries[0]["source"], "./")
         self.assertFalse(entries[0]["strict"])
+        # The entry carries no skills field of its own. The plugin
+        # manifest lists the skill path, and a marketplace entry
+        # that also declares skills beside strict false conflicts
+        # with that manifest and stops the plugin loading.
+        self.assertNotIn("skills", entries[0])
 
 
 class TestCheckPacket(unittest.TestCase):

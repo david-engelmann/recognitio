@@ -2,11 +2,11 @@
 
 This index encodes the incidents the audit program actually
 found, from the first cycle through round 1, and maps each one
-to the regression test or fixture that now covers it. A test
-name in this file was checked against the suite in the same
+to the regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
-incident has no honest entry here, and that gap is the finding
-the next round should raise.
+incident is recorded here as uncovered, with the gap stated in
+the open, and that gap is the finding the next round should
+raise.
 
 The corpus is an index today rather than a second suite, because
 the incidents already live as regression tests in the suite that

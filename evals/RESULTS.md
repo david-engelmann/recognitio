@@ -78,7 +78,7 @@ This is a small run and its limits are part of the result. Four
 tasks and eight defects cannot carry a rate anyone should quote
 beyond this repo. One reviewer ran both passes and graded both
 passes, so the grading is not blind and the passes are not
-independent in the way a two reviewer study would be. The tasks
+independent in the way a two-reviewer study would be. The tasks
 were designed around the packet strengths, because the point of
 the run is to measure the claimed delta, and a task set built
 from ordinary review work would show a smaller one. The packet

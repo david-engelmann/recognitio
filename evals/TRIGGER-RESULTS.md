@@ -26,7 +26,7 @@ a future run with fresh judges could move them.
 
 ## Outcome
 
-The should trigger queries scored 10 of 10 in every pass. Every
+The queries that should trigger the skill scored 10 of 10 in every pass. Every
 phrasing that asks for extraction, a packet, a re-review after
 new commits, or a completeness confirmation routed to the skill
 under the shipped text.

@@ -174,6 +174,12 @@ def display_path(path):
             out.append("\\t")
         elif ord(char) < 32 or ord(char) == 127:
             out.append("\\x%02x" % ord(char))
+        elif char in ("\u0085", "\u2028", "\u2029"):
+            # Unicode line separators split lines for many readers
+            # even though they are not newline characters, so a
+            # name carrying one would print a second line that
+            # looks like packet structure to those readers.
+            out.append("\\u%04x" % ord(char))
         else:
             out.append(char)
     return "".join(out)

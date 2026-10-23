@@ -1,0 +1,10 @@
+{
+  "base": {
+    "data.py": "from report import render\n\n\ndef show():\n    return render()\n",
+    "report.py": "def render():\n    return \"ok\"\n"
+  },
+  "head": {
+    "data.py": "from report import render\n\n\ndef show():\n    return render()\n",
+    "report.py": "from data import show\n\n\ndef render():\n    return \"OK \"\n"
+  }
+}

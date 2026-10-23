@@ -1,1 +1,19 @@
-{"metadata":{"description":"The marketplace listing for the recognitio skill.","version":"1.3.0"},"name":"recognitio-marketplace","owner":{"name":"David Engelmann"},"plugins":[{"description":"Assembles a pull request or a commit range from a local clone into one verified review packet, so a review starts from evidence instead of a bare diff.","name":"recognitio","skills":["./skills/recognitio/"],"source":"./","strict":false,"version":"1.3.0"}]}
+{
+  "metadata": {
+    "description": "The marketplace listing for the recognitio skill.",
+    "version": "1.3.0"
+  },
+  "name": "recognitio-marketplace",
+  "owner": {
+    "name": "David Engelmann"
+  },
+  "plugins": [
+    {
+      "description": "Assembles a pull request or a commit range from a local clone into one verified review packet, so a review starts from evidence instead of a bare diff.",
+      "name": "recognitio",
+      "source": "./",
+      "strict": false,
+      "version": "1.3.0"
+    }
+  ]
+}

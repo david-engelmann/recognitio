@@ -1,0 +1,12 @@
+{
+  "base": {
+    "parse.py": "def parse_port(text):\n    return int(text)\n",
+    "server.py": "from parse import parse_port\n\n\ndef start(text):\n    return parse_port(text)\n",
+    "test_parse.py": "import pytest\n\nfrom parse import parse_port\n\n\ndef test_bad_port_raises():\n    with pytest.raises(ValueError):\n        parse_port(\"abc\")\n"
+  },
+  "head": {
+    "parse.py": "def parse_port(text):\n    if not text.isdigit():\n        return None\n    return int(text) + 1\n",
+    "server.py": "from parse import parse_port\n\n\ndef start(text):\n    return parse_port(text)\n",
+    "test_parse.py": "import pytest\n\nfrom parse import parse_port\n\n\ndef test_bad_port_raises():\n    with pytest.raises(ValueError):\n        parse_port(\"abc\")\n"
+  }
+}
