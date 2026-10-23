@@ -2061,5 +2061,133 @@ class TestRound2CompanionScaling(unittest.TestCase):
             self.assertIn("Call sites for func0 in mod0.py", text)
 
 
+class TestRound3TestSectionDedupe(unittest.TestCase):
+    """One test line is one piece of evidence (RT3-01)."""
+
+    def test_a_line_matching_several_terms_prints_once_before_the_cap(self):
+        test_file = (
+            "from util import add, add_tax\n"
+            "\n"
+            "\n"
+            "def test_add():\n"
+            "    assert add(2, 3) == 5\n"
+            "    assert add_tax(2, 3) == 8\n"
+            "    assert add(1, 1) == 2\n"
+            "    assert add_tax(1, 1) == 3\n"
+            "    assert add(0, 0) == 0\n"
+            "    assert add_tax(0, 0) == 0\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "util.py": (
+                        "def add(a, b):\n    return a + b\n\n\n"
+                        "def add_tax(a, b):\n    return a + b\n"
+                    ),
+                    "test_util.py": test_file,
+                },
+                {
+                    "util.py": (
+                        "def add(a, b):\n    return a + b + 0\n\n\n"
+                        "def add_tax(a, b):\n    return a + b + 0\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            section = packet.split(
+                "### Test files that mention the changed code", 1
+            )[1].split("## T3 History", 1)[0]
+            # The first line matches the stem and both function
+            # names, yet it is one line of evidence and prints once.
+            self.assertEqual(
+                section.count("1: from util import add, add_tax"), 1,
+                section,
+            )
+            # Seven distinct lines match and the cap counts those
+            # distinct lines, not the nine term by term entries the
+            # section once gathered.
+            self.assertIn(
+                "matches in test_util.py capped at 5 of 7", packet
+            )
+            # The five shown lines are the first five distinct lines,
+            # so the duplicated first line crowded nothing out.
+            self.assertIn("5:     assert add(2, 3) == 5", section)
+            self.assertIn("6:     assert add_tax(2, 3) == 8", section)
+            self.assertIn("7:     assert add(1, 1) == 2", section)
+            self.assertIn("8:     assert add_tax(1, 1) == 3", section)
+            self.assertNotIn("assert add(0, 0) == 0", section)
+
+
+class TestRound3BulkBoundaries(unittest.TestCase):
+    """The bulk matcher agrees with the per term grep (RT3-02)."""
+
+    def test_term_matches_line_holds_non_word_edges_to_boundaries(self):
+        rejected = (
+            (".hidden", "x.hidden"),
+            ("-lead", "x-lead"),
+            ("trail-", "trail-x"),
+            ("foo.", "foo.bar"),
+            ("foo.", "foo.x"),
+            ("caf\u00e9", "caf\u00e9x"),
+            ("\u00e9cole", "x\u00e9cole"),
+        )
+        for term, line in rejected:
+            self.assertFalse(
+                extract_mod.term_matches_line(term, line), (term, line)
+            )
+        accepted = (
+            (".hidden", "a .hidden b"),
+            (".hidden", ".hidden.py"),
+            ("-lead", "a -lead b"),
+            ("trail-", "a trail- b"),
+            ("foo.", "a foo. b"),
+            ("caf\u00e9", "a caf\u00e9 b"),
+            ("\u00e9cole", "\u00e9cole"),
+        )
+        for term, line in accepted:
+            self.assertTrue(
+                extract_mod.term_matches_line(term, line), (term, line)
+            )
+
+    def test_bulk_search_agrees_with_per_term_grep_on_edge_terms(self):
+        corpus = "\n".join([
+            "x.hidden", "a .hidden b", ".hidden.py", "dir/.hidden",
+            "x-lead", "a -lead b", "-leadx",
+            "trail-x", "a trail- b", "trail--",
+            "foo.bar", "foo.x", "a foo. b", "foo..py",
+            "caf\u00e9x", "a caf\u00e9 b", "xcaf\u00e9",
+            "\u00e9cole", "x\u00e9cole", "a \u00e9cole b",
+            "\u00e9colex",
+            "util", "a util b", "xutil",
+            # A false occurrence rides into the bulk output on a
+            # line a companion term truly matches, which is the
+            # only way the bulk filter ever sees it. The per term
+            # search rejects every one of these for the edge term.
+            "util x.hidden", "util x-lead", "util trail-x",
+            "util foo.bar", "util caf\u00e9x", "util x\u00e9cole",
+        ]) + "\n"
+        terms = [
+            ".hidden", "-lead", "trail-", "foo.", "caf\u00e9",
+            "\u00e9cole", "util",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"corpus.txt": corpus}])
+            head = git(repo, "rev-parse", "HEAD")
+            bulk = extract_mod.git_grep_bulk(repo, head, terms)
+            for term in terms:
+                per_term = set(
+                    extract_mod.git_grep_lines(repo, head, term)
+                )
+                self.assertEqual(
+                    set(bulk.get(term, [])), per_term, term
+                )
+                self.assertTrue(per_term, term)
+
+
 if __name__ == "__main__":
     unittest.main()

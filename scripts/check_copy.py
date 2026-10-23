@@ -26,9 +26,11 @@ waiting for someone to remember the list. Every Markdown file in
 the tree is prose, apart from the generated packets saved as eval
 fixtures, which are extractor output and not authored text. The
 description fields of the plugin manifests are prose a reader
-meets in a listing, so they are scanned as values. The YAML files
-whose values are prose are scanned as YAML, and the files whose
-prose lives in hash comments are scanned by comment span.
+meets in a listing, so they are scanned as values. Every YAML
+file in the tree is discovered by the same rule as the Markdown
+files and scanned as YAML, apart from the files in the comment
+span class, whose values are code and whose prose lives in hash
+comments, and those are scanned by comment span.
 
 Exits nonzero and lists every violation when the bar is broken.
 """
@@ -40,42 +42,82 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def is_fence_excluded(root, path):
+    """Whether a path stands outside the fence by the shared rule.
+
+    Local dependency and tool directories are not authored prose,
+    so a file under a hidden directory other than the GitHub
+    config directory, or under a node_modules directory, stays
+    outside the fence, and so does a symlink whose target leaves
+    the tree. The generated eval packets stay outside it for the
+    reason the module docstring records. Discovery and the fence
+    completeness walk in the gate tests both call this one
+    predicate, so the two can never encode opposite rules for
+    the same locations again.
+    """
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        return True
+    parts = rel.parts
+    if any(
+        part == "node_modules"
+        or (part.startswith(".") and part != ".github")
+        for part in parts[:-1]
+    ):
+        return True
+    if len(parts) == 4 and parts[:2] == ("evals", "tasks") \
+            and parts[3] == "packet.md":
+        return True
+    if path.is_symlink():
+        try:
+            path.resolve().relative_to(root.resolve())
+        except ValueError:
+            return True
+    return False
+
+
+def is_comment_span_file(root, path):
+    """Whether a file is scanned by comment span rather than as prose.
+
+    The dependabot config and the workflow files carry code in
+    their values, so their prose lives in their hash comments and
+    the comment span scan is the scan that reaches them. The
+    Makefile and the gitignore stand in the same class.
+    """
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        return False
+    if rel == Path(".github") / "dependabot.yml":
+        return True
+    if rel.parent == Path(".github") / "workflows" \
+            and path.suffix in (".yml", ".yaml"):
+        return True
+    return rel in (Path("Makefile"), Path(".gitignore"))
+
+
 def discover_prose_files(root=None):
     """Every authored prose file the bar reaches, found by rule.
 
-    Local dependency and tool directories are not authored prose,
-    so a Markdown file under a hidden directory other than the
-    GitHub config directory, or under a node_modules directory,
-    stays outside the fence, and so does a symlink whose target
-    leaves the tree. The generated eval packets stay outside it
-    for the reason the module docstring records.
+    Markdown files and YAML files are discovered the same way,
+    by location and suffix under the shared exclusion rule, so a
+    new YAML surface joins the fence by construction just as a
+    new Markdown file does. YAML files in the comment span class
+    stay out of this set because that scan already reaches them.
     """
     root = ROOT if root is None else root
     found = []
-    for path in sorted(root.rglob("*.md")):
-        rel = path.relative_to(root)
-        parts = rel.parts
-        if any(
-            part == "node_modules"
-            or (part.startswith(".") and part != ".github")
-            for part in parts[:-1]
-        ):
+    candidates = []
+    for pattern in ("*.md", "*.yml", "*.yaml"):
+        candidates.extend(root.rglob(pattern))
+    for path in sorted(set(candidates)):
+        if is_fence_excluded(root, path):
             continue
-        if len(parts) == 4 and parts[:2] == ("evals", "tasks") \
-                and parts[3] == "packet.md":
+        if path.suffix in (".yml", ".yaml") \
+                and is_comment_span_file(root, path):
             continue
-        if path.is_symlink():
-            try:
-                path.resolve().relative_to(root.resolve())
-            except ValueError:
-                continue
         found.append(path)
-    for extra in (
-        root / ".github" / "ISSUE_TEMPLATE" / "config.yml",
-        root / ".coderabbit.yaml",
-    ):
-        if extra.is_file():
-            found.append(extra)
     return sorted(found)
 
 

@@ -42,8 +42,14 @@ as a finding.
 
 A review report opens with a summary and groups its findings by
 severity. Every finding carries its evidence and its impact and
-closes with an action item. The template below is the shape a
-report follows in this repo.
+closes with an action item. The checked record at the end of the
+report also carries a findings disposition count in four parts,
+covering how many findings were fixed, how many were wrong, how
+many describe behaviour that is intentional, and how many were
+not worth the change they asked for. That count is the standing
+signal for whether review findings earn their place, and every
+report that follows the template adds one more record of it.
+The template below is the shape a report follows in this repo.
 
 ```
 # Review of the change under review
@@ -84,6 +90,9 @@ At most three, under the nit cap above.
 
 The packet the review ran on, with its base and head, and the
 commands that were run and their exit codes.
+
+Findings disposition. Fixed 0. Wrong 0. Intentional 0. Not
+worth it 0.
 ```
 
 ## The stopping rule

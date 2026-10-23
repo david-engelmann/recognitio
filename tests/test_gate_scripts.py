@@ -220,16 +220,36 @@ class TestCheckCopy(unittest.TestCase):
     def test_fence_covers_every_authored_prose_file_in_the_tree(self):
         covered = {str(p.relative_to(ROOT)) for p in self.mod.PROSE_FILES}
         authored = set()
-        for path in ROOT.rglob("*.md"):
-            if ".git" in path.parts:
-                continue
-            rel = path.relative_to(ROOT)
-            if len(rel.parts) == 4 and rel.parts[:2] == ("evals", "tasks") \
-                    and rel.parts[3] == "packet.md":
-                continue
-            authored.add(str(rel))
+        authored_yaml = set()
+        # The walk shares the one exclusion predicate the discovery
+        # function uses, so a file under a hidden directory or a
+        # node_modules directory is outside both or inside both and
+        # the two rules can never contradict each other again.
+        for pattern in ("*.md", "*.yml", "*.yaml"):
+            for path in ROOT.rglob(pattern):
+                if self.mod.is_fence_excluded(ROOT, path):
+                    continue
+                if path.suffix in (".yml", ".yaml") \
+                        and self.mod.is_comment_span_file(ROOT, path):
+                    continue
+                rel = str(path.relative_to(ROOT))
+                authored.add(rel)
+                if path.suffix in (".yml", ".yaml"):
+                    authored_yaml.add(rel)
         self.assertTrue(authored)
+        self.assertTrue(authored_yaml)
         self.assertEqual(authored - covered, set())
+        comment_covered = {
+            str(p.relative_to(ROOT)) for p in self.mod.COMMENT_FILES
+        }
+        for pattern in ("*.yml", "*.yaml"):
+            for path in ROOT.rglob(pattern):
+                if self.mod.is_fence_excluded(ROOT, path):
+                    continue
+                if self.mod.is_comment_span_file(ROOT, path):
+                    self.assertIn(
+                        str(path.relative_to(ROOT)), comment_covered
+                    )
         manifests = {
             str(p.relative_to(ROOT)) for p in self.mod.MANIFEST_FILES
         }
@@ -296,6 +316,100 @@ class TestCheckCopy(unittest.TestCase):
             if linked:
                 self.assertNotIn("docs/linked.md", found)
 
+    def test_discovery_extends_to_new_yaml_files_by_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            form = root / ".github" / "ISSUE_TEMPLATE" / "feature_form.yml"
+            form.parent.mkdir(parents=True)
+            form.write_text("name: Feature\n", encoding="utf-8")
+            settings = root / "docs" / "settings.yml"
+            settings.parent.mkdir(parents=True)
+            settings.write_text("title: Settings\n", encoding="utf-8")
+            notes = root / "notes.yaml"
+            notes.write_text("title: Notes\n", encoding="utf-8")
+            workflow = root / ".github" / "workflows" / "ci.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text("name: ci\n", encoding="utf-8")
+            dependabot = root / ".github" / "dependabot.yml"
+            dependabot.write_text("version: 2\n", encoding="utf-8")
+            hidden = root / ".notes" / "secret.yml"
+            hidden.parent.mkdir(parents=True)
+            hidden.write_text("title: Secret\n", encoding="utf-8")
+            modules = root / "node_modules" / "pkg" / "conf.yml"
+            modules.parent.mkdir(parents=True)
+            modules.write_text("title: Package\n", encoding="utf-8")
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertIn(".github/ISSUE_TEMPLATE/feature_form.yml", found)
+            self.assertIn("docs/settings.yml", found)
+            self.assertIn("notes.yaml", found)
+            self.assertNotIn(".github/workflows/ci.yml", found)
+            self.assertNotIn(".github/dependabot.yml", found)
+            self.assertNotIn(".notes/secret.yml", found)
+            self.assertNotIn("node_modules/pkg/conf.yml", found)
+            comments = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_comment_files(root)
+            }
+            self.assertIn(".github/workflows/ci.yml", comments)
+            self.assertIn(".github/dependabot.yml", comments)
+
+    def test_a_new_yaml_issue_form_joins_the_fence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            form = root / ".github" / "ISSUE_TEMPLATE" / "feature_form.yml"
+            form.parent.mkdir(parents=True)
+            form.write_text(
+                "name: Feature\n"
+                "description: Ask for a thing %s in plain words.\n"
+                % EM_DASH,
+                encoding="utf-8",
+            )
+            found = self.mod.discover_prose_files(root)
+            self.assertIn(form, found)
+            self.assertEqual(self.run_main_on(found), 1)
+
+    def test_the_walk_and_discovery_share_one_exclusion_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "note.md").write_text(
+                "A note.\n", encoding="utf-8"
+            )
+            (root / "docs" / "settings.yml").write_text(
+                "title: Settings\n", encoding="utf-8"
+            )
+            hidden = root / ".notes"
+            hidden.mkdir()
+            (hidden / "draft.md").write_text("A draft.\n", encoding="utf-8")
+            (hidden / "secret.yml").write_text(
+                "title: Secret\n", encoding="utf-8"
+            )
+            modules = root / "node_modules" / "pkg"
+            modules.mkdir(parents=True)
+            (modules / "README.md").write_text(
+                "Package docs.\n", encoding="utf-8"
+            )
+            walked = set()
+            for pattern in ("*.md", "*.yml", "*.yaml"):
+                for path in root.rglob(pattern):
+                    if self.mod.is_fence_excluded(root, path):
+                        continue
+                    if path.suffix in (".yml", ".yaml") \
+                            and self.mod.is_comment_span_file(root, path):
+                        continue
+                    walked.add(str(path.relative_to(root)))
+            discovered = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertEqual(walked, discovered)
+            self.assertEqual(
+                walked, {"docs/note.md", "docs/settings.yml"}
+            )
+
     def test_manifest_discovery_returns_missing_paths_for_the_caller(self):
         with tempfile.TemporaryDirectory() as tmp:
             found = self.mod.discover_manifest_files(Path(tmp))
@@ -335,6 +449,15 @@ class TestCheckCopy(unittest.TestCase):
                 "tone: \"Be direct and plain.\"\n",
             )
             self.assertEqual(self.run_main_on([path]), 0)
+
+
+class TestEvalDocs(unittest.TestCase):
+    def test_the_runner_note_describes_the_current_method(self):
+        text = (ROOT / "evals" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("Run the three passes in a fixed order", text)
+        self.assertIn("fair raw pass", text)
+        self.assertIn("clean control", text)
+        self.assertNotIn("Run the two passes", text)
 
 
 class TestCheckSkill(unittest.TestCase):
@@ -510,6 +633,23 @@ class TestCheckVersion(unittest.TestCase):
             with self.assertRaises(ValueError) as caught:
                 self.mod.marketplace_versions(text)
             self.assertIn("no plugins", str(caught.exception))
+
+    def test_a_unicode_digit_version_is_not_a_version(self):
+        mixed = "1\u0663.3.0"
+        self.assertFalse(self.mod.VERSION_RE.fullmatch(mixed))
+        problems = self.mod.coherence_problems({
+            "plugin.json": mixed,
+            "EXTRACTOR_VERSION": mixed,
+        })
+        self.assertTrue(
+            any("not a version" in p for p in problems), problems
+        )
+        text = (
+            "## [Unreleased]\n\nThis work carries version %s.\n" % mixed
+        )
+        self.assertIsNone(self.mod.changelog_version(text))
+        released = "## [%s] - 2026-01-01\n" % mixed
+        self.assertIsNone(self.mod.changelog_version(released))
 
     def test_a_leading_zero_version_is_not_a_version(self):
         problems = self.mod.coherence_problems({

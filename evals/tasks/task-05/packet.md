@@ -3,9 +3,9 @@
 A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
 
 Mode: range
-Base: 3f80507942e960215635593b9a92438e7b065818
-Head: 21ec2aa7a91343c9bdf487a872593b5067c07c06
-Merge base: 3f80507942e960215635593b9a92438e7b065818
+Base: 8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672
+Head: 02fad663e902bb34aed684684c4897fd42aaa34d
+Merge base: 8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672
 Verified: yes
 
 ## T0 Triage
@@ -27,7 +27,7 @@ Files changed: 2
 ### Commits
 
 ```
-21ec2aa commit
+02fad66 commit
 ```
 
 ## T1 The change
@@ -119,7 +119,6 @@ No definitions of the changed names were found outside the changed files.
 
 ```
 1: from util import add
-1: from util import add
 5:     assert add(2, 3) == 5
 ```
 
@@ -130,13 +129,13 @@ No definitions of the changed names were found outside the changed files.
 #### page.py
 
 ```
-Test User 21ec2aa7 lines 2
+Test User 02fad663 lines 2
 ```
 
 #### util.py
 
 ```
-Test User 21ec2aa7 lines 4
+Test User 02fad663 lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -144,7 +143,7 @@ Test User 21ec2aa7 lines 4
 #### heading_total in page.py
 
 ```
-commit 21ec2aa commit
+commit 02fad66 commit
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -153,7 +152,7 @@ diff --git a/page.py b/page.py
  def heading_total(qty, rate):
 -    return add(qty, rate)
 +    return add_tax(qty, rate)
-commit 3f80507 commit
+commit 8a00e5b commit
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -166,7 +165,7 @@ diff --git a/page.py b/page.py
 #### add in util.py
 
 ```
-commit 21ec2aa commit
+commit 02fad66 commit
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -176,7 +175,7 @@ diff --git a/util.py b/util.py
      return a + b
 +
 +
-commit 3f80507 commit
+commit 8a00e5b commit
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -189,7 +188,7 @@ diff --git a/util.py b/util.py
 #### add_tax in util.py
 
 ```
-commit 21ec2aa commit
+commit 02fad66 commit
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -208,10 +207,10 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 ## Budget and completeness
 
 Budget in tokens: none set
-Packet estimate in tokens: 975
+Packet estimate in tokens: 969
 T0 included at about 42 tokens across 2 files
 T1 included at about 153 tokens across 2 files
-T2 included at about 229 tokens across 2 files
+T2 included at about 223 tokens across 2 files
 T3 included at about 365 tokens across 2 files
 No tier was dropped.
 

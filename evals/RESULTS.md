@@ -110,6 +110,10 @@ conditions.
 
 ## Run notes
 
+The per pass notes behind this summary stand in PASS-NOTES.md
+in this directory, naming who ran each pass, the condition it
+held and what it reported.
+
 The original paired run over tasks 01 to 04 was run by the
 round 1 fix lane on 2026-10-23. Its method was the two pass
 method the head of this file describes in its original form.

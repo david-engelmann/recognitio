@@ -1,11 +1,11 @@
-# The pericope for range 1741a15b4f3ccc89f0d941cc891c6de2b1ef8786..af640b42bd17ae252ebd7c281314c4f233395f67
+# The pericope for range 29770e45af0a5efaafb3e137e0c5838c00da8356..1af217a2cd63627221e0d42d165c13728f530bb1
 
 A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
 
 Mode: range
-Base: 1741a15b4f3ccc89f0d941cc891c6de2b1ef8786
-Head: af640b42bd17ae252ebd7c281314c4f233395f67
-Merge base: 1741a15b4f3ccc89f0d941cc891c6de2b1ef8786
+Base: 29770e45af0a5efaafb3e137e0c5838c00da8356
+Head: 1af217a2cd63627221e0d42d165c13728f530bb1
+Merge base: 29770e45af0a5efaafb3e137e0c5838c00da8356
 Verified: yes
 
 ## T0 Triage
@@ -25,7 +25,7 @@ Files changed: 1
 ### Commits
 
 ```
-af640b4 change under review
+1af217a change under review
 ```
 
 ## T1 The change
@@ -83,7 +83,6 @@ No definitions of the changed names were found outside the changed files.
 
 ```
 1: from calc import price
-1: from calc import price
 5:     assert price(2, 3) == 6
 ```
 
@@ -94,7 +93,7 @@ No definitions of the changed names were found outside the changed files.
 #### calc.py
 
 ```
-Eval Fixture af640b42 lines 2
+Eval Fixture 1af217a2 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -102,7 +101,7 @@ Eval Fixture af640b42 lines 2
 #### price in calc.py
 
 ```
-commit af640b4 change under review
+commit 1af217a change under review
 
 diff --git a/calc.py b/calc.py
 --- a/calc.py
@@ -112,7 +111,7 @@ diff --git a/calc.py b/calc.py
 -    return qty * rate
 +def price(qty, rate, tax):
 +    return qty * rate + tax + tax
-commit 1741a15 base
+commit 29770e4 base
 
 diff --git a/calc.py b/calc.py
 --- /dev/null
@@ -131,10 +130,10 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 ## Budget and completeness
 
 Budget in tokens: none set
-Packet estimate in tokens: 752
+Packet estimate in tokens: 745
 T0 included at about 37 tokens across 1 files
 T1 included at about 85 tokens across 1 files
-T2 included at about 193 tokens across 1 files
+T2 included at about 186 tokens across 1 files
 T3 included at about 234 tokens across 1 files
 No tier was dropped.
 

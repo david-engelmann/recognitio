@@ -1,11 +1,11 @@
-# The pericope for range e637a54d903236c06074e403a16376d8d43d1600..770c08cd14543db9ee83ee2f14df6d3d3cd02151
+# The pericope for range 9a422a7c8fdb57efb50b1fa93ba604bb52712e99..d6af5760ead34f0b2cf23e7dd2d643eaf28bfa4d
 
 A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
 
 Mode: range
-Base: e637a54d903236c06074e403a16376d8d43d1600
-Head: 770c08cd14543db9ee83ee2f14df6d3d3cd02151
-Merge base: e637a54d903236c06074e403a16376d8d43d1600
+Base: 9a422a7c8fdb57efb50b1fa93ba604bb52712e99
+Head: d6af5760ead34f0b2cf23e7dd2d643eaf28bfa4d
+Merge base: 9a422a7c8fdb57efb50b1fa93ba604bb52712e99
 Verified: yes
 
 ## T0 Triage
@@ -25,7 +25,7 @@ Files changed: 1
 ### Commits
 
 ```
-770c08c change under review
+d6af576 change under review
 ```
 
 ## T1 The change
@@ -85,7 +85,6 @@ No definitions of the changed names were found outside the changed files.
 
 ```
 3: from parse import parse_port
-3: from parse import parse_port
 8:         parse_port("abc")
 ```
 
@@ -96,7 +95,7 @@ No definitions of the changed names were found outside the changed files.
 #### parse.py
 
 ```
-Eval Fixture 770c08cd lines 3
+Eval Fixture d6af5760 lines 3
 ```
 
 ### Recent evolution of changed functions
@@ -104,7 +103,7 @@ Eval Fixture 770c08cd lines 3
 #### parse_port in parse.py
 
 ```
-commit 770c08c change under review
+commit d6af576 change under review
 
 diff --git a/parse.py b/parse.py
 --- a/parse.py
@@ -115,7 +114,7 @@ diff --git a/parse.py b/parse.py
 +    if not text.isdigit():
 +        return None
 +    return int(text) + 1
-commit e637a54 base
+commit 9a422a7 base
 
 diff --git a/parse.py b/parse.py
 --- /dev/null
@@ -134,10 +133,10 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 ## Budget and completeness
 
 Budget in tokens: none set
-Packet estimate in tokens: 783
+Packet estimate in tokens: 775
 T0 included at about 37 tokens across 1 files
 T1 included at about 89 tokens across 1 files
-T2 included at about 214 tokens across 1 files
+T2 included at about 206 tokens across 1 files
 T3 included at about 240 tokens across 1 files
 No tier was dropped.
 

@@ -1249,9 +1249,12 @@ def term_matches_line(term, content):
 
     This mirrors the word match the grep flags ask git for, so a
     bulk search can hand each candidate line to the terms it truly
-    matches. A match must sit between two non word characters or
-    the edges of the line, at each end where the term itself ends
-    in a word character.
+    matches. The grep word rule checks both ends of every match,
+    whatever characters the term itself begins or ends with. The
+    character before the match and the character after it must
+    each be a non word character or the edge of the line, so a
+    term that begins with a dot or ends with a hyphen is held to
+    the same boundaries as a plain name.
     """
     if not term:
         return False
@@ -1260,13 +1263,9 @@ def term_matches_line(term, content):
         index = content.find(term, start)
         if index == -1:
             return False
-        before_ok = True
-        if term[0] in _WORD_CHARS and index > 0:
-            before_ok = content[index - 1] not in _WORD_CHARS
+        before_ok = index == 0 or content[index - 1] not in _WORD_CHARS
         after = index + len(term)
-        after_ok = True
-        if term[-1] in _WORD_CHARS and after < len(content):
-            after_ok = content[after] not in _WORD_CHARS
+        after_ok = after == len(content) or content[after] not in _WORD_CHARS
         if before_ok and after_ok:
             return True
         start = index + 1
@@ -1508,7 +1507,16 @@ def test_files_section(repo, head, files, functions_by_file, notes,
         for term in terms:
             for hit_path, hit_line, content in hits_by_term.get(term, []):
                 if is_test_path(hit_path) and hit_path not in changed_paths:
-                    test_hits.setdefault(hit_path, []).append(
+                    # One line is one piece of evidence however many
+                    # of the terms match it. Hits are deduped by path
+                    # and line here, before the cap below applies, so
+                    # the cap and its note count distinct lines and a
+                    # line that matches several terms cannot crowd
+                    # distinct lines out of the section. The section
+                    # sorts each file's hits before display, so a set
+                    # per file loses no ordering and membership stays
+                    # constant time however many lines match.
+                    test_hits.setdefault(hit_path, set()).add(
                         (hit_line, content)
                     )
     lines.append("### Test files that mention the changed code")
