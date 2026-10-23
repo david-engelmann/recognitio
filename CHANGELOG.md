@@ -149,6 +149,27 @@ This unreleased work carries version 1.3.0.
   from the template in REVIEW.md at
   `docs/reviews/round7-fix-review.md` with a real four way
   disposition count of its own findings.
+- An eval integrity gate at `scripts/check_evals.py`, wired
+  into the check beside the copy fence. The gate reads a
+  checksum record at `evals/checksums.json` over every eval
+  artefact file under `evals/tasks/` and over the results
+  file and the per pass notes, checks the results totals
+  against the per task entries the results table prints,
+  rebuilds every task diff and manifest from its sources
+  file and runs the shipped packet checker over each rebuilt
+  packet, and fails when the corpus index cites a test name
+  the suite no longer holds. A deliberate eval update
+  refreshes the checksum record by running the gate script
+  with its write flag and committing the record beside the
+  artefacts it covers.
+- A round 8 section in the corpus index, mapping each
+  incident of that round to its covering tests by exact name
+  and recording the record only repairs of the round as
+  uncovered in the open.
+- A review report for the round 8 fix change itself, written
+  from the template in REVIEW.md at
+  `docs/reviews/round8-fix-review.md` with a real four way
+  disposition count of its own findings.
 
 ### Fixed
 
@@ -446,3 +467,16 @@ This unreleased work carries version 1.3.0.
   named helpers under the recorded function length ceiling,
   with an AST test pinning that ceiling for the file and no
   change in what the fence flags.
+- The eval artefacts stood outside every gate, so a quiet
+  edit to a transcript fence or a planted grading rule or a
+  recorded results cell left the gate green while the
+  summaries kept asking a reader to trust those files. The
+  eval integrity gate now names the first artefact whose
+  bytes moved off its checksum record and catches a single
+  results cell edit through the totals check even where a
+  checksum refresh would hide it.
+- The corpus index discipline stood as a manual check, so
+  renaming a cited test orphaned its corpus rows in silence
+  while the suite count gave no signal. The eval gate now
+  extracts the test names the index cites and fails with
+  the missing names listed.

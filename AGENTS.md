@@ -27,8 +27,14 @@ The first command is the full gate and the second is the narrow form
 to use while working. The gate runs the extractor test suite, the
 skill validator at `scripts/check_skill.py`, the version coherence
 check at `scripts/check_version.py`, the copy bar scan at
-`scripts/check_copy.py`, and an end to end extractor smoke that must
-produce a verified manifest. CI runs the gate word for word and
+`scripts/check_copy.py`, the eval integrity check at
+`scripts/check_evals.py`, and an end to end extractor smoke that must
+produce a verified manifest. The eval integrity check reads the
+checksum record at `evals/checksums.json` over the eval artefacts
+and fails on the first file whose bytes moved. A deliberate eval
+update refreshes that record by running
+`python3 scripts/check_evals.py --write-checksums` and committing
+the record beside the artefacts it covers. CI runs the gate word for word and
 adds one job with no local step. That job checks the Signed-off-by
 trailer on pull request commits, and a green local run says nothing
 about it. Green local gates first, then merge. CI is a backstop,
@@ -174,6 +180,11 @@ as well as characters, rested the re-review verdict on the
 content change of the anchored lines with line endings
 normalised away, and lifted the stateful YAML reader of
 the copy fence into named helpers under the recorded
-function ceiling. The owner dropped
+function ceiling. The round 8 pass then pinned the eval
+artefacts under a checksum record with a totals check on
+the recorded results and a rebuild of every task diff and
+manifest from its sources, and turned the corpus index
+discipline into a gate check that fails when a cited test
+name leaves the suite. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
 branch the same evening. No release has been tagged yet.

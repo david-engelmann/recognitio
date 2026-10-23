@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -1477,6 +1478,158 @@ class TestDcoWorkflow(unittest.TestCase):
             "github.actor != 'dependabot[bot]'",
             workflow,
         )
+
+
+class TestCheckEvals(unittest.TestCase):
+    def setUp(self):
+        self.mod = load_script("check_evals")
+
+    def copy_fixture(self, tmp):
+        root = Path(tmp) / "root"
+        shutil.copytree(ROOT / "evals", root / "evals")
+        shutil.copytree(ROOT / "tests", root / "tests")
+        shutil.copytree(ROOT / "scripts", root / "scripts")
+        skill_scripts = (
+            root / "skills" / "recognitio" / "scripts"
+        )
+        skill_scripts.mkdir(parents=True)
+        shutil.copy2(
+            ROOT / "skills" / "recognitio" / "scripts" / "extract.py",
+            skill_scripts / "extract.py",
+        )
+        return root
+
+    def test_the_real_eval_artefacts_pass(self):
+        self.assertEqual(self.mod.all_problems(ROOT), [])
+
+    def test_a_transcript_edit_fails_naming_its_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-06" / "transcripts.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "Finding 2. The file is renamed from ledger.py to "
+                "book.py, so anything importing the old module name "
+                "will break. I cannot name an importer, because the "
+                "diff shows no other file. This is a warning, not a "
+                "placed finding.",
+                "Finding 2. report.py line 1 reads from ledger "
+                "import total, so that import names a module that "
+                "no longer exists and report.py breaks.",
+            )
+            self.assertIn("report.py line 1 reads", text)
+            target.write_text(text, encoding="utf-8")
+            problems = self.mod.checksum_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn(
+                "evals/tasks/task-06/transcripts.md", problems[0]
+            )
+
+    def test_a_planted_rule_edit_fails_naming_its_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-02" / "planted.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "A pass finds this only when it names the test "
+                "expectation or the unchecked caller in server.py.",
+                "A pass finds this when it notes the behaviour "
+                "change in general words.",
+            )
+            self.assertIn("in general words", text)
+            target.write_text(text, encoding="utf-8")
+            problems = self.mod.checksum_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn(
+                "evals/tasks/task-02/planted.md", problems[0]
+            )
+
+    def test_a_results_cell_edit_fails_the_totals_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "RESULTS.md"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "| task-01 | 2 | 1 | 2 |",
+                "| task-01 | 2 | 2 | 2 |",
+            )
+            self.assertIn("| task-01 | 2 | 2 | 2 |", text)
+            target.write_text(text, encoding="utf-8")
+            problems = self.mod.results_problems(root)
+            self.assertTrue(problems)
+            self.assertIn("total row states 4", problems[0])
+            named = self.mod.checksum_problems(root)
+            self.assertEqual(len(named), 1)
+            self.assertIn("evals/RESULTS.md", named[0])
+
+    def test_a_tampered_diff_fails_the_rebuild(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-01" / "diff.patch"
+            data = target.read_bytes()
+            target.write_bytes(data.replace(b"tax + tax", b"tax + fee"))
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any(
+                    "task-01" in problem and "byte for byte" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_the_checksum_record_regenerates_and_then_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "tasks" / "task-03" / "planted.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(text + "\nA deliberate note.\n",
+                              encoding="utf-8")
+            self.assertEqual(len(self.mod.checksum_problems(root)), 1)
+            original = self.mod.ROOT
+            self.mod.ROOT = root
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main(["--write-checksums"])
+            finally:
+                self.mod.ROOT = original
+            self.assertEqual(code, 0)
+            self.assertEqual(self.mod.checksum_problems(root), [])
+
+    def test_a_renamed_cited_test_fails_the_corpus_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "tests" / "test_gate_scripts.py"
+            text = target.read_text(encoding="utf-8")
+            text = text.replace(
+                "def test_the_real_skill_package_is_valid",
+                "def test_the_real_skill_package_stays_valid",
+            )
+            self.assertIn(
+                "test_the_real_skill_package_stays_valid", text
+            )
+            target.write_text(text, encoding="utf-8")
+            problems = self.mod.corpus_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn(
+                "test_the_real_skill_package_is_valid", problems[0]
+            )
+
+    def test_a_corpus_name_that_never_existed_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA row citing "
+                "`test_a_name_that_never_existed` in the gate "
+                "script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.corpus_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
 
 
 if __name__ == "__main__":
