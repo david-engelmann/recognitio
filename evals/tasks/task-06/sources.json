@@ -1,0 +1,12 @@
+{
+  "base": {
+    "ledger.py": "\"\"\"Ledger helpers.\"\"\"\n\n\ndef total(items):\n    subtotal = sum(items)\n    return subtotal\n",
+    "report.py": "from ledger import total\n\n\ndef grand(items):\n    return total(items)\n",
+    "test_ledger.py": "from ledger import total\n\n\ndef test_total():\n    assert total([1, 2]) == 3\n"
+  },
+  "head": {
+    "book.py": "\"\"\"Ledger helpers.\"\"\"\n\n\ndef total(items):\n    subtotal = sum(items)\n    return subtotal + subtotal\n",
+    "report.py": "from ledger import total\n\n\ndef grand(items):\n    return total(items)\n",
+    "test_ledger.py": "from ledger import total\n\n\ndef test_total():\n    assert total([1, 2]) == 3\n"
+  }
+}

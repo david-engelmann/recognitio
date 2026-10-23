@@ -155,3 +155,37 @@ raw condition found 4 of 8 and the packet condition found 8
 of 8, with the split tied at 4 of 4 inside the diff and split
 at 0 of 4 against 4 of 4 on unchanged files, and no number in
 RESULTS.md moves on this evidence.
+
+## The round 6 passes over the replay task-06
+
+The round 6 fix lane ran these passes on 2026-10-23. The task
+is a replay of a real merged pull request, built at fixture
+scale from pull request 9 and its finding R4-01, and its
+planted file says so in the open. The lane that ran both
+passes also built the task, so these passes stand as a
+protocol demonstration graded under the rule in the planted
+file rather than as blind evidence, in the same terms the
+round 2 passes over the earlier tasks record for themselves.
+The full verbatim transcripts of both passes stand in
+transcripts.md inside the task-06 folder, and this entry is
+the summary that points at them.
+
+The raw pass held only the diff.patch file. It found the
+doubled subtotal in the changed return line of book.py and
+warned that importers of the old module name would break,
+without naming any importer, so the unchanged file defect
+does not count as found. The raw pass reported 1 of 2 planted
+defects.
+
+The packet pass held only the packet.md file, produced by the
+shipped extractor with a verified manifest. It named
+report.py line 1 importing the old module name ledger after
+the triage tier showed that module renamed to book.py, with
+test_ledger.py line 1 carrying the same stale import in the
+test files section, and it found the doubled subtotal. The
+packet pass reported 2 of 2 planted defects.
+
+Task-06 stands as an additional task beside the scored set.
+Its numbers join no headline total in RESULTS.md, so the
+recorded numbers over tasks 01 to 05 stay reproducible as
+they stand.

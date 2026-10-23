@@ -1,0 +1,89 @@
+{
+  "extractor": "recognitio extract.py",
+  "version": "1.3.0",
+  "command": [
+    "extract.py",
+    "--repo",
+    "/home/hatch/workspace/recognitio-r6-eval06/repo",
+    "--range",
+    "2d141304d648c099f9ba3359fcb92481335ec5dd..ee149ede0b1666c511ac14ecea8870f2c9527554",
+    "--out",
+    "/home/hatch/workspace/recognitio-r6-eval06/packet"
+  ],
+  "created_utc": "2026-10-23T12:10:05.405477+00:00",
+  "mode": "range",
+  "label": "range 2d141304d648c099f9ba3359fcb92481335ec5dd..ee149ede0b1666c511ac14ecea8870f2c9527554",
+  "base": "2d141304d648c099f9ba3359fcb92481335ec5dd",
+  "head": "ee149ede0b1666c511ac14ecea8870f2c9527554",
+  "merge_base": "2d141304d648c099f9ba3359fcb92481335ec5dd",
+  "since": null,
+  "pr": null,
+  "files": [
+    {
+      "path": "book.py",
+      "old_path": "ledger.py",
+      "status": "renamed",
+      "status_code": "R068",
+      "additions": 1,
+      "deletions": 1,
+      "hunks": 1,
+      "binary": false,
+      "attribute_text": false,
+      "binary_transition": false,
+      "placeholder": null,
+      "instruction_file": false
+    }
+  ],
+  "exclusions": [],
+  "selected_tiers": [
+    "T0",
+    "T1",
+    "T2",
+    "T3"
+  ],
+  "tiers": {
+    "T0": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 48,
+      "emitted_tokens": 48,
+      "files": 1
+    },
+    "T1": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 105,
+      "emitted_tokens": 105,
+      "files": 1
+    },
+    "T2": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 195,
+      "emitted_tokens": 195,
+      "files": 1
+    },
+    "T3": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 245,
+      "emitted_tokens": 245,
+      "files": 1
+    }
+  },
+  "sections": [
+    "## T0 Triage",
+    "## T1 The change",
+    "## T2 Companions",
+    "## T3 History",
+    "## Budget and completeness"
+  ],
+  "budget": {
+    "budget_tokens": null,
+    "estimated_tokens": 796,
+    "dropped": []
+  },
+  "cap_notes": [],
+  "verified": true,
+  "discrepancies": []
+}

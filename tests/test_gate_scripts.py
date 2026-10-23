@@ -492,6 +492,151 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertEqual(self.run_main_on([path]), 1)
 
+    def test_wide_key_shapes_are_structure_not_prose(self):
+        shapes = (
+            "app.name: myapp\n",
+            "404: missing page\n",
+            "my key: some value\n",
+            "\"my key\": some value\n",
+            "'my key': some value\n",
+            "a/b: some value\n",
+            "2fa: enabled\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 0, text)
+
+    def test_a_prose_value_after_a_wide_key_still_flags(self):
+        shapes = (
+            "app.name: see the guide: the long version\n",
+            "404: see the guide: the long version\n",
+            "\"my key\": see the guide: the long version\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 1, text)
+
+    def test_flow_collections_after_anchors_and_tags_are_structure(self):
+        shapes = (
+            "point: &anchor {x: 1, y: 2}\n",
+            "point: !!str {x: 1, y: 2}\n",
+            "items:\n  - &anchor {x: 1, y: 2}\n",
+            "point: &anchor\n  x: 1\n  y: 2\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 0, text)
+
+    def test_a_flow_sequence_of_mappings_is_structure_not_prose(self):
+        shapes = (
+            "points: [{x: 1, y: 2}, {x: 3, y: 4}]\n",
+            "items: [{name: alpha}, {name: beta}]\n",
+            "items:\n  - [{x: 1, y: 2}]\n",
+            "- [{x: 1, y: 2}]\n",
+            "names: [alpha, beta]\n",
+            "point: {inner: {x: 1}}\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 0, text)
+
+    def test_a_prose_value_inside_a_flow_sequence_still_flags(self):
+        shapes = (
+            "points: [{label: \"Read: now\"}]\n",
+            "items:\n  - [{label: \"Read: now\"}]\n",
+            "point: &anchor {label: \"Read: now\"}\n",
+            "point: {\"label\":\"Read: now\"}\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 1, text)
+
+    def test_an_apostrophe_in_a_plain_flow_scalar_is_not_a_quote(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "tags: [don't, ok]\n"
+                "next: value\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "tags: [don't, \"Read: now\"]\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_text_after_a_flow_collection_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "ports: [80, 443] # Open: web\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "ports: [80, 443] # Open web\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_a_key_shaped_continuation_of_a_quoted_scalar_still_flags(self):
+        shapes = (
+            "description: \"Long prose starts here\n"
+            "  continues: with words after a key shaped colon\"\n",
+            "description: \"Long prose starts\n"
+            "  Summary: only colon is here\"\n",
+        )
+        for text in shapes:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = self.write_tmp(tmp, "config.yaml", text)
+                self.assertEqual(self.run_main_on([path]), 1, text)
+
+    def test_a_key_shaped_continuation_of_a_plain_scalar_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "description: Long prose starts\n"
+                "  Summary: only colon is here\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_a_key_shaped_line_inside_a_flow_quoted_scalar_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "point: {label: \"Read\n"
+                "  now: the sequel\"}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
+    def test_ordinary_keys_after_a_plain_value_still_parse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "name: Readme\n"
+                "url: https://example.com/readme\n"
+                "about: What the skill does in plain words.\n"
+                "other: true\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_a_multiline_flow_mapping_with_prose_values_still_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "config.yaml",
+                "point: {\n"
+                "  label: \"Read: now\",\n"
+                "  other: \"See: this\"\n"
+                "}\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
     def test_yaml_keys_and_directives_are_syntax(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_tmp(
@@ -546,6 +691,39 @@ class TestCheckSkill(unittest.TestCase):
                 self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
             self.assertEqual(code, 1)
             self.assertIn("over the 1024 limit", captured.getvalue())
+
+    def run_main_on_skill_text(self, text):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp) / "recognitio"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(text, encoding="utf-8")
+            original = (self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT)
+            self.mod.SKILL_DIR = skill_dir
+            self.mod.SKILL_MD = skill_md
+            self.mod.EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+            try:
+                with redirect_stderr(io.StringIO()) as captured:
+                    code = self.mod.main()
+            finally:
+                self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
+            return code, captured.getvalue()
+
+    def test_a_skill_file_past_the_size_limit_fails(self):
+        head = "---\nname: recognitio\ndescription: a packet\n---\n\n"
+        text = head + "x" * (self.mod.SKILL_TEXT_LIMIT + 1 - len(head))
+        self.assertEqual(len(text), self.mod.SKILL_TEXT_LIMIT + 1)
+        code, err = self.run_main_on_skill_text(text)
+        self.assertEqual(code, 1)
+        self.assertIn("over the %d limit" % self.mod.SKILL_TEXT_LIMIT, err)
+        self.assertIn("references file", err)
+
+    def test_a_skill_file_at_the_size_limit_passes(self):
+        head = "---\nname: recognitio\ndescription: a packet\n---\n\n"
+        text = head + "x" * (self.mod.SKILL_TEXT_LIMIT - len(head))
+        self.assertEqual(len(text), self.mod.SKILL_TEXT_LIMIT)
+        code, err = self.run_main_on_skill_text(text)
+        self.assertEqual(code, 0, err)
 
     def test_the_real_skill_package_is_valid(self):
         self.assertEqual(self.mod.main(), 0)
@@ -766,6 +944,79 @@ class TestCheckVersion(unittest.TestCase):
                 ) = original
             return code, captured.getvalue()
 
+    def test_manifest_conflict_problems_names_the_broken_pair(self):
+        plugin = '{"name": "x", "skills": ["./skills/x/"]}'
+        broken = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(plugin, broken)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("strict", problems[0])
+        # A plugin manifest that declares no components at all
+        # still conflicts, because the host treats the entry
+        # components under strict false as a conflict whenever a
+        # plugin manifest stands beside the entry at all. A live
+        # install probe in the round 6 fix lane confirmed the
+        # metadata only pair fails to load with the same error.
+        entry_only = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x"}', entry_only
+        )
+        self.assertEqual(len(problems), 1, problems)
+        # The host conflict set is the six component fields the
+        # host names, so a themes pair conflicts in the same way.
+        themes = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"themes": ["./themes/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x", "themes": ["./themes/"]}', themes
+        )
+        self.assertEqual(len(problems), 1, problems)
+
+    def test_manifest_conflict_problems_accept_the_loadable_pairs(self):
+        plugin = '{"name": "x", "skills": ["./skills/x/"]}'
+        strict_true = (
+            '{"plugins": [{"name": "x", "strict": true, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(plugin, strict_true), []
+        )
+        manifest_only = '{"plugins": [{"name": "x", "strict": false}]}'
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(plugin, manifest_only),
+            [],
+        )
+        # The server fields stand outside the host conflict set,
+        # and a live install probe in the round 6 fix lane
+        # confirmed an mcpServers pair loads under strict false.
+        mcp = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"mcpServers": {}}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(
+                '{"name": "x", "mcpServers": {}}', mcp
+            ),
+            [],
+        )
+
+    def test_the_real_manifest_pair_has_no_conflict(self):
+        problems = self.mod.manifest_conflict_problems(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            ),
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            ),
+        )
+        self.assertEqual(problems, [])
+
     def test_main_reports_wrong_typed_shapes_without_a_traceback(self):
         good_market = (
             '{"metadata": {"version": "1.3.0"}, "plugins": '
@@ -833,7 +1084,12 @@ class TestPluginPackaging(unittest.TestCase):
         entries = [p for p in data["plugins"] if p["name"] == "recognitio"]
         self.assertEqual(len(entries), 1, data["plugins"])
         self.assertEqual(entries[0]["source"], "./")
-        self.assertFalse(entries[0]["strict"])
+        # The entry sets strict to true, so the plugin manifest is
+        # the definition the host loads and the pair may both name
+        # the skill without conflicting. Under strict false the
+        # host refused to load this pair at all, as the round 6
+        # marketplace install run showed.
+        self.assertTrue(entries[0]["strict"])
         # The entry carries the skills list of the researched
         # official shape, naming the same path the plugin manifest
         # names, so a marketplace reader sees the skill the entry

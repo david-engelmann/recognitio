@@ -74,6 +74,66 @@ def marketplace_versions(text):
     return versions
 
 
+COMPONENT_KEYS = (
+    "skills", "commands", "agents", "hooks", "outputStyles",
+    "themes",
+)
+
+
+def manifest_conflict_problems(plugin_text, marketplace_text):
+    """Problems in the manifest pair that stop the plugin loading.
+
+    The host refuses to load a plugin when its marketplace
+    entry specifies components while the entry sets strict to
+    false and a plugin manifest stands beside the entry,
+    because under a strict false entry the entry itself is the
+    plugin definition and the manifest beside it is a second
+    definition. The manifest does not have to specify any
+    component itself for the conflict to fire, and a live
+    install probe in the round 6 fix lane confirmed that a
+    metadata only manifest fails to load in this shape with
+    the same error the shipped pair once drew. Setting strict
+    to true makes the manifest the definition the host loads,
+    so the pair can both name the components and the manifest
+    stays self describing. The conflict set is the six
+    component fields the host names for this rule. The server
+    fields stand outside it, and the same probe confirmed an
+    mcpServers pair loads under strict false. Wrong typed
+    input is left to the version checks in this gate, which
+    already name it.
+    """
+    try:
+        plugin = json.loads(plugin_text)
+        market = json.loads(marketplace_text)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(plugin, dict) or not isinstance(market, dict):
+        return []
+    plugins = market.get("plugins")
+    if not isinstance(plugins, list):
+        return []
+    problems = []
+    for entry in plugins:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("strict") is True:
+            continue
+        shared = [key for key in COMPONENT_KEYS if key in entry]
+        if shared:
+            problems.append(
+                "marketplace entry %r specifies components (%s) "
+                "while a plugin.json stands beside it and the "
+                "entry does not set strict to true, so the host "
+                "refuses to load the plugin for conflicting "
+                "manifests"
+                % (
+                    entry.get("name"),
+                    ", ".join(shared),
+                )
+            )
+    return problems
+
+
 def extractor_version(text):
     match = EXTRACTOR_RE.search(text)
     return match.group(1) if match else None
@@ -148,6 +208,12 @@ def read(path):
 def main():
     versions = {}
     problems = []
+    plugin_text = read(PLUGIN_JSON)
+    marketplace_text = read(MARKETPLACE_JSON)
+    if plugin_text is not None and marketplace_text is not None:
+        problems.extend(
+            manifest_conflict_problems(plugin_text, marketplace_text)
+        )
 
     text = read(PLUGIN_JSON)
     if text is None:

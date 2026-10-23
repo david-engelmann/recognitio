@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 3, with each round
+found, from the first cycle through round 6, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -103,6 +103,65 @@ record, and no test pins any of them.
 | The YAML half of the copy fence stayed a two file hand list while the claims promised discovery by rule (ST3-01) | `test_discovery_extends_to_new_yaml_files_by_rule` and `test_a_new_yaml_issue_form_joins_the_fence` in the gate script suite, with the completeness walk in `test_fence_covers_every_authored_prose_file_in_the_tree` extended to the YAML class |
 | The completeness test walk encoded exclusion rules that contradicted the discovery exclusions (ST3-02) | `test_the_walk_and_discovery_share_one_exclusion_rule` in the gate script suite, with the walk and the discovery both calling the shared `is_fence_excluded` predicate in the copy gate |
 | The eval runner note still described the two pass method after round 2 moved to three conditions plus a clean control (SP3-01) | `test_the_runner_note_describes_the_current_method` in the gate script suite |
+
+## Round 4 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A paired rename dropped the old module name from the companion search and the test files section could print a false absence (R4-01) | `test_companion_terms_include_old_stem_only_for_renames` and `test_old_name_only_importlib_line_is_found_after_a_rename` and `test_cap_note_names_the_test_file_for_old_stem_hits` in the extractor suite, with `test_ordinary_change_still_finds_its_test_mentions` in the extractor suite as the ordinary change control |
+| YAML structure was judged as prose by the copy fence on the flow mapping and nested sequence shapes (R4-02) | `test_a_flow_mapping_value_is_structure_not_prose` and `test_a_nested_sequence_of_mappings_is_structure_not_prose` in the gate script suite, with `test_a_prose_mapping_value_with_a_colon_still_flags` and `test_a_prose_value_in_a_nested_sequence_still_flags` and `test_a_colon_inside_a_flow_mapping_value_still_flags` and `test_a_colon_inside_a_list_item_flow_mapping_still_flags` in the gate script suite pinning that prose values still flag |
+| A findings entry written with a leading ./ counted as a second finding with the opposite verdict (R4-03) | `test_parse_and_dedupe_normalise_a_leading_dot_slash` and `test_dotted_pair_counts_once_with_one_verdict` in the extractor suite |
+
+Five round 4 repairs stand as records only with no test of
+their own, and this section records them as uncovered in the
+open under the rule at the head of this file. The corpus
+index gained its round 2 section and completed its scope
+through round 3 (N4-01). The paired eval gained a fresh eyes
+rerun over all five tasks, recorded in the per pass notes
+with totals that agree with the results file. Decision 3
+gained its explicit event trigger for a runnable incident
+suite in the decisions file and in the path section of this
+index. The review guidance gained its statement of where
+disposition counts aggregate and when they are read, and the
+first populated review report written from the template
+stands in the reviews folder under docs. The one finding
+that report raised, a miscount and an omission in the new
+round 2 section of this index, was fixed in the same change
+as a record and no test pins it.
+
+## Round 5 incidents
+
+Round 5 was a planning round and raised no code incidents
+of its own. Its two handoff findings were adjudicated in
+round 6 and stand in the round 6 section as the skill size
+guard row and the instruction file flag row. This section
+stands so the head of this index can say that each round
+has its own section and a reader can tell that round 5 was
+checked rather than skipped.
+
+## Round 6 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A copy of a modified file overwrote the re-review ranges of its source file and flipped both verdicts in a verified packet (R6-RT-01) | `test_modify_plus_copy_packet_pins_both_verdicts` and `test_rereview_ranges_for_a_copy_entry_hold_no_source_ranges` and `test_modify_without_a_copy_control_is_unchanged` in the extractor suite |
+| The plugin did not load through the marketplace route, because both manifests specified the skill while the marketplace entry set strict to false (R6-INSTALL) | `test_manifest_conflict_problems_names_the_broken_pair` and `test_manifest_conflict_problems_accept_the_loadable_pairs` and `test_the_real_manifest_pair_has_no_conflict` in the gate script suite, with `test_marketplace_lists_the_plugin_with_its_skill_path` in the gate script suite pinning the strict entry in the shipped listing |
+| A scalar spanning lines escaped its colon when the continuation line was shaped like a key (R6-01) | `test_a_key_shaped_continuation_of_a_quoted_scalar_still_flags` and `test_a_key_shaped_continuation_of_a_plain_scalar_still_flags` and `test_a_key_shaped_line_inside_a_flow_quoted_scalar_still_flags` in the gate script suite |
+| Whole classes of YAML structure were still judged as prose, across wide key shapes and flow collections standing after anchors or tags or inside flow sequences (R6-RT-04 and S6-03) | `test_wide_key_shapes_are_structure_not_prose` and `test_flow_collections_after_anchors_and_tags_are_structure` and `test_a_flow_sequence_of_mappings_is_structure_not_prose` in the gate script suite, with `test_a_prose_value_after_a_wide_key_still_flags` and `test_a_prose_value_inside_a_flow_sequence_still_flags` and `test_ordinary_keys_after_a_plain_value_still_parse` and `test_a_multiline_flow_mapping_with_prose_values_still_flags` in the gate script suite pinning that prose still flags |
+| Packets listed changed instruction files exactly like ordinary code, with no marker in the triage list and no field in the manifest (R6-RT-06) | `test_each_instruction_name_flags_and_an_ordinary_file_does_not` and `test_packet_flags_instruction_files_in_triage_and_manifest` and `test_a_rename_to_or_from_an_instruction_name_flags` in the extractor suite |
+| Findings path normalisation stopped at a leading dot slash, so sibling spellings and a decomposed Unicode spelling each recounted one worry with a second verdict (R6-RT-02 and R6-RT-03) | `test_normalize_finding_path_covers_each_spelling` and `test_each_spelling_pair_counts_once_with_one_verdict` and `test_space_before_the_anchor_colon_counts_once` and `test_decomposed_path_counts_once_with_the_composed_file` in the extractor suite, with `test_distinct_line_and_distinct_file_still_count_separately` in the extractor suite as the distinctness control |
+| No gate guarded the size of the skill file against host truncation (R6-RT-05) | `test_a_skill_file_past_the_size_limit_fails` and `test_a_skill_file_at_the_size_limit_passes` and `test_the_real_skill_package_is_valid` in the gate script suite |
+
+Four round 6 repairs stand as records only with no test of
+their own, and this section records them as uncovered in the
+open under the rule at the head of this file. The stale
+changelog sentence about a flow mapping value was repaired
+as one prose sentence (R6-02). The corpus index gained its
+round 4 section in this same change beside this section
+(S6-01 and R6-E1). The populated round 4 review record
+gained the identifiers its template requires in its checked
+section (S6-02). The paired eval gained its replay task
+task-06 with verbatim transcripts as records in the evals
+documents, graded in the open as a designer run replay.
 
 ## Disclosure incidents with no test of their own
 

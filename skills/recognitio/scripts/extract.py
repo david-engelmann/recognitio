@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -95,6 +96,21 @@ LOCKFILE_NAMES = {
     "go.sum",
     "flake.lock",
     "packages.lock.json",
+}
+# Files whose whole purpose is to steer the agent that loads the
+# tree. A change to one changes agent behaviour rather than merely
+# describing code, so the packet flags it in the triage list and in
+# the manifest instead of listing it exactly like ordinary code.
+# The set is name based and deterministic. It covers the agent
+# guidance names hosts load at any depth, the Copilot instructions
+# file name, and the Cursor rules names.
+INSTRUCTION_BASENAMES = {
+    "AGENTS.md",
+    "CLAUDE.md",
+    "SKILL.md",
+    "GEMINI.md",
+    "copilot-instructions.md",
+    ".cursorrules",
 }
 GENERATED_SUFFIXES = (
     ".pb.go",
@@ -1067,6 +1083,29 @@ def packet_headings(packet):
     ]
 
 
+def is_instruction_path(path):
+    """Whether one path names an instruction bearing file."""
+    if not path:
+        return False
+    parts = Path(path).parts
+    name = parts[-1] if parts else ""
+    if name in INSTRUCTION_BASENAMES:
+        return True
+    if name.endswith(".mdc") and ".cursor" in parts:
+        return True
+    return False
+
+
+def entry_is_instruction(entry):
+    """Whether a changed file is an instruction bearing file.
+
+    A rename is judged from either name, so renaming a file into
+    an instruction name or out of one flags the entry either way.
+    """
+    return is_instruction_path(entry.get("path")) or \
+        is_instruction_path(entry.get("old_path"))
+
+
 def build_t0(files, commit_log, pr_info):
     lines = []
     lines.append("## T0 Triage")
@@ -1104,14 +1143,18 @@ def build_t0(files, commit_log, pr_info):
     lines.append("### Files")
     lines.append("")
     for entry in files:
+        marker = ", instruction file" if entry_is_instruction(entry) else ""
         if entry.get("old_path"):
             lines.append(
-                "- %s (%s, renamed from %s)"
-                % (display_path(entry["path"]), entry["status"],
+                "- %s (%s%s, renamed from %s)"
+                % (display_path(entry["path"]), entry["status"], marker,
                    display_path(entry["old_path"]))
             )
         else:
-            lines.append("- %s (%s)" % (display_path(entry["path"]), entry["status"]))
+            lines.append(
+                "- %s (%s%s)"
+                % (display_path(entry["path"]), entry["status"], marker)
+            )
     lines.append("")
     lines.append("### Numstat")
     lines.append("")
@@ -1855,13 +1898,30 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
 def normalize_finding_path(path):
     """The one spelling a findings path is accounted under.
 
-    A leading ./ names the same file as the plain spelling, so
+    Many spellings name the same file as the plain spelling, so
     identity and verdicts share the plain spelling and one worry
-    written both ways counts once with one verdict.
+    written in any of them counts once with one verdict. A leading
+    or mid path dot segment names nothing, a doubled separator
+    separates nothing extra, a backslash separates on the systems
+    that write paths that way, and stray space around the path is
+    not part of a file name. Case is left untouched, because two
+    spellings that differ only in case can name two different
+    files in one tree. The path is also folded to composed
+    Unicode form, so a name written with combining marks counts
+    as the file the tree holds in composed form. That fold can
+    merge two files whose names differ only in normalisation
+    form. Such a pair can coexist on a byte exact filesystem and
+    a reviewer can barely tell the two apart, so the fold is the
+    right trade and it is recorded here as a choice.
     """
-    while path.startswith("./"):
-        path = path[2:]
-    return path
+    path = unicodedata.normalize("NFC", path)
+    path = path.strip()
+    path = path.replace("\\", "/")
+    parts = [
+        part for part in path.split("/")
+        if part not in ("", ".")
+    ]
+    return "/".join(parts)
 
 
 def parse_findings(text):
@@ -1936,21 +1996,38 @@ def rereview_ranges(repo, since, head):
     tree_text = run_git(
         repo, ["ls-tree", "-r", "-z", "--name-only", head]
     ).stdout
-    head_paths = {field for field in tree_text.split("\0") if field}
+    head_paths = {
+        normalize_finding_path(field)
+        for field in tree_text.split("\0") if field
+    }
     since_text = run_git(
         repo, ["ls-tree", "-r", "-z", "--name-only", since]
     ).stdout
-    since_paths = {field for field in since_text.split("\0") if field}
+    since_paths = {
+        normalize_finding_path(field)
+        for field in since_text.split("\0") if field
+    }
     since_files = parse_name_status_z(status_text)
     chunks = split_diff(precise)
     ranges_by_path = {}
     moved_to = {}
     for position, entry in enumerate(since_files):
+        if entry["status"] == "copied":
+            # A copied entry carries its source as its old path and
+            # its chunk describes the delta between the source at
+            # the previous revision and the copy at the head. Those
+            # ranges are not edits to the source file, so a copy
+            # writes no ranges under its source path and it never
+            # overwrites the ranges the source file its own
+            # modification wrote there.
+            continue
         chunk = chunks[position] if position < len(chunks) else ""
-        since_path = entry["old_path"] or entry["path"]
+        since_path = normalize_finding_path(
+            entry["old_path"] or entry["path"]
+        )
         ranges_by_path[since_path] = old_side_ranges(chunk)
         if entry["status"] == "renamed":
-            moved_to[since_path] = entry["path"]
+            moved_to[since_path] = normalize_finding_path(entry["path"])
     return ranges_by_path, moved_to, head_paths, since_paths
 
 
@@ -2576,6 +2653,7 @@ def manifest_file_records(files):
             "attribute_text": entry["attribute_text"],
             "binary_transition": entry["binary_transition"],
             "placeholder": entry["placeholder"],
+            "instruction_file": entry_is_instruction(entry),
         }
         for entry in files
     ]
