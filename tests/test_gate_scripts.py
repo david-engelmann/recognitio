@@ -59,6 +59,7 @@ class TestCheckCopy(unittest.TestCase):
         names = {str(path.relative_to(ROOT)) for path in self.mod.PROSE_FILES}
         for expected in (
             "README.md",
+            "REVIEW.md",
             "AGENTS.md",
             "CHANGELOG.md",
             "CLAUDE.md",
@@ -264,6 +265,118 @@ class TestCheckSkill(unittest.TestCase):
 
     def test_the_real_skill_package_is_valid(self):
         self.assertEqual(self.mod.main(), 0)
+
+    def test_name_character_rules_accept_the_shipped_name(self):
+        self.assertEqual(self.mod.name_problems("recognitio"), [])
+
+    def test_name_character_rules_reject_each_break(self):
+        for bad in (
+            "Recognitio",
+            "recog_nitio",
+            "-recognitio",
+            "recognitio-",
+            "recog--nitio",
+            "r" * 65,
+        ):
+            self.assertTrue(
+                self.mod.name_problems(bad),
+                "name %r must fail the character rules" % bad,
+            )
+
+    def test_a_name_with_consecutive_hyphens_fails_the_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp) / "recognitio"
+            skill_dir.mkdir()
+            skill_md = skill_dir / "SKILL.md"
+            skill_md.write_text(
+                "---\nname: recog--nitio\ndescription: a packet\n---\n\n# X\n",
+                encoding="utf-8",
+            )
+            original = (self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT)
+            self.mod.SKILL_DIR = skill_dir
+            self.mod.SKILL_MD = skill_md
+            self.mod.EXTRACT = ROOT / "skills" / "recognitio" / "scripts" / "extract.py"
+            try:
+                with redirect_stderr(io.StringIO()) as captured:
+                    code = self.mod.main()
+            finally:
+                self.mod.SKILL_DIR, self.mod.SKILL_MD, self.mod.EXTRACT = original
+            self.assertEqual(code, 1)
+            self.assertIn("consecutive hyphens", captured.getvalue())
+
+
+class TestCheckVersion(unittest.TestCase):
+    def setUp(self):
+        self.mod = load_script("check_version")
+
+    def test_the_real_versions_agree(self):
+        self.assertEqual(self.mod.main(), 0)
+
+    def test_each_version_source_is_read(self):
+        self.assertEqual(
+            self.mod.extractor_version('EXTRACTOR_VERSION = "1.3.0"\n'),
+            "1.3.0",
+        )
+        self.assertEqual(
+            self.mod.changelog_version("## [Unreleased]\n\nThis work "
+                                        "carries version 1.3.0.\n"),
+            "1.3.0",
+        )
+        self.assertEqual(
+            self.mod.changelog_version("## [2.0.0] - 2026-01-01\n"),
+            "2.0.0",
+        )
+        self.assertEqual(
+            self.mod.plugin_version('{"version": "1.3.0"}'), "1.3.0"
+        )
+
+    def test_disagreement_is_a_problem(self):
+        problems = self.mod.coherence_problems({
+            "plugin.json": "1.3.0",
+            "EXTRACTOR_VERSION": "1.2.0",
+            "CHANGELOG.md": "1.3.0",
+        })
+        self.assertTrue(any("disagree" in p for p in problems), problems)
+
+    def test_a_missing_version_is_a_problem(self):
+        problems = self.mod.coherence_problems({
+            "plugin.json": None,
+            "EXTRACTOR_VERSION": "1.3.0",
+        })
+        self.assertTrue(any("no version" in p for p in problems), problems)
+
+    def test_a_malformed_version_is_a_problem(self):
+        problems = self.mod.coherence_problems({
+            "plugin.json": "1.3",
+            "EXTRACTOR_VERSION": "1.3",
+        })
+        self.assertTrue(
+            any("not a version" in p for p in problems), problems
+        )
+
+
+class TestPluginPackaging(unittest.TestCase):
+    def test_plugin_manifest_names_the_skill_and_its_path(self):
+        data = json.loads(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(data["name"], "recognitio")
+        self.assertEqual(data["skills"], ["./skills/recognitio/"])
+        self.assertTrue(data["version"])
+
+    def test_marketplace_lists_the_plugin_with_its_skill_path(self):
+        data = json.loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        entries = [p for p in data["plugins"] if p["name"] == "recognitio"]
+        self.assertEqual(len(entries), 1, data["plugins"])
+        self.assertEqual(entries[0]["skills"], ["./skills/recognitio/"])
+        self.assertEqual(entries[0]["source"], "./")
+        self.assertFalse(entries[0]["strict"])
 
 
 class TestCheckPacket(unittest.TestCase):

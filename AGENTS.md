@@ -25,7 +25,8 @@ python3 -m unittest discover -s tests
 
 The first command is the full gate and the second is the narrow form
 to use while working. The gate runs the extractor test suite, the
-skill validator at `scripts/check_skill.py`, the copy bar scan at
+skill validator at `scripts/check_skill.py`, the version coherence
+check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, and an end to end extractor smoke that must
 produce a verified manifest. CI runs the gate word for word and
 adds one job with no local step. That job checks the Signed-off-by
@@ -47,6 +48,11 @@ not a gate.
   review is stamped on it.
 - `docs/decisions.md` records the design decisions that depart from
   the research sketch, with the reason for each one.
+- `evals/` holds the paired eval tasks, the trigger set, the
+  corpus index and their recorded results.
+- `.claude-plugin/` holds the plugin manifest and the marketplace
+  listing for the skill.
+- `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
 ## Hard rules
@@ -67,11 +73,13 @@ not a gate.
 
 ## Conventions
 
-- The default branch is `dev`. Branch off `dev` under a name of the
-  form `kind/slug` and open the pull request against `dev`.
-- The `main` branch is the release branch. It moves only through
-  promotion pull requests from `dev`, and release tags are cut
-  from `main` by David alone.
+- The default working branch is `main`. Branch off `main` under a
+  name of the form `kind/slug` and open the pull request against
+  `main`.
+- Release tags are cut from `main` by David alone.
+- The `dev` branch is vestigial. It carried the work until the
+  promotion of October 2026 and no work branches from it or
+  targets it any more.
 - Pull request titles follow Conventional Commits and become the
   squash commit title. Merges are squash only.
 - Every human commit carries a `Signed-off-by` trailer with the
@@ -102,16 +110,23 @@ this map instead.
 - A change to the description field in SKILL.md is a spec change,
   and the pull request body says so and says why.
 - Gate changes update this file and the CI workflow together.
+- A version string change moves every surface that carries one in
+  the same pull request, and the gate checks that they agree.
 
 ## Current state
 
-Written on 2026-10-15 and updated on 2026-10-22. The first version
-of the skill is built and landing on `dev`, with the extractor, the
+Written on 2026-10-15 and updated on 2026-10-23. The first version
+of the skill is built and landed on `main`, with the extractor, the
 four tier model and the fail closed manifest in place. The first
 perfection cycle hardened the extractor against ambient git
 configuration, grew the tier content the design called for, and put
 the gate scripts under test. The second cycle pinned object
 identity against replace refs, rebuilt the recount the first cycle
 added so ordinary content cannot fail or slip it, and closed the
-failure paths at the argument checking boundary. No release has
-been tagged yet.
+failure paths at the argument checking boundary. The round 1 pass
+then closed the crafted filename and never existed findings and
+binary transition findings, banned marks left the generated
+packet prose, and the plugin packaging and the eval layer landed.
+The owner dropped the branch ceremony on 2026-10-22 and `main`
+became the working branch the same evening. No release has been
+tagged yet.

@@ -30,6 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROSE_FILES = [
     ROOT / "README.md",
+    ROOT / "REVIEW.md",
     ROOT / "AGENTS.md",
     ROOT / "CHANGELOG.md",
     ROOT / "CLAUDE.md",

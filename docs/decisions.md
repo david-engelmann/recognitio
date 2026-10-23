@@ -38,6 +38,15 @@ extractor and its gate had to be trustworthy first. The corpus
 belongs to a later cycle, and this note is its placeholder so the
 deferral stays visible.
 
+The deferral condition has now expired, recorded on 2026-10-23.
+The extractor hardening it waited for has landed and so has the
+promotion to the working branch, and the corpus exists in its
+first form as an index at `evals/corpus.md`, mapping each audit
+incident to the regression test or fixture that now covers it.
+The paired evidence the sketch called for lives at
+`evals/RESULTS.md`. A corpus that runs as its own suite can still
+follow when a round needs one.
+
 ## 4. Enforcement ships as a script and as prose
 
 Packet enforcement ships as the packet check script in this repo
@@ -49,6 +58,12 @@ The reason is reach. A script any agent can run today enforces the
 rule in every environment the skill runs in, while a hook would
 only exist where a plugin host loads it. When packaging lands, the
 hook can call the same script and the rule does not move.
+
+Packaging has now landed, recorded on 2026-10-23. The plugin
+manifest and the marketplace listing live under `.claude-plugin/`
+and enforcement stays script first, exactly as this decision
+promised. No hook ships yet, and when one does it will call the
+same packet check script and the rule will not move.
 
 ## 5. The smoke fixture stays independent
 
@@ -72,3 +87,16 @@ The reason is the founding rule of the project. Nothing leaves the
 packet silently. The reviewer trades the noise of a generated diff
 for a receipt that names what was withheld and proves the counts
 still cover it.
+
+## 7. Main is the working branch
+
+Recorded on 2026-10-23. Work branches off `main` and pull requests
+target `main`, and release tags are cut from `main` by David
+alone. The `dev` branch is vestigial and carries history only.
+
+The reason is a ruling by David on 2026-10-22. The branch
+ceremony that moved `main` only through promotion pull requests
+cost an extra landing for every change and bought no safety the
+gate and the reviews do not already give, so the ceremony was
+dropped on the same evening the promotion it governed landed.
+This decision supersedes the branch flow the repo opened with.

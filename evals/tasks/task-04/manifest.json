@@ -1,0 +1,88 @@
+{
+  "extractor": "recognitio extract.py",
+  "version": "1.3.0",
+  "command": [
+    "extract.py",
+    "--repo",
+    "/home/hatch/workspace/recognitio-eval-scratch/task-04/repo",
+    "--range",
+    "430facac35efa57597483dacf8e832dcf2f22dcb..feb3397041071579e016c1c9e203dd89469ef49d",
+    "--out",
+    "/home/hatch/workspace/recognitio-eval-scratch/task-04/packet"
+  ],
+  "created_utc": "2026-10-23T05:03:01.026840+00:00",
+  "mode": "range",
+  "label": "range 430facac35efa57597483dacf8e832dcf2f22dcb..feb3397041071579e016c1c9e203dd89469ef49d",
+  "base": "430facac35efa57597483dacf8e832dcf2f22dcb",
+  "head": "feb3397041071579e016c1c9e203dd89469ef49d",
+  "merge_base": "430facac35efa57597483dacf8e832dcf2f22dcb",
+  "since": null,
+  "pr": null,
+  "files": [
+    {
+      "path": "report.py",
+      "old_path": null,
+      "status": "modified",
+      "status_code": "M",
+      "additions": 4,
+      "deletions": 1,
+      "hunks": 1,
+      "binary": false,
+      "attribute_text": false,
+      "binary_transition": false,
+      "placeholder": null
+    }
+  ],
+  "exclusions": [],
+  "selected_tiers": [
+    "T0",
+    "T1",
+    "T2",
+    "T3"
+  ],
+  "tiers": {
+    "T0": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 38,
+      "emitted_tokens": 38,
+      "files": 1
+    },
+    "T1": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 79,
+      "emitted_tokens": 79,
+      "files": 1
+    },
+    "T2": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 144,
+      "emitted_tokens": 144,
+      "files": 1
+    },
+    "T3": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 221,
+      "emitted_tokens": 221,
+      "files": 1
+    }
+  },
+  "sections": [
+    "## T0 Triage",
+    "## T1 The change",
+    "## T2 Companions",
+    "## T3 History",
+    "## Budget and completeness"
+  ],
+  "budget": {
+    "budget_tokens": null,
+    "estimated_tokens": 685,
+    "dropped": []
+  },
+  "cap_notes": [],
+  "verified": true,
+  "discrepancies": []
+}

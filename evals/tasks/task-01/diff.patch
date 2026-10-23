@@ -1,0 +1,9 @@
+diff --git a/calc.py b/calc.py
+index 739e5a7..7dc0e10 100644
+--- a/calc.py
++++ b/calc.py
+@@ -1,2 +1,2 @@
+-def price(qty, rate):
+-    return qty * rate
++def price(qty, rate, tax):
++    return qty * rate + tax + tax

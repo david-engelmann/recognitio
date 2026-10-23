@@ -2,6 +2,8 @@
 
 Recognitio is an agent skill that pulls the relevant changes out of a pull request or a commit range and assembles them into a verified review packet. The packet holds the change plus the context a careful human reviewer would go and find, and it proves that nothing was left behind.
 
+In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed.
+
 ## Why
 
 A diff alone is not what a reviewer reads. A reviewer reads the change inside its enclosing function, follows changed names to the places that call them, opens the tests that touch the changed module, and checks who shaped these lines in the past. Most tools hand the reviewer a fixed slice of lines and stay silent when the slice runs out. Hosted diff endpoints cap their file counts and drop oversized patches without a flag, so a large pull request can be reviewed in part while everyone believes it was reviewed in whole.
@@ -10,13 +12,27 @@ Recognitio takes the other path. Extraction runs against the local clone, where 
 
 ## Install
 
-Copy the skill folder into any skills directory your agent reads.
+Take one install route only. Installing through two routes installs the skill twice and the agent loads both copies.
+
+The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers.
+
+```bash
+/plugin marketplace add david-engelmann/recognitio
+```
+
+The generic route works with any agent that reads the skill format.
+
+```bash
+npx skills add david-engelmann/recognitio
+```
+
+The folder copy route still works by hand. Copy the skill folder into any skills directory your agent reads.
 
 ```bash
 cp -r skills/recognitio ~/.claude/skills/recognitio
 ```
 
-The same folder works as a plugin payload when it sits inside a plugin tree, because the skill format is the payload either way. The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
+The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
 
 ## Usage
 
@@ -70,7 +86,7 @@ The packet is built in four tiers.
 - T2 is the companions, with call sites of the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and test files that mention the changed modules. Companions come from deterministic search only, each one is capped, and the packet says when a cap was hit.
 - T3 is history, with a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. That lookup checks the three most changed files against the thirty most recent pull requests and shows at most five matches, and the packet states that window where it reports the results. When the CLI cannot name them, the tier says so.
 
-Some files stand in the change as named placeholders rather than diffs. A binary file is named with its byte count. A file detected as generated or as a lockfile is named with its detection reason, and detection works from a list of known lockfile names, known generated suffixes, and the do not edit marker in a file header. The header marker withholds a diff only when it already stood at the base revision. A marker that arrives in the change itself is flagged in the packet header and the change is shown in full, because a file cannot exempt itself with words it just wrote. Every placeholder keeps its lines and hunks counted in the manifest, and the packet header lists each one with its reason. A text file that the tree marks binary through its attributes file is counted and shown as text instead, and the header names that too.
+Some files stand in the change as named placeholders rather than diffs. A binary file is named with its byte count. A file detected as generated or as a lockfile is named with its detection reason, and detection works from a list of known lockfile names, known generated suffixes, and the do not edit marker in a file header. The header marker withholds a diff only when it already stood at the base revision. A marker that arrives in the change itself is flagged in the packet header and the change is shown in full, because a file cannot exempt itself with words it just wrote. Every placeholder keeps its lines and hunks counted in the manifest, and the packet header lists each one with its reason. A text file that the tree marks binary through its attributes file is counted and shown as text instead, and the header names that too. A file that changed from binary content to text in the change itself is counted and shown as text as well, its receipt names the transition as the real reason, and the manifest records the transition on the file record.
 
 A budget spends itself in tier order. T3 drops first and T2 drops second, and the manifest records every drop with its reason. The receipt reports tokens per tier, files per tier, and what was cut. Files per tier counts what each tier worked over. T0 and T1 count every changed file, T2 counts the changed source files it searched for companions, and T3 counts the capped subset of most changed files it drew history from. The change itself never drops and never truncates. When T0 and T1 alone exceed the budget, the run fails with a clear message instead of handing over a partial change dressed as a whole one.
 
@@ -80,6 +96,14 @@ After assembly, the extractor recounts the changed files, their statuses, their 
 
 Two guards stand in front of the recount. Every git invocation runs with its output format pinned, so configuration in the clone or in a global config file cannot reshape the diff, and path data moves through NUL delimited output, so names with spaces, quotes, or non ASCII characters survive end to end. Packet text preserves the bytes of the change, CRLF line endings included. A shallow clone is refused before any of this runs, because its truncated history cannot support the guarantee.
 
+## Trust and limits
+
+Extraction is local only. The extractor reads a local clone with git plus the pull request metadata the GitHub CLI returns, and it writes a packet and a manifest into the output directory the run names. Nothing in the skill points an agent at an untrusted network source, and the bundled code takes no third party dependencies. Install the skill only from a source you trust, because a skill ships executable code and this one is no exception.
+
+A verified packet proves one thing. It proves the packet holds the whole change it names, counted twice with agreement. It does not prove the change is correct and it does not prove the change is safe, and a clean packet is never a verdict on the code. Run the packet check script against a packet directory before a review is stamped on it.
+
 ## The name
 
 Recognitio is a Latin word for a formal re-examination of a matter with the record open. Roman law used it when a case was looked at again by someone charged with getting it right. A pull request review is the same act in modern dress, and the packet this skill builds is the record the examination runs on.
+
+The measured evidence behind the packet claim lives in [the paired eval results](evals/RESULTS.md).

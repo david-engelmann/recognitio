@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-EXTRACTOR_VERSION = "1.2.0"
+EXTRACTOR_VERSION = "1.3.0"
 SOURCE_EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".rs", ".go"}
 MAX_CALL_SITES_PER_FUNCTION = 5
 MAX_TEST_FILES = 10
@@ -148,6 +148,49 @@ class Proc:
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
+
+
+def display_path(path):
+    """Render a path as one safe line of packet text.
+
+    A path is data the reviewed party controls and it can carry a
+    newline. Written raw into a heading or a list it would print
+    forged packet sections in the packet's own voice and it would
+    split one record across lines. Control characters are escaped
+    instead, so a crafted name stays one inert line everywhere the
+    packet names a file. The manifest keeps the true path as data.
+    """
+    if path is None:
+        return ""
+    out = []
+    for char in str(path):
+        if char == "\\":
+            out.append("\\\\")
+        elif char == "\n":
+            out.append("\\n")
+        elif char == "\r":
+            out.append("\\r")
+        elif char == "\t":
+            out.append("\\t")
+        elif ord(char) < 32 or ord(char) == 127:
+            out.append("\\x%02x" % ord(char))
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def sanitize_packet_text(text):
+    """Keep raw NUL bytes out of packet text.
+
+    A blob that turns from binary to text is shown through a text
+    diff, and the old side of that diff can carry raw NUL bytes
+    into a document every downstream tool reads as Markdown text.
+    The byte is named instead of carried, which changes no line
+    count because the replacement holds no newline.
+    """
+    if not text:
+        return text
+    return text.replace("\x00", "[NUL]")
 
 
 def decode_bytes(data):
@@ -464,7 +507,12 @@ def parse_numstat_z(text):
     stats = {}
     binary_paths = set()
     index = 0
-    record_re = re.compile(r"^(\S+)\t(\S+)\t(.*)$")
+    # The path field runs to the end of the NUL delimited record
+    # and it may itself carry a newline, so the pattern must match
+    # across lines and anchor at the true end of the record. A
+    # pattern that stops at a newline truncates the record and
+    # reads a crafted name at zero counts.
+    record_re = re.compile(r"^([^\t]+)\t([^\t]+)\t([\s\S]*)\Z")
     while index < len(fields):
         match = record_re.match(fields[index])
         index += 1
@@ -790,6 +838,7 @@ def enrich_files(repo, diff_base, head, change):
         adds, dels = stats.get(path, (0, 0))
         entry["binary"] = False
         entry["attribute_text"] = False
+        entry["binary_transition"] = False
         entry["placeholder"] = None
         entry["head_bytes"] = None
         # One receipt entry per file, decided last. An attribute
@@ -802,14 +851,22 @@ def enrich_files(repo, diff_base, head, change):
             # The entry path names the file on both sides of a deletion.
             data = file_bytes(repo, side_ref, path)
             if data is not None and looks_textual(data):
-                # The tree marks this file binary, through a checked in
-                # attributes file, but the content is plain text. Count
-                # it and show it as text, and name it in the receipt.
-                text_chunk = per_file_text_diff(
-                    repo, diff_base, head, entry, "-W"
+                # Git reports this file with the binary marker. Two
+                # very different cases sit behind that marker and the
+                # receipt must not confuse them. When the old side
+                # holds real binary content and the head side is
+                # plain text, the file changed from binary to text
+                # in this change and no attributes file need exist.
+                # When both sides are plain text, git only calls the
+                # file binary because the tree marks it so through
+                # its attributes file. Count and show both as text,
+                # and name each one in the receipt by its real
+                # reason.
+                text_chunk = sanitize_packet_text(
+                    per_file_text_diff(repo, diff_base, head, entry, "-W")
                 )
-                zero_chunk = per_file_text_diff(
-                    repo, diff_base, head, entry, "-U0"
+                zero_chunk = sanitize_packet_text(
+                    per_file_text_diff(repo, diff_base, head, entry, "-U0")
                 )
                 chunks[path] = text_chunk
                 precise[path] = zero_chunk
@@ -823,21 +880,36 @@ def enrich_files(repo, diff_base, head, change):
                     adds, dels = measured
                 else:
                     adds, dels = count_chunk_lines(zero_chunk)
-                entry["attribute_text"] = True
-                receipt = {
-                    "path": path,
-                    "reason": "marked binary by repository attributes, "
-                              "counted and shown as text",
-                    "shown_as_text": True,
-                }
+                base_path = entry["old_path"] or path
+                base_data = None
+                if entry["status"] not in ("added", "deleted"):
+                    base_data = file_bytes(repo, diff_base, base_path)
+                if base_data is not None and not looks_textual(base_data):
+                    entry["binary_transition"] = True
+                    receipt = {
+                        "path": path,
+                        "reason": "changed from binary content to text "
+                                  "in this change, counted and shown "
+                                  "as text",
+                        "shown_as_text": True,
+                    }
+                else:
+                    entry["attribute_text"] = True
+                    receipt = {
+                        "path": path,
+                        "reason": "marked binary by repository attributes, "
+                                  "counted and shown as text",
+                        "shown_as_text": True,
+                    }
             elif data is not None:
                 entry["binary"] = True
                 entry["head_bytes"] = len(data)
                 adds, dels = 0, 0
                 entry["placeholder"] = (
-                    "(binary file, %d bytes at the %s revision; no textual "
-                    "diff)" % (len(data), "head" if entry["status"] != "deleted"
-                               else "base")
+                    "(binary file of %d bytes at the %s revision. No "
+                    "textual diff is shown.)"
+                    % (len(data), "head" if entry["status"] != "deleted"
+                       else "base")
                 )
                 receipt = {
                     "path": path,
@@ -865,9 +937,9 @@ def enrich_files(repo, diff_base, head, change):
                 }
             elif reason is not None:
                 entry["placeholder"] = (
-                    "(%s; the diff is withheld from the packet and its %d "
-                    "additions and %d deletions across %d hunks are counted "
-                    "in the manifest)"
+                    "(%s. The diff is withheld from the packet and its "
+                    "%d additions and %d deletions across %d hunks are "
+                    "counted in the manifest)"
                     % (reason, adds, dels, entry["hunks"])
                 )
                 receipt = {
@@ -908,7 +980,7 @@ def build_header(resolved, diff_base, verified, exclusions):
         lines.append("")
         lines.append("Exclusions and placeholders:")
         for item in exclusions:
-            lines.append("- %s: %s" % (item["path"], item["reason"]))
+            lines.append("- %s: %s" % (display_path(item["path"]), item["reason"]))
     lines.append("")
     return "\n".join(lines)
 
@@ -1011,21 +1083,23 @@ def build_t0(files, commit_log, pr_info):
         if entry.get("old_path"):
             lines.append(
                 "- %s (%s, renamed from %s)"
-                % (entry["path"], entry["status"], entry["old_path"])
+                % (display_path(entry["path"]), entry["status"],
+                   display_path(entry["old_path"]))
             )
         else:
-            lines.append("- %s (%s)" % (entry["path"], entry["status"]))
+            lines.append("- %s (%s)" % (display_path(entry["path"]), entry["status"]))
     lines.append("")
     lines.append("### Numstat")
     lines.append("")
     numstat_lines = []
     for entry in files:
         if entry["binary"]:
-            numstat_lines.append("-\t-\t%s" % entry["path"])
+            numstat_lines.append("-\t-\t%s" % display_path(entry["path"]))
         else:
             numstat_lines.append(
                 "%d\t%d\t%s"
-                % (entry["additions"], entry["deletions"], entry["path"])
+                % (entry["additions"], entry["deletions"],
+                   display_path(entry["path"]))
             )
     numstat_text = "\n".join(numstat_lines) if numstat_lines else "(no changes)"
     fence = fence_for(numstat_text)
@@ -1054,11 +1128,11 @@ def build_t1(files, chunks):
     lines.append("")
     for entry in files:
         path = entry["path"]
-        lines.append("### %s" % path)
+        lines.append("### %s" % display_path(path))
         lines.append("")
         lines.append("Status: %s" % entry["status"])
         if entry.get("old_path"):
-            lines.append("Renamed from: %s" % entry["old_path"])
+            lines.append("Renamed from: %s" % display_path(entry["old_path"]))
         lines.append("")
         lines.append("```diff")
         if entry["placeholder"] is not None:
@@ -1132,7 +1206,7 @@ def call_sites_section(repo, head, files, functions_by_file, notes):
         end = min(len(rows), lineno + 1)
         block = []
         for number in range(start, end + 1):
-            block.append("%s:%d: %s" % (path, number, rows[number - 1]))
+            block.append("%s:%d: %s" % (display_path(path), number, rows[number - 1]))
         return "\n".join(block)
 
     for entry in source_entries(files):
@@ -1141,7 +1215,7 @@ def call_sites_section(repo, head, files, functions_by_file, notes):
             hits = [
                 hit for hit in git_grep_lines(repo, head, name) if hit[0] != path
             ]
-            lines.append("### Call sites for %s in %s" % (name, path))
+            lines.append("### Call sites for %s in %s" % (name, display_path(path)))
             lines.append("")
             if not hits:
                 lines.append("No call sites found outside the changed file.")
@@ -1203,7 +1277,7 @@ def imports_section(repo, head, files, notes):
                 "imports of %s capped at %d of %d"
                 % (path, len(shown), len(found))
             )
-        lines.append("#### %s" % path)
+        lines.append("#### %s" % display_path(path))
         lines.append("")
         lines.append("```")
         for number, row in shown:
@@ -1254,7 +1328,7 @@ def definitions_section(repo, head, files, functions_by_file, notes):
             lines.append("")
             lines.append("```")
             for hit_path, hit_line, content in shown:
-                lines.append("%s:%d: %s" % (hit_path, hit_line, content.strip()))
+                lines.append("%s:%d: %s" % (display_path(hit_path), hit_line, content.strip()))
             lines.append("```")
             lines.append("")
     if not any_found:
@@ -1293,7 +1367,7 @@ def test_files_section(repo, head, files, functions_by_file, notes):
         test_paths = test_paths[:MAX_TEST_FILES]
     for test_path in test_paths:
         hits = sorted(test_hits[test_path])
-        lines.append("#### %s" % test_path)
+        lines.append("#### %s" % display_path(test_path))
         lines.append("")
         shown = hits[:MAX_MATCH_LINES_PER_TEST_FILE]
         if len(hits) > len(shown):
@@ -1414,7 +1488,7 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
                     key = (row[len("author "):], pending_sha)
                     tally[key] = tally.get(key, 0) + pending_count
                     pending_sha = None
-        lines.append("#### %s" % path)
+        lines.append("#### %s" % display_path(path))
         lines.append("")
         if not tally:
             lines.append("No blame data for the changed ranges.")
@@ -1461,7 +1535,7 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
                  "--format=commit %h %s", head],
                 check=False,
             )
-            lines.append("#### %s in %s" % (name, path))
+            lines.append("#### %s in %s" % (name, display_path(path)))
             lines.append("")
             if result.returncode != 0:
                 lines.append("No history available for this function.")
@@ -1635,6 +1709,10 @@ def findings_accounting(repo, diff_base, since, head, findings):
         repo, ["ls-tree", "-r", "-z", "--name-only", head]
     ).stdout
     head_paths = {field for field in tree_text.split("\0") if field}
+    since_text = run_git(
+        repo, ["ls-tree", "-r", "-z", "--name-only", since]
+    ).stdout
+    since_paths = {field for field in since_text.split("\0") if field}
     since_files = parse_name_status_z(status_text)
     chunks = split_diff(precise)
     # Findings anchor at the since revision, so their paths are the
@@ -1656,7 +1734,26 @@ def findings_accounting(repo, diff_base, since, head, findings):
     for finding in findings:
         path = finding["path"]
         anchor = finding["line"]
-        if moved_to.get(path, path) not in head_paths:
+        target = moved_to.get(path, path)
+        if path not in since_paths and target not in head_paths \
+                and path not in head_paths:
+            # The path never existed at the previous reviewed
+            # revision and it does not exist at the head either. A
+            # mistyped or crafted path, a traversal path above
+            # all, is not a file that went away. Counting it as
+            # addressed would inflate the summary with work that
+            # was never done, so it reads unaddressed in plain
+            # words.
+            verdict = (
+                "unaddressed, the file never existed at the previous "
+                "reviewed revision or at the head"
+            )
+        elif path not in since_paths:
+            verdict = (
+                "unaddressed, the file did not exist at the previous "
+                "reviewed revision, so no anchored line was reviewed then"
+            )
+        elif target not in head_paths:
             verdict = "addressed, the file is gone at the head"
             addressed += 1
         else:
@@ -1675,7 +1772,8 @@ def findings_accounting(repo, diff_base, since, head, findings):
             else:
                 verdict = "unaddressed, the anchored lines are unchanged"
         lines.append(
-            "- %s:%d %s — %s" % (path, anchor, finding["text"], verdict)
+            "- %s:%d %s. %s"
+            % (display_path(path), anchor, finding["text"], verdict)
         )
     lines.append("")
     lines.append(
@@ -1942,7 +2040,10 @@ def render_completeness(budget, packet_estimate, tier_info, dropped,
             "as if it were whole. Discrepancies follow."
         )
         for item in discrepancies:
-            lines.append("Missing or mismatched: %s" % item)
+            lines.append(
+                "Missing or mismatched: %s"
+                % item.replace("\n", "\\n").replace("\r", "\\r")
+            )
     lines.append("")
     return "\n".join(lines)
 
@@ -2194,7 +2295,7 @@ def build_packet_text(header, tier_texts, rereview, tier_info, dropped,
             budget, packet_estimate, tier_info, dropped,
             verified, discrepancies,
         )
-        packet = "\n".join(sections + [completeness])
+        packet = sanitize_packet_text("\n".join(sections + [completeness]))
         new_estimate = estimate_tokens(packet)
         if new_estimate == packet_estimate:
             break
@@ -2214,6 +2315,7 @@ def manifest_file_records(files):
             "hunks": entry["hunks"],
             "binary": entry["binary"],
             "attribute_text": entry["attribute_text"],
+            "binary_transition": entry["binary_transition"],
             "placeholder": entry["placeholder"],
         }
         for entry in files
