@@ -49,6 +49,7 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -58,19 +59,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKSUM_REL = "evals/checksums.json"
-ENTRY_KEYS = (
-    "path",
-    "old_path",
-    "status",
-    "status_code",
-    "additions",
-    "deletions",
-    "hunks",
-    "binary",
-    "binary_transition",
-    "placeholder",
-    "instruction_file",
+GIT_SCRUB_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
 )
+GIT_PIN = [
+    "-c", "core.quotepath=false",
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "color.ui=false",
+    "-c", "color.diff=false",
+    "-c", "color.grep=false",
+    "-c", "color.status=false",
+    "-c", "grep.column=false",
+    "-c", "diff.interHunkContext=0",
+]
+DIFF_FLAGS = [
+    "diff", "--histogram", "--find-renames", "--find-copies",
+    "-W", "--no-ext-diff", "--no-textconv",
+]
 
 
 def artefact_paths(root):
@@ -232,16 +246,30 @@ def corpus_problems(root):
     return []
 
 
-def git(repo, *args):
+def git(repo, *args, raw=False):
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_SCRUB_VARS
+    }
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    argv = (
+        ["git", "--no-replace-objects", "--literal-pathspecs"]
+        + ["-C", str(repo)] + GIT_PIN + list(args)
+    )
     result = subprocess.run(
-        ["git", "-C", str(repo)] + list(args),
+        argv,
         capture_output=True,
-        text=True,
+        text=not raw,
+        env=env,
         timeout=120,
     )
     if result.returncode != 0:
+        stderr = result.stderr
+        if raw:
+            stderr = stderr.decode("utf-8", errors="replace")
         raise AssertionError(
-            "git %s failed with %s" % (" ".join(args), result.stderr)
+            "git %s failed with %s" % (" ".join(args), stderr)
         )
     return result.stdout
 
@@ -280,6 +308,11 @@ def shipped_packet_problems(root, task_dir, checker):
     except (OSError, json.JSONDecodeError) as exc:
         return ["the saved packet of %s cannot be read with %s"
                 % (task_dir.name, exc)]
+    if not isinstance(manifest, dict):
+        return [
+            "the saved manifest of %s does not hold a JSON object"
+            % task_dir.name
+        ]
     if manifest.get("verified") is not True:
         problems.append(
             "the saved manifest of %s does not report verified"
@@ -306,6 +339,7 @@ def rebuild_problems(root, task_dir, tmp):
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "eval@example.com")
     git(repo, "config", "user.name", "Eval Fixture")
+    git(repo, "config", "core.autocrlf", "false")
     git(repo, "config", "commit.gpgsign", "false")
     write_fixture(repo, sources["base"])
     git(repo, "add", "-A")
@@ -316,9 +350,11 @@ def rebuild_problems(root, task_dir, tmp):
     git(repo, "commit", "-m", "head")
     head = git(repo, "rev-parse", "HEAD").strip()
     problems = []
-    rebuilt_diff = git(repo, "diff", "%s..%s" % (base, head))
+    rebuilt_diff = git(
+        repo, *(DIFF_FLAGS + ["%s..%s" % (base, head)]), raw=True
+    )
     saved_diff = (task_dir / "diff.patch").read_bytes()
-    if rebuilt_diff.encode("utf-8") != saved_diff:
+    if rebuilt_diff != saved_diff:
         problems.append(
             "the diff of %s does not rebuild byte for byte from "
             "its sources" % task_dir.name
@@ -347,19 +383,7 @@ def rebuild_problems(root, task_dir, tmp):
             "the rebuilt packet of %s does not report verified"
             % task_dir.name
         )
-    keys = [key for key in ENTRY_KEYS if key in saved["files"][0]]
-    rebuilt_entries = [
-        {key: entry.get(key) for key in keys}
-        for entry in rebuilt["files"]
-    ]
-    saved_entries = [
-        {key: entry.get(key) for key in keys} for entry in saved["files"]
-    ]
-    if rebuilt_entries != saved_entries:
-        problems.append(
-            "the manifest entries of %s do not rebuild from its "
-            "sources" % task_dir.name
-        )
+    problems.extend(entry_problems(task_dir.name, saved, rebuilt))
     check = subprocess.run(
         [sys.executable, str(root / "scripts" / "check_packet.py"),
          str(out), "--repo", str(repo)],
@@ -375,6 +399,60 @@ def rebuild_problems(root, task_dir, tmp):
     return problems
 
 
+def entry_problems(task_name, saved, rebuilt):
+    """Compare the saved manifest entries against the rebuilt ones.
+
+    The rebuilt manifest sets the entry format, because the
+    current extractor writes it. A key that no saved entry of
+    the task carries at all marks a task recorded under an
+    older entry format and that key is set aside for the task.
+    A key missing from only some saved entries is drift and
+    the comparison catches it, because the saved side reads
+    the missing key as no value against the rebuilt value.
+    """
+    saved_files = saved.get("files") if isinstance(saved, dict) else None
+    rebuilt_files = (
+        rebuilt.get("files") if isinstance(rebuilt, dict) else None
+    )
+    if not isinstance(saved_files, list) or not saved_files:
+        return [
+            "the saved manifest of %s records no file entries"
+            % task_name
+        ]
+    if not isinstance(rebuilt_files, list) or not rebuilt_files:
+        return [
+            "the rebuilt manifest of %s records no file entries"
+            % task_name
+        ]
+    keys = list(rebuilt_files[0].keys())
+    dated = {
+        key
+        for key in keys
+        if all(
+            not isinstance(entry, dict) or key not in entry
+            for entry in saved_files
+        )
+    }
+    keys = [key for key in keys if key not in dated]
+    rebuilt_entries = [
+        {key: entry.get(key) for key in keys}
+        for entry in rebuilt_files
+        if isinstance(entry, dict)
+    ]
+    saved_entries = [
+        {key: entry.get(key) for key in keys}
+        if isinstance(entry, dict)
+        else {}
+        for entry in saved_files
+    ]
+    if rebuilt_entries != saved_entries:
+        return [
+            "the manifest entries of %s do not rebuild from its "
+            "sources" % task_name
+        ]
+    return []
+
+
 def packet_problems(root):
     """Rebuild every task and verify its packet and its diff."""
     problems = []
@@ -385,11 +463,22 @@ def packet_problems(root):
     for task_dir in sorted(tasks.iterdir()):
         if not task_dir.is_dir():
             continue
-        problems.extend(shipped_packet_problems(root, task_dir, checker))
         with tempfile.TemporaryDirectory() as tmp:
             try:
+                problems.extend(
+                    shipped_packet_problems(root, task_dir, checker)
+                )
                 problems.extend(rebuild_problems(root, task_dir, tmp))
-            except (OSError, json.JSONDecodeError, AssertionError) as exc:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                IndexError,
+                TypeError,
+                AttributeError,
+                subprocess.SubprocessError,
+                AssertionError,
+            ) as exc:
                 problems.append(
                     "the rebuild of %s failed with %s"
                     % (task_dir.name, exc)

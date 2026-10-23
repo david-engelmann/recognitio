@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -1594,6 +1595,97 @@ class TestCheckEvals(unittest.TestCase):
                 self.mod.ROOT = original
             self.assertEqual(code, 0)
             self.assertEqual(self.mod.checksum_problems(root), [])
+
+    def test_a_manifest_entry_missing_a_key_fails_the_rebuild(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = (
+                root / "evals" / "tasks" / "task-03" / "manifest.json"
+            )
+            manifest = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["files"]), 2)
+            del manifest["files"][0]["hunks"]
+            target.write_text(json.dumps(manifest), encoding="utf-8")
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any(
+                    "task-03" in problem and "entries" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_non_object_manifest_is_a_problem_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = (
+                root / "evals" / "tasks" / "task-02" / "manifest.json"
+            )
+            target.write_text("[1, 2]\n", encoding="utf-8")
+            problems = self.mod.packet_problems(root)
+            self.assertTrue(
+                any("task-02" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_task_with_crlf_sources_rebuilds_byte_for_byte(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            task = root / "evals" / "tasks" / "task-07"
+            task.mkdir()
+            base = {"crlf.py": "one = 1\r\ntwo = 2\r\n"}
+            head = {"crlf.py": "one = 1\r\ntwo = 22\r\n"}
+            (task / "sources.json").write_text(
+                json.dumps({"base": base, "head": head}),
+                encoding="utf-8",
+            )
+            (task / "planted.md").write_text(
+                "# Planted defects for task-07\n\nNone.\n",
+                encoding="utf-8",
+            )
+            work = Path(tmp) / "build"
+            repo = work / "repo"
+            repo.mkdir(parents=True)
+            self.mod.git(repo, "init", "-b", "main")
+            self.mod.git(repo, "config", "user.email", "eval@example.com")
+            self.mod.git(repo, "config", "user.name", "Eval Fixture")
+            self.mod.git(repo, "config", "core.autocrlf", "false")
+            self.mod.git(repo, "config", "commit.gpgsign", "false")
+            self.mod.write_fixture(repo, base)
+            self.mod.git(repo, "add", "-A")
+            self.mod.git(repo, "commit", "-m", "base")
+            base_sha = self.mod.git(repo, "rev-parse", "HEAD").strip()
+            self.mod.write_fixture(repo, head)
+            self.mod.git(repo, "add", "-A")
+            self.mod.git(repo, "commit", "-m", "head")
+            head_sha = self.mod.git(repo, "rev-parse", "HEAD").strip()
+            diff = self.mod.git(
+                repo,
+                *(self.mod.DIFF_FLAGS
+                  + ["%s..%s" % (base_sha, head_sha)]),
+                raw=True,
+            )
+            self.assertIn(b"\r\n", diff)
+            (task / "diff.patch").write_bytes(diff)
+            out = work / "out"
+            extract = (
+                root / "skills" / "recognitio" / "scripts" / "extract.py"
+            )
+            run = subprocess.run(
+                [sys.executable, str(extract), "--repo", str(repo),
+                 "--range", "%s..%s" % (base_sha, head_sha),
+                 "--out", str(out)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            shutil.copy2(out / "packet.md", task / "packet.md")
+            shutil.copy2(out / "manifest.json", task / "manifest.json")
+            problems = self.mod.packet_problems(root)
+            self.assertFalse(
+                any("task-07" in problem for problem in problems),
+                problems,
+            )
 
     def test_a_renamed_cited_test_fails_the_corpus_check(self):
         with tempfile.TemporaryDirectory() as tmp:
