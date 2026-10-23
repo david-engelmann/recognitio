@@ -20,6 +20,7 @@ first, so binary files and non UTF-8 content cannot crash the run.
 """
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -103,7 +104,9 @@ LOCKFILE_NAMES = {
 # the manifest instead of listing it exactly like ordinary code.
 # The set is name based and deterministic. It covers the agent
 # guidance names hosts load at any depth, the Copilot instructions
-# file name, and the Cursor rules names.
+# file name, the path specific Copilot instructions files under
+# .github/instructions, the Cursor rules names, and the Claude
+# rules files under .claude/rules.
 INSTRUCTION_BASENAMES = {
     "AGENTS.md",
     "CLAUDE.md",
@@ -1093,6 +1096,15 @@ def is_instruction_path(path):
         return True
     if name.endswith(".mdc") and ".cursor" in parts:
         return True
+    if len(parts) >= 3 and parts[-3] == ".github" \
+            and parts[-2] == "instructions" \
+            and name.endswith(".instructions.md"):
+        return True
+    if name.endswith(".md") and any(
+        parts[index] == ".claude" and parts[index + 1] == "rules"
+        for index in range(len(parts) - 2)
+    ):
+        return True
     return False
 
 
@@ -1973,6 +1985,72 @@ def dedupe_findings(findings):
     return unique, duplicates
 
 
+def _content_lines(data):
+    """The lines of one file revision with line endings normalised.
+
+    The bytes are decoded the way the packet decodes file text,
+    split on line feeds, and a carriage return closing a line is
+    dropped, so a line that only changed its ending compares
+    equal to itself.
+    """
+    text = data.decode("utf-8", "surrogateescape")
+    return [
+        line[:-1] if line.endswith("\r") else line
+        for line in text.split("\n")
+    ]
+
+
+def _unchanged_old_lines(old_lines, new_lines):
+    """Old line numbers whose content survives in the new revision.
+
+    The two revisions are matched line by line in order, so an
+    old line counts as unchanged only when the same words stand
+    at the matched position in the new revision.
+    """
+    matcher = difflib.SequenceMatcher(
+        None, old_lines, new_lines, autojunk=False
+    )
+    unchanged = set()
+    for tag, i1, i2, _j1, _j2 in matcher.get_opcodes():
+        if tag == "equal":
+            unchanged.update(range(i1 + 1, i2 + 1))
+    return unchanged
+
+
+def _content_changed_ranges(repo, since, head, entry, git_ranges):
+    """Filter diff ranges to the lines whose content really changed.
+
+    Hunk membership alone would mark a line changed when the
+    interval only re-terminated it, as a rename that flips every
+    line ending of a file does. The old side and the new side of
+    the file are compared with line endings normalised away,
+    and a range keeps only the old lines that no matching line
+    survives for. When either side of the file cannot be read,
+    the diff ranges stand as they are.
+    """
+    if entry["status"] == "deleted":
+        return git_ranges
+    old_data = file_bytes(
+        repo, since, entry["old_path"] or entry["path"]
+    )
+    new_data = file_bytes(repo, head, entry["path"])
+    if old_data is None or new_data is None:
+        return git_ranges
+    unchanged = _unchanged_old_lines(
+        _content_lines(old_data), _content_lines(new_data)
+    )
+    in_hunks = set()
+    for start, count in git_ranges:
+        in_hunks.update(range(start, start + count))
+    ranges = []
+    for number in sorted(in_hunks - unchanged):
+        if ranges and ranges[-1][0] + ranges[-1][1] == number:
+            ranges[-1] = (ranges[-1][0], ranges[-1][1] + 1)
+        else:
+            ranges.append((number, 1))
+    return ranges
+
+
 def rereview_ranges(repo, since, head):
     """The diff ranges and tree listings one accounting runs over.
 
@@ -2025,7 +2103,9 @@ def rereview_ranges(repo, since, head):
         since_path = normalize_finding_path(
             entry["old_path"] or entry["path"]
         )
-        ranges_by_path[since_path] = old_side_ranges(chunk)
+        ranges_by_path[since_path] = _content_changed_ranges(
+            repo, since, head, entry, old_side_ranges(chunk)
+        )
         if entry["status"] == "renamed":
             moved_to[since_path] = normalize_finding_path(entry["path"])
     return ranges_by_path, moved_to, head_paths, since_paths
@@ -2071,9 +2151,12 @@ def findings_accounting(repo, diff_base, since, head, findings):
     """Mark each prior finding addressed or unaddressed.
 
     A finding counts as addressed when the file is gone at the head or
-    when the lines it anchors to sit inside a hunk of the diff between
-    the previous reviewed head and this head. When the anchored lines
-    survive that diff untouched, the finding is unaddressed.
+    when the content of the lines it anchors to changed between the
+    previous reviewed head and this head. A change of line endings
+    alone does not change the content of a line, so a finding on a
+    line that was only re-terminated reads unaddressed. When the
+    anchored lines survive that interval untouched, the finding is
+    unaddressed.
 
     Repeated copies of one finding are removed before the cap is
     applied, so the summary counts unique findings and duplicates

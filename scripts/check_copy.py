@@ -515,6 +515,89 @@ def _closes_quote(text, quote):
     return False
 
 
+def _yaml_carried_state(raw, stripped, indent, number, state):
+    """Run the carried state checks for one YAML line.
+
+    Returns a pair of a carried flag and the spans the carried
+    state yields for this line. A line inside a block scalar, a
+    spanning quoted scalar or an unfinished flow collection is
+    prose of that carried shape and never reaches the line
+    reader below. The three carried shapes never stand active
+    together, because each one is entered from the line reader
+    only while the others are clear and each consumes every
+    line until it closes.
+    """
+    if state["block_indent"] is not None:
+        if stripped and indent <= state["block_indent"]:
+            state["block_indent"] = None
+        else:
+            spans = [(number, clean(raw))] if stripped else []
+            return True, spans
+    if state["open_quote"] is not None:
+        # A line inside a spanning quoted scalar is prose in
+        # full, whatever shape its first words take.
+        spans = [(number, clean(raw))]
+        if _closes_quote(raw, state["open_quote"]):
+            state["open_quote"] = None
+        return True, spans
+    if state["flow_buffer"] is not None:
+        state["flow_buffer"].append(stripped)
+        joined = "\n".join(state["flow_buffer"])
+        if _flow_complete(joined):
+            spans = [
+                (state["flow_start"], clean(value))
+                for value in flow_prose_values(joined)
+            ]
+            state["flow_buffer"] = None
+            return True, spans
+        return True, []
+    return False, []
+
+
+def _yaml_flow_yields(text, number, state):
+    """The prose spans of one flow collection standing on a line.
+
+    A complete collection is read by the flow reader at once. An
+    incomplete one is buffered into the carried state and read
+    whole when its closing line arrives.
+    """
+    if _flow_complete(text):
+        return [
+            (number, clean(value)) for value in flow_prose_values(text)
+        ]
+    state["flow_buffer"] = [text]
+    state["flow_start"] = number
+    return []
+
+
+def _yaml_key_value(split, number, candidate_col, state):
+    """The prose spans of the value on one key line.
+
+    A flow value is read by the flow reader, a quoted value is
+    yielded whole with its spanning state recorded when it does
+    not close on its line, and a plain value is yielded with the
+    key column recorded so a more indented line after it reads
+    as its continuation.
+    """
+    _key, value = split
+    state["plain_key_col"] = None
+    if not value:
+        return []
+    value = _strip_value_prefix(value)
+    if not value:
+        return []
+    if value.startswith("{") or value.startswith("["):
+        # A flow collection standing as a key value, after any
+        # anchor or tag tokens, is read by the flow reader.
+        return _yaml_flow_yields(value, number, state)
+    if value[0] in "\"'":
+        if _quoted_end(value) is None:
+            state["open_quote"] = value[0]
+        return [(number, clean(value))]
+    state["plain_key_col"] = candidate_col
+    return [(number, clean(value))]
+
+
 def yaml_prose_lines(lines):
     """Yield the prose of a YAML file.
 
@@ -533,35 +616,21 @@ def yaml_prose_lines(lines):
     mapping, standing at the same column, is never swallowed as
     a continuation.
     """
-    block_indent = None
-    open_quote = None
-    flow_buffer = None
-    flow_start = 0
-    plain_key_col = None
+    state = {
+        "block_indent": None,
+        "open_quote": None,
+        "flow_buffer": None,
+        "flow_start": 0,
+        "plain_key_col": None,
+    }
     for number, raw in enumerate(lines, start=1):
         stripped = raw.strip()
         indent = len(raw) - len(raw.lstrip())
-        if block_indent is not None:
-            if stripped and indent <= block_indent:
-                block_indent = None
-            else:
-                if stripped:
-                    yield number, clean(raw)
-                continue
-        if open_quote is not None:
-            # A line inside a spanning quoted scalar is prose in
-            # full, whatever shape its first words take.
-            yield number, clean(raw)
-            if _closes_quote(raw, open_quote):
-                open_quote = None
-            continue
-        if flow_buffer is not None:
-            flow_buffer.append(stripped)
-            joined = "\n".join(flow_buffer)
-            if _flow_complete(joined):
-                for value in flow_prose_values(joined):
-                    yield flow_start, clean(value)
-                flow_buffer = None
+        carried, spans = _yaml_carried_state(
+            raw, stripped, indent, number, state
+        )
+        yield from spans
+        if carried:
             continue
         if not stripped:
             continue
@@ -573,85 +642,48 @@ def yaml_prose_lines(lines):
             yield number, clean(body)
             continue
         if YAML_BLOCK.search(raw):
-            block_indent = indent
-            plain_key_col = None
+            state["block_indent"] = indent
+            state["plain_key_col"] = None
             continue
+        plain_key_col = state["plain_key_col"]
         if plain_key_col is not None:
             if indent > plain_key_col:
                 # A line inside a spanning plain scalar is prose
                 # in full, whatever shape its first words take.
                 yield number, clean(raw)
                 continue
-            plain_key_col = None
+            state["plain_key_col"] = None
         candidate = stripped
         while candidate.startswith("- "):
-            # Repeated list markers are structure too. A nested
-            # sequence of mappings opens with two or more markers
-            # and stripping only one leaves the inner key standing
-            # as if it were prose.
+            # Repeated list markers are structure too, so a nested
+            # sequence of mappings is stripped to its inner key.
             candidate = candidate[2:].lstrip()
         candidate_col = len(raw.rstrip()) - len(candidate)
         flow_text = _strip_value_prefix(candidate)
         if flow_text.startswith("{") or flow_text.startswith("["):
-            # A flow collection standing as a list item, behind an
-            # anchor or a tag as much as bare, is structure in its
-            # brackets and its key marks, and its values are
-            # yielded for the scan by the flow reader.
-            if _flow_complete(flow_text):
-                for value in flow_prose_values(flow_text):
-                    yield number, clean(value)
-            else:
-                flow_buffer = [flow_text]
-                flow_start = number
-            plain_key_col = None
+            yield from _yaml_flow_yields(flow_text, number, state)
+            state["plain_key_col"] = None
             continue
         split = _split_key(candidate)
         if split:
-            _key, value = split
-            if not value:
-                plain_key_col = None
-                continue
-            value = _strip_value_prefix(value)
-            if not value:
-                plain_key_col = None
-                continue
-            if value.startswith("{") or value.startswith("["):
-                # A flow collection standing as a key value, after
-                # any anchor or tag tokens, is read by the flow
-                # reader in the same way.
-                if _flow_complete(value):
-                    for inner in flow_prose_values(value):
-                        yield number, clean(inner)
-                else:
-                    flow_buffer = [value]
-                    flow_start = number
-                plain_key_col = None
-                continue
-            if value[0] in "\"'":
-                yield number, clean(value)
-                if _quoted_end(value) is None:
-                    open_quote = value[0]
-                plain_key_col = None
-                continue
-            yield number, clean(value)
-            # A plain scalar value can span the lines that follow
-            # it. Its column is the column the key stands in, so
-            # only a line indented past that column continues it.
-            plain_key_col = candidate_col
+            yield from _yaml_key_value(
+                split, number, candidate_col, state
+            )
             continue
         if candidate and candidate[0] in "\"'" \
                 and _quoted_end(candidate) is None:
             yield number, clean(candidate)
-            open_quote = candidate[0]
-            plain_key_col = None
+            state["open_quote"] = candidate[0]
+            state["plain_key_col"] = None
             continue
         yield number, clean(candidate)
         if candidate and candidate[0] not in "{[\"'":
-            plain_key_col = candidate_col
-    if flow_buffer is not None:
-        for value in flow_prose_values("\n".join(flow_buffer)):
-            yield flow_start, clean(value)
-
+            state["plain_key_col"] = candidate_col
+    if state["flow_buffer"] is not None:
+        for value in flow_prose_values(
+            "\n".join(state["flow_buffer"])
+        ):
+            yield state["flow_start"], clean(value)
 
 def comment_spans(path):
     """Yield (number, text) pairs for the comment spans of a file."""

@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import io
 import json
@@ -647,6 +648,21 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertEqual(self.run_main_on([path]), 0)
 
+    def test_no_function_in_check_copy_passes_the_length_ceiling(self):
+        source = (ROOT / "scripts" / "check_copy.py").read_text(
+            encoding="utf-8"
+        )
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                length = node.end_lineno - node.lineno + 1
+                self.assertLessEqual(
+                    length, 86,
+                    "function %s runs %d lines, over the 86 line "
+                    "ceiling the gate scripts record"
+                    % (node.name, length),
+                )
+
 
 class TestEvalDocs(unittest.TestCase):
     def test_the_runner_note_describes_the_current_method(self):
@@ -716,6 +732,23 @@ class TestCheckSkill(unittest.TestCase):
         code, err = self.run_main_on_skill_text(text)
         self.assertEqual(code, 1)
         self.assertIn("over the %d limit" % self.mod.SKILL_TEXT_LIMIT, err)
+        self.assertIn("references file", err)
+
+    def test_a_multibyte_skill_file_past_the_byte_limit_fails(self):
+        head = "---\nname: recognitio\ndescription: a packet\n---\n\n"
+        text = head + "世" * 7000
+        self.assertEqual(len(text), 7048)
+        self.assertLess(len(text), self.mod.SKILL_TEXT_LIMIT)
+        self.assertEqual(len(text.encode("utf-8")), 21048)
+        self.assertGreater(
+            len(text.encode("utf-8")), self.mod.SKILL_TEXT_LIMIT
+        )
+        code, err = self.run_main_on_skill_text(text)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "bytes, over the %d limit" % self.mod.SKILL_TEXT_LIMIT,
+            err,
+        )
         self.assertIn("references file", err)
 
     def test_a_skill_file_at_the_size_limit_passes(self):
@@ -1002,6 +1035,101 @@ class TestCheckVersion(unittest.TestCase):
         self.assertEqual(
             self.mod.manifest_conflict_problems(
                 '{"name": "x", "mcpServers": {}}', mcp
+            ),
+            [],
+        )
+
+    def test_manifest_conflict_problems_follow_the_strict_states(self):
+        plugin = '{"name": "x", "skills": ["./skills/x/"]}'
+        # A missing strict key reads as true on the host, so an
+        # entry that names components and omits the key loads.
+        absent = (
+            '{"plugins": [{"name": "x", '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(plugin, absent), []
+        )
+        # An entry that sets strict to false beside a plugin
+        # manifest is the conflict the host refuses.
+        present_false = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            plugin, present_false
+        )
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("strict to false", problems[0])
+        # An entry that sets strict to true loads with the
+        # manifest as its definition.
+        present_true = (
+            '{"plugins": [{"name": "x", "strict": true, '
+            '"skills": ["./skills/x/"]}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(plugin, present_true),
+            [],
+        )
+
+    def test_manifest_conflict_problems_cover_the_experimental_home(self):
+        # The pure experimental pair, with themes declared
+        # under the experimental object on both sides, is the
+        # pair the round 7 audit watched the host refuse.
+        pure_plugin = (
+            '{"name": "x", "experimental": '
+            '{"themes": ["./themes/"]}}'
+        )
+        pure_entry = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"experimental": {"themes": ["./themes/"]}}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            pure_plugin, pure_entry
+        )
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("themes", problems[0])
+        # The mixed pair, with the plugin manifest declaring
+        # themes at the top level and the entry declaring them
+        # under its experimental object, refuses in the same
+        # way.
+        mixed_entry = pure_entry
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x", "themes": ["./themes/"]}', mixed_entry
+        )
+        self.assertEqual(len(problems), 1, problems)
+        # The scan covers the whole conflict set in that home
+        # and not themes alone.
+        skills_entry = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"experimental": {"skills": ["./skills/x/"]}}]}'
+        )
+        problems = self.mod.manifest_conflict_problems(
+            '{"name": "x"}', skills_entry
+        )
+        self.assertEqual(len(problems), 1, problems)
+        # An experimental object carrying no conflict field is
+        # a control that passes, because the monitors field in
+        # that home stands outside the conflict set.
+        monitors_entry = (
+            '{"plugins": [{"name": "x", "strict": false, '
+            '"experimental": {"monitors": []}}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(
+                '{"name": "x"}', monitors_entry
+            ),
+            [],
+        )
+        # An experimental conflict with no strict key still
+        # loads, because the missing key reads as true.
+        absent_entry = (
+            '{"plugins": [{"name": "x", '
+            '"experimental": {"themes": ["./themes/"]}}]}'
+        )
+        self.assertEqual(
+            self.mod.manifest_conflict_problems(
+                pure_plugin, absent_entry
             ),
             [],
         )

@@ -128,14 +128,26 @@ This unreleased work carries version 1.3.0.
   exact name and recording the record only repairs of each
   round as uncovered in the open.
 - A size guard on the skill file in the skill validator, set
-  at 16000 characters with a 20 percent buffer under the
-  disclosed host cut, and a manifest conflict check in the
-  version gate that fails when a marketplace entry and the
-  plugin manifest both specify components under a strict
-  false entry.
+  at 16000 in both characters and bytes with a 20 percent
+  buffer under the disclosed host cut, and a manifest
+  conflict check in the version gate that fails when a
+  marketplace entry specifies a component field at the top
+  level of the entry or under its experimental object while
+  the entry sets strict to false and a plugin manifest
+  stands beside the entry.
 - A review report for the round 6 fix change itself, written
   from the template in REVIEW.md at
   `docs/reviews/round6-fix-review.md` with a real four way
+  disposition count of its own findings.
+- A round 7 section in the corpus index, mapping each
+  incident of that round to its covering tests by exact name
+  and recording the record only repairs of the round as
+  uncovered in the open, with the round 6 section completed
+  by the two fence tests and the one review record finding
+  it had omitted.
+- A review report for the round 7 fix change itself, written
+  from the template in REVIEW.md at
+  `docs/reviews/round7-fix-review.md` with a real four way
   disposition count of its own findings.
 
 ### Fixed
@@ -404,3 +416,33 @@ This unreleased work carries version 1.3.0.
   after an anchor or a tag or inside a flow sequence as much
   as in the positions earlier rounds covered, while prose
   values in every one of those shapes still flag.
+- The manifest conflict check in the version gate now
+  follows the host on a missing strict key. An entry that
+  omits the key loads as if strict were true, so the check
+  fails a components pair only when the entry sets strict
+  to false, and its scan reads the experimental object of
+  the entry for the whole conflict field set, so a themes
+  declaration in that home no longer passes a pair the host
+  refuses.
+- Changed instruction files are flagged on two further
+  surfaces hosts load. A path specific Copilot instructions
+  file under the instructions folder of .github and a
+  Claude rules file under .claude/rules now carry the
+  instruction file flag in the triage list and in the
+  manifest.
+- The skill file size guard now counts bytes beside
+  characters and fails on whichever measure crosses the
+  limit first, so a multibyte skill file cannot pass under
+  the character count while standing past a byte counting
+  host cut.
+- A re-review finding now reads addressed only when the
+  content of its anchored lines changed. A rename that
+  flips the line endings of a file no longer marks the
+  findings on its unchanged lines addressed, because the
+  ranges behind the verdict are filtered by a comparison
+  of the old and new content with line endings normalised
+  away.
+- The stateful YAML reader in the copy gate now stands as
+  named helpers under the recorded function length ceiling,
+  with an AST test pinning that ceiling for the file and no
+  change in what the fence flags.
