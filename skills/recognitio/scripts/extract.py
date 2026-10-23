@@ -1229,7 +1229,13 @@ def git_grep_lines(repo, head, term, fixed=True):
         args = ["grep", "--text", "-n", "-z", "-w", "-F", "-e", term, head]
     result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
-        return []
+        # A search that failed is not a search that found nothing.
+        # Returning no hits would let the tier report an absence
+        # the run never established, inside a verified packet.
+        raise GitError(
+            "git grep failed with exit %d: %s"
+            % (result.returncode, result.stderr.strip())
+        )
     return parse_grep_z(result.stdout, head)
 
 
@@ -1288,7 +1294,10 @@ def git_grep_bulk(repo, head, terms):
     args.append(head)
     result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
-        return {term: [] for term in unique}
+        raise GitError(
+            "git grep failed with exit %d: %s"
+            % (result.returncode, result.stderr.strip())
+        )
     hits = {term: [] for term in unique}
     for path, lineno, content in parse_grep_z(result.stdout, head):
         for term in unique:

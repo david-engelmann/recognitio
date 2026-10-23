@@ -249,3 +249,11 @@ This unreleased work carries version 1.3.0.
   and a fence completeness test walks the tree and fails when
   an authored prose file exists that the scanner does not
   cover.
+- Three answers to review of the round 2 change itself. A
+  companion search that fails now ends the run with a failure
+  receipt instead of reporting that nothing was found. A
+  malformed version declaration in the unreleased section of
+  this changelog now governs instead of falling back to a
+  released heading. The copy discovery skips dependency
+  directories and symlinks that leave the tree, and a missing
+  plugin manifest is reported instead of passing unscanned.

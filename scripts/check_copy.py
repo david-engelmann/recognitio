@@ -41,16 +41,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 def discover_prose_files(root=None):
-    """Every authored prose file the bar reaches, found by rule."""
+    """Every authored prose file the bar reaches, found by rule.
+
+    Local dependency and tool directories are not authored prose,
+    so a Markdown file under a hidden directory other than the
+    GitHub config directory, or under a node_modules directory,
+    stays outside the fence, and so does a symlink whose target
+    leaves the tree. The generated eval packets stay outside it
+    for the reason the module docstring records.
+    """
     root = ROOT if root is None else root
     found = []
     for path in sorted(root.rglob("*.md")):
-        if ".git" in path.parts:
-            continue
         rel = path.relative_to(root)
-        if len(rel.parts) == 4 and rel.parts[:2] == ("evals", "tasks") \
-                and rel.parts[3] == "packet.md":
+        parts = rel.parts
+        if any(
+            part == "node_modules"
+            or (part.startswith(".") and part != ".github")
+            for part in parts[:-1]
+        ):
             continue
+        if len(parts) == 4 and parts[:2] == ("evals", "tasks") \
+                and parts[3] == "packet.md":
+            continue
+        if path.is_symlink():
+            try:
+                path.resolve().relative_to(root.resolve())
+            except ValueError:
+                continue
         found.append(path)
     for extra in (
         root / ".github" / "ISSUE_TEMPLATE" / "config.yml",
@@ -81,16 +99,17 @@ def discover_comment_files(root=None):
 
 
 def discover_manifest_files(root=None):
-    """Plugin manifests whose description fields are public prose."""
+    """Plugin manifests whose description fields are public prose.
+
+    The two paths are fixed surfaces of the repo, so both are
+    returned even when one is absent, and the caller reports the
+    missing file instead of passing a scan that never ran.
+    """
     root = ROOT if root is None else root
-    found = []
-    for path in (
+    return [
         root / ".claude-plugin" / "plugin.json",
         root / ".claude-plugin" / "marketplace.json",
-    ):
-        if path.is_file():
-            found.append(path)
-    return found
+    ]
 
 
 PROSE_FILES = discover_prose_files()

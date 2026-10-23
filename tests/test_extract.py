@@ -1990,6 +1990,32 @@ class TestRound2CompanionScaling(unittest.TestCase):
         )
         self.assertFalse(extract_mod.term_matches_line("", "anything"))
 
+    def test_a_failed_companion_search_fails_closed(self):
+        class Failed:
+            returncode = 2
+            stdout = ""
+            stderr = "fatal: search failed"
+
+        original = extract_mod.run_git
+
+        def failing(repo_arg, args, check=True, global_flags=()):
+            if args and args[0] == "grep":
+                return Failed()
+            return original(
+                repo_arg, args, check=check, global_flags=global_flags
+            )
+
+        extract_mod.run_git = failing
+        try:
+            with self.assertRaises(extract_mod.GitError):
+                extract_mod.git_grep_lines("repo", "head", "name")
+            with self.assertRaises(extract_mod.GitError):
+                extract_mod.git_grep_bulk(
+                    "repo", "head", ["one", "two"]
+                )
+        finally:
+            extract_mod.run_git = original
+
     def test_build_t2_runs_one_grep_however_many_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             commits = []

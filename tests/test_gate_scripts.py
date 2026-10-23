@@ -261,6 +261,47 @@ class TestCheckCopy(unittest.TestCase):
             self.assertIn("evals/tasks/task-99/planted.md", found)
             self.assertNotIn("evals/tasks/task-99/packet.md", found)
 
+    def test_discovery_skips_dependency_dirs_and_outside_symlinks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "note.md").write_text(
+                "A note.\n", encoding="utf-8"
+            )
+            venv = root / ".venv" / "lib"
+            venv.mkdir(parents=True)
+            (venv / "README.md").write_text(
+                "Third party docs.\n", encoding="utf-8"
+            )
+            modules = root / "node_modules" / "pkg"
+            modules.mkdir(parents=True)
+            (modules / "README.md").write_text(
+                "Third party docs.\n", encoding="utf-8"
+            )
+            outside = root.parent / "outside-the-tree.md"
+            outside.write_text("Outside the tree.\n", encoding="utf-8")
+            try:
+                (root / "docs" / "linked.md").symlink_to(outside)
+            except OSError:
+                linked = False
+            else:
+                linked = True
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertIn("docs/note.md", found)
+            self.assertNotIn(".venv/lib/README.md", found)
+            self.assertNotIn("node_modules/pkg/README.md", found)
+            if linked:
+                self.assertNotIn("docs/linked.md", found)
+
+    def test_manifest_discovery_returns_missing_paths_for_the_caller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            found = self.mod.discover_manifest_files(Path(tmp))
+            self.assertEqual(len(found), 2)
+            self.assertTrue(all(not p.exists() for p in found))
+
     def test_em_dash_in_a_manifest_description_is_caught(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_tmp(
@@ -477,6 +518,20 @@ class TestCheckVersion(unittest.TestCase):
         })
         self.assertTrue(
             any("not a version" in p for p in problems), problems
+        )
+
+    def test_a_malformed_unreleased_declaration_governs(self):
+        text = (
+            "## [Unreleased]\n\nThis work carries version 01.3.0.\n\n"
+            "## [1.3.0] - 2026-01-01\n"
+        )
+        self.assertIsNone(self.mod.changelog_version(text))
+        problems = self.mod.coherence_problems({
+            "CHANGELOG.md": self.mod.changelog_version(text),
+            "EXTRACTOR_VERSION": "1.3.0",
+        })
+        self.assertTrue(
+            any("no version" in p for p in problems), problems
         )
 
     def test_a_decoy_carries_phrase_in_a_release_note_loses(self):

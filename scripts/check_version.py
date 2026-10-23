@@ -27,7 +27,7 @@ VERSION_SHAPE = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
 VERSION_RE = re.compile(VERSION_SHAPE)
 EXTRACTOR_RE = re.compile(r'^EXTRACTOR_VERSION\s*=\s*"([^"]+)"', re.M)
 RELEASED_RE = re.compile(r"^## \[(%s)\]" % VERSION_SHAPE, re.M)
-CARRIES_RE = re.compile(r"carries version (%s)" % VERSION_SHAPE)
+CARRIES_DECLARATION_RE = re.compile(r"carries version\s+(\S+)")
 UNRELEASED_RE = re.compile(r"^## \[Unreleased\]", re.M)
 SECTION_RE = re.compile(r"^## \[", re.M)
 
@@ -92,9 +92,15 @@ def changelog_version(text):
         rest = text[unreleased.end():]
         following = SECTION_RE.search(rest)
         section = rest[:following.start()] if following else rest
-        match = CARRIES_RE.search(section)
-        if match:
-            return match.group(1)
+        declaration = CARRIES_DECLARATION_RE.search(section)
+        if declaration:
+            # A declaration stands in the unreleased section, so
+            # its word governs. A value that is not a strict
+            # version is a broken declaration, not an absence, and
+            # it must never fall back to a released heading and
+            # pass beside surfaces that carry the real version.
+            candidate = declaration.group(1).rstrip(".,;:!?)]}")
+            return candidate if VERSION_RE.fullmatch(candidate) else None
     match = RELEASED_RE.search(text)
     return match.group(1) if match else None
 
