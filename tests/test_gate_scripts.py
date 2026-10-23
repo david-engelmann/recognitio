@@ -299,10 +299,18 @@ class TestCheckPacket(unittest.TestCase):
             return self.mod.main([str(out), "--repo", str(self.repo)])
 
     def test_verified_packet_for_the_current_head_passes(self):
-        out = self.write_packet(
-            "good", {"verified": True, "head": self.head}
+        out = self.write_sections_packet(
+            "good",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
         )
         self.assertEqual(self.run_check(out), 0)
+
+    def test_a_manifest_without_sections_fails(self):
+        out = self.write_packet(
+            "nosections", {"verified": True, "head": self.head}
+        )
+        self.assertEqual(self.run_check(out), 1)
 
     def test_unverified_packet_fails(self):
         out = self.write_packet(
@@ -311,8 +319,11 @@ class TestCheckPacket(unittest.TestCase):
         self.assertEqual(self.run_check(out), 1)
 
     def test_packet_for_a_stale_head_fails(self):
-        out = self.write_packet(
-            "stale", {"verified": True, "head": "0" * 40}
+        out = self.write_sections_packet(
+            "stale",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
+            head="0" * 40,
         )
         self.assertEqual(self.run_check(out), 1)
 
@@ -341,14 +352,15 @@ class TestCheckPacket(unittest.TestCase):
         (out / "manifest.json").write_text('["verified"]', encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
-    def write_sections_packet(self, name, sections, packet_text):
+    def write_sections_packet(self, name, sections, packet_text,
+                              head=None):
         out = Path(self.tmp.name) / name
         out.mkdir()
         (out / "packet.md").write_text(packet_text, encoding="utf-8")
         (out / "manifest.json").write_text(
             json.dumps({
                 "verified": True,
-                "head": self.head,
+                "head": self.head if head is None else head,
                 "sections": sections,
             }),
             encoding="utf-8",
@@ -382,6 +394,15 @@ class TestCheckPacket(unittest.TestCase):
         )
         self.assertEqual(self.run_check(out), 1)
 
+    def test_a_heading_inside_a_fence_satisfies_nothing(self):
+        out = self.write_sections_packet(
+            "fenced",
+            ["## T0 Triage", "## T3 History"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "````\n## T3 History\n\nQuoted text, not a section.\n````\n",
+        )
+        self.assertEqual(self.run_check(out), 1)
+
     def test_exported_git_dir_does_not_redirect_the_packet_check(self):
         decoy = Path(self.tmp.name) / "decoy"
         decoy.mkdir()
@@ -392,8 +413,10 @@ class TestCheckPacket(unittest.TestCase):
         (decoy / "z.py").write_text("z = 1\n")
         git(decoy, "add", "-A")
         git(decoy, "commit", "-m", "decoy")
-        out = self.write_packet(
-            "good", {"verified": True, "head": self.head}
+        out = self.write_sections_packet(
+            "good",
+            ["## T0 Triage"],
+            "# packet\n\n## T0 Triage\n\nThe triage.\n",
         )
         env = dict(os.environ)
         env["GIT_DIR"] = str(decoy / ".git")

@@ -929,6 +929,48 @@ def fence_for(text):
     return "`" * max(3, longest + 1)
 
 
+def outside_fence(lines):
+    """Flag each line that stands outside every code fence.
+
+    A fence opens on a run of three or more backticks with no
+    backtick in the rest of the line and closes on a run at least
+    as long standing alone. The rule the packet's own fences are
+    written under, read back.
+    """
+    flags = []
+    open_len = None
+    for line in lines:
+        stripped = line.strip()
+        ticks = len(stripped) - len(stripped.lstrip("`"))
+        rest = stripped[ticks:]
+        if open_len is None:
+            flags.append(True)
+            if ticks >= 3 and "`" not in rest:
+                open_len = ticks
+        else:
+            flags.append(False)
+            if ticks >= open_len and rest == "":
+                open_len = None
+    return flags
+
+
+def packet_headings(packet):
+    """The level two headings a packet carries, fences excluded.
+
+    Text the reviewed party wrote stands inside fences, the pull
+    request body above all, and a heading inside a fence is quoted
+    text, not a section of the packet. Recording it as one would
+    let quoted text stand in the manifest as packet structure,
+    and checking against it would let quoted text satisfy a
+    section the packet itself does not hold.
+    """
+    lines = packet.splitlines()
+    return [
+        line for line, outside in zip(lines, outside_fence(lines))
+        if outside and line.startswith("## ")
+    ]
+
+
 def build_t0(files, commit_log, pr_info):
     lines = []
     lines.append("## T0 Triage")
@@ -2203,13 +2245,12 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
         "exclusions": exclusions,
         "selected_tiers": sorted(selected),
         "tiers": tier_info,
-        # The section headings this packet carries, in order. The
-        # packet check compares them against the packet itself, so
-        # a thin packet cannot wear a full packet's manifest.
-        "sections": [
-            line for line in packet.splitlines()
-            if line.startswith("## ")
-        ],
+        # The section headings this packet carries, in order,
+        # counted outside its fences. The packet check compares
+        # them against the packet itself under the same rule, so
+        # a thin packet cannot wear a full packet's manifest and
+        # quoted text cannot stand in for a missing section.
+        "sections": packet_headings(packet),
         "budget": {
             "budget_tokens": args.budget,
             "estimated_tokens": packet_estimate,

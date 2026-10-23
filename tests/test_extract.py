@@ -1545,6 +1545,11 @@ class TestFenceSafety(unittest.TestCase):
             self.assertEqual(
                 stripped.count("## Budget and completeness"), 1
             )
+            manifest = read_manifest(out)
+            self.assertEqual(
+                manifest["sections"].count("## Budget and completeness"),
+                1,
+            )
 
 
 class TestManifestSections(Fixture):
@@ -1562,6 +1567,16 @@ class TestManifestSections(Fixture):
             "## Budget and completeness",
         ):
             self.assertIn(heading, manifest["sections"])
+
+    def test_headings_inside_fences_are_not_recorded(self):
+        packet = (
+            "# title\n\n## T0 Triage\n\n````\n## Forged section\n"
+            "\nquoted text\n````\n\n## T1 The change\n"
+        )
+        self.assertEqual(
+            extract_mod.packet_headings(packet),
+            ["## T0 Triage", "## T1 The change"],
+        )
 
 
 class TestReReviewTraces(unittest.TestCase):

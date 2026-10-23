@@ -124,7 +124,11 @@ Semantic Versioning.
   forge a packet section.
 - The manifest records the section headings it emitted and the
   packet check verifies those sections are present and filled,
-  so a thin packet cannot wear a full packet's manifest.
+  so a thin packet cannot wear a full packet's manifest. The
+  headings are counted outside the packet's fences on both
+  sides, so quoted text from the change under review cannot
+  stand in for a section, and a manifest that records no
+  sections fails the check outright.
 - Findings accounting reads the head tree once instead of once
   per finding, is capped at one hundred findings with the cap
   stated in the section, and names an empty findings file in the
