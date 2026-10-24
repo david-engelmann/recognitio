@@ -497,6 +497,15 @@ def semantic_problems(root=None):
             r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
             low,
         ))
+        # Modifier chain from R36-E1-02. A membership phrase
+        # followed by a pure modifier chain and then
+        # resolved states the same membership at any gap
+        # length, so it fires beside the bounded form.
+        membership_modifier_chain = bool(re.search(
+            r"\b(" + MEMBERSHIP_PHRASES + r")\b"
+            + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
+            low,
+        ))
         # Verb plus membership from S4. A listed verb within
         # 30 of a membership phrase with resolved within 20
         # of the phrase restores the long filler verb shape.
@@ -518,6 +527,7 @@ def semantic_problems(root=None):
             and (
                 verb_then_equivalence
                 or membership_near_resolved
+                or membership_modifier_chain
                 or verb_then_membership_near_resolved
             )
         ):
