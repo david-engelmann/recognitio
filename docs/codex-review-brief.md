@@ -347,6 +347,13 @@ the main policy. Managed guardian_extra_policy takes
 precedence. Blank values are ignored." The managed keys take
 precedence over the local ones in both entries.
 
+The primary agent approvals page at learn.chatgpt.com, recorded
+by the round 25 research, says automatic review fails closed on
+prompt build, review session, and parse failures, checks data
+exfiltration, credential probing, persistent security weakening,
+and destructive actions, and lets admins constrain the reviewer
+with `allowed_approvals_reviewers`.
+
 ## The CI example
 
 The CI example installs with

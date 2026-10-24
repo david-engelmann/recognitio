@@ -181,6 +181,33 @@ class TestCheckCopilot(unittest.TestCase):
                 problems,
             )
 
+    def test_a_markerless_derivation_note_fails(self):
+        # R27-ST-02. The deliberate_source marker distinguishes a
+        # note that derives from a canonical section from passing
+        # prose that merely mentions one. A note that names a
+        # section title without the marker must fail the gate, so
+        # a regression to bare substring matching cannot pass the
+        # suite. A naive substring check would pass this plant.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "Derives from canonical skill, Trust and limits, "
+                "which keeps untrusted content outside the "
+                "packet's verified boundary, and the primary "
+                "GitHub release note for the July 17 2026 change "
+                "at github.com with its security note.",
+                "Derives from a passing mention of Trust and limits "
+                "and nothing at all.",
+            )
+            self.assertTrue(
+                any(
+                    "names no canonical skill section" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_a_dropped_pin_fails(self):
         # A later edit that drops a stated pin must fail the
         # gate instead of drifting in silence.

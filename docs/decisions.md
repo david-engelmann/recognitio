@@ -785,3 +785,42 @@ build like every other build. Skill tightness holds. The
 brief, its gate script, and its tests live outside the
 canonical skill text, and the description protocol is
 untouched.
+
+## 24. Build 14, the Kimi managed plugin
+
+Recorded on 2026-10-24 in round 27. The brief at
+`docs/kimi-plugin-brief.md` records the Kimi managed plugin
+surface as primary, read on 2026-10-24. The manifest `agents`
+field takes one or more `./` paths to agent files, with an
+`agents/` directory at the plugin root auto discovered when the
+field is omitted. User level, extra, project level, and
+`--agent-file` agents all win over the plugin provided agent,
+and replacing a built in agent requires an explicit
+`override: true` in the frontmatter. Plugin skills are invoked
+under their qualified `<pluginId>:<skillName>` name, and the
+bare name no longer works. Global hooks such as `PreToolUse`
+and `Stop` run in the session's project directory, while each
+plugin hook runs with its working directory set to the plugin
+root, and the brief keeps the two scopes distinct. Each
+`systemPrompt` field is limited to 32 KB, with 64 KB total
+across one prompt build. Unsupported runtime fields appear as
+diagnostics and are ignored. Print mode CI runs under the
+reviewer persona through `kimi -p --agent reviewer`, and the CI
+gate waits for the run to settle because print mode stays alive
+while background tasks are pending. The four hook events
+TurnStarted, UserPromptQueued, TaskStarted, and SessionHeartbeat
+are configurable under `[[hooks]]` in `config.toml`, and the
+managed plugin wires each through a blocking check of its own.
+A check that fails stops the turn it gates. That blocking
+posture is the managed plugin's own contract, recorded here,
+not a platform behavior the primaries describe. The primaries
+describe the events as observation points. Plugins install per
+user and apply to all projects, and the reference layout is the
+alibaba/open-code-review `.kimi-plugin` package. Every rule
+carries a derivation note naming the canonical skill section or
+primary citation it reports, pinned by the gate at
+`scripts/check_kimi.py`, so the scoped guidance cannot become a
+rival instruction source. Decision 4 binds this build like every
+other build. Skill tightness holds. The brief, its gate script,
+and its tests live outside the canonical skill text, and the
+description protocol is untouched.

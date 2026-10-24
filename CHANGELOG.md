@@ -366,6 +366,20 @@ This unreleased work carries version 1.3.0.
   model. The gate at `scripts/check_copilot.py` pins every
   rule's derivation note and the three adversarial pins the
   round 26 red team proved. Decision 23 records the build.
+- Build 14, the Kimi managed plugin. The brief at
+  `docs/kimi-plugin-brief.md` records the managed plugin surface
+  as primary. The manifest `agents` field carries auto discovery,
+  the collision precedence is explicit, plugin skills are invoked
+  under their qualified names, hooks run in the session project
+  directory in the global scope and at the plugin root in the
+  plugin scope, the four hook events each carry a blocking check,
+  the limits are 32KB per `systemPrompt` field and 64KB total,
+  unsupported runtime fields appear as diagnostics, and print
+  mode CI runs under the reviewer persona. The gate at
+  `scripts/check_kimi.py` pins every rule's derivation note and
+  the six adversarial pins the round 27 red team proved, with a
+  live blocking test over the four hook events. Decision 24
+  records the build.
 
 ### Fixed
 

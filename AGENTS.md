@@ -40,7 +40,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_cursor.py`, the CodeRabbit guidelines check at
 `scripts/check_coderabbit.py`, the Antigravity plugin contract check at
 `scripts/check_antigravity.py`, the Copilot SDK agent build check at
-`scripts/check_copilot.py`, the test vacuity guard at
+`scripts/check_copilot.py`, the Kimi managed plugin check at
+`scripts/check_kimi.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -182,6 +183,18 @@ not a gate.
   primary citation it reports, pinned by the gate at
   `scripts/check_copilot.py`, so the scoped guidance cannot
   become a rival instruction source.
+- `docs/kimi-plugin-brief.md` holds the brief for Build
+  14, the Kimi managed plugin. The agents manifest field with
+  auto discovery, the explicit collision precedence, the
+  qualified skill names, the hook working directory in both
+  scopes, the four hook events with a blocking check on each,
+  the 32KB per `systemPrompt` field and 64KB total limits, the
+  unsupported runtime field diagnostics, and the print mode CI
+  persona under `kimi -p --agent reviewer`. Every rule carries
+  a derivation note naming the canonical skill section or the
+  primary citation it reports, pinned by the gate at
+  `scripts/check_kimi.py`, so the scoped guidance cannot
+  become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -264,7 +277,7 @@ this map instead.
 
 ## Current state
 
-Written on 2026-10-15 and updated on 2026-10-23. The first version
+Written on 2026-10-15 and updated on 2026-10-24. The first version
 of the skill is built and landed on `main`, with the extractor, the
 four tier model and the fail closed manifest in place. The first
 perfection cycle hardened the extractor against ambient git
@@ -381,4 +394,9 @@ v0.65.0 pin with the docs lag caveat, the PreToolUse hook
 wiring as the build's declared mapping, the second extensions
 namespace beside the portable core, and the generalized
 extension path resolution with the package root tree pin, and
-closed the round 24 findings.
+closed the round 24 findings. The round 26 pass then landed
+Build 13, the Copilot SDK agent build with its derivation noted
+brief and gate script, and closed the round 26 findings. The
+round 27 pass then landed Build 14, the Kimi managed plugin
+with its derivation noted brief and gate script, and closed the
+round 27 findings.

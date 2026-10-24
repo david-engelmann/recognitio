@@ -224,6 +224,24 @@ class TestCheckCoderabbit(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_security_merge_blocking_pin_fails(self):
+        # R27-SP-02. The October 5 2026 changelog entry says
+        # publishing the CodeRabbit Security check alone does
+        # not block. A later edit that drops the entry must fail
+        # the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "publishing alone does not block.",
+                "publishing alone blocks every merge.",
+            )
+            self.assertTrue(
+                any("security merge blocking entry" in p
+                    for p in problems),
+                problems,
+            )
+
     def test_a_dropped_auto_approvals_pin_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

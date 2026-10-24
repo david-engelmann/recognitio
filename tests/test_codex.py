@@ -270,6 +270,29 @@ class TestCheckCodex(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_fails_closed_lifecycle_fails(self):
+        # R27-SP-01. Automatic review fails closed on prompt
+        # build, review session, and parse failures, per the
+        # primary agent approvals page. A later edit that drops
+        # the lifecycle sentence must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.brief_text(root)
+            broken = text.replace(
+                "fails closed on\nprompt build, review session, and "
+                "parse failures",
+                "fails open on prompt build, review session, and "
+                "parse failures",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("fails closed lifecycle" in p for p in problems),
+                problems,
+            )
+
     def test_a_decision_record_without_decision_4_fails(self):
         # Every landed build records a decision 4 statement. A
         # Build 9 record without one fails the pin.

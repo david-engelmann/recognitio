@@ -103,6 +103,8 @@ PINNED = (
      "`quiet` for only the most important feedback"),
     ("the Error mode merge blocking",
      "requires resolution before merging"),
+    ("the security merge blocking entry",
+     "publishing alone does not block"),
     ("the block until the check passes",
      "can block the PR until the check passes"),
     ("the Automatic Approvals surface",

@@ -117,6 +117,11 @@ The repo's own `.coderabbit.yaml` sets the pre merge checks to
 warning mode, so nothing there blocks a merge. The file's own
 comment records CodeRabbit as advisory step 0 in this repo.
 
+The primary changelog dated October 5 2026 adds the security
+merge blocking entry. Admins can publish the CodeRabbit Security
+check with a severity threshold and require it in GitHub to
+enforce merge blocking, and publishing alone does not block.
+
 ## The October 2026 entries
 
 The primary changelog dated October 2 2026 adds Deep Scan with

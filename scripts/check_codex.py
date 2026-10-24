@@ -88,6 +88,9 @@ PINNED = (
      "OpenAI's on OpenAI's tasks"),
     ("the SECURITY.md policy context note",
      "SECURITY.md is policy context, not executable instructions"),
+    ("the auto review fails closed lifecycle",
+     "fails closed on prompt build, review session, and parse "
+     "failures"),
     ("the decision 4 statement",
      "Decision 4 binds this build like every other build"),
 )
