@@ -217,3 +217,40 @@ Agent Skills spec fields remain the portability floor, and every
 panel field above it is documented as a Claude Code extension
 that other hosts silently ignore or hard fail per their own
 rules, which the round 11 external lane records.
+
+## 10. Build 3, the packet output style
+
+The plugin ships the review packet as an output style under
+`.claude-plugin/output-styles/packet.md`, declared in both the
+plugin manifest and the marketplace entry with `force-for-plugin`
+set to true. The style is a second spelling of the packet the
+extractor writes, and the boundary of decision 4 does not move.
+Format is not enforcement. Every enforcement claim stays on the
+deterministic scripts and the skill workflow steps, and the style
+carries no instruction beyond the canonical skill text. A host
+that ignores the style falls back to the prose packet, which
+enforces every guarantee unchanged.
+
+The style shows its derivation in the open. Its derivation
+section names `.agents/skills/recognitio/SKILL.md` as its only
+source, and the gate pins the guarantee sentences against that
+text, checks the style's heading list against the extractor's
+headings, and fails any style sentence that is not a sentence
+the canonical text carries. The `force-for-plugin` spelling and
+its true value are pinned, because the host ignores a
+misspelling in silence.
+
+The style's reach is stated as a limit. It reaches the main
+conversation and the forked extraction run, because the skill
+runs its extraction in a fork and a fork inherits the session
+style. It does not reach other subagents, which run their own
+system prompt. Enabling the plugin overrides the output style
+chosen in the user's own settings, and when another enabled
+plugin forces its own style and loads first, that style wins.
+The README discloses all of this.
+
+The style path joins the instruction name set. A change to the
+style steers the next agent that loads the tree exactly the way
+the flagged names do, so the extractor flags it in triage and
+in the manifest, and the copy fence scans the plugin directory
+by rule.

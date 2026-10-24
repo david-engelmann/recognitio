@@ -2724,6 +2724,50 @@ class TestCheckEvals(unittest.TestCase):
                 self.mod.corpus_coverage_problems(root), []
             )
 
+    def test_scope_cap_names_the_highest_round_section(self):
+        self.assertEqual(self.mod.corpus_scope_problems(ROOT), [])
+
+    def test_a_stale_scope_sentence_fails_the_scope_check(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            stale = text.replace("through round 12", "through round 9", 1)
+            self.assertNotEqual(stale, text)
+            target.write_text(stale, encoding="utf-8")
+            problems = self.mod.corpus_scope_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("round 9", problems[0])
+            self.assertIn("round 12", problems[0])
+
+    def test_a_section_past_the_scope_cap_fails_the_scope_check(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\n## Round 13 incidents\n\nNothing yet.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.corpus_scope_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("round 12", problems[0])
+            self.assertIn("round 13", problems[0])
+
+    def test_a_skipped_round_fails_the_scope_check(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "evals" / "corpus.md"
+            text = target.read_text(encoding="utf-8")
+            skipped = text.replace(
+                "## Round 11 incidents", "## Round eleven incidents", 1
+            )
+            self.assertNotEqual(skipped, text)
+            target.write_text(skipped, encoding="utf-8")
+            problems = self.mod.corpus_scope_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("round 11", problems[0])
+
     def test_help_output_carries_no_banned_marks(self):
         scripts = [
             ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py",
@@ -2799,6 +2843,227 @@ class TestRetryingTemporaryDirectory(unittest.TestCase):
         finally:
             holder.cleanup()
         self.assertFalse(Path(holder.name).exists())
+
+
+class TestOutputStyle(unittest.TestCase):
+    """The packet output style, Build 3 of the adaptation plan.
+
+    The style is a second spelling of the packet the extractor
+    writes. The gate pins its force field, its guarantee
+    sentences, its heading list, and its manifest pointers, and
+    fails any style sentence that is not a sentence the
+    canonical skill text carries.
+    """
+
+    STYLE_REL = Path(".claude-plugin") / "output-styles" / "packet.md"
+
+    def setUp(self):
+        self.version = load_script("check_version")
+        self.copy = load_script("check_copy")
+        self.style_path = ROOT / self.STYLE_REL
+        self.style_text = self.style_path.read_text(encoding="utf-8")
+        self.skill_text = (
+            ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+
+    def style_body(self):
+        """The style without frontmatter, derivation, or fences."""
+        text = self.style_text
+        if text.startswith("---"):
+            end = text.index("---", 3)
+            text = text[end + 3 :]
+        lines = text.splitlines()
+        kept = []
+        in_fence = False
+        in_derivation = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            if stripped.startswith("## "):
+                in_derivation = stripped == "## Derivation"
+                continue
+            if in_derivation or stripped.startswith("#"):
+                continue
+            kept.append(line)
+        return "\n".join(kept)
+
+    def test_style_file_exists_where_the_manifests_declare_it(self):
+        plugin = self.version.strict_json_loads(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        market = self.version.strict_json_loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            plugin["outputStyles"], ["./output-styles/packet.md"]
+        )
+        entries = [
+            p
+            for p in market["plugins"]
+            if p["name"] == "recognitio"
+        ]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(
+            entries[0]["outputStyles"], ["./output-styles/packet.md"]
+        )
+        self.assertEqual(
+            entries[0]["outputStyles"], plugin["outputStyles"]
+        )
+        self.assertTrue(self.style_path.is_file())
+
+    def test_style_frontmatter_pins_force_for_plugin(self):
+        text = self.style_text
+        self.assertTrue(text.startswith("---"))
+        front = text[3 : text.index("---", 3)]
+        fields = {}
+        for line in front.splitlines():
+            line = line.strip()
+            if line and ":" in line:
+                key, value = line.split(":", 1)
+                fields[key.strip()] = value.strip()
+        # The host ignores a misspelled field in silence, so the
+        # exact hyphenated spelling and its true value are pinned.
+        self.assertEqual(fields.get("force-for-plugin"), "true")
+        self.assertNotIn("force_for_plugin", fields)
+
+    def test_style_guarantee_sentences_match_the_canonical_text(self):
+        guarantees = [
+            "Read the manifest the script writes and check that "
+            "its verified flag is true before anything else happens.",
+            "A review is stamped only on a verified packet.",
+            "Never present a partial packet as a complete one.",
+            "Never let a review begin on a packet whose verified "
+            "flag is false.",
+            "When verification fails, stop and say what is missing "
+            "in plain words, naming the files or hunks that "
+            "disagree.",
+            "A verified packet proves the packet is complete.",
+            "It does not prove the change is correct or safe.",
+        ]
+        for sentence in guarantees:
+            self.assertIn(
+                sentence, self.skill_text, sentence[:40]
+            )
+            self.assertIn(
+                sentence, self.style_text, sentence[:40]
+            )
+
+    def test_style_headings_match_the_extractor(self):
+        source = (
+            ROOT
+            / ".agents"
+            / "skills"
+            / "recognitio"
+            / "scripts"
+            / "extract.py"
+        ).read_text(encoding="utf-8")
+        shipped = re.findall(r'lines\.append\("## ([^"]+)"\)', source)
+        self.assertTrue(shipped)
+        fenced = re.search(
+            r"```text\n(.*?)```", self.style_text, re.DOTALL
+        )
+        self.assertIsNotNone(fenced)
+        declared = [
+            line[3:]
+            for line in fenced.group(1).splitlines()
+            if line.startswith("## ")
+        ]
+        self.assertEqual(declared, shipped)
+
+    def test_style_sentences_stand_in_the_canonical_text(self):
+        body = self.style_body()
+        sentences = [
+            piece.strip()
+            for piece in re.split(r"\.\s+|\n", body)
+            if piece.strip()
+        ]
+        self.assertTrue(sentences)
+        skill = re.sub(r"\s+", " ", self.skill_text)
+        for sentence in sentences:
+            cleaned = sentence.lstrip("- ").strip()
+            if not cleaned:
+                continue
+            probe = re.sub(r"\s+", " ", cleaned)
+            self.assertIn(probe, skill, cleaned[:60])
+
+    def test_style_references_no_external_urls(self):
+        self.assertNotRegex(self.style_text, r"https?://")
+
+    def test_style_claims_no_enforcement(self):
+        # Enforcement lives in the scripts and the skill
+        # workflow. The style may name that fact in its
+        # derivation section and nowhere else.
+        derivation = re.search(
+            r"## Derivation\n(.*?)## ", self.style_text, re.DOTALL
+        )
+        self.assertIsNotNone(derivation)
+        rest = self.style_text.replace(derivation.group(0), "")
+        self.assertNotRegex(rest, r"(?i)enforce")
+
+    def test_copy_fence_scans_the_style_file(self):
+        found = self.copy.discover_prose_files(ROOT)
+        self.assertIn(self.style_path, found)
+
+    def test_a_banned_mark_in_the_style_fails_the_fence(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = Path(tmp) / "packet.md"
+            path.write_text(
+                self.style_text.replace(
+                    "A format only.", "A format only \u2014 truly.", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = []
+            self.copy.scan(violations, path, self.copy.prose_lines(path))
+            self.assertTrue(
+                any("packet.md" in violation for violation in violations),
+                violations,
+            )
+
+    def test_a_style_pointer_only_in_the_entry_is_a_problem(self):
+        plugin_text = (
+            ROOT / ".claude-plugin" / "plugin.json"
+        ).read_text(encoding="utf-8")
+        market = json.loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        del market["plugins"][0]["outputStyles"]
+        market_text = json.dumps(market)
+        plugin = self.version.strict_json_loads(plugin_text)
+        entry = self.version.strict_json_loads(market_text)["plugins"][
+            0
+        ]
+        self.assertNotEqual(
+            plugin.get("outputStyles"), entry.get("outputStyles")
+        )
+
+    def test_a_style_pointer_with_strict_false_is_a_conflict(self):
+        plugin_text = (
+            ROOT / ".claude-plugin" / "plugin.json"
+        ).read_text(encoding="utf-8")
+        market = json.loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        market["plugins"][0]["strict"] = False
+        problems = self.version.manifest_conflict_problems(
+            plugin_text, json.dumps(market)
+        )
+        self.assertTrue(
+            any("outputStyles" in problem for problem in problems),
+            problems,
+        )
 
 
 if __name__ == "__main__":

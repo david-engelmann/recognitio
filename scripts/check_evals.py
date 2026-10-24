@@ -6,7 +6,7 @@ evals/tasks and on the grading rules those fixtures carry. Before
 this gate no step in the check compared any of those files against
 anything, so a quiet edit to a transcript or a planted rule or a
 recorded number left the gate green. This script closes that gap
-with seven checks that run in one gate step.
+with eight checks that run in one gate step.
 
 The first check compares every eval artefact file under
 evals/tasks plus the results file and the per pass notes and the
@@ -80,6 +80,15 @@ fails here even after a checksum refresh, because the refresh
 does not move this record. A deliberate index change
 moves the coverage first with the coverage write flag, as its
 own committed step.
+
+The eighth check reads the scope sentence at the head of the
+corpus index, which declares the rounds the index covers as
+"from the first cycle through round N", and compares that cap
+against the round sections the index carries. A stale scope
+sentence, a section added past the declared cap, or a skipped
+round fails here, so the gate tells a complete index from one
+abandoned mid program. The checksum refresh refuses to run
+while the scope is stale.
 
 Record keys use the forward slash spelling on every host, so the
 gate reads the same record on Windows and on POSIX.
@@ -979,6 +988,51 @@ def corpus_coverage_problems(root):
     return []
 
 
+def corpus_scope_problems(root):
+    """The index scope sentence must name the highest round section.
+
+    The head paragraph of evals/corpus.md declares the rounds the
+    index covers, "from the first cycle through round N". This
+    check parses that cap and compares it against the "## Round N
+    incidents" sections the index carries. A stale scope
+    sentence, a section added past the declared cap, or a round
+    skipped in between fails here, so the gate can tell a
+    complete index from one abandoned mid program.
+    """
+    try:
+        text = (root / "evals" / "corpus.md").read_text(encoding="utf-8")
+    except OSError:
+        return ["the corpus index cannot be read"]
+    head = text.split("## ", 1)[0]
+    match = re.search(r"through round (\d+)", head)
+    if not match:
+        return ["the corpus index scope sentence names no round cap"]
+    cap = int(match.group(1))
+    rounds = [
+        int(number)
+        for number in re.findall(
+            r"^## Round (\d+) incidents\s*$", text, re.MULTILINE
+        )
+    ]
+    if not rounds:
+        return ["the corpus index carries no round section"]
+    missing = sorted(set(range(1, cap + 1)) - set(rounds))
+    if missing:
+        return [
+            "the corpus index scope sentence caps the index at "
+            "round %d while round %s carries no section"
+            % (cap, ", ".join(str(number) for number in missing))
+        ]
+    highest = max(rounds)
+    if highest != cap:
+        return [
+            "the corpus index scope sentence caps the index at "
+            "round %d while its highest round section is round %d"
+            % (cap, highest)
+        ]
+    return []
+
+
 def write_corpus_coverage(root):
     text = (root / "evals" / "corpus.md").read_text(encoding="utf-8")
     sections = {
@@ -1341,6 +1395,7 @@ def all_problems(root):
     problems.extend(source_anchor_problems(root))
     problems.extend(corpus_problems(root))
     problems.extend(corpus_coverage_problems(root))
+    problems.extend(corpus_scope_problems(root))
     problems.extend(packet_problems(root))
     return problems
 
@@ -1383,6 +1438,7 @@ def main(argv=None):
     if args.write_checksums:
         guard = source_anchor_problems(ROOT)
         guard.extend(corpus_coverage_problems(ROOT))
+        guard.extend(corpus_scope_problems(ROOT))
         if guard:
             for problem in guard:
                 print("check_evals: %s" % problem, file=sys.stderr)
@@ -1412,7 +1468,9 @@ def main(argv=None):
         "still stands in its rebuilt head and every task rebuilds "
         "from its sources and every task sources file matches its "
         "anchor and every corpus name stands in the suite and the "
-        "corpus coverage record matches the index"
+        "corpus coverage record matches the index and the corpus "
+        "scope sentence names the highest round section the index "
+        "carries"
     )
     return 0
 

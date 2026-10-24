@@ -599,3 +599,19 @@ This unreleased work carries version 1.3.0.
   program's ruling, so the event is now a provider adaptation
   build whose brief needs the corpus rows as runnable skill
   tasks for its evidence.
+- The corpus index now covers rounds 10, 11 and 12 with their
+  incidents and regression tests, and the eval gate checks that
+  the scope sentence at the head of the index names the highest
+  round section it carries, so a complete index reads apart from
+  one abandoned mid program.
+- The plugin ships the review packet as an output style with
+  force for plugin semantics, declared in both the plugin
+  manifest and the marketplace entry. The style is a second
+  spelling of the packet with no instruction beyond the
+  canonical skill text, and the gate pins its guarantee
+  sentences, its heading list and its force field against drift.
+  The README discloses the session global reach and the
+  subagent boundary.
+- A change to the packet output style is flagged as a change to
+  an instruction file in triage and in the manifest, and the
+  copy fence now scans the plugin directory by rule.

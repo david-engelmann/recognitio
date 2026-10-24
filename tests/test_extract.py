@@ -2722,6 +2722,26 @@ class TestRound6InstructionFiles(unittest.TestCase):
                 extract_mod.is_instruction_path(path), path
             )
 
+    def test_output_style_path_flags_and_near_misses_do_not(self):
+        # The packet output style steers the next agent that loads
+        # the tree, so it joins the instruction name set (R13).
+        for path in (
+            ".claude-plugin/output-styles/packet.md",
+            ".claude-plugin/output-styles/other.md",
+        ):
+            self.assertTrue(
+                extract_mod.is_instruction_path(path), path
+            )
+        for path in (
+            ".claude-plugin/plugin.json",
+            ".claude-plugin/skills/demo.md",
+            "output-styles/packet.md",
+            "sub/.claude-plugin/output-styles/packet.md",
+        ):
+            self.assertFalse(
+                extract_mod.is_instruction_path(path), path
+            )
+
     def test_packet_flags_instruction_files_in_triage_and_manifest(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [

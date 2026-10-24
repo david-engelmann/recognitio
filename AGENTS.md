@@ -44,7 +44,10 @@ grading rule, runs a planted defect anchor for each of tasks 01 to
 task-05, compares each task sources file against the source
 anchor record at `evals/source-anchors.json`, and compares each
 corpus section against the coverage record at
-`evals/corpus-coverage.json`. The anchor and coverage records stand
+`evals/corpus-coverage.json`, and checks that the scope sentence
+at the head of the index names the highest round section the
+index carries, so a complete index reads apart from one
+abandoned mid program. The anchor and coverage records stand
 apart from the checksum refresh. A deliberate eval update moves
 them first with the anchor and coverage write flags of the gate
 script, each as its own committed step, and then refreshes the

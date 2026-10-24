@@ -44,6 +44,10 @@ cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 
 The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
 
+### The packet output style
+
+The plugin ships an output style that shapes the review packet as the tiered section document the extractor writes. The style sets `force-for-plugin`, so it applies to every response in the session while the plugin is enabled and it overrides the output style chosen in your own settings. It reaches the main conversation and the forked extraction run, because the skill runs its extraction in a fork and a fork inherits the session style. It does not reach other subagents, which run their own system prompt. If another enabled plugin forces its own style and loads first, that style wins and the review falls back to the prose packet, which enforces every guarantee unchanged. The style is a format only. Every enforcement claim stays on the shipped scripts and the skill workflow.
+
 ## Usage
 
 Extract a pull request by number. The base and head are resolved with the GitHub CLI and the extraction itself runs on local git objects. Both refs must already live in the local clone. When either one is missing the run stops and says to fetch it, because guessing from a same named local branch would build a packet for the wrong change.

@@ -41,6 +41,32 @@
       "test_rename_into_a_newline_filename_forges_nothing",
       "test_transition_receipt_and_no_raw_nul_in_packet"
     ],
+    "Round 10": [
+      "test_a_casual_filename_note_does_not_move_d1",
+      "test_a_doubling_denial_gets_no_credit",
+      "test_a_plus_side_overcount_gets_no_credit",
+      "test_a_single_summary_move_fails_the_agreement_check",
+      "test_kindred_doubling_words_credit",
+      "test_pristine_fences_grade_as_recorded"
+    ],
+    "Round 11": [
+      "test_a_commented_task06_doubling_fails_the_d2_effect_anchor",
+      "test_a_doubling_denial_gets_no_credit",
+      "test_a_shimmed_task06_head_fails_the_d1_effect_anchor",
+      "test_kindred_doubling_words_credit",
+      "test_task01_three_argument_tamper_fails_the_task_anchor",
+      "test_task_anchors_pass_on_the_real_tree",
+      "test_the_real_eval_artefacts_pass"
+    ],
+    "Round 12": [
+      "test_a_repeated_key_in_marketplace_json_fails",
+      "test_a_repeated_key_in_plugin_json_fails",
+      "test_a_wrong_typed_strict_key_is_a_problem",
+      "test_frontmatter_description_is_pinned",
+      "test_marketplace_entry_description_is_pinned",
+      "test_marketplace_lists_the_plugin_with_its_skill_path",
+      "test_plugin_manifest_description_is_pinned"
+    ],
     "Round 2": [
       "test_a_decoy_carries_phrase_in_a_release_note_loses",
       "test_a_leading_zero_version_is_not_a_version",

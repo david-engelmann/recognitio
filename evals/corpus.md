@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 9, with each round
+found, from the first cycle through round 12, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -244,6 +244,54 @@ record of this change and no test pins it. The deliberate
 residual over the tasks 01 to 05 score distribution stands
 as decision 8 in the decisions file, and no test pins a
 prose decision.
+
+## Round 10 incidents
+
+Round 10 was a research and plan refinement round and shipped
+no code of its own. Its red team filed two findings against
+the round 9 eval hardening, and both were closed by the round
+11 landing.
+
+| Incident | Covered by |
+| --- | --- |
+| The fence grader credited grading tokens anywhere in the transcript, so a score move plus a token plant passed the derivation the round 9 repair added (R10-RT-01) | `test_pristine_fences_grade_as_recorded` and `test_a_casual_filename_note_does_not_move_d1` and `test_a_doubling_denial_gets_no_credit` and `test_a_plus_side_overcount_gets_no_credit` and `test_kindred_doubling_words_credit` in tests/test_eval_anchors.py |
+| The two summaries agreement branch of the task-06 re-derivation had no pinning test (R10-SF-01) | `test_a_single_summary_move_fails_the_agreement_check` in tests/test_eval_anchors.py |
+
+One round 10 repair stands as a record only with no test of
+its own, and this section records it as uncovered in the open
+under the rule at the head of this file. The pushed commit
+titles of the round 9 landing did not follow Conventional
+Commits (ST-R10-01), and the round 11 landing closed the
+finding by carrying the prefixes. No test pins a commit title.
+
+## Round 11 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Tasks 01 to 05 had no planted defect anchor, so a sources tamper that drops a planted defect passed the full documented refresh (R11-RT-01) | `test_task01_three_argument_tamper_fails_the_task_anchor` and `test_task_anchors_pass_on_the_real_tree` in tests/test_eval_anchors.py, with the per task effect probes in `TASK_ANCHOR_PROBES` in scripts/check_evals.py exercised by `test_the_real_eval_artefacts_pass` in the gate script suite |
+| A shimmed task-06 head kept its planted defect out of reach while the transcripts still described it (R9G-RT-02, first shape) | `test_a_shimmed_task06_head_fails_the_d1_effect_anchor` in tests/test_eval_anchors.py |
+| A commented doubling kept its planted defect out of reach while the transcript still described it (R9G-RT-02, second shape) | `test_a_commented_task06_doubling_fails_the_d2_effect_anchor` in tests/test_eval_anchors.py |
+| A transcript that denied the defect in plain words still derived full credit (R9G-RT-03) | `test_a_doubling_denial_gets_no_credit` and `test_kindred_doubling_words_credit` in tests/test_eval_anchors.py |
+
+Round 11 raised no spec or standards findings of its own, and
+its Build 1 frontmatter widening passed every gate unchanged.
+
+## Round 12 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The skill description was spelled three ways with no text pin on any of them, so a clean rewrite of the trigger-tuned frontmatter description passed the full gate (R12-RT-01) | `test_frontmatter_description_is_pinned` and `test_plugin_manifest_description_is_pinned` and `test_marketplace_entry_description_is_pinned` in the gate script suite |
+| A duplicate key in the packaging manifests was silently resolved to the last value by every gate reader (R12-RT-02) | `test_a_repeated_key_in_plugin_json_fails` and `test_a_repeated_key_in_marketplace_json_fails` in the gate script suite |
+| The marketplace listing could carry a second plugin entry naming the same skill under a different name with the full gate green (R12-RT-03) | `test_marketplace_lists_the_plugin_with_its_skill_path` in the gate script suite, which pins the listing to its single entry |
+| A wrong-typed strict key was silently read as strict true (R12-RT-04) | `test_a_wrong_typed_strict_key_is_a_problem` in the gate script suite |
+
+One round 12 repair stands as a record only with no test of
+its own, and this section records it as uncovered in the open
+under the rule at the head of this file. The mode-only
+follow-up commit title of the round 12 landing carried no
+`chore:` prefix (R13-ST-01, filed in round 13), and the
+convention in AGENTS.md now requires the prefix on every
+pushed title going forward. No test pins a commit title.
 
 ## Disclosure incidents with no test of their own
 
