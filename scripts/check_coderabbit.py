@@ -116,6 +116,15 @@ PINNED = (
      "Deep Scan with linked repositories"),
     ("the 20 linked repositories limit",
      "up to 20 linked repositories"),
+    ("the Deep Scan linked source platforms",
+     "available in the scan trigger flow on GitHub Cloud and "
+     "GitHub Enterprise Server and GitLab Cloud"),
+    ("the Deep Scan linked source platform limit",
+     "not available in that flow for self hosted GitLab or "
+     "Azure DevOps or Bitbucket"),
+    ("the Deep Scan linked source default branch pin",
+     "pinned to a commit on each linked repository default "
+     "branch"),
     ("the plan linked repository limit",
      "subject to the plan linked repository limit"),
     ("the manual versus automatic linking",

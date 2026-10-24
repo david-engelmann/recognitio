@@ -750,9 +750,18 @@ def brief_negative_problems(root=None):
                 )
                 return problems
         if (
-            "effort" in low
-            and "bugbot.yaml" in low
-            and re.search(r"\b(pin\w*|set|configur\w*)\b", low)
+            "bugbot.yaml" in low
+            and (
+                re.search(
+                    r"\beffort\b[^.]{0,50}\b(pin\w*|set|configur\w*)\b",
+                    low,
+                )
+                or re.search(
+                    r"\b(pin\w*|set|configur\w*)\b[^.]{0,30}"
+                    r"\beffort\b",
+                    low,
+                )
+            )
             and not re.search(
                 r"\b(claims|secondary|no such|inventing"
                 r"|not|never)\b",
@@ -808,6 +817,7 @@ def cursor_problems(root=None):
     problems.extend(bugbot_rules_problems(root))
     problems.extend(bugbot_yaml_problems(root))
     problems.extend(brief_problems(root))
+    problems.extend(brief_negative_problems(root))
     problems.extend(decision_problems(root))
     return problems
 
