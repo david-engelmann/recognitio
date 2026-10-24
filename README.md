@@ -80,6 +80,10 @@ Before running any route above, pin the install to a commit
 SHA and read the install script, because a skill ships
 executable code and an unpinned route can move under you.
 
+A copied or installed skill does not inherit later upstream
+fixes. Receiving a fix means reinstalling or recopying from
+a newly reviewed pinned commit.
+
 Pinned forms. The plugin route pins on the marketplace add
 line, with a commit SHA after a hash mark. The Cursor route
 and the folder copy route pin by copying from a checkout at

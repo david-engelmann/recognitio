@@ -48,6 +48,14 @@ Antigravity as the forward path for agentic coding assistance.
 The page's FAQ names the Gemini CLI to Antigravity CLI
 migration guide as the concrete form of that path.
 
+The Gemini Code Assist service on GitHub stands in split
+form, with the consumer version deprecated on June 18 2026
+and shut down on July 17 2026 and the enterprise version
+not affected. No brief cites the config page as proof of
+consumer availability, and a new adaptation on the
+enterprise GitHub surface requires a current primary
+status check first.
+
 The October 9 2026 date is the page's content date, and this
 brief never pins a page stamp, because a stamp is a moving
 target. The round 24 lane read the sunset page live on

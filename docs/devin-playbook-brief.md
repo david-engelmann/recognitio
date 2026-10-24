@@ -300,16 +300,21 @@ extension, not a portable Agent Skills core item, so a
 packet workflow that moves a skill to another host must
 not assume the script travels with it. Auto suggested
 skill content passes human curation before entering
-packet procedure, because self generated procedure does
-not reliably help and an uncurated suggestion must never
+packet procedure, because the SkillsBench version 4
+record reports the self generated condition as a loss on
+each of its three dedicated harness configurations, 8.1
+points on Claude Code with Opus 4.7 and 11.3 points on
+Codex with GPT-5.5 and 11.5 points on Gemini CLI with
+Gemini 3.1 Pro, and an uncurated suggestion must never
 become a packet step on its own authority.
 
 Derives from the primary Devin docs skills pages at
 docs.devin.ai, read in the round 30 research sweep, which
 carry the Devin Dynamic Workflows script in a skill as a
-Devin extension, and the SkillsBench self generated record,
-which requires human curation before auto suggested content
-enters procedure.
+Devin extension, and the SkillsBench version 4 record,
+whose self generated condition is reported per model and
+harness configuration and which requires human curation
+before auto suggested content enters procedure.
 
 ### R17. The stacked pull request packet rule
 

@@ -129,6 +129,11 @@ linked repositories, so a scan can take context from linked
 repositories to analyze the primary repository more thoroughly.
 The Deep Scan linked repository limits are up to 20 linked
 repositories subject to the plan linked repository limit.
+Linked source is available in the scan trigger flow on
+GitHub Cloud and GitHub Enterprise Server and GitLab Cloud,
+and is not available in that flow for self hosted GitLab or
+Azure DevOps or Bitbucket. Linked source is pinned to a
+commit on each linked repository default branch.
 Essentials supports manual links while Team, Advanced, and
 Enterprise also support automatic linking. Linked repositories
 provide read only context while findings and coverage remain
