@@ -520,12 +520,14 @@ This unreleased work carries version 1.3.0.
   pairs, clause level guards, and figure binding in
   place of the first narrow forms, with the false
   positives the widening first carried guarded out.
-- A visual pass over the README. A badge row, a
-  recorded demo of a real extraction run, a packet
-  excerpt beside the raw diff for the same commit, a
-  flow diagram, and a platform adaptation table now
-  open the file, and the paired eval result moved
-  into the first screen.
+- A visual pass over the README. The file now
+  opens with a badge row, a recorded demo of a real
+  extraction run, the paired eval result, and a
+  packet excerpt set against the raw diff for the
+  same commit, and a flow diagram and a platform
+  adaptation table stand further down. The version
+  gate now reads the README version badge as one of
+  the surfaces that must agree.
 
 ### Fixed
 

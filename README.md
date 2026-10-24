@@ -8,7 +8,7 @@ Recognitio is an agent skill that pulls the relevant changes out of a pull reque
 
 Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
 
-![A terminal session runs the extractor on a real commit, and the packet shows the whole enclosing function and the test files before the manifest reads verified true](docs/images/recognitio-demo.gif)
+![A terminal session runs the extractor on a real commit, and the packet view shows the enclosing function span and the test files it names before the manifest reads verified true](docs/images/recognitio-demo.gif)
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. The full record lives in [the paired eval results](evals/RESULTS.md).
 
@@ -21,7 +21,7 @@ In the paired eval recorded in this repo the packet pass found 8 of 8 planted de
 
 ## See it on a real change
 
-Commit `991ac6a` in this repo changed two gate scripts. The raw diff for `scripts/check_devin.py` shows a six line window around the edit, with three lines of context on each side.
+Commit `991ac6a` in this repo changed two gate scripts. The first hunk of the raw diff for `scripts/check_devin.py` shows a six line window around the edit, with three lines of context on each side.
 
 ```diff
 diff --git a/scripts/check_devin.py b/scripts/check_devin.py
@@ -72,13 +72,17 @@ The same packet names the test files that mention the changed code and closes wi
 
 20: at scripts/check_devin.py. These tests prove the pin fires
 50:         self.mod = load_script("check_devin")
+```
 
+The packet closes with its recount.
+
+```text
 No tier was dropped.
 
 Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
 ```
 
-Both excerpts are trimmed for length. The full packet for this commit runs 579 lines, and the commands that produce one for any change are in the Usage section below.
+Both excerpts are trimmed for length, and the fence lines inside the packet itself are dropped so the excerpts can sit inside the fences of this file. The full packet for this commit runs 579 lines, and the commands that produce one for any change are in the Usage section below.
 
 ## How it works
 

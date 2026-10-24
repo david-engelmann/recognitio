@@ -3,9 +3,10 @@
 
 The extractor stamps each manifest with its version, the plugin
 manifest carries a version, the marketplace listing carries one in
-its metadata and one on its plugin entry, and the changelog names
+its metadata and one on its plugin entry, the changelog names
 the version its unreleased work carries or the newest released
-version it records. A reader who installs through any surface
+version it records, and the README carries the version on its
+badge. A reader who installs through any surface
 should meet the same version on every one, so the gate fails when
 any of them drifts from the others.
 
@@ -22,6 +23,7 @@ PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
 EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
+README_MD = ROOT / "README.md"
 
 
 class DuplicateKeyError(ValueError):
@@ -61,6 +63,7 @@ RELEASED_RE = re.compile(r"^## \[(%s)\]" % VERSION_SHAPE, re.M)
 CARRIES_DECLARATION_RE = re.compile(r"carries version\s+(\S+)")
 UNRELEASED_RE = re.compile(r"^## \[Unreleased\]", re.M)
 SECTION_RE = re.compile(r"^## \[", re.M)
+BADGE_RE = re.compile(r"badge/version-(%s)-" % VERSION_SHAPE)
 
 
 def plugin_version(text):
@@ -202,6 +205,18 @@ def extractor_version(text):
     return match.group(1) if match else None
 
 
+def readme_badge_version(text):
+    """The version the README badge carries, or None when absent.
+
+    The badge is a static image URL, so nothing updates it when
+    the version moves. Reading it here keeps the badge inside
+    the coherence check instead of letting it drift stale on
+    the next bump.
+    """
+    match = BADGE_RE.search(text)
+    return match.group(1) if match else None
+
+
 def changelog_version(text):
     """The version the changelog speaks for.
 
@@ -316,6 +331,11 @@ def main():
         changelog_version(text) if text is not None else None
     )
 
+    text = read(README_MD)
+    versions["README.md version badge"] = (
+        readme_badge_version(text) if text is not None else None
+    )
+
     problems.extend(coherence_problems(versions))
     if problems:
         for problem in problems:
@@ -323,7 +343,8 @@ def main():
         return 1
     print(
         "check_version: version %s agrees across the plugin manifest, "
-        "the marketplace listing, the extractor and the changelog"
+        "the marketplace listing, the extractor, the changelog and "
+        "the README version badge"
         % versions["EXTRACTOR_VERSION"]
     )
     return 0

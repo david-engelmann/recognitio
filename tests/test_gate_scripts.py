@@ -1018,6 +1018,29 @@ class TestCheckVersion(unittest.TestCase):
             self.mod.plugin_version('{"version": "1.3.0"}'), "1.3.0"
         )
 
+    def test_the_readme_badge_version_is_read(self):
+        badge = (
+            "[![Version](https://img.shields.io/badge/"
+            "version-1.3.0-blue.svg)](CHANGELOG.md)"
+        )
+        self.assertEqual(self.mod.readme_badge_version(badge), "1.3.0")
+        self.assertIsNone(
+            self.mod.readme_badge_version("a README with no badge")
+        )
+
+    def test_a_stale_readme_badge_is_a_problem(self):
+        problems = self.mod.coherence_problems({
+            "plugin.json": "1.3.0",
+            "EXTRACTOR_VERSION": "1.3.0",
+            "README.md version badge": "1.2.0",
+        })
+        self.assertTrue(any("disagree" in p for p in problems), problems)
+        problems = self.mod.coherence_problems({
+            "plugin.json": "1.3.0",
+            "README.md version badge": None,
+        })
+        self.assertTrue(any("no version" in p for p in problems), problems)
+
     def test_disagreement_is_a_problem(self):
         problems = self.mod.coherence_problems({
             "plugin.json": "1.3.0",
