@@ -231,9 +231,9 @@ def rules_problems(root=None):
 
 
 def _sentences(section):
-    """The rules section as lowercased sentences.
+    """The text as lowercased sentences.
 
-    Rule headings are labels, not claims, so they are
+    Headings are labels, not claims, so they are
     stripped before splitting. A heading remainder without
     a period would otherwise merge with the next sentence
     and carry its negation into it.
@@ -259,14 +259,18 @@ def trust_problems(root=None):
     fails. Sentences that state the negative posture, such
     as the brief's own untrusted input sentence, are
     skipped.
+
+    R36-RT-01. The scan reads every sentence in the whole
+    brief, inside and outside the rules section. The three
+    trust core restatements as plain sentences appended
+    after the rules section passed while the scan read the
+    rules section only, so an appended contradiction now
+    fails just as loudly as an in rule rewrite.
     """
     root = ROOT if root is None else root
     raw = read_text(root / "docs" / "copilot-sdk-brief.md")
     if raw is None:
         return ["docs/copilot-sdk-brief.md is missing"]
-    section = rules_section(raw)
-    if section is None:
-        return []
     problems = []
     # R29-RT-13. Trust is a meaning claim, not one phrase:
     # reliable, trustworthy, followable, or trusted head
@@ -291,7 +295,7 @@ def trust_problems(root=None):
         r"\bcredible\b",
         r"\bendorse\w*\b",
     )
-    for sentence in _sentences(section):
+    for sentence in _sentences(raw):
         if "head branch" not in sentence:
             continue
         if "untrusted" in sentence:
@@ -337,7 +341,7 @@ def trust_problems(root=None):
             )
             return problems
     if re.search(r"(?<!no )carries base branch merge authority",
-                 re.sub(r"\s+", " ", section)):
+                 re.sub(r"\s+", " ", raw)):
         problems.append(
             "a copilot rule grants head branch content merge "
             "authority, which the base branch authority rule "
@@ -393,14 +397,18 @@ def approval_problems(root=None):
     permission verb, so it is not flagged. A sentence that
     negates its own permission verb is a correct
     restatement.
+
+    R36-RT-01. The scan reads every sentence in the whole
+    brief, inside and outside the rules section, for the
+    same reason the trust scan does. A plain restatement
+    that an approval fires on a red packet appended after
+    the rules section passed while the scan read the rules
+    section only.
     """
     root = ROOT if root is None else root
     raw = read_text(root / "docs" / "copilot-sdk-brief.md")
     if raw is None:
         return ["docs/copilot-sdk-brief.md is missing"]
-    section = rules_section(raw)
-    if section is None:
-        return []
     problems = []
     # R29-RT-13. Permission is a meaning claim, not one
     # verb: an approval that goes ahead, is granted,
@@ -427,7 +435,7 @@ def approval_problems(root=None):
         r"\bgreenlight\w*\b",
         r"\bis valid\b",
     )
-    for sentence in _sentences(section):
+    for sentence in _sentences(raw):
         if "approval" not in sentence:
             continue
         for pattern in patterns:
@@ -441,7 +449,7 @@ def approval_problems(root=None):
                     "rule forbids"
                 )
                 return problems
-    text = re.sub(r"\s+", " ", section)
+    text = re.sub(r"\s+", " ", raw)
     if re.search(
         r"(?<!never )(?<!not )fires on an? (?:red|unverified) "
         r"packet",

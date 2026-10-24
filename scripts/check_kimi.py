@@ -1115,6 +1115,59 @@ def limits_problems(root=None):
     if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
+    # R36-RT-02. The per field figure and the total figure
+    # swapped state the same inflation with both figures
+    # inside the allowed pair, so the figure census below
+    # passes them. A figure bound to the field scope by a
+    # limit phrase must be the 32 figure, and a figure
+    # bound to the total scope must be the 64 figure. The
+    # derivation note clause that states the 32 per field
+    # limit and the 64 prompt build budget in one breath
+    # binds no limit phrase to its 64 figure, so it passes.
+    for clause in clauses:
+        swap = None
+        for match in re.finditer(
+            r"field\b[^.]{0,80}?(?:limited to|may hold up to"
+            r"|holds? up to|hold up to|capped at|at most)"
+            r"\s*(\d+)\s*kb\b",
+            clause,
+        ):
+            if int(match.group(1)) != 32 and not _neg_before(
+                clause, match.start(), 15
+            ):
+                swap = (
+                    "a kimi rule states a per field limit of "
+                    "%s KB, which swaps the pinned 32KB per "
+                    "field figure for the 64KB total figure"
+                    % match.group(1)
+                )
+        for match in re.finditer(
+            r"(\d+)\s*kb\s+per\s+field\b", clause
+        ):
+            if int(match.group(1)) != 32 and not _neg_before(
+                clause, match.start(), 15
+            ):
+                swap = (
+                    "a kimi rule states a per field limit of "
+                    "%s KB, which swaps the pinned 32KB per "
+                    "field figure for the 64KB total figure"
+                    % match.group(1)
+                )
+        for match in re.finditer(
+            r"(\d+)\s*kb\s+total\b", clause
+        ):
+            if int(match.group(1)) != 64 and not _neg_before(
+                clause, match.start(), 15
+            ):
+                swap = (
+                    "a kimi rule states a total limit of %s "
+                    "KB, which swaps the pinned 64KB total "
+                    "figure for the 32KB per field figure"
+                    % match.group(1)
+                )
+        if swap is not None:
+            problems.append(swap)
+            break
     # R29-RT-05 and R29-RT-12. A limit stated in bytes, in
     # KiB, in words, or as lifted or unlimited is still an
     # inflated limit, and a lowercased figure matches the
