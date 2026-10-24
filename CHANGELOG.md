@@ -488,6 +488,32 @@ This unreleased work carries version 1.3.0.
   carried forward. The Copilot October 22 through
   October 26 window re-read and the November 16
   retirements recheck stay owed after their dates pass.
+- The round 36 pass hardens the landed build gates
+  against the round 36 audit findings with no new build.
+  The Copilot trust and approval negatives now read the
+  whole brief instead of the rules section alone. The
+  Kimi gate catches the per field and total figure swap
+  and a bare name stated as the subject of an invocation.
+  The Cursor gate rejects a repository cap figure stated
+  without the R35-C-01 conflict note beside it, a
+  bugbot.yaml effort pin, and a merge blocking neutral
+  conclusion. The CodeRabbit brief gains the Deep Scan
+  linked source platform limit and the default branch pin
+  beside the linked context sentence, and its gate rejects
+  linked source promised on an excluded platform and any
+  linked repository figure above 20. The ZCode gate
+  rejects an execution claim for the registered fields
+  and a description cap above 1024 characters. The Qwen
+  figure family gains sentence scope, and the Devin
+  membership branch catches membership stated through a
+  pure modifier chain, closing the two structural escapes
+  the round 36 metamorphic generation lane proved. The
+  Devin brief restates its SkillsBench claim under the
+  version 4 citation rule, the Antigravity brief states
+  the Gemini Code Assist on GitHub split status, and the
+  README install guidance states that copies do not
+  inherit upstream fixes. The accepted round 34 single
+  synonym residual stands unchanged.
 
 ### Fixed
 

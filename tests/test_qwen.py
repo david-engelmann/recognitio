@@ -95,6 +95,10 @@ PLANTS = (
     "The .qwen/skills copy is beaten on collision",
     "Qwen runs twenty parallel agents on a large review",
     "Qwen runs two parallel agents on a large review",
+    "Qwen runs 16 reviewers spread across the whole set of "
+    "files in the review packet for this change, with each "
+    "one checking a different part of the diff in full, "
+    "together",
 )
 
 CONTROL = (
@@ -170,9 +174,6 @@ class TestCheckQwen(unittest.TestCase):
             "in Qwen stays UNVERIFIED."), [])
 
     def test_the_wrapped_qoder_unverified_sentence_passes(self):
-        self.assertEqual(self.mod.negative_problems(
-            "Activation of preserved Qoder commands and agents "
-            "in Qwen stays UNVERIFIED."), [])
         self.assertEqual(self.mod.negative_problems(
             "Activation of preserved Qoder commands and agents\n"
             "in Qwen stays UNVERIFIED."), [])

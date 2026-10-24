@@ -424,5 +424,49 @@ class TestCheckCursor(unittest.TestCase):
             )
 
 
+    def test_cap_figure_and_bugbot_control_plants_fail(self):
+        # R36-RT-03. A repository cap figure stated alone,
+        # a bugbot.yaml effort pin, and a merge blocking
+        # neutral conclusion each passed while the pins
+        # stayed in place, because no check read a
+        # contradicting brief sentence.
+        cases = (
+            ("A cloud agent environment supports up to 500 "
+             "repositories.", "cap figure of 500"),
+            ("A cloud agent environment supports up to 300 "
+             "repositories.", "cap figure of 300"),
+            ("Bugbot effort can be pinned at High in "
+             "bugbot.yaml for this repository.",
+             "pins Bugbot effort"),
+            ("A neutral Bugbot conclusion blocks merges on "
+             "findings.", "neutral Bugbot conclusion"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_cap_figure_with_the_conflict_note_passes(self):
+        # R36-RT-03. A cap figure stated with the R35-C-01
+        # conflict named beside it in the same sentence is
+        # the one allowed form, so it passes.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nOne primary page supports up to "
+                "500 repositories and another states 300, "
+                "and the conflict stands unresolved.\n",
+            )
+            self.assertEqual(self.problems(root), [])
+
+
 if __name__ == "__main__":
     unittest.main()

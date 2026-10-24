@@ -489,4 +489,12 @@ consolidated the rounds 31 through 33 builds with no
 new build, closed the round 34 audit findings, added
 the rounds 15 through 24 sections to the eval corpus
 index, and carried every round 33 residual in its
-current wording.
+current wording. The round 36 pass then hardened the
+landed build gates against the round 36 audit findings
+with no new build, widened the Copilot negatives to the
+whole brief, caught the Kimi figure swap and the ZCode
+execution and cap restatements, added the Cursor and
+CodeRabbit brief negatives, gave the Qwen figure family
+sentence scope and the Devin membership branch a
+modifier chain form, folded the remaining plan round 35
+brief corrections, and closed the round 36 findings.

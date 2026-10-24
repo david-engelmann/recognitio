@@ -427,5 +427,47 @@ class TestCheckCoderabbit(unittest.TestCase):
             )
 
 
+    def test_linked_source_plants_fail(self):
+        # R36-RT-04. Linked source promised on an excluded
+        # platform, and a linked repository limit above 20,
+        # each passed while the pins stayed in place.
+        cases = (
+            ("Deep Scan linked source is available in the "
+             "scan trigger flow for self hosted GitLab and "
+             "Azure DevOps and Bitbucket.",
+             "promises Deep Scan linked source"),
+            ("A Deep Scan can read up to 50 linked "
+             "repositories on any plan.",
+             "above the pinned limit of 20"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_dropped_platform_limit_pin_fails(self):
+        # R36-RT-04. The platform limit sentence folded
+        # beside the linked context sentence is pinned, so
+        # dropping it fails.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "not available in that flow for self hosted "
+                "GitLab or Azure DevOps or Bitbucket",
+                "available on every platform",
+            )
+            self.assertTrue(
+                any("platform limit" in p for p in problems),
+                problems,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

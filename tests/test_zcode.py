@@ -243,5 +243,28 @@ class TestCheckZcode(unittest.TestCase):
             )
 
 
+    def test_execution_and_cap_plants_fail(self):
+        # R36-RT-05. An execution claim for the registered
+        # fields and a doubled description cap each passed
+        # while the pins stayed in place, because no check
+        # read a contradicting brief sentence.
+        cases = (
+            ("ZCode executes the settings declared in a "
+             "plugin manifest.", "executing a registered"),
+            ("A plugin description on ZCode runs at most "
+             "2048 characters.", "description cap of 2048"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

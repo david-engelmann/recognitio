@@ -147,6 +147,27 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_github_split_status_fails(self):
+        # Round 36 fold of the plan round 35 section 3 Gemini
+        # correction. The GitHub service status stands in the
+        # split form, and dropping either half of it fails.
+        cases = (
+            ("the consumer version deprecated on June 18 2026",
+             "the consumer version deprecated at some point",
+             "consumer deprecation"),
+            ("the enterprise version not affected",
+             "every version affected alike",
+             "enterprise unaffected"),
+        )
+        for old, new, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(root, old, new)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (old, problems),
+                )
+
     def test_a_dropped_renewal_dates_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

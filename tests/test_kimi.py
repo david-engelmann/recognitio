@@ -1339,6 +1339,47 @@ class TestCheckKimi(unittest.TestCase):
                     (sentence, problems),
                 )
 
+    def test_a_swapped_per_field_limit_fails(self):
+        # R36-RT-02. The total figure bound to the per field
+        # scope states the pinned 64KB total as the per field
+        # limit, with both figures inside the allowed pair,
+        # so the figure census alone passes it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nEach systemPrompt field in Kimi "
+                "may hold up to 64 KB of content.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("per field limit of 64" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_bare_name_subject_invocation_fails(self):
+        # R36-RT-02. A bare name acceptance stated with the
+        # bare name as the subject of an invocation verb
+        # carries no acceptance verb from the existing list,
+        # so the qualified names check passed it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nA bare skill name still invokes a "
+                "plugin skill in Kimi without the qualified "
+                "name.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("accepts a bare name" in p
+                    for p in problems),
+                problems,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

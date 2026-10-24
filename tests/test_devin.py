@@ -516,6 +516,32 @@ class TestCheckDevin(unittest.TestCase):
                 problems = self.problems(root)
                 self.assertEqual(problems, [], (probe, problems))
 
+    def test_modifier_chain_membership_plants_fail(self):
+        # R36-E1-02. A membership phrase joined to resolved
+        # by a 41 character run of pure modifiers defeats
+        # both the 15 character membership bound and the 20
+        # character verb plus membership bound, while the
+        # audit trail probe shapes in the false positive
+        # test above put a noun phrase in the gap and pass.
+        cases = (
+            "Dismissed findings are part of the comprehensive "
+            "and carefully audited resolved total.",
+            "Dismissed findings are treated as part of the "
+            "comprehensive and carefully audited resolved "
+            "total.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any("counts dismissed findings" in p
+                        for p in problems),
+                    (plant, problems),
+                )
+
     def test_a_decision_record_without_decision_4_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
