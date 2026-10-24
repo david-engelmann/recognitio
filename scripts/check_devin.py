@@ -218,6 +218,29 @@ RESOLVED_VERBS = (
 EQUIVALENCE_PHRASES = "as resolved|as fixed"
 MEMBERSHIP_PHRASES = "part of|go into|belong in"
 
+# Modifier chain gap from R36-E1-02. A membership phrase
+# and resolved can also be joined by a run of pure
+# modifiers, articles and conjunctions and adjective or
+# adverb shaped words and nothing else, at any length.
+# The E1 plants put a 41 character modifier run there,
+# far past the 15 and 20 character bounds, while the B3
+# probe puts a noun phrase there, the audit trail, which
+# starts a second claim unit and so stays out. Modifier
+# shaped means an article or conjunction or a word
+# carrying a derivational adjective or adverb suffix. A
+# gap holding any other word shape is not a modifier
+# chain and this branch does not fire on it, so filler
+# that smuggles a noun or a verb into the gap still
+# escapes by design, as the bound comment above records
+# for its own zone.
+MODIFIER_WORD = (
+    r"(?:the|and|or|[a-z]+(?:ly|ous|ive|al|ic|ed|ing|ful"
+    r"|less|able|ible|ent|ant|ary|ory))"
+)
+MEMBERSHIP_MODIFIER_GAP = (
+    r"(?:\s+" + MODIFIER_WORD + r")*\s+"
+)
+
 # Spelled SARIF version words from W-07, mirroring the
 # Qwen gate number word normalisation. A spelled version
 # after SARIF counts the same as its digit form, so

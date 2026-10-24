@@ -404,12 +404,12 @@ def sentence_units(text):
 def figure_problem(sentence):
     """Whether a sentence states a single Qwen figure."""
     if re.search(
-        r"\b" + FIGURE_NUMBER + r"\b" + WINDOW + r"\b("
+        r"\b" + FIGURE_NUMBER + r"\b" + FIGURE_SPAN + r"\b("
         + FIGURE_ADVERBS + r")\b", sentence
     ):
         return True
     if re.search(
-        r"\b(" + FIGURE_ADVERBS + r")\b" + WINDOW + r"\b"
+        r"\b(" + FIGURE_ADVERBS + r")\b" + FIGURE_SPAN + r"\b"
         + FIGURE_NUMBER + r"\b", sentence
     ):
         return True
@@ -418,12 +418,12 @@ def figure_problem(sentence):
     ):
         return False
     if re.search(
-        r"\b" + FIGURE_NUMBER + r"\b" + WINDOW + r"\b("
+        r"\b" + FIGURE_NUMBER + r"\b" + FIGURE_SPAN + r"\b("
         + FIGURE_AGENTS + r")\b", sentence
     ):
         return True
     return bool(re.search(
-        r"\b(" + FIGURE_AGENTS + r")\b" + WINDOW + r"\b"
+        r"\b(" + FIGURE_AGENTS + r")\b" + FIGURE_SPAN + r"\b"
         + FIGURE_NUMBER + r"\b", sentence
     ))
 
