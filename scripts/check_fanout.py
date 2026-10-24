@@ -369,6 +369,11 @@ def check_second_pass(record, merged_ids, files, finding_schema):
                 "%s carries verdict %r, not confirm, contest, or new"
                 % (where, verdict)
             )
+        if verdict in ("confirm", "contest") and fid not in merged_ids:
+            problems.append(
+                "%s judges %r, which is not a merged finding"
+                % (where, fid)
+            )
         if fid in seen:
             problems.append(
                 "%s judges finding %r twice" % (where, fid)

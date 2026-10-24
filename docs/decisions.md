@@ -406,3 +406,44 @@ run shows overlapping groups, a merged finding, a
 contested finding, and a planted defect the first pass
 missed and the second pass caught, and the gate validates
 it on every run.
+
+## 16. Build 7, the Claude Code mod with in process hooks
+
+Recorded on 2026-10-23 in round 18. The mod gates the
+reviewer fan out at spawn time, exploiting the Mods
+surface the round 15 research confirmed on primary. The
+hooks module at `hooks/register.js`, named by
+`hooks/hooks.json`, registers one hook on the
+`agent.spawn` event. The hook reads the review packet
+manifest named by `RECOGNITIO_PACKET_DIR` and denies the
+spawn unless the manifest reads verified, applying the
+shipped deterministic rule and never a model judgment.
+The registration carries a `.catch` handler returning
+the deny shape for `agent.spawn`, so a hook crash fails
+closed. The brief at `docs/mod-build7.md` records the
+second layer fail open as a stated limit. If the catch
+handler itself throws or times out, the host skips the
+hook as if it had no handler and the spawn proceeds.
+
+The brief strikes the `onFailure` language as a category
+error and the `--mod` flag as withdrawn, and narrows the
+`agent.spawn` claim to model choice and deny, which is
+what the primary Mods reference documents. Prompt
+rewriting by the hook stays unverified. The hook sees
+only in session agent spawns. Reviewers the runbook
+starts as `claude -p` subprocesses stay gated by
+`scripts/check_fanout.py`. When mods are disabled or
+unavailable, the mod never loads and the packet scripts
+gate unchanged, which is the decision 4 degradation.
+The mod leaves `disable-model-invocation` at its default
+false with no deny rule, so scheduled `/loop` runs keep
+working. The deployment gate is `claude plugin validate
+--json` with its `gatingHooks` `hasCatch` flags, and the
+host side test story is `claude plugin test` running the
+`*.test.ts` files under `hooks/`. Where the CLI is
+absent, `scripts/check_mod.py` pins the same contract
+deterministically in the repo gate.
+
+Skill tightness holds. The mod, its tests, and the brief
+live outside the canonical skill text, and the
+description protocol is untouched.

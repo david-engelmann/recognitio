@@ -33,13 +33,19 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
 `scripts/check_evals.py`, the persona pin check at
 `scripts/check_persona.py`, the fan-out run record validator at
-`scripts/check_fanout.py`, and an end to end extractor smoke that must
+`scripts/check_fanout.py`, the mod contract check at
+`scripts/check_mod.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
 findings schema, the proof packet manifest, and the primary
 concurrency caps, and fails a run whose groups drop a file, whose
 merge did not dedupe, whose second pass left a finding without an
-evidenced verdict, or whose caps exceed the primary numbers. The eval integrity check reads the
+evidenced verdict or judged a finding outside the merged set, or
+whose caps exceed the primary numbers. The mod contract check pins
+the `hooks/` module list, the `agent.spawn` hook with its `.catch`
+deny handler, the struck `onFailure` language and the withdrawn
+`--mod` flag, the mods API allowlist, and the brief's stated
+limits. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
 the results file, the per pass notes and the corpus index, and
 fails on the first file whose bytes moved. The record loads
@@ -98,6 +104,11 @@ not a gate.
   `workflows/review-fanout.md`, the findings schema at
   `workflows/findings.schema.json`, and the shipped proof run
   under `workflows/proof-run/`. The fan out is a home platform
+  extension beside the portable core, not a change to the
+  canonical skill text.
+- `hooks/` holds the Build 7 mod, the hooks module at
+  `hooks/register.js` named by `hooks/hooks.json` with its
+  `*.test.ts` host side tests. The mod is a home platform
   extension beside the portable core, not a change to the
   canonical skill text.
 - `REVIEW.md` records the review workflow shape for this repo.
@@ -267,5 +278,11 @@ file under `agents/`, the `agents` and `settings` manifest
 keys, a gate script pinning the persona surface field by
 field, and the sentence discipline extended to the persona
 prose, and recorded the Build 16 posture reversal and the
-Build 18 condition lift as decisions 12 and 13. No release has
+Build 18 condition lift as decisions 12 and 13. The round 17 pass
+then landed Build 6, the dynamic workflows review fan out with
+one reviewer per file group and an adversarial second pass, and
+closed the round 17 findings. The round 18 pass then landed
+Build 7, the Claude Code mod with in process hooks gating the
+reviewer fan out at spawn time with a `.catch` fail closed
+handler, and closed the round 18 findings. No release has
 been tagged yet.

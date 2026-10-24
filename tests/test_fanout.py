@@ -265,6 +265,24 @@ class FanoutTestCase(unittest.TestCase):
             any("repeated key" in p for p in problems), problems
         )
 
+    def test_a_verdict_for_an_unknown_finding_fails(self):
+        # R18-ST-01. A second pass verdict that names a finding id
+        # outside the merged set is out of contract and must fail.
+        record = self.proof_record()
+        record["second_pass"].append(
+            {
+                "finding": "phantom",
+                "verdict": "confirm",
+                "evidence": ["src/a.py"],
+                "note": "rechecked the phantom",
+            }
+        )
+        problems = self.problems_for(record)
+        self.assertTrue(
+            any("not a merged finding" in p for p in problems),
+            problems,
+        )
+
 
 class InstructionAgentsTestCase(unittest.TestCase):
     """R17-RT-01. Plugin agent files join the instruction name set."""

@@ -247,8 +247,21 @@ This unreleased work carries version 1.3.0.
   flagged as a change to an instruction bearing file, the way
   decision 10 did for the output style. The gate pins the
   `agents/` directory to exactly the declared agent file.
+- Build 7, the Claude Code mod with in process hooks. The
+  hooks module under `hooks/` registers an `agent.spawn`
+  hook that denies a review spawn unless the packet manifest
+  named by `RECOGNITIO_PACKET_DIR` reads verified, with a
+  `.catch` handler returning the deny shape so a hook crash
+  fails closed. The brief at `docs/mod-build7.md` records
+  the second layer fail open as a stated limit, and the
+  repo gate pins the mod contract in `scripts/check_mod.py`.
+  Decision 16 records the build.
 
 ### Fixed
+
+- The fan out validator now fails a second pass verdict
+  that names a finding outside the merged set. A phantom
+  verdict for a nonexistent finding previously read green.
 
 - Paths that git quotes no longer drop out of the packet. Path data
   moves through NUL delimited output, and every git invocation runs
