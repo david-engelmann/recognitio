@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 12, with each round
+found, from the first cycle through round 14, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -292,6 +292,44 @@ follow-up commit title of the round 12 landing carried no
 `chore:` prefix (R13-ST-01, filed in round 13), and the
 convention in AGENTS.md now requires the prefix on every
 pushed title going forward. No test pins a commit title.
+
+## Round 13 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The corpus index stopped at round 9 while the program was at round 13, leaving the round 10 to 12 incidents unmapped to their regression tests (R13-RT-01) | `test_scope_cap_names_the_highest_round_section` and `test_a_stale_scope_sentence_fails_the_scope_check` and `test_a_section_past_the_scope_cap_fails_the_scope_check` and `test_a_skipped_round_fails_the_scope_check` in the gate script suite, with the round 10, 11 and 12 sections added in the same change pinned by the corpus coverage floor |
+
+One round 13 repair stands as a record only with no test of
+its own, and this section records it as uncovered in the open
+under the rule at the head of this file. The mode-only
+follow-up commit title of the round 13 landing carried no
+`chore:` prefix (R13-ST-01), the same defect the round 12
+section records on the round 12 follow-up, and the convention
+in AGENTS.md now requires the prefix on every pushed title
+going forward. No test pins a commit title.
+
+## Round 14 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The declared outputStyles path missed the shipped style file under the vendor's path rules, so the forced packet style never loaded on the host while the gate stayed green (R14-RT-05) | `test_style_path_resolves_against_the_plugin_root` and `test_the_old_layout_fails_the_vendor_resolution` in the gate script suite, with `test_style_file_exists_where_the_manifests_declare_it` in the gate script suite pinning the relocated file against the plugin root |
+| The derivation section was skipped by the "no new instruction" sentence check, so a novel instruction or a non http external reference shipped with the gate green (R14-RT-01) | `test_style_derivation_is_the_pinned_prose` in the gate script suite, which pins the derivation word for word, with `test_style_claims_no_enforcement` in the gate script suite pinning the line-anchored region the B2 subheading plant first slipped |
+| Substring matching let an imperative inversion of a pinned prohibition pass the sentence check (R14-RT-02) | `test_style_sentences_stand_in_the_canonical_text` in the gate script suite, which matches whole sentences instead of substrings |
+| A duplicate frontmatter key or an unbalanced bracket passed the spelling pin while the host would load the style with no fields set, force silently off (R14-RT-03) | `test_style_frontmatter_is_host_readable` and `test_a_duplicate_frontmatter_key_is_a_readability_problem` and `test_an_unbalanced_bracket_is_a_readability_problem` in the gate script suite |
+| The style pointer test asserted on an in-memory dict and never ran any gate code, so it could not fail for a real reason (R14-RT-04 and R14-ST-01) | `test_an_entry_missing_the_style_pointer_fails_the_pin` in the gate script suite, which plants the defect in real manifest files on a scratch tree and runs the real pin |
+| The Build 4 plan definition named a permission denials signal in stream-json with no primary source, so the adversarial pass it specified could not be built against it (R14-EX-01) | the sourced denial signal in scripts/check_headless.py pinned by `test_permission_denials_fail_the_run` and `test_a_run_without_structured_output_fails` and `test_an_in_run_failure_printed_as_the_result_fails` in tests/test_headless.py, with decision 11 in the decisions file recording the correction |
+
+Five round 14 repairs stand as records only with no test of
+their own, and this section records them as uncovered in the
+open under the rule at the head of this file. The derivation
+source list gained the stamping section as prose (R14-SF-01).
+Decision 9 was rephrased to state the evidence boundary on
+other hosts' frontmatter behavior and the decision 10 path was
+corrected (R14-EX-02). The round 14 fix review report stands in
+the reviews folder as a record of this change and no test pins
+it. The round 11, 12 and 13 fix review records were written
+retrospectively in round 14 from their fix reports with the
+caveat stated, and no test pins any of them.
 
 ## Disclosure incidents with no test of their own
 

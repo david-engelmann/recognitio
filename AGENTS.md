@@ -39,7 +39,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_codex.py`, the Cursor plugin check at
 `scripts/check_cursor.py`, the CodeRabbit guidelines check at
 `scripts/check_coderabbit.py`, the Antigravity plugin contract check at
-`scripts/check_antigravity.py`, the test vacuity guard at
+`scripts/check_antigravity.py`, the Copilot SDK agent build check at
+`scripts/check_copilot.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -171,6 +172,16 @@ not a gate.
   `.cursor/config/bugbot.yaml` with `autofix.mode` set to
   `disabled`. Unknown YAML fields fall back silently down the
   precedence order, so the gate rejects them.
+- `docs/copilot-sdk-brief.md` holds the brief for Build
+  13, the Copilot SDK agent build. Head branch instructions
+  are untrusted input, merge authority lives in base branch
+  CODEOWNERS and rulesets only, an approval never fires on a
+  red packet, and model pinning stays at capability level
+  with no named review model. Every rule carries a
+  derivation note naming the canonical skill section or the
+  primary citation it reports, pinned by the gate at
+  `scripts/check_copilot.py`, so the scoped guidance cannot
+  become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -187,8 +198,9 @@ not a gate.
    A test that cannot fail for a real reason is not a test.
 5. The skill is never named `code-review`. That name would shadow
    the bundled command in Claude Code and muddy the namespace.
-6. Public prose follows the copy bar. No em dashes, no colons and
-   no semicolons in prose sentences. The gate enforces the bar.
+6. Public prose follows the copy bar. No em dashes, no en dashes,
+   no colons and no semicolons in prose sentences. The gate
+   enforces the bar.
 
 ## Conventions
 

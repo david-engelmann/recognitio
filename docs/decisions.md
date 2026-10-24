@@ -658,8 +658,9 @@ kept as compat aliases. It records the focus toggle table as
 the constraint. High trims verbosity and does not deepen
 analysis, and the brief must never treat high as deeper review.
 The focus axis governs review output verbosity while the
-profile axis governs feedback volume and scope, and every focus
-and profile sentence names its axis. The summary fold at high
+profile axis governs feedback volume and scope, and each
+section opens by naming its axis with the two controls never
+mixed. The summary fold at high
 is pinned explicitly, so no reader counts it as added analysis.
 It records the Quiet, Chill, and Assertive profiles as primary,
 with the July 2 2026 Quiet launch. It records the pre merge
@@ -753,4 +754,34 @@ Skill tightness holds. The brief, its gate script at
 `scripts/check_antigravity.py`, its tests, the `.antigravity/`
 plugin tree, and the manifest's second namespace live outside
 the canonical skill text, and the description protocol is
+untouched.
+
+## 23. Build 13, the Copilot SDK agent build
+
+Recorded on 2026-10-24 in round 26. The brief at
+`docs/copilot-sdk-brief.md` records the Copilot code review
+surface as primary, read on 2026-10-24. Head branch
+instructions are untrusted input for the review run, and
+merge authority lives in base branch CODEOWNERS and
+rulesets only, per the July 17 2026 head branch change with
+its security note. An approval never fires on a red packet,
+including opt in approvals that count toward branch
+protection. The review model reports as unknown, so model
+pinning stays at capability level and no rule names a
+review model. The brief records the effort levels, the
+approvals public preview posture, the review cost surface,
+the Microsoft Agent Framework integration, the code review
+API surface, the settings surface, the improved review
+experience, the October 9 2026 weekly releases, the
+November 16 2026 retirement wave, the bot authored pull
+request surface, and the October 22 2026 usage metrics,
+each with the vendor reported or telemetry caveat its
+primary source carries. Every rule carries a derivation
+note naming the canonical skill section or primary
+citation it reports, pinned by the gate at
+`scripts/check_copilot.py`, so the scoped guidance cannot
+become a rival instruction source. Decision 4 binds this
+build like every other build. Skill tightness holds. The
+brief, its gate script, and its tests live outside the
+canonical skill text, and the description protocol is
 untouched.

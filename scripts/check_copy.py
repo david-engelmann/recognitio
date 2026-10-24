@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Enforce the copy bar on the public prose files.
 
-The bar bans three marks from prose sentences. Em dashes, semicolons
-and colons all push a writer toward compressed clauses, and the house
-style is short plain sentences instead. The em dash is matched by
+The bar bans four marks from prose sentences. Em dashes, en
+dashes, semicolons and colons all push a writer toward
+compressed clauses, and the house style is short plain
+sentences instead. The em dash and the en dash are matched by
 codepoint because a shell grep for the character once reported zero
 hits on a tree full of them.
 
@@ -203,6 +204,7 @@ COMMENT_FILES = discover_comment_files()
 MANIFEST_FILES = discover_manifest_files()
 
 EM_DASH = "\u2014"
+EN_DASH = "\u2013"
 FRONTMATTER_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*:(\s|$)")
 LINK_REFERENCE = re.compile(r"^\s*\[[^\]]+\]:")
 BARE_PATH = re.compile(r"^[\w.@~+-]+(/[\w.@~+-]+)+/?$")
@@ -756,6 +758,8 @@ def scan(violations, path, spans):
         where = "%s line %d" % (display_name(path), number)
         if EM_DASH in text:
             violations.append("%s has an em dash" % where)
+        if EN_DASH in text:
+            violations.append("%s has an en dash" % where)
         if ";" in text:
             violations.append("%s has a semicolon" % where)
         if ":" in text:
@@ -791,6 +795,8 @@ def scan_manifest(violations, path):
         where = "%s description field" % display_name(path)
         if EM_DASH in text:
             violations.append("%s has an em dash" % where)
+        if EN_DASH in text:
+            violations.append("%s has an en dash" % where)
         if ";" in text:
             violations.append("%s has a semicolon" % where)
         if ":" in text:

@@ -246,6 +246,12 @@ build, and the primary Bugbot docs at cursor.com/docs/bugbot.
 
 ## Distribution
 
+Skills cannot be imported on their own. A GitHub repo of
+skills must be packaged in a plugin with
+`.cursor-plugin/marketplace.json`, per the primary Cursor
+packaging page. This strengthens the distribution story
+the brief already carries.
+
 Every plugin is manually reviewed before it is listed. All
 plugins must be open source, and we review each update before
 publishing.

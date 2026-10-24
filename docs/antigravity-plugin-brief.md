@@ -106,14 +106,15 @@ and the contract sentences, not the host's enforcement.
 ### S1. The wiring declares one PreToolUse entry
 
 The shipped wiring at `.antigravity/hooks.json` declares one
-`PreToolUse` entry, and the entry's matcher names the review
-run tool call as the build's declared mapping, because the
-primary hooks page names no subagent spawn event.
+`PreToolUse` entry, and the entry's matcher names
+`invoke_subagent` with its Subagents spec fields, per the new
+primary Subagents spec evidence. The matcher is the build's
+declared mapping for the review run tool call.
 
-Derives from the primary hooks page at
-antigravity.google/docs/hooks, which documents exactly six
-events and names no `agent.spawn` event, so the matcher is the
-build's declared mapping and not a primary tool name.
+Derives from the primary Subagents spec, which documents
+`invoke_subagent` with its fields, and the primary hooks page
+at antigravity.google/docs/hooks, which documents exactly six
+events and the stdin and stdout JSON contract.
 
 ### S2. The event contract
 

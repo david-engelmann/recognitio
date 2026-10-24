@@ -357,6 +357,15 @@ This unreleased work carries version 1.3.0.
   namespace in the extensions object and pins the package root
   tree to `plugin.json` and the `skills/` tree. Decision 22
   records the build.
+- Build 13, the Copilot SDK agent build. The brief at
+  `docs/copilot-sdk-brief.md` records the Copilot code review
+  surface as primary. Head branch instructions are untrusted
+  input, merge authority lives in base branch CODEOWNERS and
+  rulesets only, an approval never fires on a red packet, and
+  model pinning stays at capability level with no named review
+  model. The gate at `scripts/check_copilot.py` pins every
+  rule's derivation note and the three adversarial pins the
+  round 26 red team proved. Decision 23 records the build.
 
 ### Fixed
 

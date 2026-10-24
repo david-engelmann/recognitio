@@ -95,8 +95,12 @@ settings hooks, not to mods. The `--mod` flag is struck.
 The one session flags are `--plugin-dir` and
 `--plugin-url`. The `agent.spawn` claim narrows to model
 choice and deny, which is what the primary Mods
-reference documents. Prompt rewriting by the hook stays
-unverified on the primary evidence.
+reference documents. Prompt rewriting by the hook is now
+primary documented. The v2.1.300 release notes and the
+October 14 2026 docs changelog both document the
+prompt.change mod hook. The mods reference return table
+lags behind, showing model choice and deny only, stamped
+as of v2.1.290.
 
 ## The scheduled execution reconciliation
 

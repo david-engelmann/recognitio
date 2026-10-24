@@ -81,9 +81,9 @@ Two separate controls govern how a CodeRabbit review reads, and
 the brief never conflates them. The focus control sets review
 output verbosity. The profile control sets feedback volume and
 scope. A reader who mixes the two will read high as a deeper
-review through the assertive profile's wider scope, so every
-sentence in the focus and profile sections names the axis it
-describes.
+review through the assertive profile's wider scope, so each
+section opens by naming its axis and the two controls are
+never mixed.
 
 ## The profiles
 

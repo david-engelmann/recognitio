@@ -67,6 +67,27 @@
       "test_marketplace_lists_the_plugin_with_its_skill_path",
       "test_plugin_manifest_description_is_pinned"
     ],
+    "Round 13": [
+      "test_a_section_past_the_scope_cap_fails_the_scope_check",
+      "test_a_skipped_round_fails_the_scope_check",
+      "test_a_stale_scope_sentence_fails_the_scope_check",
+      "test_scope_cap_names_the_highest_round_section"
+    ],
+    "Round 14": [
+      "test_a_duplicate_frontmatter_key_is_a_readability_problem",
+      "test_a_run_without_structured_output_fails",
+      "test_an_entry_missing_the_style_pointer_fails_the_pin",
+      "test_an_in_run_failure_printed_as_the_result_fails",
+      "test_an_unbalanced_bracket_is_a_readability_problem",
+      "test_permission_denials_fail_the_run",
+      "test_style_claims_no_enforcement",
+      "test_style_derivation_is_the_pinned_prose",
+      "test_style_file_exists_where_the_manifests_declare_it",
+      "test_style_frontmatter_is_host_readable",
+      "test_style_path_resolves_against_the_plugin_root",
+      "test_style_sentences_stand_in_the_canonical_text",
+      "test_the_old_layout_fails_the_vendor_resolution"
+    ],
     "Round 2": [
       "test_a_decoy_carries_phrase_in_a_release_note_loses",
       "test_a_leading_zero_version_is_not_a_version",

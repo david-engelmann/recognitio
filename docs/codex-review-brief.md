@@ -228,6 +228,19 @@ learn.chatgpt.com/docs/security/setup, read on 2026-10-24,
 names One Time Scan as an explicit Scan Method beside
 Continuous Scanning.
 
+### The billing terms
+
+The primary Security Cloud page, read on 2026-10-24,
+documents the billing terms with the October 21 2026 date.
+Scans set up after October 1 2026 at 1253 Pacific are
+billed at plan token rates outside the plan's included
+allowance. Pre cutoff continuous scans are free until
+October 21 2026, then billed if paid usage is enabled or
+paused. Eligible accounts without pre cutoff continuous
+scanning get 500 dollars in free scanning credits instead,
+shared across scan types and workspace users, with no
+expiry.
+
 ### Continuous commit monitoring
 
 The same setup page documents continuous commit monitoring.
@@ -316,7 +329,9 @@ recommends gpt-5.6-sol with xhigh reasoning effort for best scan
 quality, read on 2026-10-24. CLI 0.161.0 made GPT-6.1 Sol the
 default model, per the round 20 research read on 2026-10-24. A
 brief that writes one model name without naming its surface
-will be caught by its own citations.
+will be caught by its own citations. GPT-5.5 retired from
+Codex on October 14 2026, and the brief claims no Codex
+surface for it after that date.
 
 ## The Guardian auto review keys
 
