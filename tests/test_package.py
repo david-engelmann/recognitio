@@ -11,7 +11,11 @@ present mcp.json, a dangling extension path, a brief without
 the honesty sentence, a brief without the primary AAIF sentence,
 and a brief with the stale AAIF wording each fail the package
 gate, and an em dash in the portable description fails the copy
-gate.
+gate. A second extensions namespace with a dangling shape path
+fails the generalized path resolution, a dangling Antigravity
+shape path fails the same way, and a native platform file
+placed inside the portable core fails the package root tree
+pin.
 """
 
 import importlib.util
@@ -55,6 +59,8 @@ EXTENSION_PATHS = (
     "scripts/check_headless.py",
     "workflows/review-fanout.md",
     "workflows/findings.schema.json",
+    ".antigravity/plugin.json",
+    ".antigravity/hooks.json",
 )
 
 
@@ -194,6 +200,77 @@ class TestCheckPackage(unittest.TestCase):
             problems = self.problems(root)
             self.assertTrue(
                 any("does not resolve" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_second_namespace_with_a_dangling_path_fails(self):
+        # R24-RT-01 and R24-RT-02. Path resolution covers every
+        # namespace in the extensions object, not just the pinned
+        # Claude Code one. A fixture namespace whose shape path
+        # dangles must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["extensions"]["com.example.fixture"] = {
+                "shapes": {"fixtureShape": ["fixture/missing.md"]}
+            }
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "fixture/missing.md" in problem
+                    and "does not resolve" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_dangling_antigravity_path_fails(self):
+        # R24-RT-01 and R24-RT-02. The Build 12 namespace rides
+        # the same generalized resolution as every other
+        # namespace, so a renamed Antigravity shape dangles
+        # loudly instead of in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            shapes = data["extensions"]["com.google.antigravity"]["shapes"]
+            shapes["hookWiring"] = [".antigravity/hooks-missing.json"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("does not resolve" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_native_file_inside_the_portable_core_fails(self):
+        # R24-RT-01. The allowed contents of
+        # agent-plugins-package/ are plugin.json and the skills/
+        # tree. A native platform file placed inside the portable
+        # core must fail the gate instead of blending in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            package = root / "agent-plugins-package"
+            (package / "hooks.json").write_text(
+                '{"hooks": []}\n', encoding="utf-8"
+            )
+            agents = package / "agents"
+            agents.mkdir()
+            (agents / "reviewer.md").write_text(
+                "Native.\n", encoding="utf-8"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "agent-plugins-package/hooks.json" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+            self.assertTrue(
+                any(
+                    "agent-plugins-package/agents/reviewer.md" in problem
+                    for problem in problems
+                ),
                 problems,
             )
 

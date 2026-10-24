@@ -38,7 +38,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_package.py`, the Codex review rules check at
 `scripts/check_codex.py`, the Cursor plugin check at
 `scripts/check_cursor.py`, the CodeRabbit guidelines check at
-`scripts/check_coderabbit.py`, the test vacuity guard at
+`scripts/check_coderabbit.py`, the Antigravity plugin contract check at
+`scripts/check_antigravity.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -142,6 +143,20 @@ not a gate.
   it follows, pinned by the gate at
   `scripts/check_coderabbit.py`, so the scoped guidance cannot
   become a rival instruction source.
+- `docs/antigravity-plugin-brief.md` holds the brief for Build
+  12, the Antigravity plugin alteration. The dated October 9
+  2026 sunset evidence, the v0.65.0 stable pin with the docs lag
+  caveat, the `PreToolUse` hook with the deny, force_ask, and
+  auto_approve decisions as the build's declared mapping, and
+  the second extensions namespace beside the portable core are
+  pinned by the gate at `scripts/check_antigravity.py`, so the
+  scoped guidance cannot become a rival instruction source.
+- `.antigravity/` holds the Build 12 Antigravity plugin
+  manifest at `.antigravity/plugin.json` and the PreToolUse
+  hook wiring at `.antigravity/hooks.json`, declared under the
+  second extensions namespace in the portable manifest. The
+  Antigravity shapes are a home platform extension beside the
+  portable core, not a change to the canonical skill text.
 - `.cursor-plugin/` holds the Cursor plugin manifest at
   `.cursor-plugin/plugin.json` and the marketplace listing at
   `.cursor-plugin/marketplace.json`. The skill ships as a real
@@ -347,4 +362,11 @@ CodeRabbit guidelines build with the derivation noted
 guidelines, the focus table constraint pins, and the rename
 direction pins, added the test vacuity guard against the joint
 check plus test softening attack, brought the Cursor plugin tree
-under the copy fence, and closed the round 23 findings.
+under the copy fence, and closed the round 23 findings. The
+round 24 pass then landed Build 12, the Antigravity plugin
+alteration with the dated October 9 2026 sunset evidence, the
+v0.65.0 pin with the docs lag caveat, the PreToolUse hook
+wiring as the build's declared mapping, the second extensions
+namespace beside the portable core, and the generalized
+extension path resolution with the package root tree pin, and
+closed the round 24 findings.

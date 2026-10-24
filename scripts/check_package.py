@@ -15,12 +15,17 @@ skill must stay byte identical to the canonical skill at
 .agents/skills/recognitio/, which is the only spelling that
 ever changes. Recognitio ships no MCP servers, so mcp.json is
 omitted and its absence is pinned. Every repo relative path
-the extensions object names must resolve in the repo, and the
+the extensions object names must resolve in the repo, across
+every namespace in the extensions object and not just the
+pinned Claude Code one, and the
 brief at docs/agent-plugins-brief.md must state the honesty
 sentence, so the package cannot drift into claiming a native
 Claude Code install it does not have, and must record the Agent
 Skills donation transfer as primary on both halves, so the round
-21 one sentence correction cannot quietly revert.
+21 one sentence correction cannot quietly revert. The tree shape
+of agent-plugins-package/ itself is pinned to plugin.json and
+the skills/ tree, so a native platform shape placed inside the
+portable core fails the gate instead of blending in silence.
 """
 
 import json
@@ -147,20 +152,33 @@ def native_version(root):
 
 
 def extension_paths(data):
-    """Every repo relative path the extensions object declares."""
-    namespace = data["extensions"][NAMESPACE]
+    """Every repo relative path the extensions object declares.
+
+    R24-RT-01 and R24-RT-02. Every namespace object under
+    extensions is resolved, not just the pinned Claude Code one.
+    A second namespace carrying a dangling shape path passed in
+    silence before this change, because the old helper read the
+    shapes object of the pinned namespace only and never looked
+    at a sibling namespace.
+    """
     paths = []
-    for key in ("nativeManifest", "nativeMarketplace"):
-        value = namespace.get(key)
-        if isinstance(value, str):
-            paths.append(value)
-    shapes = namespace.get("shapes")
-    if isinstance(shapes, dict):
-        for entries in shapes.values():
-            if isinstance(entries, list):
-                paths.extend(
-                    entry for entry in entries if isinstance(entry, str)
-                )
+    extensions = data.get("extensions")
+    if not isinstance(extensions, dict):
+        return paths
+    for namespace in extensions.values():
+        if not isinstance(namespace, dict):
+            continue
+        for key in ("nativeManifest", "nativeMarketplace"):
+            value = namespace.get(key)
+            if isinstance(value, str):
+                paths.append(value)
+        shapes = namespace.get("shapes")
+        if isinstance(shapes, dict):
+            for entries in shapes.values():
+                if isinstance(entries, list):
+                    paths.extend(
+                        entry for entry in entries if isinstance(entry, str)
+                    )
     return paths
 
 
@@ -293,6 +311,39 @@ def mcp_problems(root):
     return []
 
 
+def tree_problems(root):
+    """Problems with the package root tree shape.
+
+    R24-RT-01. The allowed contents of agent-plugins-package/
+    are plugin.json and the skills/ tree, and anything else
+    fails the gate. The manifest schema pin cannot catch a
+    native platform file placed inside the portable core,
+    because these are files and not manifest keys, and the
+    skills pin only walks skills/recognitio, so the tree shape
+    needs its own pin.
+    """
+    problems = []
+    package = root / "agent-plugins-package"
+    if not package.is_dir():
+        return ["agent-plugins-package/ is missing"]
+    for path in sorted(package.rglob("*")):
+        if "__pycache__" in path.parts:
+            continue
+        if path.is_dir():
+            continue
+        rel = path.relative_to(package)
+        if len(rel.parts) == 1 and rel.parts[0] == "plugin.json":
+            continue
+        if rel.parts[0] == "skills":
+            continue
+        problems.append(
+            "agent-plugins-package/%s sits inside the portable core, "
+            "but only plugin.json and the skills/ tree may live there"
+            % rel
+        )
+    return problems
+
+
 def brief_problems(root):
     """Problems with the Build 8 brief's stated contract."""
     problems = []
@@ -331,6 +382,7 @@ def package_problems(root=None):
     problems.extend(manifest_problems(data, root))
     problems.extend(skills_problems(root))
     problems.extend(mcp_problems(root))
+    problems.extend(tree_problems(root))
     problems.extend(brief_problems(root))
     return problems
 

@@ -39,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TESTS_DIR = ROOT / "tests"
 
-EXEMPT_NAMES = {"self", "True", "False", "None"}
+EXEMPT_NAMES = {"self"}
 
 
 def assertion_calls(method):

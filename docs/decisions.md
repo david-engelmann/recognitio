@@ -690,3 +690,67 @@ enforce, and enforcement stays on the shipped scripts.
 Skill tightness holds. The brief, its gate script at
 `scripts/check_coderabbit.py`, and its tests live outside the
 canonical skill text, and the description protocol is untouched.
+
+## 22. Build 12, the Antigravity plugin alteration
+
+Recorded on 2026-10-24 in round 24. The brief at
+`docs/antigravity-plugin-brief.md` records the Antigravity
+plugin format with `plugin.json`, `skills/`, `agents/`,
+`rules/`, and `hooks.json` per the primary plugins page read
+as text on 2026-10-24, the six hook events with the
+`PreToolUse` decision contract per the primary hooks page read
+the same day, and a `PreToolUse` hook carrying the `deny`,
+`force_ask`, and `auto_approve` decisions as the build's
+declared mapping for the review run tool call, because the
+primary page names no `agent.spawn` event. The Build 7 mod
+hooks are Claude Code only on current evidence.
+
+The brief records the dated sunset evidence as primary. Starting
+October 9 2026, no new Gemini Code Assist Standard or Enterprise
+subscriptions can be purchased, with existing subscriptions
+continuing through their contract terms, license additions and
+annual renewals running to January 31 2027, and monthly
+renewals running to December 31 2027, and the page names
+Antigravity as the forward path for agentic coding assistance.
+The sunset page was read live on 2026-10-24, and the page
+showed the stamp Last updated 2026-10-20 UTC that day. The
+October 9 2026 date is the content date, and the brief never
+pins a page stamp, because a stamp is a moving target.
+
+The brief records the v0.65.0 stable pin read from the GitHub
+releases page on 2026-10-24, with the docs changelog page at
+geminicli.com still rendering v0.64.0 released October 13
+2026, so the lag is real and the brief trusts the releases
+page over the docs page. The v0.66.0 pre-release is not
+stable, so the pin stands, and its SKILL.md frontmatter
+parsing hardening is an adjacent watch item with no brief
+impact, because the recognitio description carries no colon.
+
+No primary source names a reverse domain namespace for an
+Antigravity plugin, so the portable manifest uses
+`com.google.antigravity` as a documented placeholder following
+the section 8 reverse domain convention, and the brief does not
+present it as primary. The Antigravity native shapes live as a
+second extensions namespace beside the portable core, never
+blended into it, and the gate resolves every declared path
+across every namespace and pins the package root tree to
+`plugin.json` and the `skills/` tree.
+
+The harness contract is the repo-documented contract. This
+lane has no Antigravity product and no live browser, so the
+brief claims no product enforcement behavior it cannot run. A
+missing or unparseable hook file is a planned degraded state,
+never a silent pass, and the gate fails on either. Every
+contract statement carries a derivation note naming the
+canonical skill section, the primary citation, or the binding
+decision it restates.
+
+Decision 4 binds the build. The brief and the hook wiring
+document the contract and never enforce it, and enforcement
+stays on the shipped scripts.
+
+Skill tightness holds. The brief, its gate script at
+`scripts/check_antigravity.py`, its tests, the `.antigravity/`
+plugin tree, and the manifest's second namespace live outside
+the canonical skill text, and the description protocol is
+untouched.

@@ -325,6 +325,38 @@ This unreleased work carries version 1.3.0.
   the guideline file provenance now shown in review summaries,
   with `.claude/rules/` as the fourth guideline source. Decision
   20 records the build.
+- `scripts/check_test_vacuity.py`, the test vacuity guard, joins
+  the gate as its own step. Every test method must carry a real
+  assertion and touch a fixture, which answers the joint check
+  plus test softening attack, and the guard catches the crude
+  joint softening (vacuous bodies), not subtle tautologies over
+  fixture derived values, with the spec lane diff review staying
+  the guard for that shape.
+- Build 12, the Antigravity plugin alteration. The brief at
+  `docs/antigravity-plugin-brief.md` records the Antigravity
+  plugin format with `plugin.json`, `skills/`, `agents/`,
+  `rules/`, and `hooks.json` per the primary Google docs read
+  as text on 2026-10-24, and a `PreToolUse` hook carrying the
+  `deny`, `force_ask`, and `auto_approve` decisions as the
+  build's declared mapping for the review run tool call,
+  because the primary hooks page names no `agent.spawn` event.
+  The dated October 9 2026 sunset evidence names Antigravity
+  as the forward path for agentic coding assistance, the
+  v0.65.0 stable pin stands with the docs lag caveat trusting
+  the releases page over the docs page, and the Antigravity
+  native shapes ride as a second extensions namespace beside
+  the portable core, never blended into it. No primary source
+  names a reverse domain namespace for an Antigravity plugin,
+  so the portable manifest uses `com.google.antigravity` as a
+  documented placeholder. The harness contract is the
+  repo-documented contract, and a missing or unparseable hook
+  file is a planned degraded state that fails the gate, never
+  a silent pass. The gate script at
+  `scripts/check_antigravity.py` pins every dated and
+  structural sentence, and the package gate now resolves every
+  namespace in the extensions object and pins the package root
+  tree to `plugin.json` and the `skills/` tree. Decision 22
+  records the build.
 
 ### Fixed
 
