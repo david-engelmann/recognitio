@@ -30,6 +30,12 @@ The plugin route comes first. Register this repo as a marketplace in Claude Code
 /plugin install recognitio@recognitio-marketplace
 ```
 
+The Cursor plugin route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The plugin is distributed through the manually reviewed Cursor Marketplace, and reviewed updates auto deploy to clients pinned at the commit SHA. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
+
+```bash
+cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio
+```
+
 The generic route works with any agent that reads the skill format.
 
 ```bash

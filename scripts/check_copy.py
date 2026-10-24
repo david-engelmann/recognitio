@@ -44,8 +44,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Hidden directories whose files are authored prose the bar
 # reaches. Every other hidden directory holds tool or dependency
-# state and stays outside the fence.
-_PUBLIC_DOT_DIRS = (".github", ".agents", ".claude", ".claude-plugin")
+# state and stays outside the fence. The .cursor directory holds
+# the authored Bugbot rules and repo config beside the plugin
+# directory, so it joins the fence with them.
+_PUBLIC_DOT_DIRS = (".github", ".agents", ".claude", ".claude-plugin", ".cursor")
 
 
 def is_fence_excluded(root, path):
@@ -53,8 +55,8 @@ def is_fence_excluded(root, path):
 
     Local dependency and tool directories are not authored prose,
     so a file under a hidden directory other than the GitHub
-    config directory or the skill directories or the plugin
-    directory, or under a
+    config directory, the skill directories, the plugin
+    directories, or the Cursor config directory, or under a
     node_modules directory, stays outside the fence, and so does
     a symlink whose target leaves the tree. The skill directories
     .agents/skills and .claude/skills hold authored skill prose

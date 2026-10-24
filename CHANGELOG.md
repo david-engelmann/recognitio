@@ -288,6 +288,21 @@ This unreleased work carries version 1.3.0.
   review_model key, the Guardian auto review keys, the threat
   model draft and edit loop, and the CI example with the same
   repo guard. Decision 18 records the build.
+- Build 10, the Cursor plugin. The manifest at
+  `.cursor-plugin/plugin.json` follows the primary packaging
+  rules with the six component set, and the skill ships as a real
+  directory copy under `skills/recognitio/`, byte identical to
+  the canonical skill, because the host skips a symlink that
+  points outside the local plugin folder. The plugin ships no
+  agents, no commands, no MCP servers, and no hooks. The Bugbot
+  rules at `.cursor/BUGBOT.md` carry derivation noted rules and
+  pin the effort level as a Teams dashboard setting, the neutral
+  default with the fail on unresolved gate, and the rule caps.
+  The repo config at `.cursor/config/bugbot.yaml` sets
+  `autofix.mode` to `disabled`, and the gate rejects unknown
+  fields because they fall back silently. The brief at
+  `docs/cursor-plugin-brief.md` is pinned by the gate in
+  `scripts/check_cursor.py`. Decision 19 records the build.
 
 ### Fixed
 

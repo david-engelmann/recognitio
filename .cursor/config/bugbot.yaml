@@ -1,0 +1,10 @@
+# Repo settings for Cursor Bugbot, read from the PR base branch.
+# The primary docs name autofix.mode as the only repo YAML field.
+# It can lower the Autofix mode from the dashboard setting, but it
+# cannot raise it. The value stays disabled because Autofix would
+# repair findings with a Cloud Agent, which is model judgment in
+# place of script enforcement, and decision 4 forbids that trade.
+# Unknown fields fall back silently down the precedence order, so
+# scripts/check_cursor.py rejects any field outside this shape.
+autofix:
+  mode: disabled

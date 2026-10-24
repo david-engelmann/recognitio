@@ -1,0 +1,22 @@
+---
+description: The recognitio review packet discipline for Cursor sessions.
+globs:
+alwaysApply: false
+---
+
+# Recognitio packet discipline
+
+The recognitio skill assembles the relevant changes out of a pull
+request or a commit range into one verified review packet. It
+makes no judgement about the code. Judgement belongs to the review
+skill downstream, which keeps its own axes and its own reporting
+rules.
+
+A review starts only on a packet whose manifest reads verified. A
+failed packet is a stop, never a smaller yes. When verification
+fails, the review says what is missing in plain words.
+
+Derives from the canonical skill at
+`.agents/skills/recognitio/SKILL.md`, sections Purpose, The tier
+model, and The boundary. This rule restates that guidance and
+adds no new instruction source.

@@ -114,6 +114,26 @@ def rule_blocks(section):
     return [part for part in parts[1:]]
 
 
+def deliberate_source(note):
+    """Whether the derivation note names a source on purpose.
+
+    R21-ST-01. A bare substring match lets a note mention a
+    canonical section title in passing prose without deriving
+    from it, so a section title counts only when it is named as
+    the source, right after the "canonical skill" attribution
+    marker. Primary URL stems and Decision 4 are rare enough to
+    match as substrings.
+    """
+    for title in CANONICAL_SECTIONS:
+        if re.search(
+            r"canonical skill[^.;]{0,200}" + re.escape(title), note
+        ):
+            return True
+    if any(stem in note for stem in PRIMARY_CITATIONS):
+        return True
+    return "Decision 4" in note
+
+
 def derivation_problems(section):
     """Problems with the rules derivation discipline."""
     problems = []
@@ -129,7 +149,7 @@ def derivation_problems(section):
             )
             continue
         note = flat.split("Derives from", 1)[1]
-        if not any(source in note for source in ALLOWED_SOURCES):
+        if not deliberate_source(note):
             problems.append(
                 "rule R%d names no canonical skill section, gate, or "
                 "primary OpenAI citation in its derivation note"

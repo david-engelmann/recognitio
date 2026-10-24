@@ -36,7 +36,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_fanout.py`, the mod contract check at
 `scripts/check_mod.py`, the portable package check at
 `scripts/check_package.py`, the Codex review rules check at
-`scripts/check_codex.py`, and an end to end extractor smoke that must
+`scripts/check_codex.py`, the Cursor plugin check at
+`scripts/check_cursor.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
 findings schema, the proof packet manifest, and the primary
@@ -127,6 +128,25 @@ not a gate.
   the primary OpenAI citation it reports, pinned by the gate at
   `scripts/check_codex.py`, so the scoped guidance cannot become
   a rival instruction source.
+- `docs/cursor-plugin-brief.md` holds the brief for Build 10, the
+  Cursor plugin. Every Bugbot rule carries a derivation note naming
+  the canonical skill section or the primary Cursor citation it
+  reports, pinned by the gate at `scripts/check_cursor.py`, so the
+  scoped guidance cannot become a rival instruction source.
+- `.cursor-plugin/` holds the Cursor plugin manifest at
+  `.cursor-plugin/plugin.json` and the marketplace listing at
+  `.cursor-plugin/marketplace.json`. The skill ships as a real
+  directory copy under `.cursor-plugin/skills/recognitio/`, byte
+  identical to the canonical skill and pinned real by the gate,
+  because the host skips a symlink that points outside the local
+  plugin folder. One rule file lives under
+  `.cursor-plugin/rules/`. The plugin ships no agents, no
+  commands, no MCP servers, and no hooks.
+- `.cursor/` holds the Bugbot rules at `.cursor/BUGBOT.md` with
+  the effort level and gate pins, and the repo config at
+  `.cursor/config/bugbot.yaml` with `autofix.mode` set to
+  `disabled`. Unknown YAML fields fall back silently down the
+  precedence order, so the gate rejects them.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -309,4 +329,8 @@ portable core as per platform extensions, and closed the round
 been tagged yet. The round 21 pass then landed Build 9, the
 Codex review rules package with the derivation noted rules, the
 primary grounded Security Cloud surfaces, and the CI example,
-and closed the round 21 findings.
+and closed the round 21 findings. The round 22 pass then landed
+Build 10, the Cursor plugin with the real directory copy of the
+skill, the Bugbot rules with the effort and neutral pins, and
+the `.cursor/config/bugbot.yaml` repo config, and closed the
+round 22 findings.

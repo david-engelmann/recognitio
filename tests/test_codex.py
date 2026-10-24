@@ -292,6 +292,47 @@ class TestCheckCodex(unittest.TestCase):
                 any("decision 4" in p for p in problems), problems
             )
 
+    def test_a_passing_prose_title_mention_fails(self):
+        # R21-ST-01. A note that names a canonical section title
+        # in passing prose without deriving from it must fail.
+        # The old substring check would pass on the bare title.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.brief_text(root)
+            broken = text.replace(
+                "Derives from canonical skill, The tier model, the T0\n"
+                "instruction file flag.",
+                "Derives from the primary blog post. It shapes the\n"
+                "Workflow of the review and nothing else.",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "no canonical skill section" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_deliberate_title_naming_still_passes(self):
+        # The hardening must not reject a note that names its
+        # source deliberately through the attribution marker.
+        note = (
+            "canonical skill, The tier model, the T0 instruction "
+            "file flag"
+        )
+        self.assertTrue(self.mod.deliberate_source(note))
+
+    def test_a_title_after_a_sentence_break_is_passing_prose(self):
+        # A title appearing after a sentence break is passing
+        # prose, not a derivation, and must not satisfy the
+        # check on its own.
+        bare = "The rule keeps the Workflow readable for reviewers"
+        self.assertFalse(self.mod.deliberate_source(bare))
+
 
 if __name__ == "__main__":
     unittest.main()

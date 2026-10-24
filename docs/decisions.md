@@ -583,3 +583,53 @@ per platform extension.
 Skill tightness holds. The brief, its gate script at
 `scripts/check_codex.py`, and its tests live outside the
 canonical skill text, and the description protocol is untouched.
+
+## 19. Build 10, the Cursor plugin
+
+Recorded on 2026-10-24 in round 22. The brief at
+`docs/cursor-plugin-brief.md` exploits the Cursor Plugin
+manifest at `.cursor-plugin/plugin.json` with its packaging
+rules, the six component set using the primary term Agents, the
+Bugbot rules in `.cursor/BUGBOT.md` with the effort levels, and
+the second rule surface at `.cursor/config/bugbot.yaml` with its
+precedence order, distributed through the manually reviewed
+Cursor Marketplace.
+
+The plugin ships the manifest, the README, the skill as a real
+directory copy under `skills/recognitio/`, and one rule file
+under `rules/`. It ships no agents, no commands, no MCP servers,
+and no hooks. The reviewer persona stays a Claude Code plugin
+agent, so the Cursor plugin carries no second persona. The
+plugin copy is real files because Cursor skips a symlink that
+points to a plugin repository elsewhere on disk, and the gate
+verifies the copy is a real directory and byte identical to the
+canonical skill. This box has no Cursor client, so the real
+client run is owed and recorded as the honest limitation. The
+duplicate skill residual stays UNVERIFIED at primary, and the
+standing guidance is unchanged. Never ship two separate copies
+of the same skill.
+
+The Bugbot surface pins the round 22 findings. Effort level is a
+Teams dashboard setting billed from prepaid credit, and no
+`bugbot.yaml` field pins it. Smart effort does not read the PR
+description, labels, or BUGBOT.md when it chooses a level.
+Findings default to neutral, so a gate built on Bugbot must
+enable fail on unresolved where available and must never read
+neutral as a pass. The shipped `bugbot.yaml` sets
+`autofix.mode` to `disabled`, the only documented repo field,
+because Autofix is model judgment in place of script
+enforcement. Unknown fields fall back silently down the
+precedence order, so the gate rejects them. The platform
+provided `${CURSOR_PLUGIN_ROOT}` is exempt from the manifest
+variables schema checklist item, which covers user set values
+only. Marketplace update review latency has no stated SLA and is
+carried as an unbounded risk. The prebuilt canvases ride as an
+optional mention, not a packaged component.
+
+Decision 4 binds the build. The plugin and the Bugbot rules
+advise and never enforce, and enforcement stays on the shipped
+scripts.
+
+Skill tightness holds. The brief, its gate script at
+`scripts/check_cursor.py`, and its tests live outside the
+canonical skill text, and the description protocol is untouched.
