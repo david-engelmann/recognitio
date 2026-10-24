@@ -196,6 +196,29 @@ class TestCheckZcode(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_derivation_url_fails(self):
+        # R31-SP-02. The ZCode derivation notes carry the
+        # two retrievable zcode.z.ai page URLs, so a
+        # repo-only reader can reopen the primary pages.
+        cases = (
+            ("https://zcode.z.ai/en/docs/skill",
+             "skill page URL"),
+            ("https://zcode.z.ai/en/docs/plugin",
+             "plugin page URL"),
+        )
+        for old, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                broken = text.replace(old, "")
+                self.assertNotEqual(broken, text)
+                self.write_brief(root, broken)
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (old, problems),
+                )
+
     def test_a_decision_record_without_decision_4_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

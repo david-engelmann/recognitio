@@ -111,6 +111,26 @@ class TestCheckCodex(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_0_164_0_pin_fails(self):
+        # R31-EX-10. The Codex brief carries the CLI 0.164.0
+        # promotion as the later primary pin, with presets
+        # as TUI slots only and no skill format claim.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.brief_text(root)
+            broken = text.replace(
+                "CLI 0.164.0 is the later primary pin",
+                "CLI 0.161.0 is the later primary pin",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("0.164.0 promotion" in p for p in problems),
+                problems,
+            )
+
     def test_a_dropped_no_calendar_negative_fails(self):
         # The negative pin. Without the sentence, a later edit
         # could claim a product native calendar schedule.

@@ -48,6 +48,10 @@ The folder copy route still works by hand. Copy the skill folder into any skills
 cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 ```
 
+Before running any route above, pin the install to a commit
+SHA and read the install script, because a skill ships
+executable code and an unpinned route can move under you.
+
 The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
 
 ### The packet output style

@@ -84,6 +84,10 @@ PINNED = (
      "truncated at 100KB"),
     ("the trust posture",
      "stand unchanged on ZCode"),
+    ("the ZCode skill page URL",
+     "https://zcode.z.ai/en/docs/skill"),
+    ("the ZCode plugin page URL",
+     "https://zcode.z.ai/en/docs/plugin"),
     ("the decision 4 statement",
      "Decision 4 binds this build like every other build"),
 )

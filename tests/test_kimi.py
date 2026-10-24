@@ -1085,6 +1085,233 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
+    def test_a_replacement_hook_rewording_fails(self):
+        # R31-RT-01. The round 29 hardening stopped added
+        # sentences but not a sentence rewritten in place.
+        # Each plant below replaces the one non-pin sentence
+        # in R6, keeping every pin sentence untouched, and
+        # must still fail the gate.
+        cases = (
+            ("The session advances despite a failed hook check.",
+             "blocking posture"),
+            ("The turn is not gated by a hook failure.",
+             "blocking posture"),
+            ("Hook checks observe the turn but do not stop it.",
+             "blocking posture"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    plant,
+                )
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_replacement_collision_rewording_fails(self):
+        # R31-RT-02. A plugin win stated as a default or as
+        # an agent file loss states the same ordering claim
+        # without any winning verb.
+        cases = (
+            "In a collision, the plugin agent is the default "
+            "that runs.",
+            "In a collision, the agent-file agent loses to "
+            "the plugin agent.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    plant,
+                )
+                self.assertTrue(
+                    any("win a name collision" in p
+                        for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_replacement_qualified_rewording_fails(self):
+        # R31-RT-03. Bare name acceptance stated as a short
+        # name answered to, or as just its skill name being
+        # fine, states the same acceptance without the bare
+        # name noun.
+        cases = (
+            "Plugin skills answer to their short name.",
+            "Invoking a plugin skill with just its skill "
+            "name is fine.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    plant,
+                )
+                self.assertTrue(
+                    any("bare name plugin skill" in p
+                        for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_replacement_workdir_rewording_fails(self):
+        # R31-RT-04. A server location stated as a process
+        # cwd or as a checkout directory of the server
+        # states the same location claim without the server
+        # directory word pair.
+        cases = (
+            "Hooks run in the server process cwd.",
+            "Hooks run in the checkout directory of the server.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    plant,
+                )
+                self.assertTrue(
+                    any("server start directory" in p
+                        for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_replacement_secondary_rewording_fails(self):
+        # R31-RT-06. One replacement plant in each of five
+        # secondary negative families, each keeping every
+        # pin sentence untouched.
+        cases = (
+            ("Unsupported runtime fields are passed through "
+             "to the runtime.",
+             "honours unsupported runtime fields"),
+            ("The managed copy refreshes from the source on "
+             "restart.",
+             "take effect without a reinstall"),
+            ("A kimi.plugin.json at the plugin root is "
+             "ignored by the loader.",
+             "manifest location is ignored"),
+            ("Five hook events exist, with a fifth event added.",
+             "denies the four hook events"),
+            ("The main agent cannot delegate to plugin agents "
+             "at all.",
+             "denies delegation to plugin agents"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    plant,
+                )
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_a_no_form_autodiscovery_denial_fails(self):
+        # R31-ST-01. A no form of discovery and a bare
+        # agents subject deny auto discovery without the
+        # not form the old pattern needed.
+        cases = (
+            "When the agents field is omitted, no agents "
+            "directory is auto discovered.",
+            "No agents directory is auto discovered.",
+            "Agents are not auto discovered.",
+        )
+        for sentence in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, sentence)
+                self.assertTrue(
+                    any("denies the agents auto discovery" in p
+                        for p in problems),
+                    (sentence, problems),
+                )
+
+    def test_an_any_override_drop_fails(self):
+        # R31-ST-01. Without any override drops the override
+        # with a one word article the old pattern did not
+        # admit.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Built in agents can be replaced without any "
+                "override in the frontmatter.",
+            )
+            self.assertTrue(
+                any("without an override" in p for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_trust_workspace_pin_fails(self):
+        # R31-SP-01 and R31-EX-06. The Kimi headless CI
+        # rule names KIMI_CODE_TRUST_WORKSPACE for fresh
+        # checkouts, without claiming print mode blocking
+        # by the trust prompt.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "A fresh checkout CI run sets "
+                "KIMI_CODE_TRUST_WORKSPACE to mark the "
+                "workspace trusted.",
+                "A fresh checkout CI run needs no variable.",
+            )
+            self.assertTrue(
+                any("trust workspace variable" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_unversioned_layout_pin_fails(self):
+        # R31-RT-12. The reference layout claim states
+        # plainly that no version is pinned for it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "No version is pinned for this reference "
+                "layout in this brief.",
+                "Version 1.13.3 is pinned for this layout.",
+            )
+            self.assertTrue(
+                any("unversioned reference layout" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_noun_free_event_denial_fails(self):
+        # R31-ST-01. A bare event denial with no event noun,
+        # and a does not fire form, deny an event without
+        # the old pattern's event word and never form.
+        cases = (
+            "TaskStarted never runs.",
+            "SessionHeartbeat does not fire.",
+        )
+        for sentence in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, sentence)
+                self.assertTrue(
+                    any("denies the four hook events" in p
+                        for p in problems),
+                    (sentence, problems),
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

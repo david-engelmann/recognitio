@@ -861,6 +861,17 @@ that always blocks fails the gate. The collision fixture contents
 are pinned, not only their directory names. Decision 4 binds this
 build like every other build.
 
+Round 31 note, recorded on 2026-10-24. The any phrasing
+wording above is narrowed in this round to the phrasing
+families the gate tests, including the replacement
+rewordings and the new synonyms the round 31 red team
+proved. The gate now forbids the blocking, precedence,
+qualified names, workdir, auto discovery, override, and
+event claims in those tested families, and every pinned
+claim carries a negative check in that tested sense. This
+note does not claim the gate forbids a phrasing no test
+has yet named.
+
 ## 26. Build 15 deferral, round 29
 
 Recorded on 2026-10-24 in round 29. Build 15, the Qwen Code

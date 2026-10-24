@@ -269,11 +269,33 @@ at the old commit. Update submission is fire and forget with no
 delivery promise.
 
 The Security Review bot and the Bot Development Kit stay adjacent
-ecosystem, not plugin surfaces. Security Review reads every pull
-request and posts one review comment reporting exploitable bugs,
-with style and quality staying with Bugbot. Neither is a plugin
+ecosystem, not plugin surfaces. Security Review is a separate bot
+from Bugbot. Security Review reads every pull request in the
+context of the codebase and posts one review comment reporting
+exploitable bugs, with style and quality staying with Bugbot. Its
+scope covers injection across SQL, command, and template surfaces,
+authentication and authorization bypasses including checks that a
+refactor stopped running, secrets and credentials committed to
+source, SSRF and unvalidated redirects, unsafe deserialization,
+and dependency changes that introduce known vulnerabilities. Each
+finding carries a severity, the attack path, and a proposed fix.
+Team rules can be added, such as which client external calls must
+go through or which tables are never queried from a request
+handler, and Security Review enforces them on every pull request.
+Draft pull requests are skipped. Security Review is gated to Teams
+and Enterprise plans. The Cursor skills page lists a matching
+built in review-security skill beside the review-bugbot skill.
+Neither Security Review nor the Bot Development Kit is a plugin
 component and neither is a packaging surface this brief builds
 against.
+
+The Origin App Marketplace launched October 13 2026 with
+CodeRabbit as a launch review app beside the Cursor plugin path,
+so the plugin path is not the only CodeRabbit in Cursor path. A
+Cursor Origin hosted pull request can carry a CodeRabbit review
+as an Origin app. The marketplace integrates with over 20 apps
+for deployments, CI, code review, security, monitoring, and
+project management, and it is open to public submissions.
 
 Plugins now ship with prebuilt canvases, shared setup templates a
 team can open and reuse, with Hex Canvas and Atlassian Canvas as

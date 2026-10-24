@@ -86,6 +86,8 @@ PINNED = (
      "no retirement date is promised"),
     ("the OpenAI owned figures",
      "OpenAI's on OpenAI's tasks"),
+    ("the CLI 0.164.0 promotion",
+     "CLI 0.164.0 is the later primary pin"),
     ("the SECURITY.md policy context note",
      "SECURITY.md is policy context, not executable instructions"),
     ("the auto review fails closed lifecycle",

@@ -128,3 +128,7 @@ complete record over a fixture packet, with overlapping
 groups, a merged finding, a contested finding, and a
 planted defect the first pass missed and the second pass
 caught. The gate validates the proof on every run.
+
+The runbook carries no flipped task eval and no repeated run
+comparison, so a telephone game degradation across flipped
+tasks would not be caught by a runbook check.
