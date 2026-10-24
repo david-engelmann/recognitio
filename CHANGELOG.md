@@ -593,6 +593,10 @@ This unreleased work carries version 1.3.0.
   as at a comma. The Devin chain tail reads its of
   phrase on a wider reach and its guard resets read
   the noun subject beside the pronoun forms.
+- The README demo now ships in two renderings of the one
+  recorded run. The chat rendering leads the page and the raw
+  terminal rendering closes the See it on a real change
+  section, and the single rendering they replace is gone.
 
 ### Fixed
 
