@@ -616,5 +616,96 @@ class TestCheckDevin(unittest.TestCase):
                     (plant, problems),
                 )
 
+    def test_round37_plain_adjective_chain_fails(self):
+        # R37-RT-11. A plain adjective with no suffix
+        # shape, big, no longer breaks the modifier chain,
+        # because a chain word is now any word that starts
+        # no new claim unit.
+        plant = (
+            "Dismissed findings are part of the "
+            "comprehensive big audited resolved total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_negation_behind_a_subordinate_clause_passes(self):
+        # R37-RT-12. The negation stands ahead of a
+        # subordinate clause, far before the membership
+        # phrase, and the true sentence must pass on the
+        # claim stretch guard.
+        sentence = (
+            "Dismissed findings are not, under the audit "
+            "rules that govern the analytics in this brief, "
+            "part of the comprehensive and carefully "
+            "audited resolved total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_fixreview_aggregate_of_phrase_tail_fails(self):
+        # R37F-RT-18. An aggregate noun heading an of
+        # phrase heads the same membership object as a
+        # listed tail word, so the resolved pool of
+        # findings fires the chain branch.
+        plant = (
+            "Dismissed findings are part of the "
+            "comprehensive audited resolved pool of "
+            "findings."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_plain_and_negation_no_guard(self):
+        # R37F-RT-19. A plain and clause opening on an
+        # auxiliary resets the claim stretch with no comma
+        # needed, so a negation in the first assertion no
+        # longer guards the membership the second asserts.
+        plant = (
+            "Dismissed findings are not in the audit trail "
+            "sample and are part of the comprehensive "
+            "audited resolved total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

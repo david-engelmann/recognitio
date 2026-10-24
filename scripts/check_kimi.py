@@ -269,6 +269,14 @@ def _brief_clauses(root):
     return clauses
 
 
+def _brief_sentences(root):
+    """Every sentence of the brief, lowercased, in order."""
+    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
+    if raw is None:
+        return None
+    return _sentences(raw)
+
+
 # Claim words each shipped derivation note carries, so a note
 # that names a path and a verb but never restates what the
 # rule claims is still a bare citation. R29-RT-08.
@@ -993,14 +1001,34 @@ def qualified_problems(root=None):
             # puts the verb before the bare name and then
             # negates the working of it, so this branch needs
             # the bare name first and no no longer after it.
+            # R37-RT-05. Both verb branches now read the
+            # whole segment, because the round 37 review
+            # stated the acceptance with filler between the
+            # bare name and the invocation verb, past the
+            # measured reach of each branch. The bare name
+            # and its verb in one segment state the claim
+            # however much filler stands between them.
             invoke_match = re.search(
-                r"\bbare (skill )?names?\b[^.]{0,40}"
+                r"\bbare (skill )?names?\b[^.]*"
                 r"\binvok\w*\b",
                 segment,
             )
             if invoke_match and "no longer" not in segment:
                 verb = re.search(r"\binvok\w*\b", segment)
-                if not _neg_before(segment, verb.start()):
+                # R37F-RT-05. The negation guard reads the
+                # verb's own clause of the segment. A
+                # negation before a coordinating and or but
+                # negates that earlier clause, not the
+                # invocation this clause states.
+                prefix = segment[:verb.start()]
+                boundary = 0
+                for joint in re.finditer(
+                    r",\s+(?:and|but)\s+", prefix
+                ):
+                    boundary = joint.end()
+                if not _neg_before(
+                    segment[boundary:], verb.start() - boundary
+                ):
                     hit = True
             # Gate review repair. Bare name acceptance
             # stated with a response verb before the bare
@@ -1008,7 +1036,7 @@ def qualified_problems(root=None):
             # states the same acceptance with the verb on
             # the other side of the name.
             respond_match = re.search(
-                r"\b(respond\w*|answer\w*)\b[^.]{0,30}"
+                r"\b(respond\w*|answer\w*)\b[^.]*"
                 r"\bbare (skill )?names?\b",
                 segment,
             )
@@ -1205,63 +1233,126 @@ def _clause_figures(clause):
     return figures
 
 
-def _swap_problem(clause):
-    """Whether a clause swaps the per field and total figures.
+def _swap_problem(sentence):
+    """Whether a sentence swaps the per field and total figures.
 
-    Figures bind to scope words by closeness, closest
-    pairs first, and each scope word binds one figure. A
-    figure bound to the field scope must be 32 and a
-    figure bound to the total scope must be 64.
+    Every figure in the sentence binds to its nearest scope
+    word in the same sentence, and a scope word may bind
+    more than one figure. A figure bound to the field scope
+    must be 32 and a figure bound to the total scope must
+    be 64.
+
+    R37-RT-04. The reading is the whole sentence, not one
+    clause, and the binding carries no gap limit and no one
+    figure per scope word rule. The clause reading let a
+    swap hide behind a semicolon clause holding the figure
+    and no scope word, behind a second figure the single
+    field word could not also bind, and behind filler that
+    pushed the figure past the gap limit, and each shape
+    stated the same swap.
+
+    R37F-RT-04 and R37F-RT-06. Nearest is not the whole
+    binding rule. A scope word standing after the figure
+    across an of, 64 KB of total content, names the
+    content the figure measures rather than the scope of
+    the limit, so it binds only when no other scope word
+    stands in the sentence. And a scope word in the
+    figure's own comma clause binds ahead of a nearer
+    scope word across the comma, because the comma clause
+    is where the sentence states that figure's limit.
+    The binding ranks scope words by those two rules
+    first and by gap last.
     """
     if not re.search(
-        r"systemprompt|prompt|field|limit|total|budget", clause
+        r"systemprompt|prompt|field|limit|total|budget", sentence
     ):
         return None
-    figures = _clause_figures(clause)
+    figures = _clause_figures(sentence)
     if not figures:
         return None
     markers = []
-    for match in re.finditer(r"\bfields?\b", clause):
+    for match in re.finditer(r"\bfields?\b", sentence):
         markers.append(("field", match.start(), match.end()))
     for match in re.finditer(
-        r"\b(total|overall|combined|aggregate|budget)\b", clause
+        r"\b(total|overall|combined|aggregate|budget)\b", sentence
     ):
         markers.append(("total", match.start(), match.end()))
     if not markers:
         return None
-    pairs = []
-    for fi, (value, fstart, fend) in enumerate(figures):
-        for mi, (scope, mstart, mend) in enumerate(markers):
+    for value, fstart, fend in figures:
+        # A field scope word standing before the figure is
+        # the sentence subject for the figure, so an after
+        # figure total word that a later field word in the
+        # same sentence restates as the per field scope is
+        # a decoy in the same family as the of forms.
+        field_before = any(
+            name == "field" and mend <= fstart
+            for name, mstart, mend in markers
+        )
+        scope = None
+        best_key = None
+        for name, mstart, mend in markers:
+            if mstart >= fend:
+                between = sentence[fend:mstart]
+                decoy = 1 if re.search(r"\bof\b", between) else 0
+                # R37C-RT-03. A total word right after the
+                # figure whose own of phrase names field
+                # content, 64 KB total of all field content,
+                # measures that field content, so it ranks
+                # as a decoy the same way.
+                if name == "total" and re.search(
+                    r"\bof\b[^.]*\bfields?\b", sentence[mend:]
+                ):
+                    decoy = 1
+                # Spec confirmation candidate. A total word
+                # after the figure in a sentence whose field
+                # subject stands before the figure and whose
+                # per field restatement stands right after
+                # the total word, 64 KB in total content per
+                # field, measures the field content the
+                # subject names, so it ranks as a decoy too.
+                # The restatement reach is a measured bound.
+                # The plant restates at a gap of 13 and the
+                # shipped summary sentence names its next
+                # field topic at a gap of 25, so the bound
+                # stands at 20 and a restatement past it
+                # escapes by design.
+                if (
+                    name == "total"
+                    and field_before
+                    and any(
+                        other == "field"
+                        and 0 <= ostart - mend <= 20
+                        for other, ostart, oend in markers
+                    )
+                ):
+                    decoy = 1
+            else:
+                between = sentence[mend:fstart]
+                decoy = 0
+            crossed = (
+                1 if ("," in between or ";" in between) else 0
+            )
             gap = max(mstart - fend, fstart - mend, 0)
-            if gap <= 100:
-                pairs.append((gap, fi, mi))
-    pairs.sort()
-    bound_figures = set()
-    bound_markers = set()
-    bindings = {}
-    for gap, fi, mi in pairs:
-        if fi in bound_figures or mi in bound_markers:
-            continue
-        bound_figures.add(fi)
-        bound_markers.add(mi)
-        bindings[fi] = markers[mi][0]
-    for fi, (value, fstart, fend) in enumerate(figures):
-        scope = bindings.get(fi)
+            key = (decoy, crossed, gap)
+            if best_key is None or key < best_key:
+                best_key = key
+                scope = name
         if scope is None:
             continue
-        if _neg_before(clause, fstart, 15):
+        if _neg_before(sentence, fstart, 15):
             continue
         if scope == "field" and value != 32:
             return (
                 "a kimi rule states a per field limit of "
-                "%s KB, which swaps the pinned 32KB per "
-                "field figure for the 64KB total figure" % value
+                "%s KB, other than the pinned 32KB per "
+                "field figure" % value
             )
         if scope == "total" and value != 64:
             return (
                 "a kimi rule states a total limit of %s "
-                "KB, which swaps the pinned 64KB total "
-                "figure for the 32KB per field figure" % value
+                "KB, other than the pinned 64KB total "
+                "figure" % value
             )
     return None
 
@@ -1273,10 +1364,11 @@ def limits_problems(root=None):
     stated, but an added sentence stating a larger limit
     passes while the pins stay in place. Any kilobyte figure
     other than 32 or 64, and any megabyte figure at all, is
-    an inflated limit. A swapped figure, the total figure
-    bound to the per field scope or the per field figure
-    bound to the total scope, is the same inflation stated
-    with both figures inside the allowed pair.
+    a limit outside the pinned pair. A swapped figure, the
+    total figure bound to the per field scope or the per
+    field figure bound to the total scope, is the same
+    violation stated with both figures inside the allowed
+    pair.
     """
     root = ROOT if root is None else root
     clauses = _brief_clauses(root)
@@ -1285,7 +1377,7 @@ def limits_problems(root=None):
     problems = []
     # R36-RT-02, repaired at the gate review. The per field
     # figure and the total figure swapped state the same
-    # inflation with both figures inside the allowed pair,
+    # violation with both figures inside the allowed pair,
     # so the figure census below passes them. The first
     # repair bound a figure to a scope through a short list
     # of limit phrases in the digit kilobyte form only, and
@@ -1304,15 +1396,28 @@ def limits_problems(root=None):
     # prompt build budget in one breath binds its 32 to
     # the field word beside it and its 64 to the budget
     # word beside it, so it passes.
-    for clause in clauses:
-        swap = _swap_problem(clause)
+    # R37-RT-04. The swap reading moved from the clause to
+    # the sentence, and the binding dropped its one figure
+    # per scope word rule and its gap limit. The round 37
+    # review restated the swap behind a semicolon clause
+    # holding no scope word, as a second figure the single
+    # field word could not also bind, and past the gap
+    # limit behind filler, and each shape passed the clause
+    # reading. Every figure in a sentence now binds to its
+    # nearest scope word in that sentence, and a scope word
+    # may bind more than one figure.
+    sentences = _brief_sentences(root)
+    if sentences is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for sentence in sentences:
+        swap = _swap_problem(sentence)
         if swap is not None:
             problems.append(swap)
             break
     # R29-RT-05 and R29-RT-12. A limit stated in bytes, in
-    # KiB, in words, or as lifted or unlimited is still an
-    # inflated limit, and a lowercased figure matches the
-    # same pattern as an uppercased one.
+    # KiB, in words, or as lifted or unlimited is still a
+    # limit outside the pinned pair, and a lowercased
+    # figure matches the same pattern as an uppercased one.
     for clause in clauses:
         hit = None
         for match in re.finditer(r"(\d+)\s*kb\b", clause):
@@ -1320,7 +1425,7 @@ def limits_problems(root=None):
                 if not _neg_before(clause, match.start(), 15):
                     hit = (
                         "a kimi rule states a size limit of %s "
-                        "KB, which inflates the pinned 32KB and "
+                        "KB, other than the pinned 32KB and "
                         "64KB limits" % match.group(1)
                     )
         if hit is None and re.search(r"\d+\s*mb\b", clause):
@@ -1328,7 +1433,7 @@ def limits_problems(root=None):
             if not _neg_before(clause, match.start(), 15):
                 hit = (
                     "a kimi rule states a size limit in "
-                    "megabytes, which inflates the pinned "
+                    "megabytes, other than the pinned "
                     "32KB and 64KB limits"
                 )
         if hit is None:
@@ -1341,7 +1446,7 @@ def limits_problems(root=None):
                     if not _neg_before(clause, match.start(), 15):
                         hit = (
                             "a kimi rule states a size limit "
-                            "of %s bytes, which inflates the "
+                            "of %s bytes, other than the "
                             "pinned 32KB and 64KB limits"
                             % match.group(1)
                         )
@@ -1351,7 +1456,7 @@ def limits_problems(root=None):
                 if not _neg_before(clause, match.start(), 15):
                     hit = (
                         "a kimi rule states a size limit of "
-                        "%s KiB, which inflates the pinned "
+                        "%s KiB, other than the pinned "
                         "32KB and 64KB limits"
                         % match.group(1)
                     )
@@ -1369,9 +1474,8 @@ def limits_problems(root=None):
                 if not _neg_before(clause, kilo_at, 50):
                     hit = (
                         "a kimi rule states a size limit in "
-                        "words above the pinned 32KB and 64KB "
-                        "limits, which inflates the pinned "
-                        "32KB and 64KB limits"
+                        "words, other than the pinned 32KB "
+                        "and 64KB limits"
                     )
         if hit is None and re.search(
             r"\b(unlimited|no limit|without a limit"

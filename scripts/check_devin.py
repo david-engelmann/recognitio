@@ -225,19 +225,35 @@ MEMBERSHIP_PHRASES = "part of|go into|belong in"
 # The E1 plants put a 41 character modifier run there,
 # far past the 15 and 20 character bounds, while the B3
 # probe puts a noun phrase there, the audit trail, which
-# starts a second claim unit and so stays out. Modifier
-# shaped means an article or conjunction or a plain
-# degree adverb or a word carrying a derivational
-# adjective or adverb suffix. A
-# gap holding any other word shape is not a modifier
-# chain and this branch does not fire on it, so filler
-# that smuggles a noun or a verb into the gap still
-# escapes by design, as the bound comment above records
-# for its own zone.
+# starts a second claim unit and so stays out.
+# R37-RT-11. The word shape test itself was the hole, in
+# that a plain adjective with no suffix shape and no
+# place in the plain word list, big in the plant, broke
+# the chain while stating the same membership. The chain
+# word is now defined from the other side. A word stays
+# in the chain unless it starts a new claim unit, and
+# the starters are the finite verb forms and
+# auxiliaries, the prepositions, the relative pronouns
+# and subordinators, and the pronouns. A run of the
+# remaining words reads as pre nominal material however
+# its words are shaped, and the resolved total tail on
+# the branch is what anchors the claim, so the B3 audit
+# trail probe now stays out on its resolved findings
+# tail rather than on the noun phrase in its gap. A gap
+# that smuggles a claim unit starter into the run still
+# breaks the chain by design, as the bound comment above
+# records for its own zone.
+CHAIN_STARTERS = (
+    r"(?:is|are|was|were|be|been|being|has|have|had"
+    r"|do|does|did|will|would|can|could|shall|should"
+    r"|may|might|must|that|which|who|whom|whose|when"
+    r"|where|while|because|if|as|than|of|in|on|for"
+    r"|with|by|from|at|to|into|about|under|over"
+    r"|between|through|against|within|without|per|via"
+    r"|it|they|them|these|those|this|there|he|she|we|you)"
+)
 MODIFIER_WORD = (
-    r"(?:the|and|or|very|quite|rather|so|too|just|even"
-    r"|still|more|most|[a-z]+(?:ly|ous|ive|al|ic|ed|ing"
-    r"|ful|less|able|ible|ent|ant|ary|ory))"
+    r"(?!" + CHAIN_STARTERS + r"\b)[a-z]+"
 )
 MEMBERSHIP_MODIFIER_GAP = (
     r"(?:\s+" + MODIFIER_WORD + r")*\s+"
@@ -517,17 +533,51 @@ def semantic_problems(root=None):
             + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
             low,
         )
-        membership_modifier_chain = bool(
-            chain_match
-            and not re.search(
-                r"\b(not|never)\b|n't",
-                low[max(0, chain_match.start() - 20):chain_match.end()],
+        # R37-RT-12. The chain negation guard reads the
+        # whole claim stretch before the chain, back to
+        # the last clause reset, because the round 37
+        # review placed the negation ahead of a subordinate
+        # clause and the 20 character lookback missed it
+        # while the sentence stated the shipped posture.
+        # A reset is a semicolon or a but or however or
+        # yet, or a comma and clause opening on a pronoun
+        # subject, and a negation behind a reset belongs to
+        # the earlier clause and does not guard this one.
+        membership_modifier_chain = False
+        if chain_match:
+            stretch_start = 0
+            # R37F-RT-19. A plain and clause opening on a
+            # pronoun subject or an auxiliary is a reset
+            # too, with no comma needed. Two assertions
+            # joined that way are two claims, and a
+            # negation inside the first guards nothing in
+            # the second.
+            for reset in re.finditer(
+                r";|\bbut\b|\bhowever\b|\byet\b"
+                r"|,\s+and\s+(?:they|it|we|he|she"
+                r"|these|those)\b"
+                r"|\band\s+(?:they|it|we|he|she|these|those"
+                r"|are|is|was|were)\b",
+                low[:chain_match.start()],
+            ):
+                stretch_start = max(stretch_start, reset.end())
+            membership_modifier_chain = bool(
+                not re.search(
+                    r"\b(not|never)\b|n't",
+                    low[stretch_start:chain_match.end()],
+                )
+                and re.search(
+                    # R37F-RT-18. An aggregate noun heading
+                    # an of phrase, the resolved pool of
+                    # findings, heads the same membership
+                    # object as a listed tail word, while an
+                    # attributive resolved findings review
+                    # takes no of phrase and stays out.
+                    r"\s+(total|count|tally|number)\b"
+                    r"|\s+[a-z]+\s+of\b|[.,;:]",
+                    low[chain_match.end():chain_match.end() + 12],
+                )
             )
-            and re.search(
-                r"\s+(total|count|tally|number)\b|[.,;:]",
-                low[chain_match.end():chain_match.end() + 12],
-            )
-        )
         # Verb plus membership from S4. A listed verb within
         # 30 of a membership phrase with resolved within 20
         # of the phrase restores the long filler verb shape.

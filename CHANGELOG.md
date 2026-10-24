@@ -501,9 +501,9 @@ This unreleased work carries version 1.3.0.
   linked source platform limit and the default branch pin
   beside the linked context sentence, and its gate rejects
   linked source promised on an excluded platform and any
-  linked repository figure above 20. The ZCode gate
+  linked repository figure other than 20. The ZCode gate
   rejects an execution claim for the registered fields
-  and a description cap above 1024 characters. The Qwen
+  and a description cap other than 1024 characters. The Qwen
   figure family gains sentence scope, and the Devin
   membership branch catches membership stated through a
   pure modifier chain, closing the two structural escapes
@@ -534,6 +534,46 @@ This unreleased work carries version 1.3.0.
   for it in the same run. The loop opens on the
   raw diff of the range, all 3,233 lines of it,
   before the packet distills it.
+- The round 37 pass hardens the landed build gates
+  against the round 37 audit findings with no new build.
+  The Copilot trust and approval negatives now read
+  triples of neighbouring sentences, and both scans
+  honour a negative quantifier standing after the verb.
+  The Kimi swap binding reads the whole sentence with no
+  gap limit, and its bare name verb branches read the
+  whole segment. The Cursor cap and effort branches read
+  the whole sentence, with a unit word rebinding a cap
+  figure to a different quantity, and the neutral branch
+  reads sentence pairs. The CodeRabbit linked branches
+  read sentence pairs and bind at unit scope, and a
+  negation standing before an offer in the same claim
+  stretch guards the pair. The ZCode execution reading
+  judges the sentence with its guarded clauses removed,
+  and its description figures are read from the whole
+  sentence against their own clause. The Qwen figure
+  family reads windows of three sentences, and a guard
+  word exempts only the sentences that carry the bound
+  figure. The Devin modifier chain now reads any word
+  that starts no new claim unit, and its negation guard
+  reads the whole claim stretch. The Qwen brief records
+  the round 37 full bundle conversion attempt with its
+  three named differences, the skill line rewrite, the
+  dropped author and license fields, and the mirror
+  trailing newline, and the gate pins the record. The
+  pinned figure rules are stated as other than in place
+  of above wherever the gates test inequality. The
+  accepted round 34 single synonym residual stands
+  unchanged. The three review gate on this pass then
+  filed fresh plants against every widened branch, and a
+  repair pass widened the Copilot authority and
+  CodeRabbit linked readings to triples and the Qwen
+  figure windows to four sentences, scoped each negation
+  and guard phrase to the claim it guards, and bound
+  each figure by its own clause, its own count noun, and
+  its own scope word. A confirmation pass over the repair
+  then widened the Qwen figure windows to five sentences
+  and closed the remaining fresh shapes of the same
+  seams.
 
 ### Fixed
 

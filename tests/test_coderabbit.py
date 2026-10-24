@@ -438,7 +438,7 @@ class TestCheckCoderabbit(unittest.TestCase):
              "promises Deep Scan linked source"),
             ("A Deep Scan can read up to 50 linked "
              "repositories on any plan.",
-             "above the pinned limit of 20"),
+             "other than the pinned limit of 20"),
         )
         for plant, needle in cases:
             with tempfile.TemporaryDirectory() as tmp:
@@ -488,13 +488,13 @@ class TestCheckCoderabbit(unittest.TestCase):
              "promises Deep Scan linked source"),
             ("A Deep Scan can read up to fifty linked "
              "repositories on any plan.",
-             "linked repositories, above the pinned limit"),
+             "linked repositories, other than the pinned limit"),
             ("A Deep Scan can read up to twenty one linked "
              "repositories on any plan.",
-             "linked repositories, above the pinned limit"),
+             "linked repositories, other than the pinned limit"),
             ("A Deep Scan can link 50 repositories to a "
              "primary repository on any plan.",
-             "linked repositories, above the pinned limit"),
+             "linked repositories, other than the pinned limit"),
         )
         for plant, needle in cases:
             with tempfile.TemporaryDirectory() as tmp:
@@ -526,6 +526,276 @@ class TestCheckCoderabbit(unittest.TestCase):
                 text = self.read_brief(root)
                 self.write_brief(root, text + "\n\n" + plant + "\n")
                 self.assertEqual(self.problems(root), [])
+
+    def test_round37_platform_split_across_sentences_fails(self):
+        # R37-RT-07. The offer and the excluded platform
+        # split across two sentences, and the pair reading
+        # must catch the promise.
+        plant = (
+            "Deep Scan linked source runs in the scan "
+            "trigger flow. It also runs on self hosted "
+            "GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_figure_in_partner_sentence_fails(self):
+        # R37-RT-07. The raised figure stands in a partner
+        # sentence holding no repository word, bound to
+        # the linked repositories through its cap frame.
+        plant = (
+            "A Deep Scan can read linked repositories "
+            "across a workspace. The cap for that reading "
+            "is 50 on any plan."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "linked repository cap of 50" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_platform_past_the_span_fails(self):
+        # R37-RT-07. The offer and the platform stand past
+        # the old span inside one long sentence, and the
+        # unit scope binding must catch the promise.
+        plant = (
+            "Linked source is available in the scan trigger "
+            "flow, after the scan reads the primary "
+            "repository and every linked repository in the "
+            "workspace in full, on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_negation_before_the_offer_passes(self):
+        # R37-RT-08. The negation stands ahead of a
+        # subordinate clause, far before the offer word,
+        # and the true platform limit sentence must pass.
+        sentence = (
+            "Linked source is not, in the scan trigger flow "
+            "as the security page states the platform "
+            "limit, available for self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_below_limit_figure_fails_as_other_than(self):
+        # R37-ST-01. The figure rule tests inequality, so
+        # a figure below the pinned limit fails too, and
+        # the problem states the rule as other than.
+        plant = (
+            "A Deep Scan can read up to 10 linked "
+            "repositories on any plan."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "other than the pinned limit of 20" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
+    def test_round37_neighbouring_limit_on_another_surface_passes(self):
+        # Gate review repair. A limit on another surface in
+        # the partner sentence states no linked repository
+        # cap, so the pair must pass.
+        sentence = (
+            "A Deep Scan can read linked repositories "
+            "across a workspace. The message size limit is "
+            "40 on this surface."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_self_corrected_cap_figure_passes(self):
+        # Gate review repair. A figure the same sentence
+        # corrects to the pinned figure across a correction
+        # word states the pinned cap in the end and must
+        # pass.
+        sentence = (
+            "A Deep Scan can read linked repositories "
+            "across a workspace. The cap for that reading "
+            "is 50, no, it is 20 on any plan."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_fixreview_first_clause_negation_no_guard(self):
+        # R37F-RT-10. A comma and clause opening on a
+        # pronoun subject resets the claim stretch, so a
+        # negation in the first clause no longer guards
+        # the availability the second clause asserts.
+        plant = (
+            "Linked source is not a separate product in "
+            "the scan trigger flow, and it is available "
+            "on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_cap_split_across_three_fails(self):
+        # R37F-RT-11. The cap frame rule judges every
+        # ordered pair inside a triple window, so a cap
+        # stated two sentences after the linked reading
+        # still binds to it.
+        plant = (
+            "A Deep Scan can read linked repositories "
+            "across a workspace. The scan trigger flow "
+            "records that reading in its summary. The cap "
+            "for that reading is 50 on any plan."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "linked repository cap of 50" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_platform_split_across_three_fails(self):
+        # R37F-RT-11. The platform branch reads triples,
+        # so a platform offer two sentences after the
+        # linked sentence still binds to it.
+        plant = (
+            "Deep Scan linked source runs in the scan "
+            "trigger flow. The packet lists each repository "
+            "beside its diff. It also runs on self hosted "
+            "GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_confirm_second_bare_figure_in_frame_fails(self):
+        # R37C-RT-06. A tied frame sentence can state a
+        # second repository figure with no frame of its
+        # own beside the pinned figure, and the bare
+        # figure is judged under the same guards.
+        plant = (
+            "Deep Scan can read linked repositories across "
+            "a workspace. The cap for that reading is 20 "
+            "repositories in the trigger flow and 50 "
+            "repositories in the summary report."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "linked repository cap of 50" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_platform_negated_in_own_sentence(self):
+        # R37F-RT-12. A platform negated inside its own
+        # sentence states the limit itself, so an offer in
+        # the partner sentence must not bind to it.
+        pair_text = (
+            "Linked source is available on GitHub Cloud. "
+            "For self hosted GitLab it remains unavailable."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + pair_text + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_fixreview_report_cap_in_partner_passes(self):
+        # R37F-RT-12. A cap frame whose sentence names no
+        # reading and no linked repositories caps its own
+        # subject, report entries here, and must not bind
+        # to the linked reading beside it.
+        pair_text = (
+            "Deep Scan can read up to 20 linked "
+            "repositories across a workspace. The summary "
+            "cap for that report is 50 entries."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + pair_text + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
 
 if __name__ == "__main__":
     unittest.main()

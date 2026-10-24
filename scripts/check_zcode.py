@@ -252,7 +252,8 @@ def body_problems(root=None):
 
 def negative_problems(root=None):
     """R36-RT-05. No sentence may execute the registered
-    fields or raise the description cap.
+    fields or state a description figure other than the
+    pinned cap.
 
     The pins prove the correct sentences are stated, but an
     added sentence passes while the pins stay in place,
@@ -292,16 +293,36 @@ def negative_problems(root=None):
         # and spelled figures beside the digit form, and a
         # clause that scopes its figure to a different host
         # states no ZCode cap and is skipped.
-        clauses = [
-            clause.strip()
-            for clause in re.split(r",\s+and\s+|,\s+|;\s*", low)
-            if clause.strip()
-        ]
-        for clause in clauses:
-            problem = _negative_clause_problem(clause)
-            if problem is not None:
-                problems.append(problem)
-                return problems
+        # R37-RT-09. The execution reading now removes the
+        # guarded clauses and judges what remains at
+        # sentence scope, and the description reading
+        # extracts figures from the whole sentence and
+        # judges each against its own clause.
+        spans = _clause_spans(low)
+        # R37F-RT-13. A guard removes only the text it
+        # governs, up to the end of the guard phrase
+        # itself. A clause carrying a guard phrase and an
+        # execution claim after it, register but also
+        # executes, keeps the execution text under
+        # judgement instead of dropping the whole clause.
+        judged_parts = []
+        for text, offset in spans:
+            cut = 0
+            for guard in _CLAUSE_GUARDS:
+                if guard in text:
+                    cut = max(
+                        cut, text.rfind(guard) + len(guard)
+                    )
+            judged_parts.append(text[cut:])
+        judged = " ".join(judged_parts)
+        problem = _execution_problem(judged)
+        if problem is not None:
+            problems.append(problem)
+            return problems
+        problem = _description_problem(low, spans)
+        if problem is not None:
+            problems.append(problem)
+            return problems
     return problems
 
 
@@ -351,23 +372,46 @@ def _word_number_value(tokens):
     return total + current
 
 
-def _description_figures(clause):
-    """Every character figure in a clause, digits or words."""
+def _description_figures(sentence):
+    """Every character figure in a sentence, with its start.
+
+    Each entry is the figure text and the offset where the
+    figure starts, so the caller can judge the figure
+    against the clause that holds it. Digits standing
+    directly before the unit word are one form. A digit
+    separated from its unit by a qualifier clause, capped
+    at 2048, measured in characters, is the same figure in
+    another form, and a spelled run before the unit word
+    is the third form.
+    """
     figures = []
     covered = []
     for match in re.finditer(
-        r"(\d+)\s*(?:character|characters|chars)\b", clause
+        r"(\d+)\s*(?:character|characters|chars)\b", sentence
     ):
-        figures.append(match.group(1))
+        figures.append((match.group(1), match.start(1)))
+        covered.append((match.start(), match.end()))
+    # R37F-RT-14. Short filler before the qualifier verb,
+    # with the limit measured in characters, states the
+    # same separated figure, so a few plain words may
+    # stand between the comma and the qualifier.
+    for match in re.finditer(
+        r"(?<![\d.])(\d+)(?![\d.])\s*,\s*"
+        r"(?:\w+\s+){0,6}?"
+        r"(?:measured|counted|expressed|given|stated)"
+        r"\s+in\s+(?:characters?|chars)\b",
+        sentence,
+    ):
+        figures.append((match.group(1), match.start(1)))
         covered.append((match.start(), match.end()))
     for match in re.finditer(
-        r"\b(?:character|characters|chars)\b", clause
+        r"\b(?:character|characters|chars)\b", sentence
     ):
         if any(
             start <= match.start() < end for start, end in covered
         ):
             continue
-        tokens = clause[:match.start()].split()
+        tokens = sentence[:match.start()].split()
         run = []
         for token in reversed(tokens):
             if (
@@ -384,31 +428,62 @@ def _description_figures(clause):
         if run:
             value = _word_number_value(run)
             if value is not None:
-                figures.append(str(value))
+                start = match.start() - len(" ".join(run)) - 1
+                figures.append((str(value), max(0, start)))
     return figures
 
 
-def _negative_clause_problem(clause):
-    """Whether one clause executes a field or raises the cap."""
-    if any(guard in clause for guard in _CLAUSE_GUARDS):
-        return None
+def _clause_spans(low):
+    """The clauses of one sentence with their start offsets.
+
+    The split is the gate clause split, on comma and, on a
+    bare comma, and on a semicolon, and each entry is the
+    clause text and the offset where it starts in the
+    sentence.
+    """
+    spans = []
+    start = 0
+    for match in re.finditer(r",\s+and\s+|,\s+|;\s*", low):
+        spans.append((low[start:match.start()], start))
+        start = match.end()
+    spans.append((low[start:], start))
+    return [
+        (clause.strip(), offset + (len(clause) - len(clause.lstrip())))
+        for clause, offset in spans
+        if clause.strip()
+    ]
+
+
+def _execution_problem(judged):
+    """Whether the judged text executes a registered field.
+
+    R37-RT-09. The judged text is the sentence with the
+    guarded text removed, and the patterns read it at
+    sentence scope. The clause at a time reading let a
+    parenthetical clause isolate the execution verb from
+    the field it executes, so neither clause fired alone.
+    A guard removes only the text up to its own phrase, so
+    a guard phrase in one clause still cannot shelter an
+    execution claim in another, or one standing after the
+    guard phrase inside its own clause.
+    """
     if (
         re.search(
-            r"\bzcode\s+(execut\w*|runs?|ran)\b[^.]{0,40}"
+            r"\bzcode\s+(execut\w*|runs?|ran)\b[^.]*"
             r"\b(settings|channels|lspservers|outputstyles)\b",
-            clause,
+            judged,
         )
         or re.search(
-            r"\bexecut\w*\b[^.]{0,40}\b(settings|channels"
+            r"\bexecut\w*\b[^.]*\b(settings|channels"
             r"|lspservers|outputstyles)\b",
-            clause,
+            judged,
         )
         or re.search(
             r"\b(settings|channels|lspservers|outputstyles)\b"
-            r"[^.]{0,60}\b(are|is|were|was|gets?)\s+"
+            r"[^.]*\b(are|is|were|was|gets?)\s+"
             r"(?:\w+ly\s+)?(execut\w*|run|ran)\b"
-            r"[^.]{0,40}\bzcode\b",
-            clause,
+            r"[^.]*\bzcode\b",
+            judged,
         )
     ):
         return (
@@ -416,17 +491,51 @@ def _negative_clause_problem(clause):
             "registered plugin field, which the register "
             "but do not execute rule forbids"
         )
-    if "description" in clause and not re.search(
-        r"\b(different|another|other)\s+host\b|\bits own\b",
-        clause,
-    ):
-        for figure in _description_figures(clause):
-            if int(figure) != 1024:
-                return (
-                    "the zcode brief states a plugin "
-                    "description cap of %s characters, "
-                    "above the pinned cap of 1024" % figure
-                )
+    return None
+
+
+def _description_problem(sentence, spans):
+    """Whether a sentence states a description figure
+    other than the pinned cap.
+
+    Figures are extracted from the whole sentence and each
+    figure is judged against the clause that holds it. A
+    clause that scopes its figure to a different host
+    states no ZCode cap and its figure is skipped, but a
+    clause that names ZCode states the ZCode cap even when
+    it calls the cap its own, because the possessive in
+    that clause belongs to ZCode itself. R37-RT-09.
+    """
+    for figure, start in _description_figures(sentence):
+        clause = ""
+        for text, offset in spans:
+            if offset <= start:
+                clause = text
+        if "description" not in clause:
+            continue
+        if "zcode" not in clause and re.search(
+            r"\b(different|another|other)\s+host\b|\bits own\b",
+            clause,
+        ):
+            # R37F-RT-14. The skip stands only while no
+            # clause of the sentence binds that cap to
+            # ZCode by reference. A sentence that has
+            # ZCode inherit or adopt that cap states the
+            # figure as the ZCode cap after all.
+            if re.search(
+                r"\bzcode\b[^.]*\b(inherit\w*|adopt\w*"
+                r"|same|that cap|this cap)\b",
+                sentence,
+            ):
+                pass
+            else:
+                continue
+        if int(figure) != 1024:
+            return (
+                "the zcode brief states a plugin "
+                "description cap of %s characters, "
+                "other than the pinned cap of 1024" % figure
+            )
     return None
 
 

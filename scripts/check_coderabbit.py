@@ -259,9 +259,43 @@ def guidelines_problems(root=None):
     return problems
 
 
+def _prefix_negated(low, start):
+    """R37-RT-08. Whether a negation guards a match from
+    before it in the same claim stretch.
+
+    The stretch runs from the last clause reset before the
+    match, a semicolon or a but or however or yet, to the
+    match itself. A negation inside that stretch guards
+    the match even when it stands far before the match
+    word, as a subordinate clause places it, while a
+    negation in an earlier clause joined by a reset word
+    belongs to that clause and does not guard.
+
+    R37F-RT-10. A comma and clause opening on a pronoun
+    subject is a reset too. Two assertions joined that
+    way are two claims, and a negation in the first
+    negates its own claim only.
+    """
+    prefix = low[:start]
+    cut = 0
+    for reset in re.finditer(
+        r";|\bbut\b|\bhowever\b|\byet\b"
+        r"|,\s+and\s+(?:it|they|we|he|she|these|those)\b",
+        prefix,
+    ):
+        cut = max(cut, reset.end())
+    return bool(
+        re.search(
+            r"\b(not|never|no)\b|n't|\bunavailable\b",
+            prefix[cut:],
+        )
+    )
+
+
 def linked_problems(root=None):
     """R36-RT-04. No sentence may promise Deep Scan linked
-    source on an excluded platform or above the 20 limit.
+    source on an excluded platform or state a linked
+    repository figure other than the 20 limit.
 
     The brief states the platform limit beside the linked
     context sentence, that linked source is available in
@@ -270,9 +304,18 @@ def linked_problems(root=None):
     in that flow for self hosted GitLab or Azure DevOps or
     Bitbucket. A planted sentence that offers linked source
     on one of the excluded platforms without the negation,
-    or that raises the linked repository limit above 20,
-    must fail the gate. The shipped limit sentence carries
-    its own negation, so it is skipped.
+    or that states a linked repository figure other than
+    20, must fail the gate. The shipped limit sentence
+    carries its own negation, so it is skipped.
+
+    R37-RT-07. The branches read pairs of neighbouring
+    sentences beside single sentences and bind an offer to
+    a platform anywhere inside the unit, because the round
+    37 review split the offer and the platform across a
+    sentence boundary, stated the raised figure in a
+    partner sentence holding no repository word, and
+    pushed an offer and a platform past the span limit
+    inside one long sentence.
     """
     root = ROOT if root is None else root
     raw = read_text(root / "docs" / "coderabbit-review-brief.md")
@@ -285,8 +328,23 @@ def linked_problems(root=None):
         for sentence in re.split(r"(?<=[.!?])\s+", text)
         if sentence.strip()
     ]
+    windows = [[part] for part in sentences]
+    windows += [
+        [first, second]
+        for first, second in zip(sentences, sentences[1:])
+    ]
+    # R37F-RT-11. Triples join the reading, because the
+    # fix review split both linked claims across three
+    # sentences with a filler between the halves.
+    windows += [
+        [first, second, third]
+        for first, second, third in zip(
+            sentences, sentences[1:], sentences[2:]
+        )
+    ]
     problems = []
-    for sentence in sentences:
+    for parts in windows:
+        sentence = " ".join(parts)
         low = sentence.lower()
         # R36 gate repair. The figure branch reads spelled
         # figures as well as digits, and reads a figure
@@ -325,10 +383,113 @@ def linked_problems(root=None):
             if value != 20:
                 problems.append(
                     "the coderabbit brief states %s linked "
-                    "repositories, above the pinned limit of 20"
-                    % figure_text
+                    "repositories, other than the pinned "
+                    "limit of 20" % figure_text
                 )
                 return problems
+        # R37-RT-07. A figure stated in a partner sentence
+        # through a cap frame, the cap for that reading is
+        # 50, binds to the linked repositories the other
+        # sentence of the pair names, so the pair reading
+        # judges the figure against the same limit.
+        # Gate review repair. The frame binds only where
+        # the frame sentence ties its cap to the reading of
+        # the linked repositories, so a neighbouring limit
+        # on another surface states no linked cap. A figure
+        # other than the pinned figure that a later
+        # restatement in the same sentence corrects to the
+        # pinned figure across a correction word is
+        # skipped, and a negation standing between the cap
+        # word and its figure guards that figure.
+        half_pairs = []
+        if len(parts) > 1:
+            for link_index, link_half in enumerate(parts):
+                for frame_index, frame_half in enumerate(parts):
+                    if link_index != frame_index:
+                        half_pairs.append((link_half, frame_half))
+        for link_half, frame_half in half_pairs:
+                if "linked repositories" not in link_half.lower():
+                    continue
+                frame_low = frame_half.lower()
+                if not re.search(
+                    r"\b(reading|linked|repositories)\b", frame_low
+                ):
+                    continue
+                frames = []
+                for match in re.finditer(
+                    r"\b(?:cap|limit)\b[^.]{0,40}?"
+                    r"\b(?:is|of|at)\s+(\d+|"
+                    + _NUMBER_WORDS
+                    + r")\b",
+                    frame_low,
+                ):
+                    frames.append(match)
+                for match in re.finditer(
+                    r"\bup to\s+(\d+|"
+                    + _NUMBER_WORDS
+                    + r")\b",
+                    frame_low,
+                ):
+                    frames.append(match)
+                # R37C-RT-06. A tied frame sentence can
+                # state a second repository figure with no
+                # frame of its own, the pinned 20 in the
+                # trigger flow beside a 50 in the summary
+                # report. Bare repository figures in the
+                # frame sentence join the candidates and are
+                # judged under the same guards, with the
+                # prefix negation guard the frame form gets
+                # from its own span.
+                candidates = [(match, False) for match in frames]
+                for match in re.finditer(
+                    r"\b(\d+|" + _NUMBER_WORDS
+                    + r")\s+repositories\b",
+                    frame_low,
+                ):
+                    candidates.append((match, True))
+                for match, bare in candidates:
+                    value = (
+                        int(match.group(1))
+                        if match.group(1).isdigit()
+                        else _word_value(match.group(1))
+                    )
+                    if value == 20:
+                        continue
+                    if bare and _prefix_negated(
+                        frame_low, match.start()
+                    ):
+                        continue
+                    if re.search(
+                        r"\b(not|never)\b",
+                        frame_low[match.start():match.end()],
+                    ):
+                        continue
+                    corrected = False
+                    restatement = re.search(
+                        r"\b(?:is|of|at)\s+(20|twenty)\b"
+                        r"|\bup to\s+(20|twenty)\b",
+                        frame_low[match.end():],
+                    )
+                    if restatement is not None:
+                        between = frame_low[
+                            match.end():
+                            match.end() + restatement.start()
+                        ]
+                        if re.search(
+                            r"\b(no|not|actually|true|correct"
+                            r"|rather)\b",
+                            between,
+                        ):
+                            corrected = True
+                    if corrected:
+                        continue
+                    problems.append(
+                        "the coderabbit brief states a "
+                        "linked repository cap of %s, other "
+                        "than the pinned limit of 20"
+                        % match.group(1)
+                    )
+                    return problems
         # R36 gate repair. The platform branch binds an
         # availability word to an excluded platform by
         # closeness in either direction, with any negation
@@ -339,6 +500,10 @@ def linked_problems(root=None):
         # sentence that offered linked source on an
         # included platform while naming an excluded one
         # under its own negation.
+        # R37-RT-07. The binding now runs at unit scope
+        # with no span limit, because the review pushed an
+        # offer and a platform past the span inside one
+        # sentence and split them across two sentences.
         if "linked" in low or "deep scan" in low:
             platforms = [
                 match
@@ -356,18 +521,72 @@ def linked_problems(root=None):
                     low,
                 )
             ]
+            # R37F-RT-12. A platform negated inside its
+            # own claim stretch states the limit for that
+            # platform itself, so an offer in a partner
+            # sentence does not bind to it. The stretch is
+            # the platform's clause of its own sentence,
+            # cut at the same resets the prefix guard
+            # uses, on both sides of the platform.
+            part_spans = []
+            offset = 0
+            for part in parts:
+                part_spans.append(
+                    (offset, offset + len(part), part.lower())
+                )
+                offset += len(part) + 1
             for platform in platforms:
+                home_start, home_end, home = next(
+                    (start, end, part_low)
+                    for start, end, part_low in part_spans
+                    if start <= platform.start() < end
+                )
+                local_start = platform.start() - home_start
+                local_end = platform.end() - home_start
+                pre = home[:local_start]
+                cut = 0
+                for reset in re.finditer(
+                    r";|\bbut\b|\bhowever\b|\byet\b"
+                    r"|,\s+and\s+(?:it|they|we|he|she|these"
+                    r"|those)\b",
+                    pre,
+                ):
+                    cut = max(cut, reset.end())
+                post = home[local_end:]
+                stop = len(post)
+                first_reset = re.search(
+                    r";|\bbut\b|\bhowever\b|\byet\b"
+                    r"|,\s+and\s+(?:it|they|we|he|she|these"
+                    r"|those)\b",
+                    post,
+                )
+                if first_reset is not None:
+                    stop = first_reset.start()
+                if re.search(
+                    r"\b(not|never|no)\b|n't|\bunavailable\b",
+                    pre[cut:],
+                ) or re.search(
+                    r"\b(not|never|no)\b|n't|\bunavailable\b",
+                    post[:stop],
+                ):
+                    continue
                 for offer in offers:
                     start = min(platform.start(), offer.start())
                     end = max(platform.end(), offer.end())
-                    if end - start > 80:
-                        continue
                     span = low[max(0, start - 6):end + 12]
                     if re.search(
                         r"\b(not|never|no)\b|n't"
                         r"|\bunavailable\b",
                         span,
                     ):
+                        continue
+                    # R37-RT-08. A negation standing before
+                    # the offer in the same claim stretch
+                    # guards the pair as well, because the
+                    # round 37 review placed the negation
+                    # ahead of a subordinate clause and the
+                    # span guard alone missed it.
+                    if _prefix_negated(low, offer.start()):
                         continue
                     problems.append(
                         "the coderabbit brief promises Deep "

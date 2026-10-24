@@ -309,6 +309,39 @@ at the installed root with no conversion file created.
 The installed bundles listed skill recognitio in the
 extensions list without editing frontmatter.
 
+The round 37 full bundle attempt adds the exception
+this record needs. A Qoder input of 14 files, built
+from the canonical tree at the round 36 head and
+holding the skill tree with its side shapes, was
+installed with Qwen CLI 0.26.0 in a scratch home.
+Twelve payload files and the retained Qoder manifest
+were byte identical to the canonical tree. Three
+conversion differences stand against that result. The
+installed SKILL.md differs from the canonical file in
+exactly one line, the T0 tier paragraph, where the
+words a Claude rules file under a .claude/rules folder
+in the canonical text read as a Claude rules file
+under a .qwen/rules folder in the installed text, and
+the installed file runs 15231 bytes against 15233 for
+the canonical file. The installer left the matching
+spelling inside extract.py untouched, so the installed
+bundle names one folder in its skill prose and tests
+for another in its extractor code. The converted
+qwen-extension.json carries only name and version and
+description, and the author and license fields the
+input manifest carried are absent from the converted
+file, which settles the question the round 33 record
+left open on whether the conversion drops fields. The
+installer mirror at .claude-plugin/plugin.json carries
+the input manifest fields and values at 355 bytes
+against 356 for the input, losing only its trailing
+newline. The install also added an install record file
+that has no canonical counterpart. Skill file byte
+fidelity does not hold for a Qoder install of the
+current canonical skill text, and this brief claims
+byte fidelity for the round 33 skill tree installs
+only.
+
 Side shapes do not ride in. The installed bundles
 contain only the skill tree. They do not contain the
 reviewer persona, the hooks, the output style, or the

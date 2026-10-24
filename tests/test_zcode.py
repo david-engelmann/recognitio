@@ -318,5 +318,176 @@ class TestCheckZcode(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_round37_its_own_cap_naming_zcode_fails(self):
+        # R37-RT-09. The possessive belongs to ZCode itself
+        # in this clause, so the its own skip no longer
+        # shelters the doubled cap.
+        plant = (
+            "ZCode sets its own plugin description cap at "
+            "2048 characters."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "description cap of 2048 characters, "
+                    "other than the pinned cap of 1024" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_execution_split_by_parenthetical_fails(self):
+        # R37-RT-09. A parenthetical clause isolates the
+        # verb from the field under the clause split, and
+        # the sentence scope reading must catch it.
+        plant = (
+            "ZCode executes, once the plugin manifest has "
+            "been loaded and every declaration inside it "
+            "has been read in full, the settings it "
+            "declares."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "has ZCode executing a registered" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_figure_split_from_its_unit_fails(self):
+        # R37-RT-09. The figure and its unit stand in
+        # separate clauses behind a qualifier, and the
+        # sentence extraction must still read the figure.
+        plant = (
+            "A plugin description on ZCode is capped at "
+            "2048, measured in characters."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "description cap of 2048" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_different_host_clause_still_passes(self):
+        # R37-RT-09 control. A figure scoped to a different
+        # host in its own clause states no ZCode cap, and
+        # the shipped 1024 beside it still passes.
+        sentence = (
+            "The brief states the ZCode description cap at "
+            "1024 characters, while a different host sets "
+            "its own description cap at 2048 characters."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_below_cap_figure_fails_as_other_than(self):
+        # R37-ST-01. The cap rule tests inequality, so a
+        # figure below the pinned cap fails too, and the
+        # problem states the rule as other than.
+        plant = (
+            "A plugin description on ZCode is capped at "
+            "512 characters."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "other than the pinned cap of 1024" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_guard_inside_the_clause_fails(self):
+        # R37F-RT-13. A guard removes only the text up to
+        # its own phrase, so an execution claim standing
+        # after the guard phrase inside the same clause
+        # stays under judgement and fails.
+        plant = (
+            "ZCode can register but also executes the "
+            "settings it declares."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "executing a registered plugin field" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_inherited_cap_binds_to_zcode(self):
+        # R37F-RT-14. A clause that has ZCode inherit the
+        # figure a different host clause states binds that
+        # figure to ZCode, so the skip no longer applies.
+        plant = (
+            "A plugin description on a different host is "
+            "capped at 2048 characters, and ZCode inherits "
+            "that cap for its plugin descriptions."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "description cap of 2048" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_qualifier_behind_filler_fails(self):
+        # R37F-RT-14. Short filler between the comma and
+        # the qualifier verb states the same separated
+        # figure, so the figure is extracted and fails.
+        plant = (
+            "On ZCode, a plugin description is capped at "
+            "2048, with the limit measured in characters "
+            "for every plugin."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "description cap of 2048" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -456,7 +456,11 @@ class TestCheckKimi(unittest.TestCase):
                 "the plugin total up to 256KB.",
             )
             self.assertTrue(
-                any("inflates" in p for p in problems),
+                any(
+                    "other than the pinned 32KB and 64KB "
+                    "limits" in p
+                    for p in problems
+                ),
                 problems,
             )
 
@@ -1439,6 +1443,233 @@ class TestCheckKimi(unittest.TestCase):
                     for p in problems),
                 problems,
             )
+
+    def test_round37_swap_behind_semicolon_clause_fails(self):
+        # R37-RT-04. The figure clause holds no scope word,
+        # so the clause reading formed no binding. The
+        # sentence reading binds the 64 to the field word
+        # in the first clause.
+        plant = (
+            "Each systemPrompt field is capped in Kimi; it "
+            "may hold up to 64 KB of content."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_swap_with_two_figures_one_field_word_fails(self):
+        # R37-RT-04. One field word must bind both figures,
+        # so the 64 stated as the per field maximum fails
+        # beside the true 32 minimum.
+        plant = (
+            "Each systemPrompt field in Kimi may hold 32 KB "
+            "at minimum and up to 64 KB at most."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_swap_past_the_gap_limit_fails(self):
+        # R37-RT-04. Filler between the field word and the
+        # figure no longer shelters the swap, because the
+        # sentence binding carries no gap limit.
+        plant = (
+            "Each systemPrompt field in Kimi, under the "
+            "managed plugin limits that govern every prompt "
+            "build across all enabled plugins in the "
+            "workspace, may hold up to 64 KB of content."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_bare_name_invocation_past_the_reach_fails(self):
+        # R37-RT-05. The invocation verb stands past the
+        # old measured reach after the bare name, and the
+        # segment reading must still catch the acceptance.
+        plant = (
+            "A bare skill name, typed on its own in the "
+            "prompt with no prefix and no qualification of "
+            "any kind, still invokes a plugin skill in Kimi."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "accepts a bare name" in p for p in problems
+                ),
+                problems,
+            )
+
+
+    def test_round37_spelled_kilobyte_limit_fails_with_other_than(self):
+        # R37F-ST-01 repair. The spelled kilobyte branch
+        # message states its rule as other than, and this
+        # test is the needle that branch was missing, so
+        # reverting the message repair fails here.
+        plant = (
+            "A systemPrompt field in Kimi may hold forty "
+            "kilobytes of content."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "in words, other than the pinned 32KB "
+                    "and 64KB limits" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_decoy_scope_word_does_not_bind(self):
+        # R37F-RT-04. A scope word standing after the
+        # figure across an of names the content the figure
+        # measures, so the field subject binds the 64 and
+        # the total subject binds the 32, and both swaps
+        # fail.
+        cases = (
+            (
+                "Each systemPrompt field in Kimi may hold "
+                "up to 64 KB of total content.",
+                "per field limit of 64",
+            ),
+            (
+                "The Kimi prompt build total may reach "
+                "32 KB of field content.",
+                "total limit of 32",
+            ),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(
+                    root, text + "\n\n" + plant + "\n"
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_round37_fixreview_earlier_clause_negation_no_guard(self):
+        # R37F-RT-05. A negation in an earlier clause of
+        # the segment negates that clause, not the
+        # invocation the clause after the coordinating and
+        # states, so the acceptance still fails.
+        plant = (
+            "The bare name is never documented in Kimi, "
+            "and a bare name still invokes a plugin skill."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "accepts a bare name" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_confirm_total_of_field_content_fails(self):
+        # R37C-RT-03. A total word right after the figure
+        # whose own of phrase names field content measures
+        # that field content, so the figure binds to the
+        # field subject and the swap fails.
+        plant = (
+            "Each systemPrompt field in Kimi may hold up "
+            "to 64 KB total of all field content."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_confirm_decoy_total_with_field_subject_fails(self):
+        # Spec confirmation candidate. A total word after
+        # the figure in a sentence whose field subject
+        # stands before the figure and whose per field
+        # restatement stands after the total word measures
+        # the field content, so the figure binds to the
+        # field scope and the swap fails.
+        plant = (
+            "Each systemPrompt field in Kimi may hold up "
+            "to 64 KB in total content per field."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_total_first_sentence_passes(self):
+        # R37F-RT-06. Each figure binds inside its own
+        # comma clause, so a true sentence that states the
+        # total first and the per field figure after the
+        # comma must pass.
+        sentence = (
+            "Kimi holds 64 KB in total, with 32 KB allowed "
+            "per field."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
 
 if __name__ == "__main__":
     unittest.main()

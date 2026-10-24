@@ -733,6 +733,74 @@ def brief_negative_problems(root=None):
         if sentence.strip()
     ]
     problems = []
+    # R37-RT-06. The cap and effort branches now read the
+    # whole sentence with no measured reach, because the
+    # round 37 review pushed the bound words past the
+    # reaches behind filler. A cap figure binds to the word
+    # repositories anywhere in its sentence unless the
+    # figure is bound elsewhere first, by the count noun
+    # right after it or by a unit word in its own unit
+    # position, as a character count is. The neutral branch
+    # reads pairs of neighbouring sentences beside single
+    # sentences, because the review carried the conclusion
+    # across a sentence boundary on a pronoun and neither
+    # sentence alone held the pairing.
+    unit_words = (
+        r"(?:characters?|chars|bytes?|kb|kib|mb|lines?"
+        r"|files?|rules?|seconds?|minutes?|tokens?"
+        r"|percent|words?)"
+    )
+
+    def cap_figure(low):
+        figures = list(
+            re.finditer(
+                r"\b(\d[\d,]*\d|\d+|three hundred"
+                r"|five hundred)\b",
+                low,
+            )
+        )
+        targets = list(re.finditer(r"\brepositories\b", low))
+        for figure in figures:
+            # R37F-RT-09. A figure followed directly by a
+            # plural count noun binds to that noun, not to
+            # a repositories word later in the sentence. A
+            # workspace listing 500 issues across its
+            # repositories counts issues, so the figure is
+            # not a repository cap figure at all.
+            following = re.match(
+                r"[\s,]*([a-z]+)", low[figure.end():]
+            )
+            if (
+                following
+                and following.group(1).endswith("s")
+                and following.group(1) != "repositories"
+            ):
+                continue
+            for target in targets:
+                if figure.end() <= target.start():
+                    between = low[figure.end():target.start()]
+                    # R37F-RT-07. Ahead of the target, a
+                    # unit word rebinds the figure only in
+                    # the figure's own unit position, right
+                    # after the figure. A unit word inside a
+                    # parenthetical later in the stretch,
+                    # counting files separately, leaves the
+                    # figure bound to repositories.
+                    if re.match(
+                        r"[\s,]*%s\b" % unit_words, between
+                    ):
+                        continue
+                elif target.end() <= figure.start():
+                    between = low[target.end():figure.start()]
+                    if re.search(
+                        r"\b%s\b" % unit_words, between
+                    ):
+                        continue
+                else:
+                    continue
+                return figure.group(1)
+        return None
+
     for sentence in sentences:
         low = sentence.lower()
         # R36 gate repair. The cap branch binds a figure to
@@ -744,55 +812,68 @@ def brief_negative_problems(root=None):
         # the only thing that makes a citation honest. The
         # sentence that names both figures with the conflict
         # named beside them passes on the conflict word.
-        cap = re.search(
-            r"\b(\d+|three hundred|five hundred)\b"
-            r"[^.]{0,40}\brepositories\b",
-            low,
-        ) or re.search(
-            r"\brepositories\b[^.]{0,40}"
-            r"\b(\d+|three hundred|five hundred)\b",
-            low,
-        )
+        cap = cap_figure(low)
         if cap and "conflict" not in low:
             problems.append(
                 "the cursor brief states a repository cap "
                 "figure of %s with no R35-C-01 conflict "
-                "note beside it" % cap.group(1)
+                "note beside it" % cap
             )
             return problems
-        if (
-            "bugbot.yaml" in low
-            and (
-                re.search(
-                    r"\beffort\b[^.]{0,120}"
-                    r"\b(pin\w*|set|configur\w*|control\w*)\b",
-                    low,
+        # R37F-RT-09. The effort binding reads the
+        # sentence's coordinating units, split at a comma
+        # and or comma but or a semicolon. Effort in one
+        # unit and a pin verb in the next state no pin,
+        # while the parenthetical commas of the round 37
+        # plant open no unit, so its effort and its pin
+        # verb stay in one unit and still fail.
+        effort_units = re.split(r",\s+(?:and|but)\s+|;\s*", low)
+        for unit_text in effort_units:
+            if (
+                "bugbot.yaml" in unit_text
+                and (
+                    re.search(
+                        r"\beffort\b[^.]*"
+                        r"\b(pin\w*|set|configur\w*|control\w*)\b",
+                        unit_text,
+                    )
+                    or re.search(
+                        r"\b(pin\w*|set|configur\w*|control\w*)\b"
+                        r"[^.]*\beffort\b",
+                        unit_text,
+                    )
                 )
-                or re.search(
-                    r"\b(pin\w*|set|configur\w*|control\w*)\b"
-                    r"[^.]{0,120}\beffort\b",
-                    low,
+                and not re.search(
+                    r"\b(claims|secondary|no such|inventing"
+                    r"|not|never|cannot)\b",
+                    unit_text,
                 )
-            )
-            and not re.search(
-                r"\b(claims|secondary|no such|inventing"
-                r"|not|never|cannot)\b",
-                low,
-            )
-        ):
-            problems.append(
-                "the cursor brief pins Bugbot effort in "
-                "bugbot.yaml, which the dashboard only effort "
-                "pin forbids"
-            )
-            return problems
+            ):
+                problems.append(
+                    "the cursor brief pins Bugbot effort in "
+                    "bugbot.yaml, which the dashboard only effort "
+                    "pin forbids"
+                )
+                return problems
+    units = list(sentences)
+    for first, second in zip(sentences, sentences[1:]):
+        units.append(first + " " + second)
+    for unit in units:
+        low = unit.lower()
         block = re.search(
             r"\b(blocks?|blocked|stops?|stopped|halts?"
             r"|prevent\w*)\b",
             low,
         )
+        # R37F-RT-08. The negation guard reads the stretch
+        # right before the blocking verb, and the stretch
+        # stops at a coordinating and. A negation that
+        # modifies an earlier verb joined by and, never
+        # sits idle and blocks, negates that verb and not
+        # the blocking one.
         if block and "neutral" in low and not re.search(
-            r"\b(does not|do not|not|never|no)\b[^.]{0,30}$",
+            r"\b(does not|do not|not|never|no)\b"
+            r"(?:(?!\band\b)[^.]){0,30}$",
             low[:block.start()],
         ):
             problems.append(

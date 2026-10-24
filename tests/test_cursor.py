@@ -522,5 +522,175 @@ class TestCheckCursor(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_round37_neutral_conclusion_split_across_sentences_fails(self):
+        # R37-RT-06. The pronoun carries the neutral
+        # conclusion into a second sentence that holds the
+        # blocking verb, and the pair reading must catch it.
+        plant = (
+            "Bugbot findings default to a neutral "
+            "conclusion. That conclusion blocks merges in "
+            "this repository."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "neutral Bugbot conclusion blocking" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_cap_figure_past_the_reach_fails(self):
+        # R37-RT-06 and R35-C-01. Filler between the figure
+        # and the word repositories no longer shelters a
+        # cap figure stated without the conflict note.
+        plant = (
+            "A cloud agent environment supports up to 500 "
+            "carefully counted and individually tracked "
+            "repositories in this workspace."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "repository cap figure of 500" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_effort_pin_past_the_reach_fails(self):
+        # R37-RT-06. The effort pin stated across a long
+        # dashboard filler must fail at sentence scope.
+        plant = (
+            "Bugbot effort, as a dashboard value that the "
+            "workspace admin reviews each quarter alongside "
+            "the other review choices for this repository "
+            "and its sibling projects in the same "
+            "organisation and its partner teams abroad, is "
+            "pinned in bugbot.yaml."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "pins Bugbot effort in bugbot.yaml" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
+    def test_round37_grouped_cap_figure_is_named_in_full(self):
+        # Gate review repair. A comma grouped figure binds
+        # as one figure, so the problem names 100,000 and
+        # not the truncated 100 the digit run alone reads.
+        plant = (
+            "A cloud agent environment supports up to "
+            "100,000 repositories in this workspace."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "repository cap figure of 100,000" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_unit_word_in_parenthetical_fails(self):
+        # R37F-RT-07. A unit word inside a parenthetical
+        # after the figure does not rebind it, because the
+        # figure's unit position stands empty, so the cap
+        # figure still binds to repositories.
+        plant = (
+            "A cloud agent environment supports up to 500, "
+            "counting files separately, repositories in "
+            "this workspace."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "repository cap figure of 500" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_idle_negation_does_not_guard(self):
+        # R37F-RT-08. A negation joined to the blocking
+        # verb by a coordinating and modifies the earlier
+        # verb, so the neutral conclusion blocking merges
+        # still fails.
+        plant = (
+            "Bugbot findings default to a neutral "
+            "conclusion. That conclusion never sits idle "
+            "and blocks merges in this repository."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "conclusion blocking merges" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_fixreview_effort_in_another_clause_passes(self):
+        # R37F-RT-09. Effort in one coordinating unit and
+        # a pin verb in the next state no pin, so the true
+        # sentence must pass.
+        sentence = (
+            "Bugbot effort is a dashboard setting, and the "
+            "autofix mode is pinned in bugbot.yaml."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_round37_fixreview_count_of_another_noun_passes(self):
+        # R37F-RT-09. A figure followed directly by its own
+        # count noun binds to that noun, so a workspace
+        # listing 500 issues across its repositories
+        # states no repository cap figure and must pass.
+        sentence = (
+            "The workspace lists 500 issues across its "
+            "repositories."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\n" + sentence + "\n"
+            )
+            self.assertEqual(self.problems(root), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -243,6 +243,86 @@ def _sentences(section):
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
 
 
+def _post_negated(sentence, match):
+    """R37-RT-03. A negative quantifier standing after the
+    verb as its agent or its object states the negative
+    posture in the ordinary forms, trusted by no reviewer
+    and granted on no red packet among them. A match
+    followed by one inside a short span is negated just
+    as a match preceded by a negation word is, so both
+    scans skip it.
+
+    R37F-RT-03. The quantifier paradigm is closed but
+    wider than four words. Zero and the not a single and
+    not one forms state the same negative agent or
+    object, trusted by zero reviewers and granted to
+    zero red packets among them, so they guard the match
+    the same way.
+    """
+    return bool(
+        re.search(
+            r"\b(?:by|on|for|to)\s+(?:no|nobody|none|nothing"
+            r"|zero|not a single|not one)\b",
+            sentence[match.end():match.end() + 45],
+        )
+    )
+
+
+def _windows(sentences):
+    """Neighbouring sentence windows as lists of parts.
+
+    The scans read singles, pairs, and triples. The
+    parts stay separate so a guard can be scoped to the
+    sentences that carry the claim under judgement.
+    """
+    windows = [[part] for part in sentences]
+    windows += [
+        [first, second]
+        for first, second in zip(sentences, sentences[1:])
+    ]
+    windows += [
+        [first, second, third]
+        for first, second, third in zip(
+            sentences, sentences[1:], sentences[2:]
+        )
+    ]
+    return windows
+
+
+def _match_home(parts, start):
+    """The part index and local offset a joined match
+    starts at."""
+    offset = 0
+    for index, part in enumerate(parts):
+        if start < offset + len(part) + 1:
+            return index, min(start - offset, len(part))
+        offset += len(part) + 1
+    return len(parts) - 1, len(parts[-1])
+
+
+def _guard_prefix(parts, start, subject):
+    """The text that may guard a match inside a window.
+
+    R37F-RT-02. A negation guards a claim only from a
+    sentence that carries the claim, one naming the
+    subject or the one holding the match itself. A
+    filler sentence between the halves carries neither,
+    so its negation states a different fact and does not
+    guard the claim the window joins. The result is the
+    subject sentences before the match sentence joined
+    with the match sentence up to the match.
+    """
+    index, local = _match_home(parts, start)
+    subjects = (subject,) if isinstance(subject, str) else subject
+    guards = [
+        part
+        for part in parts[:index]
+        if any(word in part for word in subjects)
+    ]
+    guards.append(parts[index][:local])
+    return " ".join(guards), index
+
+
 def trust_problems(root=None):
     """R26-RT-01. No sentence may grant head branch content trust
     or merge authority.
@@ -312,7 +392,19 @@ def trust_problems(root=None):
     units = list(sentences)
     for first, second in zip(sentences, sentences[1:]):
         units.append(first + " " + second)
-    for sentence in units:
+    # R37-RT-02. The pattern passes read triples of
+    # neighbouring sentences, because the round 37 review
+    # split the trust and approval claims across three
+    # sentences with a filler sentence between the halves,
+    # and no sentence and no pair held both halves.
+    # R37F-RT-01. The merge authority passes read triples
+    # too, because the fix review split an authority claim
+    # the same way. The guards inside every pass are
+    # scoped by _guard_prefix, so a negation in a filler
+    # sentence guards nothing.
+    windows = _windows(sentences)
+    for parts in windows:
+        sentence = " ".join(parts)
         if "head branch" not in sentence:
             continue
         if "untrusted" in sentence:
@@ -334,16 +426,36 @@ def trust_problems(root=None):
         if not attributed:
             for pattern in patterns:
                 match = re.search(pattern, sentence)
-                if match and not re.search(
-                    r"\b(not|never|no|nothing)\b|n't",
-                    sentence[:match.start()],
+                if not match:
+                    continue
+                guard, index = _guard_prefix(
+                    parts, match.start(), "head branch"
+                )
+                if re.search(
+                    r"\b(not|never|no|nothing)\b|n't", guard
                 ):
-                    problems.append(
-                        "a copilot rule trusts head branch "
-                        "instructions, which the untrusted input "
-                        "posture forbids"
-                    )
-                    return problems
+                    continue
+                local = re.search(pattern, parts[index])
+                if local and _post_negated(parts[index], local):
+                    continue
+                problems.append(
+                    "a copilot rule trusts head branch "
+                    "instructions, which the untrusted input "
+                    "posture forbids"
+                )
+                return problems
+    # The merge authority passes below read the same
+    # windows under the same three skips the trust pass
+    # applies, so a window the trust pass skips states no
+    # authority claim either.
+    for parts in windows:
+        sentence = " ".join(parts)
+        if "head branch" not in sentence:
+            continue
+        if "untrusted" in sentence:
+            continue
+        if re.search(r"\bnothing\b.{0,40}\btreats\b", sentence):
+            continue
         # R31-RT-05. Merge authority without the base branch
         # qualifier, and a merge approval authored by head
         # branch instructions said to be valid, grant the
@@ -382,12 +494,17 @@ def trust_problems(root=None):
             r"\b(decid\w*|determin\w*|govern\w*|control\w*)\b",
             sentence,
         )
+        decide_guard = (
+            _guard_prefix(parts, decide.start(), "head branch")[0]
+            if decide
+            else ""
+        )
         if (
             decide
             and "merge" in sentence
             and re.search(r"\b(codeowners|rulesets)\b", sentence)
             and not re.search(
-                r"\b(no|not|never)\b", sentence[:decide.start()]
+                r"\b(no|not|never)\b", decide_guard
             )
         ):
             problems.append(
@@ -507,24 +624,32 @@ def approval_problems(root=None):
     # other, because the review split the red packet
     # presence and the approval firing across a sentence
     # boundary and the single sentence scan passed both.
-    sentences = _sentences(raw)
-    units = list(sentences)
-    for first, second in zip(sentences, sentences[1:]):
-        units.append(first + " " + second)
-    for sentence in units:
+    # R37-RT-02. The scan also reads triples, because the
+    # round 37 review split the approval and its firing
+    # across three sentences with a filler sentence
+    # between them.
+    for parts in _windows(_sentences(raw)):
+        sentence = " ".join(parts)
         if "approval" not in sentence and "approved" not in sentence:
             continue
         for pattern in patterns:
             match = re.search(pattern, sentence)
-            if match and not re.search(
-                r"\b(never|not|no)\b", sentence[:match.start()]
-            ):
-                problems.append(
-                    "a copilot rule permits an approval firing, "
-                    "which the never approve on a red packet "
-                    "rule forbids"
-                )
-                return problems
+            if not match:
+                continue
+            guard, index = _guard_prefix(
+                parts, match.start(), ("approval", "approved")
+            )
+            if re.search(r"\b(never|not|no)\b", guard):
+                continue
+            local = re.search(pattern, parts[index])
+            if local and _post_negated(parts[index], local):
+                continue
+            problems.append(
+                "a copilot rule permits an approval firing, "
+                "which the never approve on a red packet "
+                "rule forbids"
+            )
+            return problems
     text = re.sub(r"\s+", " ", raw)
     if re.search(
         r"(?<!never )(?<!not )fires on an? (?:red|unverified) "

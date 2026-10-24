@@ -426,3 +426,116 @@ class TestCheckQwen(unittest.TestCase):
             "submit the skill through the central Qwen marketplace approval queue"
         )
         self.assertTrue(problems)
+
+    def test_round37_figure_split_across_three_sentences_fails(self):
+        # R37-RT-10. The count and the simultaneity word
+        # stand two sentences apart with a filler between
+        # them, and the three sentence window must catch
+        # the figure claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. The "
+            "packet lists each file in the change beside "
+            "its diff. They work together on the review."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_guard_word_no_longer_shelters_a_figure(self):
+        # R37-RT-10. A basis label on the neighbouring
+        # sentence exempts only its own sentence now, so a
+        # planted figure beside it still fails.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. They work "
+            "together on the review, as the roster "
+            "narrative records."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_full_conversion_byte_fidelity_claim_fails(self):
+        # R37-RT-01. Byte fidelity holds for the round 33
+        # skill tree installs only, so a byte identical
+        # claim for a full conversion must fail.
+        problems = self.mod.negative_problems(
+            "The full bundle conversion output is byte "
+            "identical to the canonical tree."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_fidelity_record_pins_hold(self):
+        # R37-RT-01. Dropping any of the six round 37
+        # record sentences from the brief fails the gate,
+        # so the conversion account cannot quietly lose
+        # one of its named differences or its install
+        # record sentence.
+        fragments = (
+            "The installed SKILL.md differs from the "
+            "canonical file in exactly one line",
+            "read as a Claude rules file under a "
+            ".qwen/rules folder",
+            "the author and license fields the input "
+            "manifest carried are absent from the "
+            "converted file",
+            "losing only its trailing newline",
+            "Skill file byte fidelity does not hold for a "
+            "Qoder install of the current canonical skill "
+            "text",
+            "an install record file that has no canonical "
+            "counterpart",
+        )
+        for fragment in fragments:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, fragment, "the record omits this"
+                )
+                self.assertTrue(problems, fragment)
+
+    def test_round37_fixreview_figure_split_across_four_fails(self):
+        # R37F-RT-15. The windows run to four neighbouring
+        # sentences, because the fix review split the count
+        # and the simultaneity word three sentences apart
+        # with two fillers between them.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. The "
+            "packet lists each file beside its diff. The "
+            "roster records each file in the change. They "
+            "work together on the review."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_fixreview_contrast_clause_guard_no_shelter(self):
+        # R37F-RT-16. A guard phrase in a contrast clause
+        # names a basis the claim separates itself from, so
+        # it exempts nothing and the own voice figure
+        # claim fails.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents together on this review, "
+            "separate from the roster narrative table."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_confirm_figure_split_across_five_fails(self):
+        # R37C-RT-01. The windows run to five neighbouring
+        # sentences, because the confirmation review split
+        # the count and the simultaneity word four
+        # sentences apart with three fillers between them.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. The "
+            "packet lists each file beside its diff. The "
+            "roster records each file in the change. The "
+            "summary notes the packet shape. They work "
+            "together on the review."
+        )
+        self.assertTrue(problems)
+
+    def test_round37_fixreview_window_with_own_count_passes(self):
+        # R37F-RT-17. A simultaneity sentence carrying its
+        # own different count heads its own claim, so the
+        # window joins no figure claim and must pass.
+        problems = self.mod.negative_problems(
+            "The roster lists 16 agents for this change. "
+            "The packet lists each file beside its diff. "
+            "The two editors work together on the packet "
+            "format."
+        )
+        self.assertEqual(problems, [])
+

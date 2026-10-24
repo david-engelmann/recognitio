@@ -133,6 +133,18 @@ PINNED = (
      "File install fidelity holds for the SKILL TREE ONLY"),
     ("the byte identical install",
      "were byte identical to the canonical skill tree"),
+    ("the round 37 skill line rewrite",
+     "The installed SKILL.md differs from the canonical file in exactly one line"),
+    ("the round 37 rules folder rewrite",
+     "read as a Claude rules file under a .qwen/rules folder"),
+    ("the round 37 field drop settled",
+     "the author and license fields the input manifest carried are absent from the converted file"),
+    ("the round 37 mirror newline",
+     "losing only its trailing newline"),
+    ("the round 37 fidelity limit",
+     "Skill file byte fidelity does not hold for a Qoder install of the current canonical skill text"),
+    ("the round 37 install record",
+     "an install record file that has no canonical counterpart"),
     ("the Qoder originSource",
      "recorded originSource as Qoder"),
     ("the AgentPlugins originSource",
@@ -405,8 +417,9 @@ def sentence_units(text):
     return units
 
 
-def _bound_figure(sentence):
-    """Whether a figure number binds to a generic agent noun.
+def _bound_figure_span(sentence):
+    """The span of the first figure number that binds to
+    a generic agent noun, or None.
 
     A number counts as a figure only when a generic agent
     noun stands within the bounded window of it, in either
@@ -422,8 +435,13 @@ def _bound_figure(sentence):
         if re.search(
             r"\b(" + FIGURE_AGENTS + r")\b", sentence[start:end]
         ):
-            return True
-    return False
+            return match.start(), match.end()
+    return None
+
+
+def _bound_figure(sentence):
+    """Whether a figure number binds to a generic agent noun."""
+    return _bound_figure_span(sentence) is not None
 
 
 def figure_problem(sentence):
@@ -506,6 +524,40 @@ def guarded(line):
     return any(word in line for word in GUARD_WORDS)
 
 
+def _figure_guarded(sentence):
+    """Whether the clause holding the bound figure is
+    guarded.
+
+    R37F-RT-16. A guard phrase exempts a figure from the
+    clause that states the figure, because a record
+    sentence names its basis beside its count. A guard
+    phrase in a later contrast clause names a basis the
+    claim separates itself from, separate from the roster
+    narrative table, and a claim standing apart from its
+    named basis in its own voice is an own voice claim,
+    not a record sentence, so the exemption does not
+    reach it.
+    """
+    span = _bound_figure_span(sentence)
+    if span is None:
+        return guarded(sentence)
+    start = span[0]
+    clause_start = max(
+        sentence.rfind(",", 0, start),
+        sentence.rfind(";", 0, start),
+    ) + 1
+    ends = [
+        index
+        for index in (
+            sentence.find(",", start),
+            sentence.find(";", start),
+        )
+        if index != -1
+    ]
+    clause_end = min(ends) if ends else len(sentence)
+    return guarded(sentence[clause_start:clause_end])
+
+
 def negative_problems(text):
     """Meaning based negatives over sentences, not lines.
 
@@ -522,10 +574,15 @@ def negative_problems(text):
         if not re.search(r"\b(never|no sentence|not a wrapper)\b", line):
             if wrapper_problem(line):
                 problems.append("wrapper exit plant: " + line[:120])
+        # R37F-RT-16. The figure check reads the clause
+        # scoped guard before the sentence guard skip, so
+        # a figure whose own clause is unguarded fails
+        # even when a contrast clause later in its
+        # sentence carries a guard phrase.
+        if figure_problem(line) and not _figure_guarded(line):
+            problems.append("figure plant: " + line[:120])
         if guarded(line):
             continue
-        if figure_problem(line):
-            problems.append("figure plant: " + line[:120])
         if re.search(r"\breturns? 4\b", line) and re.search(
             r"\b(" + WRAPPER_WORDS + r"|exit\w*)\b", line
         ):
@@ -566,6 +623,14 @@ def negative_problems(text):
             problems.append("npm scope plant: " + line[:120])
         if re.search(r"converted bundle[^.]{0,60}\b(proven|verified|confirmed)\b", line):
             problems.append("conversion plant: " + line[:120])
+        # R37-RT-01. Byte fidelity holds for the round 33
+        # skill tree installs only, so a sentence that
+        # claims byte identical output for a full or whole
+        # conversion states more than the record proves.
+        if re.search(r"\bbyte identical\b", line) and re.search(
+            r"\b(full|entire|whole)\b", line
+        ):
+            problems.append("conversion fidelity plant: " + line[:120])
         if re.search(r"\bproven to run\b", line):
             problems.append("conversion plant: " + line[:120])
         if re.search(r"\bfull packet workflow in qwen\b", line) and "not" not in line:
@@ -581,21 +646,88 @@ def negative_problems(text):
     # both orders and each half passed alone. Table rows
     # and headings and code lines stay out of the pairs,
     # as they stay out of the sentence units themselves.
+    # R37-RT-10. The reading now runs over windows of
+    # neighbouring prose sentences, and the guard no
+    # longer exempts a whole window. The round 37 review
+    # split the count and the simultaneity word two
+    # sentences apart with a filler between them, and
+    # beside that it stood a planted figure next to a
+    # guarded record sentence so the pair reading skipped
+    # the joined unit whole. A window is exempt only when
+    # every sentence in it that carries a bound figure is
+    # guarded in the figure's own clause, so a basis label
+    # on a neighbouring sentence or in a contrast clause
+    # no longer shelters an unguarded figure.
     units = sentence_units(normalise(text))
-    for first, second in zip(units, units[1:]):
-        if first.startswith(("|", "#", "`")) or second.startswith(
-            ("|", "#", "`")
+
+    def window_problem(window):
+        joined = " ".join(window)
+        if not figure_problem(joined):
+            return False
+        if not any(
+            _bound_figure(member) and not _figure_guarded(member)
+            for member in window
         ):
-            continue
-        joined = first + " " + second
-        if guarded(joined):
-            continue
-        if (
-            figure_problem(joined)
-            and not figure_problem(first)
-            and not figure_problem(second)
-        ):
-            problems.append("figure plant: " + joined[:120])
+            return False
+        # R37F-RT-17. A member that carries the
+        # simultaneity or scope word and a figure number
+        # of its own, different from the window's bound
+        # figure, heads its own claim, the two editors
+        # working together on the packet format. Joining
+        # its word to the window's count states a claim
+        # neither member states, so the window does not
+        # fire on it.
+        bound_values = set()
+        for member in window:
+            span = _bound_figure_span(member)
+            if span is not None:
+                bound_values.add(member[span[0]:span[1]])
+        for member in window:
+            if not re.search(
+                r"\b(" + FIGURE_ADVERBS + r"|" + FIGURE_SCOPE
+                + r")\b",
+                member,
+            ):
+                continue
+            own = {
+                match.group(0)
+                for match in re.finditer(
+                    r"\b" + FIGURE_NUMBER + r"\b", member
+                )
+            }
+            if own and not own <= bound_values:
+                return False
+        return True
+
+    prose = [
+        not unit.startswith(("|", "#", "`")) for unit in units
+    ]
+    # R37F-RT-15. Windows run to four neighbouring
+    # sentences, because the fix review split the count
+    # and the simultaneity word three sentences apart.
+    # R37C-RT-01. The confirmation review split them one
+    # sentence further again, so the windows run to five.
+    # Each widening moves the seam one unit out and the
+    # next audit re-tests it, which is the recorded
+    # cadence of this family.
+    for size in (2, 3, 4, 5):
+        for index in range(len(units) - size + 1):
+            window = units[index:index + size]
+            if not all(prose[index:index + size]):
+                continue
+            if not window_problem(window):
+                continue
+            if any(figure_problem(member) for member in window):
+                continue
+            if any(
+                window_problem(window[start:start + sub])
+                for sub in range(2, size)
+                for start in range(size - sub + 1)
+            ):
+                continue
+            problems.append(
+                "figure plant: " + " ".join(window)[:120]
+            )
     return problems
 
 
