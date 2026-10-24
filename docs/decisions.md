@@ -214,14 +214,17 @@ as a trigger surface change and reruns the full trigger protocol
 with two judge families, because the skill the model can no
 longer auto invoke is not the skill the protocol tested. The six
 Agent Skills spec fields remain the portability floor, and every
-panel field above it is documented as a Claude Code extension
-that other hosts silently ignore or hard fail per their own
-rules, which the round 11 external lane records.
+panel field above it is documented as a Claude Code extension.
+What other hosts do with an unrecognized frontmatter field has
+no primary source on record, so the record treats it as unknown.
+Hard fail is documented only on Anthropic's own distribution
+paths, meaning the claude.ai upload, the Skills API, and the
+packaging path, which the round 11 external lane records.
 
 ## 10. Build 3, the packet output style
 
 The plugin ships the review packet as an output style under
-`.claude-plugin/output-styles/packet.md`, declared in both the
+`output-styles/packet.md` at the plugin root, declared in both the
 plugin manifest and the marketplace entry with `force-for-plugin`
 set to true. The style is a second spelling of the packet the
 extractor writes, and the boundary of decision 4 does not move.
@@ -254,3 +257,41 @@ style steers the next agent that loads the tree exactly the way
 the flagged names do, so the extractor flags it in triage and
 in the manifest, and the copy fence scans the plugin directory
 by rule.
+
+## 11. Build 4, the headless print mode CI shape
+
+Recorded on 2026-10-23 in round 14. The unattended review shape
+runs `claude -p` with `--output-format stream-json`,
+`--permission-mode dontAsk`, and `--permission-prompts none`,
+with the packet piped in so the run needs no file read
+permission, and `--json-schema` carrying the findings schema.
+The gate script at `scripts/check_headless.py` reads the
+stream's final result message and the run's exit code and fails
+the run closed on the first problem it names.
+
+The denial signal is primary sourced. The headless docs page,
+in the section on turning off permission prompts in
+unattended runs, says denials appear as `permission_denied`
+system messages and the final result message lists them in
+`permission_denials`. The round 14 external lane read the page
+before that text landed and filed R14-EX-01 against the plan's
+wording, and the page gained the text the same day, so the
+build keeps the signal and cites the page. Denial detection is
+the exit code plus the result message parsing, meaning a
+nonzero exit fails the run, a non empty `permission_denials`
+list fails the run, and a missing `structured_output` field
+fails the run, because the docs say a run that ends without
+valid structured output carries no such field and an in run
+failure prints as the result on stdout, so exit zero is not
+proof of a clean run.
+
+The findings must match the schema the doc pins, and every
+evidence path a finding cites must stand in the packet
+manifest's file list, because a run with missing evidence must
+never read green. A pass verdict beside a non empty findings
+list fails too, because the two contradict each other. The
+check cannot run a live host on the gate box, so its
+adversarial pass runs against fixtures, and the doc says so in
+the open. Decision 4 still binds the shape. The headless run
+is a review consumer of the packet, and no model judgment in
+it replaces a script check.

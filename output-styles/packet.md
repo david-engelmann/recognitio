@@ -10,7 +10,7 @@ force-for-plugin: true
 
 This style is a second spelling of the packet the extractor
 writes. Its only source is the tier model, workflow,
-completeness, and trust sections of
+completeness, trust, and stamping sections of
 `.agents/skills/recognitio/SKILL.md`. It adds no instruction the
 canonical text does not carry and moves no guarantee. Packet
 enforcement stays where decision 4 of `docs/decisions.md` puts

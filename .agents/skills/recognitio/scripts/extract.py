@@ -1105,10 +1105,15 @@ def is_instruction_path(path):
         for index in range(len(parts) - 2)
     ):
         return True
-    # A review packet output style under the plugin's
+    # A review packet output style under the plugin root's
     # output-styles folder steers the next agent that loads the
     # tree exactly the way the flagged names do, so a change to
-    # it is flagged like a change to any instruction file.
+    # it is flagged like a change to any instruction file. The
+    # legacy spelling under .claude-plugin/ stays flagged too,
+    # because a rename is judged from either name.
+    if len(parts) >= 2 and parts[0] == "output-styles" \
+            and name.endswith(".md"):
+        return True
     if (
         len(parts) >= 3
         and parts[0] == ".claude-plugin"

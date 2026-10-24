@@ -2845,17 +2845,138 @@ class TestRetryingTemporaryDirectory(unittest.TestCase):
         self.assertFalse(Path(holder.name).exists())
 
 
+def resolve_plugin_component_path(plugin_root, declared):
+    """Resolve a manifest component path the way the host does.
+
+    The vendor manifest reference says every component path in a
+    manifest is relative to the plugin root, must start with ./,
+    must resolve inside the plugin root, and must exist, with a
+    missing path reported as path not found and the component not
+    loading. Returns the resolved Path, or None when the declared
+    value breaks the rule, so the gate fails instead of reading
+    a path the host will never load.
+    """
+    if not isinstance(declared, str) or not declared.startswith("./"):
+        return None
+    candidate = (plugin_root / declared[2:]).resolve()
+    try:
+        candidate.relative_to(plugin_root.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def style_frontmatter_problems(text):
+    """Problems a host YAML reader would hit in the style frontmatter.
+
+    The spelling pin beside this check guards the exact field name
+    and its true value. This check guards that the block parses at
+    all. A duplicate top level key, an unbalanced bracket, or a
+    line that is not a key value pair means the host loads the
+    style with no fields set, which silently switches force off,
+    so each shape is named as its own problem.
+    """
+    problems = []
+    if not text.startswith("---"):
+        return ["the style has no frontmatter block"]
+    try:
+        end = text.index("---", 3)
+    except ValueError:
+        return ["the frontmatter block never closes"]
+    front = text[3:end]
+    seen = {}
+    depth = {"[": 0, "{": 0, "(": 0}
+    closers = {"]": "[", "}": "{", ")": "("}
+    in_single = False
+    in_double = False
+    for lineno, line in enumerate(front.splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if line[0] not in (" ", "\t"):
+            match = re.match(r"^([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*:", line)
+            if not match:
+                problems.append(
+                    "frontmatter line %d is not a key value pair"
+                    % lineno
+                )
+            else:
+                key = match.group(1)
+                if key in seen:
+                    problems.append(
+                        "duplicate frontmatter key %r" % key
+                    )
+                seen[key] = lineno
+        for char in line:
+            if char == "'" and not in_double:
+                in_single = not in_single
+            elif char == '"' and not in_single:
+                in_double = not in_double
+            elif not in_single and not in_double:
+                if char in depth:
+                    depth[char] += 1
+                elif char in closers:
+                    opener = closers[char]
+                    if depth[opener] == 0:
+                        problems.append(
+                            "unbalanced %r on frontmatter line %d"
+                            % (char, lineno)
+                        )
+                    else:
+                        depth[opener] -= 1
+    for opener, count in depth.items():
+        if count:
+            problems.append(
+                "unbalanced %r in the frontmatter block" % opener
+            )
+    return problems
+
+
+def split_sentences(text):
+    """Segment prose the way the style sentence check does."""
+    pieces = []
+    for piece in re.split(r"\.\s+|\n", text):
+        cleaned = piece.lstrip("- ").strip()
+        # A sentence at the very end of the text keeps its final
+        # period, because no whitespace follows it for the split
+        # to consume, so the one trailing period is normalized
+        # away on both sides of the comparison.
+        if cleaned.endswith("."):
+            cleaned = cleaned[:-1].strip()
+        if cleaned:
+            pieces.append(re.sub(r"\s+", " ", cleaned))
+    return pieces
+
+
 class TestOutputStyle(unittest.TestCase):
     """The packet output style, Build 3 of the adaptation plan.
 
     The style is a second spelling of the packet the extractor
     writes. The gate pins its force field, its guarantee
     sentences, its heading list, and its manifest pointers, and
-    fails any style sentence that is not a sentence the
-    canonical skill text carries.
+    fails any style sentence that is not a whole sentence the
+    canonical skill text carries or a pinned derivation meta
+    sentence. Manifest component paths are resolved the way the
+    host resolves them, against the plugin root, never against
+    a hardcoded directory prefix.
     """
 
-    STYLE_REL = Path(".claude-plugin") / "output-styles" / "packet.md"
+    STYLE_REL = Path("output-styles") / "packet.md"
+
+    # The derivation prose, pinned word for word. The derivation
+    # is the one place the style may speak about enforcement, so
+    # its prose is fixed and the sentence check lets these
+    # sentences stand beside the canonical skill sentences.
+    DERIVATION_PROSE = (
+        "This style is a second spelling of the packet the extractor writes. "
+        "Its only source is the tier model, workflow, completeness, trust, "
+        "and stamping sections of `.agents/skills/recognitio/SKILL.md`. "
+        "It adds no instruction the canonical text does not carry and moves "
+        "no guarantee. Packet enforcement stays where decision 4 of "
+        "`docs/decisions.md` puts it, in the shipped scripts and the skill "
+        "workflow steps. When this style is inert, the prose packet enforces "
+        "every guarantee unchanged."
+    )
 
     def setUp(self):
         self.version = load_script("check_version")
@@ -2867,7 +2988,14 @@ class TestOutputStyle(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
     def style_body(self):
-        """The style without frontmatter, derivation, or fences."""
+        """The style without frontmatter, derivation, headings, or fences.
+
+        The derivation prose is pinned word for word by its own
+        test, because the no new instruction check must reach the
+        one section the style is allowed to speak about
+        enforcement in, and a prose pin is the strongest form of
+        that reach.
+        """
         text = self.style_text
         if text.startswith("---"):
             end = text.index("---", 3)
@@ -2891,33 +3019,157 @@ class TestOutputStyle(unittest.TestCase):
             kept.append(line)
         return "\n".join(kept)
 
-    def test_style_file_exists_where_the_manifests_declare_it(self):
+    def derivation_body(self):
+        """The derivation section prose, without its heading.
+
+        The region runs to the next top level heading, matched
+        at the line start, so a ### subheading planted inside
+        the region cannot end the region early.
+        """
+        match = re.search(
+            r"## Derivation\n(.*?)(?=\n## )", self.style_text, re.DOTALL
+        )
+        self.assertIsNotNone(match, "the style carries a Derivation section")
+        lines = []
+        in_fence = False
+        for line in match.group(1).splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence or stripped.startswith("#"):
+                continue
+            lines.append(line)
+        return "\n".join(lines)
+
+    def canonical_sentences(self):
+        """The canonical skill text segmented like the style."""
+        lines = []
+        in_fence = False
+        for line in self.skill_text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence or stripped.startswith("#"):
+                continue
+            lines.append(line)
+        return set(split_sentences("\n".join(lines)))
+
+    def _read_style_pointer_pair(self, root):
         plugin = self.version.strict_json_loads(
-            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+            (root / ".claude-plugin" / "plugin.json").read_text(
                 encoding="utf-8"
             )
         )
         market = self.version.strict_json_loads(
-            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+            (root / ".claude-plugin" / "marketplace.json").read_text(
                 encoding="utf-8"
             )
         )
-        self.assertEqual(
-            plugin["outputStyles"], ["./output-styles/packet.md"]
-        )
         entries = [
-            p
-            for p in market["plugins"]
-            if p["name"] == "recognitio"
+            p for p in market["plugins"] if p["name"] == "recognitio"
         ]
         self.assertEqual(len(entries), 1)
+        return plugin, entries[0]
+
+    def _assert_style_pointer_pin(self, root):
+        plugin, entry = self._read_style_pointer_pair(root)
         self.assertEqual(
-            entries[0]["outputStyles"], ["./output-styles/packet.md"]
+            plugin.get("outputStyles"), ["./output-styles/packet.md"]
         )
         self.assertEqual(
-            entries[0]["outputStyles"], plugin["outputStyles"]
+            entry.get("outputStyles"), ["./output-styles/packet.md"]
         )
-        self.assertTrue(self.style_path.is_file())
+        self.assertEqual(
+            entry.get("outputStyles"), plugin.get("outputStyles")
+        )
+        resolved = resolve_plugin_component_path(
+            root, entry.get("outputStyles")[0]
+        )
+        self.assertIsNotNone(
+            resolved, "the declared style path resolves under the plugin root"
+        )
+        self.assertTrue(resolved.is_file(), resolved)
+
+    def test_style_file_exists_where_the_manifests_declare_it(self):
+        self._assert_style_pointer_pin(ROOT)
+
+    def test_style_path_resolves_against_the_plugin_root(self):
+        # The vendor manifest reference resolves every component
+        # path against the plugin root. The declared value must
+        # name the shipped file through that resolution, not
+        # through a hardcoded directory prefix in the test.
+        plugin, _ = self._read_style_pointer_pair(ROOT)
+        declared = plugin["outputStyles"][0]
+        resolved = resolve_plugin_component_path(ROOT, declared)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved, self.style_path.resolve())
+        # A declaration without the ./ prefix never resolves.
+        self.assertIsNone(
+            resolve_plugin_component_path(ROOT, "output-styles/packet.md")
+        )
+        # A declaration that escapes the plugin root never resolves.
+        self.assertIsNone(
+            resolve_plugin_component_path(ROOT, "./../outside/packet.md")
+        )
+
+    def test_an_entry_missing_the_style_pointer_fails_the_pin(self):
+        # The defect is planted in real files on a scratch tree
+        # and the real pin runs against them. An entry that drops
+        # the outputStyles pointer must fail the pointer pin,
+        # which is what the vacuous in memory test it replaces
+        # never proved.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plugin_dir = root / ".claude-plugin"
+            plugin_dir.mkdir()
+            (plugin_dir / "plugin.json").write_text(
+                (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            market = json.loads(
+                (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            del market["plugins"][0]["outputStyles"]
+            (plugin_dir / "marketplace.json").write_text(
+                json.dumps(market), encoding="utf-8"
+            )
+            with self.assertRaises(AssertionError):
+                self._assert_style_pointer_pin(root)
+
+    def test_the_old_layout_fails_the_vendor_resolution(self):
+        # The R14-RT-05 shape, planted in a scratch tree. The
+        # manifests declare ./output-styles/packet.md while the
+        # file sits only under .claude-plugin/, so the vendor
+        # resolution misses and the pin must fail. This is the
+        # plant the old hardcoded test stayed green on.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plugin_dir = root / ".claude-plugin"
+            legacy = plugin_dir / "output-styles"
+            legacy.mkdir(parents=True)
+            (plugin_dir / "plugin.json").write_text(
+                (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            (plugin_dir / "marketplace.json").write_text(
+                (ROOT / ".claude-plugin" / "marketplace.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            (legacy / "packet.md").write_text(
+                self.style_text, encoding="utf-8"
+            )
+            with self.assertRaises(AssertionError):
+                self._assert_style_pointer_pin(root)
 
     def test_style_frontmatter_pins_force_for_plugin(self):
         text = self.style_text
@@ -2933,6 +3185,29 @@ class TestOutputStyle(unittest.TestCase):
         # exact hyphenated spelling and its true value are pinned.
         self.assertEqual(fields.get("force-for-plugin"), "true")
         self.assertNotIn("force_for_plugin", fields)
+
+    def test_style_frontmatter_is_host_readable(self):
+        self.assertEqual(style_frontmatter_problems(self.style_text), [])
+
+    def test_a_duplicate_frontmatter_key_is_a_readability_problem(self):
+        planted = self.style_text.replace(
+            "force-for-plugin: true",
+            "force-for-plugin: false\nforce-for-plugin: true",
+            1,
+        )
+        problems = style_frontmatter_problems(planted)
+        self.assertTrue(
+            any("duplicate" in problem for problem in problems), problems
+        )
+
+    def test_an_unbalanced_bracket_is_a_readability_problem(self):
+        planted = self.style_text.replace(
+            "A format only.", "A format only [draft.", 1
+        )
+        problems = style_frontmatter_problems(planted)
+        self.assertTrue(
+            any("unbalanced" in problem for problem in problems), problems
+        )
 
     def test_style_guarantee_sentences_match_the_canonical_text(self):
         guarantees = [
@@ -2979,20 +3254,17 @@ class TestOutputStyle(unittest.TestCase):
         self.assertEqual(declared, shipped)
 
     def test_style_sentences_stand_in_the_canonical_text(self):
-        body = self.style_body()
-        sentences = [
-            piece.strip()
-            for piece in re.split(r"\.\s+|\n", body)
-            if piece.strip()
-        ]
+        sentences = split_sentences(self.style_body())
         self.assertTrue(sentences)
-        skill = re.sub(r"\s+", " ", self.skill_text)
+        canonical = self.canonical_sentences()
         for sentence in sentences:
-            cleaned = sentence.lstrip("- ").strip()
-            if not cleaned:
-                continue
-            probe = re.sub(r"\s+", " ", cleaned)
-            self.assertIn(probe, skill, cleaned[:60])
+            self.assertIn(sentence, canonical, sentence[:60])
+
+    def test_style_derivation_is_the_pinned_prose(self):
+        self.assertEqual(
+            re.sub(r"\s+", " ", self.derivation_body()).strip(),
+            self.DERIVATION_PROSE,
+        )
 
     def test_style_references_no_external_urls(self):
         self.assertNotRegex(self.style_text, r"https?://")
@@ -3000,9 +3272,11 @@ class TestOutputStyle(unittest.TestCase):
     def test_style_claims_no_enforcement(self):
         # Enforcement lives in the scripts and the skill
         # workflow. The style may name that fact in its
-        # derivation section and nowhere else.
+        # derivation section and nowhere else. The region runs
+        # to the next top level heading at the line start, so a
+        # subheading planted inside it cannot end it early.
         derivation = re.search(
-            r"## Derivation\n(.*?)## ", self.style_text, re.DOTALL
+            r"## Derivation\n(.*?)(?=\n## )", self.style_text, re.DOTALL
         )
         self.assertIsNotNone(derivation)
         rest = self.style_text.replace(derivation.group(0), "")
@@ -3028,25 +3302,6 @@ class TestOutputStyle(unittest.TestCase):
                 violations,
             )
 
-    def test_a_style_pointer_only_in_the_entry_is_a_problem(self):
-        plugin_text = (
-            ROOT / ".claude-plugin" / "plugin.json"
-        ).read_text(encoding="utf-8")
-        market = json.loads(
-            (ROOT / ".claude-plugin" / "marketplace.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        del market["plugins"][0]["outputStyles"]
-        market_text = json.dumps(market)
-        plugin = self.version.strict_json_loads(plugin_text)
-        entry = self.version.strict_json_loads(market_text)["plugins"][
-            0
-        ]
-        self.assertNotEqual(
-            plugin.get("outputStyles"), entry.get("outputStyles")
-        )
-
     def test_a_style_pointer_with_strict_false_is_a_conflict(self):
         plugin_text = (
             ROOT / ".claude-plugin" / "plugin.json"
@@ -3064,7 +3319,6 @@ class TestOutputStyle(unittest.TestCase):
             any("outputStyles" in problem for problem in problems),
             problems,
         )
-
 
 if __name__ == "__main__":
     unittest.main()

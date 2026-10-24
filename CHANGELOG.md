@@ -198,6 +198,14 @@ This unreleased work carries version 1.3.0.
   changes landing on `main` by direct push of their reviewed
   commits and the coordinator checking the sign off trailers the
   CI DCO job no longer sees on the push path.
+- The headless print mode CI shape. `docs/headless-review.md`
+  defines the unattended review invocation with its findings
+  schema and its fail closed contract, and
+  `scripts/check_headless.py` gates a captured run on the exit
+  code, the `permission_denials` list in the final result
+  message, the presence of `structured_output`, schema
+  conformance and evidence standing in the packet manifest.
+  Fifteen tests form its adversarial pass.
 
 ### Fixed
 
@@ -615,3 +623,35 @@ This unreleased work carries version 1.3.0.
 - A change to the packet output style is flagged as a change to
   an instruction file in triage and in the manifest, and the
   copy fence now scans the plugin directory by rule.
+- The packet output style now ships at `output-styles/packet.md`
+  at the plugin root, which is where the vendor manifest
+  reference resolves the declared `./output-styles/packet.md`
+  path. The file previously sat under `.claude-plugin/`, which
+  no declaration names, so the style never loaded on the host
+  while the gate stayed green on a hardcoded prefixed path. The
+  existence pin now resolves the declared path against the
+  plugin root the way the host does, and the extractor flags
+  the new location as an instruction file.
+- The derivation section of the output style is now pinned word
+  for word. The sentence check used to skip the whole section,
+  so a novel instruction or a non http external reference
+  planted there passed the gate green. Any added or altered
+  derivation sentence fails the pin, and a subheading planted
+  inside the section cannot end the pinned region early.
+- The style sentence check now matches whole sentences instead
+  of substrings. An imperative inversion of a pinned
+  prohibition previously passed as a substring of the
+  prohibition it contradicted.
+- The style frontmatter pin now checks that the block parses
+  the way the host reads it. A duplicate key or an unbalanced
+  bracket previously passed the spelling pin while the host
+  loaded the style with no fields set and force silently off.
+- The derivation names the stamping section of the canonical
+  skill text among its sources, where it previously narrowed
+  the source list to four sections while carrying a sentence
+  from the fifth.
+- Decision 9 no longer claims other hosts silently ignore or
+  hard fail unrecognized frontmatter fields. That behavior has
+  no primary source on record, so the record treats it as
+  unknown, with hard fail documented only on Anthropic's own
+  distribution paths.

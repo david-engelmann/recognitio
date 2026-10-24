@@ -2725,9 +2725,13 @@ class TestRound6InstructionFiles(unittest.TestCase):
     def test_output_style_path_flags_and_near_misses_do_not(self):
         # The packet output style steers the next agent that loads
         # the tree, so it joins the instruction name set (R13).
+        # The style ships at the plugin root since the R14 path
+        # repair, and the legacy spelling stays flagged because a
+        # rename is judged from either name.
         for path in (
+            "output-styles/packet.md",
+            "output-styles/other.md",
             ".claude-plugin/output-styles/packet.md",
-            ".claude-plugin/output-styles/other.md",
         ):
             self.assertTrue(
                 extract_mod.is_instruction_path(path), path
@@ -2735,7 +2739,7 @@ class TestRound6InstructionFiles(unittest.TestCase):
         for path in (
             ".claude-plugin/plugin.json",
             ".claude-plugin/skills/demo.md",
-            "output-styles/packet.md",
+            "sub/output-styles/packet.md",
             "sub/.claude-plugin/output-styles/packet.md",
         ):
             self.assertFalse(
