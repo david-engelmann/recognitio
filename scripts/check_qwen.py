@@ -332,6 +332,18 @@ PRECEDENCE_VERBS = "winning|wins|prefer\\w*|outrank\\w*"
 # without letting a token anywhere in a long sentence fire.
 WINDOW = "[^.]{0,120}"
 
+# Sentence scope for the figure family from R36-E1-01.
+# The figure check works one sentence unit at a time, so
+# its span is the sentence itself with no character bound.
+# A bounded window let one long adverbial spread push the
+# simultaneity word 149 characters from its number inside
+# a single sentence, which is a filler length escape and
+# not a wording variant of a covered family. The wrapper
+# and activation families keep the bounded window above,
+# because their tokens state separate claims that a long
+# sentence can hold apart.
+FIGURE_SPAN = ".*"
+
 FIGURE_NUMBER = "([2-9]|1[0-9]|2[0-9])"
 
 

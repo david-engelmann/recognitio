@@ -344,6 +344,7 @@ def zcode_problems(root=None):
     problems = []
     problems.extend(brief_problems(root))
     problems.extend(rules_problems(root))
+    problems.extend(negative_problems(root))
     problems.extend(manifest_problems(root))
     problems.extend(body_problems(root))
     problems.extend(decision_problems(root))
