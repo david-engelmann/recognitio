@@ -362,6 +362,160 @@ class TestCheckDevin(unittest.TestCase):
                     (old, problems),
                 )
 
+    def test_a_sarif_version_swap_fails(self):
+        # R34-RT-06. A version swap that keeps SARIF in the
+        # sentence passed while the 2.1.0 pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nCode scan findings export as SARIF 1.0 "
+                "instead of SARIF 2.1.0.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("other than 2.1.0" in p for p in problems),
+                problems,
+            )
+
+    def test_resolved_rewordings_fail(self):
+        # R34-RT-06. Two resolved rewordings that use neither
+        # the dismissed before count order nor the includes
+        # order passed while the resolved pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nThe resolved count now counts "
+                "dismissed reviews as fixed. Devin Review "
+                "analytics count a finding as resolved when it "
+                "is dismissed.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("counts dismissed findings" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_gate_finding_plants_fail(self):
+        cases = (
+            ("Dismissed findings are counted as resolved.",
+             "counts dismissed findings"),
+            ("Devin Review analytics treat dismissed findings "
+             "as resolved.",
+             "counts dismissed findings"),
+            ("The resolved total treats dismissed findings "
+             "as fixed.",
+             "counts dismissed findings"),
+            ("Code scan findings export as SARIF version 1.",
+             "other than 2.1.0"),
+            ("Dismissed findings are part of the resolved total.",
+             "counts dismissed findings"),
+            ("Dismissed findings go into the resolved total.",
+             "counts dismissed findings"),
+            ("Dismissed findings belong in the resolved total.",
+             "counts dismissed findings"),
+            ("Code scan findings export as SARIF v2.",
+             "other than 2.1.0"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_verb_plus_membership_long_filler_fails(self):
+        # S4. A listed verb plus a membership phrase plus
+        # resolved within the stated bounds must fail, even
+        # with a 19 filler, while the 21 filler audit trail
+        # shape with the same verb must pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nDismissed findings are treated "
+                "as part of the comprehensive resolved total.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("counts dismissed findings" in p
+                    for p in problems),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nDismissed findings are treated "
+                "as part of the audit trail and resolved "
+                "findings are closed.\n",
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_spelled_sarif_versions_fail(self):
+        # W-07. Spelled versions count as digit versions, so
+        # version two and version one must fail while the
+        # spelled 2.1.0 form and the digit 2.1.0 form pass.
+        # The shipped pin is the digit form only, so the
+        # spelled 2.1.0 case below is a probe, not a shipped
+        # sentence.
+        cases = (
+            ("Code scan findings export as SARIF version two.",
+             True),
+            ("Code scan findings export as SARIF version one.",
+             True),
+            ("Code scan findings export as SARIF version two "
+             "point one.",
+             True),
+            ("Code scan findings export as SARIF version two "
+             "point one point zero.",
+             False),
+        )
+        for plant, must_fail in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                if must_fail:
+                    self.assertTrue(
+                        any("other than 2.1.0" in p
+                            for p in problems),
+                        (plant, problems),
+                    )
+                else:
+                    self.assertEqual(problems, [], (plant, problems))
+
+    def test_false_positive_probes_pass(self):
+        probes = (
+            "Dismissed findings are considered separately "
+            "from resolved findings.",
+            "Dismissed findings are marked for follow up "
+            "and resolved findings are closed.",
+            "We regard dismissed findings as distinct "
+            "from resolved findings.",
+            "Dismissed findings are part of the audit trail "
+            "and resolved findings are closed.",
+            "Code scan findings export as SARIF 2.1.0.",
+        )
+        for probe in probes:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + probe + "\n")
+                problems = self.problems(root)
+                self.assertEqual(problems, [], (probe, problems))
+
     def test_a_decision_record_without_decision_4_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

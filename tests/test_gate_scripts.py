@@ -2843,13 +2843,13 @@ class TestCheckEvals(unittest.TestCase):
             root = self.copy_fixture(tmp)
             target = root / "evals" / "corpus.md"
             text = target.read_text(encoding="utf-8")
-            stale = text.replace("through round 14", "through round 11", 1)
+            stale = text.replace("through round 24", "through round 11", 1)
             self.assertNotEqual(stale, text)
             target.write_text(stale, encoding="utf-8")
             problems = self.mod.corpus_scope_problems(root)
             self.assertEqual(len(problems), 1)
             self.assertIn("round 11", problems[0])
-            self.assertIn("round 14", problems[0])
+            self.assertIn("round 24", problems[0])
 
     def test_a_section_past_the_scope_cap_fails_the_scope_check(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -2857,13 +2857,13 @@ class TestCheckEvals(unittest.TestCase):
             target = root / "evals" / "corpus.md"
             text = target.read_text(encoding="utf-8")
             target.write_text(
-                text + "\n## Round 15 incidents\n\nNothing yet.\n",
+                text + "\n## Round 25 incidents\n\nNothing yet.\n",
                 encoding="utf-8",
             )
             problems = self.mod.corpus_scope_problems(root)
             self.assertEqual(len(problems), 1)
-            self.assertIn("round 14", problems[0])
-            self.assertIn("round 15", problems[0])
+            self.assertIn("round 24", problems[0])
+            self.assertIn("round 25", problems[0])
 
     def test_a_skipped_round_fails_the_scope_check(self):
         with RetryingTemporaryDirectory() as tmp:

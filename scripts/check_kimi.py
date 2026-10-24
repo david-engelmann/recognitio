@@ -334,7 +334,7 @@ def deliberate_source(note, rule=None, content=None):
     Decision 4 counts only when the note says what it binds
     the rule to. A note that says only a host stem or only a
     decision number derives from nothing. R29-RT-08. A note
-    must also restate the rule's claim in its own words: a
+    must also restate the rule's claim in its own words, so a
     shipped rule's note must carry one of its claim words,
     and a new rule's note must carry one distinctive word
     from its own content, so a path plus a verb with no claim

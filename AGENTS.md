@@ -484,4 +484,9 @@ Qwen Code marketplace presence with its derivation
 noted brief and gate script, the figure basis and
 scope table with no single figure as the Qwen figure,
 the wrapper and internal verify exit separation, and
-closed the round 33 findings.
+closed the round 33 findings. The round 34 pass then
+consolidated the rounds 31 through 33 builds with no
+new build, closed the round 34 audit findings, added
+the rounds 15 through 24 sections to the eval corpus
+index, and carried every round 33 residual in its
+current wording.

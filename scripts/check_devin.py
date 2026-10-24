@@ -167,6 +167,102 @@ PINNED = (
 DECISION_HEADING = "## 28. Build 17"
 DECISION_STATEMENT = "Decision 4 binds"
 
+# Shared diagnostic strings from round 34 repair round two.
+# Lifting them to constants keeps the three resolved blocks
+# and the two SARIF blocks on one wording, so a future
+# wording change cannot drift across blocks.
+RESOLVED_PROBLEM = (
+    "a devin rule counts dismissed findings toward "
+    "the resolved total, which the code fixed only "
+    "resolved count forbids"
+)
+
+SARIF_PROBLEM = (
+    "a devin rule exports a SARIF version other "
+    "than 2.1.0, which the SARIF 2.1.0 export "
+    "beside CSV forbids"
+)
+
+# Generic equivalence verbs from G-05 and B1.
+# Count, treat, and include are the G-05 verbs, and
+# consider, regard, classify, and mark were added in
+# the first repair. None of them fires alone any more.
+# B1 requires the verb to be followed within the
+# sentence by an equivalence phrase, so ordinary
+# sentences that merely mention both kinds of finding
+# with one of these verbs pass.
+RESOLVED_VERBS = (
+    "count\\w*|treat\\w*|includ\\w*|consider\\w*|"
+    "regard\\w*|classif\\w*|mark\\w*"
+)
+
+# Equivalence phrases from G-05 and B1.
+# As resolved and as fixed cover the G-05 plants when a
+# listed verb precedes them in the same sentence.
+# Membership phrases from R-05, B3, and Y-05.
+# Part of covers the R-05 verb free plant, and go into
+# and belong in cover the Y-05 verb free plants, and
+# each states the same membership with no listed verb
+# at all. A membership phrase fires only when resolved
+# follows it within 15 characters. The R-05 plant puts
+# resolved 5 characters after part of, while the B3
+# audit trail probe puts resolved 21 characters after
+# part of, so 15 keeps the plant caught and lets the
+# probe pass. A bare part of test with no resolved
+# bound is the B3 failure and is not used here.
+# Measured gaps for this bound are plant gap 5 and probe
+# gap 21 with bound 15. With bound 15, filler from 16 to
+# 20 escapes by design, because any bound below the 21
+# probe gap leaves a filler zone above it that escapes,
+# and for bound 15 that zone is exactly 16 to 20.
+EQUIVALENCE_PHRASES = "as resolved|as fixed"
+MEMBERSHIP_PHRASES = "part of|go into|belong in"
+
+# Spelled SARIF version words from W-07, mirroring the
+# Qwen gate number word normalisation. A spelled version
+# after SARIF counts the same as its digit form, so
+# version two fails while version two point one point
+# zero passes as the shipped 2.1.0 pin in spelled form.
+SARIF_NUMBER_WORDS = {
+    "zero": "0",
+    "one": "1",
+    "two": "2",
+    "three": "3",
+    "four": "4",
+    "five": "5",
+    "six": "6",
+    "seven": "7",
+    "eight": "8",
+    "nine": "9",
+    "ten": "10",
+}
+
+
+def spelled_sarif_problem(low):
+    """Whether a spelled SARIF version differs from 2.1.0."""
+    word = (
+        "zero|one|two|three|four|five|six|seven|eight|nine|ten"
+    )
+    prefix = r"\bsarif(?:\s+version)?\s+v?\s*"
+    dotted = re.search(
+        prefix + "(" + word + r")\s+point\s+(" + word
+        + r")\s+point\s+(" + word + r")\b", low
+    )
+    if dotted:
+        version = ".".join(
+            SARIF_NUMBER_WORDS[name] for name in dotted.groups()
+        )
+        return version != "2.1.0"
+    if re.search(
+        prefix + "(" + word + r")\s+point\s+(" + word + r")\b",
+        low,
+    ):
+        return True
+    bare = re.search(
+        prefix + "(" + word + r")\b(?!\s+point\b)", low
+    )
+    return bool(bare)
+
 
 def read_text(path):
     try:
@@ -332,21 +428,77 @@ def semantic_problems(root=None):
         low = sentence.lower()
         negated = bool(
             re.search(r"\b(no longer|never)\b", low)
-            or re.search(r"\bnot\b.{0,20}\bcount\b", low)
+            or re.search(r"\bnot\b.{0,20}\bcount\w*\b", low)
         )
         if "resolved" not in seen and not negated and (
-            re.search(r"\bdismissed\b.{0,50}\bcount\b", low)
+            re.search(r"\bdismissed\b.{0,50}\bcount\w*\b", low)
             or re.search(
                 r"\bresolved\b.{0,30}\bincludes?\b.{0,30}"
                 r"\bdismissed\b",
                 low,
             )
         ):
-            problems.append(
-                "a devin rule counts dismissed findings toward "
-                "the resolved total, which the code fixed only "
-                "resolved count forbids"
+            problems.append(RESOLVED_PROBLEM)
+            seen.add("resolved")
+        correct_definition = bool(
+            re.search(
+                r"\b(excluded|only when|fixed in code|code fixed only)\b",
+                low,
             )
+        )
+        if (
+            "resolved" not in seen
+            and not negated
+            and not correct_definition
+            and (
+                re.search(
+                    r"\bresolved\b.{0,60}\bcount\w*\b.{0,40}"
+                    r"\bdismissed\b",
+                    low,
+                )
+                or re.search(
+                    r"\bcount\w*\b.{0,60}\bresolved\b.{0,40}"
+                    r"\bdismissed\b",
+                    low,
+                )
+            )
+        ):
+            problems.append(RESOLVED_PROBLEM)
+            seen.add("resolved")
+        verb_then_equivalence = bool(re.search(
+            r"\b(" + RESOLVED_VERBS + r")\b.{0,80}\b("
+            + EQUIVALENCE_PHRASES + r")\b",
+            low,
+        ))
+        membership_near_resolved = bool(re.search(
+            r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
+            low,
+        ))
+        # Verb plus membership from S4. A listed verb within
+        # 30 of a membership phrase with resolved within 20
+        # of the phrase restores the long filler verb shape.
+        # The 19 filler comprehensive shape fires while the
+        # 21 filler audit trail shape stays out, and a probe
+        # with no listed verb stays out on the verb test
+        # alone even before the bounds are reached.
+        verb_then_membership_near_resolved = bool(re.search(
+            r"\b(" + RESOLVED_VERBS + r")\b.{0,30}\b("
+            + MEMBERSHIP_PHRASES + r")\b.{0,20}\bresolved\b",
+            low,
+        ))
+        if (
+            "resolved" not in seen
+            and not negated
+            and not correct_definition
+            and "dismissed" in low
+            and "resolved" in low
+            and (
+                verb_then_equivalence
+                or membership_near_resolved
+                or verb_then_membership_near_resolved
+            )
+        ):
+            problems.append(RESOLVED_PROBLEM)
             seen.add("resolved")
         if "bypass" not in seen and (
             re.search(r"without (any )?bypass", low)
@@ -384,6 +536,27 @@ def semantic_problems(root=None):
                 "2.1.0 export beside CSV forbids"
             )
             seen.add("sarif")
+        if "sarif" not in seen and "sarif" in low:
+            versions = re.findall(r"\b\d+\.\d+(?:\.\d+)?\b", low)
+            if any(version != "2.1.0" for version in versions):
+                problems.append(SARIF_PROBLEM)
+                seen.add("sarif")
+        if "sarif" not in seen and "sarif" in low:
+            # Bare version from R-06, with an optional v prefix.
+            # The lookahead still lets the full 2.1.0 pin pass,
+            # because its 2 is followed by a dot digit.
+            bare = re.search(
+                r"\bsarif(?:\s+version)?\s*v?(\d+)(?!\.\d)", low
+            )
+            if bare:
+                problems.append(SARIF_PROBLEM)
+                seen.add("sarif")
+        if "sarif" not in seen and "sarif" in low:
+            # Spelled version from W-07, checked after the
+            # digit blocks so a digit pin still decides first.
+            if spelled_sarif_problem(low):
+                problems.append(SARIF_PROBLEM)
+                seen.add("sarif")
     return problems
 
 
