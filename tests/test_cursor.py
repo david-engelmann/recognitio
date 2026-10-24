@@ -17,6 +17,7 @@ statement each fail the Cursor gate.
 
 import importlib.util
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -76,6 +77,17 @@ class TestCheckCursor(unittest.TestCase):
         (root / "docs" / "cursor-plugin-brief.md").write_text(
             text, encoding="utf-8"
         )
+
+    def break_brief(self, root, old, new, count=1):
+        text = self.read_brief(root)
+        pattern = re.escape(old).replace("\\ ", "\\s+")
+        broken, hits = re.subn(
+            pattern, lambda _match: new, text, count=count
+        )
+        self.assertNotEqual(broken, text)
+        self.assertTrue(hits > 0)
+        self.write_brief(root, broken)
+        return self.problems(root)
 
     def read_manifest(self, root):
         return json.loads(
@@ -354,6 +366,40 @@ class TestCheckCursor(unittest.TestCase):
                 any("not a relative path" in p for p in problems),
                 problems,
             )
+
+    def test_a_dropped_security_review_pin_fails(self):
+        # R31-EX-03. The Build 10 brief pins the Security
+        # Review separation, scope, team rules, draft skip,
+        # and plan gate, plus the Origin launch path beside
+        # the Cursor plugin path.
+        cases = (
+            ("Security Review is a separate bot from Bugbot",
+             "Security Review separation"),
+            ("injection across SQL, command, and template surfaces",
+             "Security Review scope"),
+            ("enforces them on every pull request",
+             "Security Review team rules"),
+            ("Draft pull requests are skipped",
+             "Security Review draft skip"),
+            ("gated to Teams and Enterprise plans",
+             "Security Review plan gate"),
+            ("built in review-security skill",
+             "review-security skill"),
+            ("Origin App Marketplace launched October 13 2026",
+             "Origin launch path"),
+            ("not the only CodeRabbit in Cursor path",
+             "Origin not only plugin path"),
+        )
+        for old, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, old, "Some other sentence stands here."
+                )
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (old, problems),
+                )
 
     def test_a_decision_record_without_decision_4_fails(self):
         # Every landed build records a decision 4 statement. A

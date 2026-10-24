@@ -127,6 +127,14 @@ enforce merge blocking, and publishing alone does not block.
 The primary changelog dated October 2 2026 adds Deep Scan with
 linked repositories, so a scan can take context from linked
 repositories to analyze the primary repository more thoroughly.
+The Deep Scan linked repository limits are up to 20 linked
+repositories subject to the plan linked repository limit.
+Essentials supports manual links while Team, Advanced, and
+Enterprise also support automatic linking. Linked repositories
+provide read only context while findings and coverage remain
+attached to the primary repository, so a packet that consumes
+Deep Scan findings for a primary repository must not attribute
+a linked repository finding to the linked repository itself.
 The primary changelog dated October 1 2026 opens the Deep Scan
 code findings API on all plans with a non-agentic API key and
 the `security:read` permission. The same day's entry adds the
@@ -134,6 +142,15 @@ the `security:read` permission. The same day's entry adds the
 and can be set to false to prevent pull request authors from
 using `@coderabbitai approve` and `@coderabbitai resolve` on
 their own pull requests.
+
+The primary changelog dated October 8 2026 ships CLI v0.9.0
+for cloud task work with cr code, including interactive
+messages, side questions, plans, and delivery. It completes
+shell commands and reads richer review JSON, and it verifies
+signed Linux releases and recovers more reliably from login
+and update failures. The signed Linux release verification is
+the supply chain relevant change for a packet workflow that
+installs the CLI.
 
 The Deep Scan runtime verification entry of October 23 2026 is
 not recorded here. It is Deep Scan detail rather than a new

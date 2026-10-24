@@ -273,6 +273,38 @@ class TestCheckCoderabbit(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_deep_scan_limit_pin_fails(self):
+        # R31-EX-04. The Build 11 brief pins the Deep Scan
+        # linked repository limits, the manual versus
+        # automatic linking distinction, the findings
+        # attachment rule, and the CLI v0.9.0 cloud task
+        # surface with its signed Linux release
+        # verification.
+        cases = (
+            ("up to 20 linked repositories",
+             "20 linked repositories limit"),
+            ("subject to the plan linked repository limit",
+             "plan linked repository limit"),
+            ("Essentials supports manual links",
+             "manual versus automatic linking"),
+            ("remain attached to the primary repository",
+             "findings attached to primary"),
+            ("CLI v0.9.0 for cloud task work",
+             "CLI v0.9.0 cloud tasks"),
+            ("verifies signed Linux releases",
+             "signed Linux release verification"),
+        )
+        for old, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, old, "Some other sentence stands here."
+                )
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (old, problems),
+                )
+
     def test_a_dropped_provenance_pin_fails(self):
         # R23-RT-03. The guideline file provenance now shown in
         # review summaries is a pinned sentence.

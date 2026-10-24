@@ -327,11 +327,15 @@ gpt-6-sol at action-v0.3.0, read on the GitHub Actions page on
 2026-10-24. The workbench path on the plugin scans page
 recommends gpt-5.6-sol with xhigh reasoning effort for best scan
 quality, read on 2026-10-24. CLI 0.161.0 made GPT-6.1 Sol the
-default model, per the round 20 research read on 2026-10-24. A
-brief that writes one model name without naming its surface
-will be caught by its own citations. GPT-5.5 retired from
-Codex on October 14 2026, and the brief claims no Codex
-surface for it after that date.
+default model, per the round 20 research read on 2026-10-24.
+CLI 0.164.0 is the later primary pin from the October 23 2026
+learn changelog entry and the rust-v0.164.0 release tag, with
+ten numbered preset slots as TUI slots for reusable prompts and
+slash commands, not a shipped skill format, and this brief makes
+no skill format claim for presets. A brief that writes one model
+name without naming its surface will be caught by its own
+citations. GPT-5.5 retired from Codex on October 14 2026, and
+the brief claims no Codex surface for it after that date.
 
 ## The Guardian auto review keys
 
@@ -358,7 +362,10 @@ with `allowed_approvals_reviewers`.
 
 The CI example installs with
 `npm install --global @openai/codex` and then runs
-`codex plugin add codex-security@openai-curated`. The checkout
+`codex plugin add codex-security@openai-curated`. Before
+running the install, pin the package to a version and read
+the install script, because the example installs third party
+code with no pin in the command itself. The checkout
 uses fetch-depth 0 and persist-credentials false. The job is
 guarded by `head.repo.full_name` equal to `github.repository`,
 so a fork cannot trigger a scan against the upstream

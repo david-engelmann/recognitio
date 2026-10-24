@@ -125,6 +125,10 @@ PINNED = (
      "`kimi -p --agent reviewer`"),
     ("the print mode stay alive",
      "stays alive and feeds each result back to the main agent"),
+    ("the trust workspace variable",
+     "KIMI_CODE_TRUST_WORKSPACE"),
+    ("the unversioned reference layout",
+     "No version is pinned for this reference layout"),
     ("the per user install scope",
      "installed per user and apply to all projects"),
     ("the managed copy",
@@ -295,8 +299,8 @@ RULE_CONTENT_SENTENCES = {
     "R6": 4,
     "R7": 4,
     "R8": 2,
-    "R9": 4,
-    "R10": 6,
+    "R9": 5,
+    "R10": 7,
 }
 
 # Headings allowed after the rules section. Any other heading
@@ -631,7 +635,8 @@ def hook_problems(root=None):
         r"|continuing|resumes|resume|resuming|carries on"
         r"|carry on|goes on|goes ahead|passes through"
         r"|pass through|allowed through|moves on"
-        r"|moves forward|keeps going)\b"
+        r"|moves forward|keeps going|advances|advance"
+        r"|advancing)\b"
     )
     for clause in clauses:
         if "notification only" in clause:
@@ -682,6 +687,35 @@ def hook_problems(root=None):
                 break
         if re.search(r"\bnon[-\s]?blocking\b", clause):
             if "hook" in clause or "check" in clause:
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+    # R31-RT-01. Clause splitting on but strips the hook subject
+    # from a do not stop clause, and a not gated claim carries
+    # no continuation verb at all, so both shapes are judged
+    # at sentence level too. A hook or check subject paired
+    # with a do not stop verb states the forbidden posture,
+    # and a failure paired with not gated states it without
+    # any verb.
+    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
+    if raw is not None:
+        for sentence in _sentences(raw):
+            if ("hook" in sentence or "check" in sentence) and re.search(
+                r"\b(does not|do not|never)\s+(stop|block|halt|prevent)\b",
+                sentence,
+            ):
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+            if failure.search(sentence) and re.search(
+                r"\bnot gated\b", sentence
+            ):
                 problems.append(
                     "a kimi rule lets a failed hook check pass "
                     "the turn through, which the blocking "
@@ -765,8 +799,24 @@ def collision_problems(root=None):
                 "forbids"
             )
             break
+        # R31-RT-02. A plugin win stated as a default or as
+        # an agent file loss states the same ordering claim
+        # without any winning verb. A plugin agent that is
+        # not the default is a correct restatement and is
+        # skipped.
         if re.search(
-            r"\buser\b.{0,40}\b(loses|loses to|defers?|defer"
+            r"\bplugin (agent|copy)?\b.{0,40}\bis the default\b",
+            clause,
+        ) and "not the default" not in clause:
+            problems.append(
+                "a kimi rule lets the plugin provided agent win "
+                "a name collision, which the precedence rule "
+                "forbids"
+            )
+            break
+        if re.search(
+            r"\b(user|agent-file|agent file|project|extra)\b"
+            r".{0,40}\b(loses|loses to|defers?|defer"
             r"|yields?|bows?)\b.{0,30}\bplugin\b",
             clause,
         ):
@@ -877,6 +927,23 @@ def qualified_problems(root=None):
                 "call" in segment or "invok" in segment
             ):
                 hit = True
+            # R31-RT-03. Bare name acceptance stated as a
+            # short name answered to, or as just its skill
+            # name being fine, states the same acceptance
+            # without the bare name noun.
+            if re.search(
+                r"\banswer\w*\b.{0,30}\b(short|just|bare) "
+                r"(name|names)\b",
+                segment,
+            ):
+                hit = True
+            if re.search(
+                r"\bjust (its|the) (skill )?names?\b"
+                r".{0,30}\b(fine|works?|allowed|accepted"
+                r"|sufficient|enough)\b",
+                segment,
+            ):
+                hit = True
             if re.search(
                 r"\binvoke (a plugin skill )?by the bare name\b"
                 r"|\binvoking (a plugin skill )?by the bare name\b"
@@ -946,6 +1013,14 @@ def workdir_problems(root=None):
         r"\bserver\b.{0,50}\bdirectory\b"
         r"|\bdirectory\b.{0,50}\bserver was (started|launched)\b"
     )
+    # R31-RT-04. A server location stated as a process cwd or
+    # as a checkout directory of the server states the same
+    # location claim without the server directory word pair.
+    cwd_location = re.compile(
+        r"\bserver\b.{0,30}\bcwd\b"
+        r"|\bcwd\b.{0,30}\bserver\b"
+        r"|\bdirectory\b.{0,30}\bof the server\b"
+    )
     for sentence in _sentences(raw):
         for clause in _clauses(sentence):
             match = location.search(clause)
@@ -955,6 +1030,22 @@ def workdir_problems(root=None):
                     re.search(
                         r"\b(not|never)\b",
                         clause[match.start():match.end()],
+                    )
+                )
+                if not negated:
+                    problems.append(
+                        "a kimi rule puts hooks in the server "
+                        "start directory, which the working "
+                        "directory rule forbids"
+                    )
+                    break
+            cwd_match = cwd_location.search(clause)
+            if cwd_match and "hook" in clause:
+                negated = _neg_before(clause, cwd_match.start())
+                negated = negated or bool(
+                    re.search(
+                        r"\b(not|never)\b",
+                        clause[cwd_match.start():cwd_match.end()],
                     )
                 )
                 if not negated:
@@ -1153,7 +1244,8 @@ def unsupported_problems(root=None):
     # its own effect verb is a correct restatement.
     effect = re.compile(
         r"\b(honour\w*|honor\w*|execut\w*|appl\w*|enforc\w*"
-        r"|respect\w*|used|takes? effect|in effect)\b"
+        r"|respect\w*|used|takes? effect|in effect"
+        r"|passed through|pass through|forward\w*)\b"
     )
     for clause in clauses:
         unsupported = (
@@ -1215,6 +1307,11 @@ def managed_problems(root=None):
         ):
             return [problem]
         if re.search(r"\bruns? from the source\b", clause):
+            return [problem]
+        # R31-RT-06. A managed copy refresh from the source
+        # states a source effect with no takes effect verb
+        # and no reinstall word.
+        if re.search(r"\brefresh\w*\b", clause):
             return [problem]
         if re.search(
             r"\b(picked up|hot[-\s]?reloads?|live reloads?)\b",
@@ -1393,6 +1490,20 @@ def autodiscovery_problems(root=None):
             clause,
         ):
             return [problem]
+        # R31-ST-01. A no form of discovery and a bare agents
+        # subject deny auto discovery without the not form
+        # the old pattern needed.
+        if re.search(
+            r"\bno agents? (directory|field)\b.{0,40}"
+            r"\bauto discover\w*\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\bagents? are not (auto )?discover\w*\b",
+            clause,
+        ):
+            return [problem]
         match = re.search(
             r"\bagents field\b.{0,40}"
             r"\b(ignored|disregarded|unused)\b",
@@ -1417,7 +1528,7 @@ def builtin_override_problems(root=None):
         return ["docs/kimi-plugin-brief.md is missing"]
     patterns = (
         r"\bneeds? no override\b",
-        r"\bwithout (an |the )?override\b",
+        r"\bwithout (an |the |any )?override\b",
         r"\bdoes not (need|require) an override\b",
         r"\boverride (is )?not required\b",
         r"\boverride (is )?optional\b",
@@ -1455,6 +1566,25 @@ def hook_events_problems(root=None):
         "the hook events rule forbids"
     )
     for clause in clauses:
+        # R31-ST-01 and R31-RT-06. An event denial with no
+        # event noun, a does not fire form, and a fifth count
+        # claim state the denial without the old pattern's
+        # event word and never form, so they are judged
+        # without the event requirement.
+        if re.search(
+            r"\b(turnstarted|userpromptqueued|taskstarted"
+            r"|sessionheartbeat)\b.{0,40}"
+            r"\b(never|does not|do not|not)\s+"
+            r"(fires?|runs?|triggers?)\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\b(five|six|seven|5|6|7)\b.{0,30}\bhook events?\b"
+            r"|\ba fifth event\b",
+            clause,
+        ):
+            return [problem]
         if "event" not in clause:
             continue
         if re.search(
@@ -1469,13 +1599,6 @@ def hook_events_problems(root=None):
             return [problem]
         if re.search(
             r"\bconfigurable only in a different file\b",
-            clause,
-        ):
-            return [problem]
-        if re.search(
-            r"\b(turnstarted|userpromptqueued|taskstarted"
-            r"|sessionheartbeat)\b.{0,40}"
-            r"\bnever (fires?|runs?|triggers?)\b",
             clause,
         ):
             return [problem]
@@ -1604,6 +1727,18 @@ def delegation_problems(root=None):
                 "agents, which the agents field rule "
                 "forbids"
             ]
+        # R31-RT-06. A cannot delegate claim denies
+        # delegation without the allow verb the old pattern
+        # needed.
+        if re.search(
+            r"\b(cannot|can not)\b.{0,20}\bdelegat\w*\b",
+            clause,
+        ):
+            return [
+                "a kimi rule denies delegation to plugin "
+                "agents, which the agents field rule "
+                "forbids"
+            ]
     return []
 
 
@@ -1667,6 +1802,19 @@ def manifest_problems(root=None):
                 "a kimi rule claims only one manifest "
                 "location exists, which the reference "
                 "layout rule forbids"
+            ]
+        # R31-RT-06. A manifest claim that a location is
+        # ignored narrows the two locations without saying
+        # only one exists.
+        if re.search(
+            r"\b(kimi\.plugin\.json|plugin\.json)\b.{0,40}"
+            r"\b(ignored|disregarded|not loaded|not read)\b",
+            clause,
+        ):
+            return [
+                "a kimi rule claims a manifest location is "
+                "ignored, which the reference layout rule "
+                "forbids"
             ]
     return []
 

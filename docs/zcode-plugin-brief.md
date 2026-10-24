@@ -28,7 +28,8 @@ Recognitio ships on ZCode as a native plugin with its manifest
 at `.zcode-plugin/plugin.json`.
 
 Derives from the primary ZCode plugin documentation, read in
-the round 15 research sweep, which documents the complete
+the round 15 research sweep at https://zcode.z.ai/en/docs/skill
+and https://zcode.z.ai/en/docs/plugin, which documents the complete
 plugin API with the manifest at `.zcode-plugin/plugin.json`.
 
 ### Z2. The marketplace distribution and the version bump rule
@@ -41,7 +42,8 @@ release on ZCode ships with a bumped marketplace version, or
 installed clients never see it.
 
 Derives from the primary ZCode plugin documentation, read in
-the round 15 research sweep, which documents the in client
+the round 15 research sweep at https://zcode.z.ai/en/docs/skill
+and https://zcode.z.ai/en/docs/plugin, which documents the in client
 plugin marketplace distribution with the version bump rule.
 
 ### Z3. The portable shape loses output styles and settings
@@ -68,7 +70,8 @@ executes it. No recognitio behavior depends on a registered
 but unexecuted field.
 
 Derives from the primary ZCode plugin documentation, read in
-the round 15 research sweep, which documents the register but
+the round 15 research sweep at https://zcode.z.ai/en/docs/skill
+and https://zcode.z.ai/en/docs/plugin, which documents the register but
 not execute behavior for channels, lspServers, outputStyles,
 and settings.
 
@@ -80,7 +83,8 @@ recognitio description runs far under the cap, and the
 shipped skill body runs far under the truncation limit.
 
 Derives from the primary ZCode plugin documentation, read in
-the round 15 research sweep, which documents the 1024
+the round 15 research sweep at https://zcode.z.ai/en/docs/skill
+and https://zcode.z.ai/en/docs/plugin, which documents the 1024
 character description cap and the 100KB body truncation.
 
 ### Z6. The trust posture stands unchanged

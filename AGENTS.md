@@ -42,7 +42,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_antigravity.py`, the Copilot SDK agent build check at
 `scripts/check_copilot.py`, the Kimi managed plugin check at
 `scripts/check_kimi.py`, the ZCode plugin build check at
-`scripts/check_zcode.py`, the test vacuity guard at
+`scripts/check_zcode.py`, the Devin playbook and coordinator
+build check at `scripts/check_devin.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -102,8 +103,9 @@ not a gate.
   in `REVIEW.md`, with their findings disposition counts.
 - `evals/` holds the paired eval tasks, the trigger set, the
   corpus index and their recorded results.
-- `.claude-plugin/` holds the plugin manifest and the marketplace
-  listing for the skill.
+- `.claude-plugin/` holds the plugin manifest at
+  `.claude-plugin/plugin.json` and the marketplace listing at
+  `.claude-plugin/marketplace.json` for the skill.
 - `agents/` holds the plugin agent files. The reviewer persona
   lives at `agents/reviewer.md`, declared under the `agents`
   key of the plugin manifest and named as the session agent
@@ -120,7 +122,8 @@ not a gate.
   canonical skill text.
 - `hooks/` holds the Build 7 mod, the hooks module at
   `hooks/register.js` named by `hooks/hooks.json` with its
-  `*.test.ts` host side tests. The mod is a home platform
+  `*.test.ts` host side tests. The Build 7 brief lives at
+  `docs/mod-build7.md`. The mod is a home platform
   extension beside the portable core, not a change to the
   canonical skill text.
 - `agent-plugins-package/` holds the Build 8 portable package,
@@ -128,7 +131,8 @@ not a gate.
   `agent-plugins-package/plugin.json` and the skills tree at
   `agent-plugins-package/skills/`, with the Claude Code native
   shapes riding beside it at the repo root as per platform
-  extensions declared in the manifest. The package skill is a
+  extensions declared in the manifest. The Build 8 brief lives
+  at `docs/agent-plugins-brief.md`. The package skill is a
   byte identical copy of the canonical skill, pinned by the
   gate, and the package carries no `mcp.json`.
 - `docs/codex-review-brief.md` holds the brief for Build 9, the
@@ -209,6 +213,25 @@ not a gate.
   character description cap with the 100KB body truncation
   are pinned by the gate at `scripts/check_zcode.py`, so the
   scoped guidance cannot become a rival instruction source.
+- `docs/devin-playbook-brief.md` holds the brief for Build
+  17, the Devin playbook and coordinator build. The
+  Bitbucket Cloud host conditions, the code fixed only
+  resolved count, the Quote in chat and merge past bypass
+  surfaces, the code scan automation API path with the
+  service user permission condition, the SARIF 2.1.0 export
+  beside CSV, the repositories and blueprint v3 promotion
+  with the v3beta1 continuation note, the auto scan
+  schedules API general availability kept separate from the
+  session schedules deprecation, the coordinator surfaces,
+  Devin Oncall as an adjacent incident surface only, Devin
+  Dynamic Workflows as recorded script orchestration, the
+  targeted plugin saves and reinstall as a new revision,
+  the skill placement with both triggers enabled by default,
+  the stacked pull request packet rule, the AI Scan advisory
+  limit, the Copilot governance packet rule, and the Fusion
+  chart caveat are pinned by the gate at
+  `scripts/check_devin.py`, so the scoped guidance cannot
+  become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -426,4 +449,11 @@ function, hardened the Copilot gate in the same meaning based
 style, flagged the plugin root `kimi.plugin.json` manifest in
 the extractor, landed Build 16, the ZCode plugin build, and
 deferred Build 15, the Qwen Code marketplace presence, by
-dated decision to round 33.
+dated decision to round 33. The round 31 pass then landed
+Build 17, the Devin playbook and coordinator build with its
+derivation noted brief and gate script, hardened the Build
+14 and Copilot gates against replacement rewording and new
+synonyms, folded the Build 13, Build 10, and Build 11
+currency corrections, narrowed the decision 25 any phrasing
+wording to the phrasing families the gate tests, and closed
+the round 31 findings.

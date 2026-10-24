@@ -129,9 +129,10 @@ local sandboxing GA in Copilot CLI from the October 9 2026
 weekly releases strengthens the containerized run
 recommendation.
 
-Derives from the primary Microsoft Agent Framework
-documentation at learn.microsoft.com, the primary Microsoft
-Agent Framework devblog at
+Derives from the supplementary Microsoft Agent Framework
+documentation at learn.microsoft.com, which carries no page
+path in this brief, and the primary Microsoft Agent Framework
+devblog at
 devblogs.microsoft.com/agent-framework/build-production-ready-agents-with-the-github-copilot-harness-and-agent-framework/
 which states the integration is stable for both .NET and
 Python, and the primary October 9 2026 weekly release notes
@@ -174,7 +175,9 @@ review experience entry at github.blog/changelog.
 Claude Opus 4.8, Claude Opus 5, and GPT-5.6 Terra retire
 on November 16 2026, with an individual annual plan
 exception for Opus 4.8. This brief claims the retirement
-for the coverage the primary entry names and no more.
+across all GitHub Copilot experiences as the primary entry
+states it and no more, and names no code review claim from
+that entry.
 
 Derives from the primary github.blog October 15 2026
 retirement entry.
@@ -202,6 +205,64 @@ accounting.
 Derives from the primary October 22 2026 usage metrics
 entry at github.blog/changelog, with the client telemetry
 undercount caveat.
+
+## Currency notes
+
+The October 22 through October 26 2026 global default
+enforcement window rolls out gradually through October 26
+2026. The policy applies to eligible settings on
+"Features and clients" and "MCP servers in Copilot".
+Eligible features left unconfigured are set according to
+the global policy, explicit choices are preserved, and
+preview features remain opt in. R9 and R10 state defaults,
+so a packet workflow records its Copilot feature choices
+explicitly instead of relying on a default set during this
+window. The primary entry names no code review policy page,
+so this brief names none, and the explicit choice note
+above covers the settings on the two pages the primary
+names.
+
+Derives from the primary github.blog October 22 2026
+global default entry, which names the two pages above and
+the explicit choice preservation.
+
+The October 19 2026 model policy API is generally
+available, with GET and PATCH endpoints for enterprises,
+enterprise teams, agent apps, and organizations.
+
+Derives from the primary github.blog October 19 2026 model
+policy API entry.
+
+The October 23 2026 totals by client metrics add a
+totals_by_client measure of model traffic from any tool
+that uses Copilot, with client values including opencode,
+claude_code, codex, zed, copilot_cli, github_app,
+cloud_agent, code_review, vscode, and jetbrains. Client
+is a best effort grouping, not a verified identity, and
+request_count counts model calls, not prompts. Copilot
+metrics no longer cover only Copilot surfaces, and this
+brief does not describe the October 23 totals as
+undercounting on that entry alone, because the undercount
+caveat belongs to the October 22 client telemetry entry
+at R14.
+
+Derives from the primary github.blog October 23 2026
+totals by client entry, which lists the client values and
+the best effort and calls not prompts caveats.
+
+The October 23 2026 Teams legacy entry says the legacy
+GitHub app will be renamed GitHub deprecated and retired
+on November 16 2026.
+
+Derives from the primary github.blog October 23 2026
+Teams legacy entry.
+
+Gemini 4 Argon general availability in Copilot is dated
+October 13 2026, on Pro Plus, Max, Business, and
+Enterprise.
+
+Derives from the primary github.blog October 13 2026
+Gemini 4 Argon entry.
 
 ## Stated limits
 

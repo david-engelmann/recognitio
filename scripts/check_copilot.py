@@ -89,6 +89,24 @@ PINNED = (
      "Balanced is the default"),
     ("the retirement wave",
      "November 16 2026"),
+    ("the November 16 all experiences coverage",
+     "across all GitHub Copilot experiences"),
+    ("the global default window",
+     "October 22 through October 26 2026"),
+    ("the global default pages",
+     "MCP servers in Copilot"),
+    ("the model policy API",
+     "model policy API is generally available"),
+    ("the totals by client metrics",
+     "totals_by_client"),
+    ("the totals best effort caveat",
+     "best effort grouping"),
+    ("the calls not prompts caveat",
+     "counts model calls, not prompts"),
+    ("the Teams legacy retirement",
+     "renamed GitHub deprecated"),
+    ("the Gemini 4 Argon availability",
+     "Gemini 4 Argon general availability in Copilot"),
     ("the decision 4 statement",
      "Decision 4 binds this build like every other build"),
 )
@@ -259,6 +277,11 @@ def trust_problems(root=None):
         r"\btrusted content\b",
         r"\breliable\b",
         r"\btrustworthy\b",
+        r"\bdependable\b",
+        r"\brelied on\b",
+        r"\bcan be relied\b",
+        r"\bmay be relied\b",
+        r"\bsafe to follow\b",
         r"\bmay be followed\b",
         r"\bcan be followed\b",
         r"\bshould be followed\b",
@@ -278,6 +301,36 @@ def trust_problems(root=None):
                     "posture forbids"
                 )
                 return problems
+        # R31-RT-05. Merge authority without the base branch
+        # qualifier, and a merge approval authored by head
+        # branch instructions said to be valid, grant the
+        # same authority the exact phrase check missed. The
+        # brief's own sentence carries no before the
+        # authority, so it is skipped on that shape, and a
+        # derivation note sentence cites a source rather
+        # than stating a rule, so it is skipped too.
+        if "derives from" in sentence:
+            continue
+        if "merge authority" in sentence and not re.search(
+            r"\b(no|never)\b.{0,30}merge authority", sentence
+        ):
+            problems.append(
+                "a copilot rule grants head branch content merge "
+                "authority, which the base branch authority rule "
+                "forbids"
+            )
+            return problems
+        if (
+            "merge" in sentence
+            and re.search(r"\bvalid\b", sentence)
+            and not re.search(r"\b(no|not|never)\b.{0,30}\bvalid\b", sentence)
+        ):
+            problems.append(
+                "a copilot rule grants head branch content merge "
+                "authority, which the base branch authority rule "
+                "forbids"
+            )
+            return problems
     if re.search(r"(?<!no )carries base branch merge authority",
                  re.sub(r"\s+", " ", section)):
         problems.append(
@@ -354,6 +407,13 @@ def approval_problems(root=None):
         r"\bproceeds\b",
         r"\ballowed\b",
         r"\bpermitted\b",
+        # R31-RT-05. An approval that moves forward, is
+        # issued, clears a packet, or is fine on a red
+        # packet permits the same firing in other words.
+        r"\bmoves forward\b",
+        r"\bissued\b",
+        r"\bclears\b",
+        r"\bis fine\b",
     )
     for sentence in _sentences(section):
         if "approval" not in sentence:

@@ -24,6 +24,7 @@ check:
 	$(PYTHON) scripts/check_copilot.py
 	$(PYTHON) scripts/check_kimi.py
 	$(PYTHON) scripts/check_zcode.py
+	$(PYTHON) scripts/check_devin.py
 	$(PYTHON) scripts/check_test_vacuity.py
 	$(PYTHON) scripts/smoke_extract.py
 

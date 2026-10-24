@@ -408,6 +408,38 @@ This unreleased work carries version 1.3.0.
   and the format limits. Build 15, the Qwen Code marketplace
   presence, is deferred by dated decision to round 33.
   Decisions 26 and 27 record the deferral and the build.
+- The round 31 pass lands Build 17, the Devin playbook and
+  coordinator build, with its derivation noted brief at
+  `docs/devin-playbook-brief.md`, its gate script at
+  `scripts/check_devin.py`, and decision 28. The Build 14
+  and Copilot gates are hardened against replacement
+  rewording and new synonyms, so an in place rewrite of a
+  rule sentence and a synonym trust or approval claim now
+  fail the gate. The Build 13 brief gains the October 22
+  through October 26 2026 global default window with its
+  explicit choice note, the October 19 2026 model policy
+  API, the October 23 2026 totals by client metrics with
+  the best effort and calls not prompts caveats, the
+  October 23 2026 Teams legacy retirement, and the October
+  13 2026 Gemini 4 Argon availability, and the November 16
+  retirement coverage is named across all GitHub Copilot
+  experiences with no code review claim from that entry.
+  The Build 10 brief gains the Cursor Security Review bot
+  separation with scope, team rules, draft skip, and the
+  Teams and Enterprise plan gate, plus the Origin App
+  Marketplace CodeRabbit launch path. The Build 11 brief
+  gains the CLI v0.9.0 cloud task surface with signed Linux
+  release verification and the Deep Scan linked repository
+  limits. The Kimi brief gains the KIMI_CODE_TRUST_WORKSPACE
+  note for fresh checkouts and the unversioned reference
+  layout statement, and the ZCode derivation notes gain
+  their retrievable page URLs. Decision 25 is narrowed by
+  dated note to the phrasing families the gate tests,
+  decision 26 is annotated with the 12 versus 16 conflict
+  and the internal verify exit 4 scope, decision 13 is
+  annotated with the UNVERIFIED Trae skill surface, and a
+  round 31 note homes the corrected Graphite CLI changelog
+  pin.
 
 ### Fixed
 

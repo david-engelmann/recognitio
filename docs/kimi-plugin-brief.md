@@ -69,7 +69,8 @@ bare name no longer works.
 
 Derives from the primary MoonshotAI/kimi-code releases page at
 github.com/MoonshotAI/kimi-code/releases, which states that
-bare name invocation no longer works.
+bare name invocation no longer works, with no release version
+or date pinned for this change in this brief.
 
 ### R4. The hook working directory, kept in two scopes
 
@@ -143,7 +144,8 @@ main agent for a new session in print mode. Print mode no longer
 exits after a single turn while background tasks are pending. It
 stays alive and feeds each result back to the main agent. The CI
 gate waits for the run to settle instead of assuming a single
-turn exit.
+turn exit. A fresh checkout CI run sets KIMI_CODE_TRUST_WORKSPACE
+to mark the workspace trusted.
 
 Derives from the primary Kimi agents page at
 www.kimi.com/code/docs/en/kimi-code-cli/customization/agents.html,
@@ -168,6 +170,7 @@ exactly two valid manifest locations, `<plugin_root>/kimi.plugin.json`
 and `<plugin_root>/.kimi-plugin/plugin.json`, with
 `kimi.plugin.json` taking precedence when both exist. A bare
 `plugin.json` at the repo root is not a valid manifest location.
+No version is pinned for this reference layout in this brief.
 
 Derives from the primary Kimi plugins page at
 www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html,
