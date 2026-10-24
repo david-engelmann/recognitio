@@ -269,7 +269,7 @@ class TestCheckCopy(unittest.TestCase):
         # function uses, so a file under a hidden directory or a
         # node_modules directory is outside both or inside both and
         # the two rules can never contradict each other again.
-        for pattern in ("*.md", "*.yml", "*.yaml"):
+        for pattern in ("*.md", "*.mdc", "*.yml", "*.yaml"):
             for path in ROOT.rglob(pattern):
                 if self.mod.is_fence_excluded(ROOT, path):
                     continue
@@ -301,6 +301,8 @@ class TestCheckCopy(unittest.TestCase):
             manifests,
             {".claude-plugin/plugin.json",
              ".claude-plugin/marketplace.json",
+             ".cursor-plugin/plugin.json",
+             ".cursor-plugin/marketplace.json",
              "agent-plugins-package/plugin.json"},
         )
 
@@ -508,6 +510,90 @@ class TestCheckCopy(unittest.TestCase):
                     self.mod.MANIFEST_FILES,
                 ) = original
             self.assertEqual(code, 1)
+
+    def test_em_dash_in_cursor_plugin_readme_is_caught(self):
+        # R23-ST-01. The Cursor plugin README is public prose, so
+        # an em dash in it fails the gate. Reverting the fence
+        # change leaves the file outside the fence and this test
+        # fails.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme = self.write_tmp(
+                root,
+                ".cursor-plugin/README.md",
+                "The plugin ships the skill %s the rules.\n"
+                % EM_DASH,
+            )
+            files = self.mod.discover_prose_files(root)
+            self.assertIn(readme, files)
+            self.assertEqual(self.run_main_on(files), 1)
+
+    def test_em_dash_in_cursor_plugin_rule_file_is_caught(self):
+        # R23-ST-01. The Cursor rule file is public prose, so an
+        # em dash in it fails the gate. The fence discovers rule
+        # files by rule, not by listing.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rule = self.write_tmp(
+                root,
+                ".cursor-plugin/rules/recognitio.mdc",
+                "---\n"
+                "description: Test rule.\n"
+                "---\n"
+                "\n"
+                "The rule restates the packet discipline %s plainly.\n"
+                % EM_DASH,
+            )
+            files = self.mod.discover_prose_files(root)
+            self.assertIn(rule, files)
+            self.assertEqual(self.run_main_on(files), 1)
+
+    def test_em_dash_in_cursor_plugin_manifest_is_caught(self):
+        # R23-ST-01. The Cursor plugin manifest descriptions are
+        # public prose. A manifest under the plugin directory
+        # joins the fence by rule.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self.write_tmp(
+                root,
+                ".cursor-plugin/plugin.json",
+                '{"name": "x", "description": "Does a thing %s '
+                'in plain words."}\n' % EM_DASH,
+            )
+            found = self.mod.discover_manifest_files(root)
+            self.assertIn(manifest, found)
+            original = (
+                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                self.mod.MANIFEST_FILES,
+            )
+            self.mod.PROSE_FILES = []
+            self.mod.COMMENT_FILES = []
+            self.mod.MANIFEST_FILES = [manifest]
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main()
+            finally:
+                (
+                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                    self.mod.MANIFEST_FILES,
+                ) = original
+            self.assertEqual(code, 1)
+
+    def test_discovery_keeps_the_plugin_skill_copy_out(self):
+        # R23-ST-01. The plugin skill copy is pinned byte identical
+        # to the canonical skill by scripts/check_cursor.py, and
+        # the canonical skill is already inside the fence, so the
+        # copy stays out by rule the way the generated eval
+        # packets do.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = self.write_tmp(
+                root,
+                ".cursor-plugin/skills/recognitio/SKILL.md",
+                "The copied skill.\n",
+            )
+            found = self.mod.discover_prose_files(root)
+            self.assertNotIn(skill, found)
 
     def test_a_flow_mapping_value_is_structure_not_prose(self):
         with RetryingTemporaryDirectory() as tmp:

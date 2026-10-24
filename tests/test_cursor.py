@@ -320,6 +320,27 @@ class TestCheckCursor(unittest.TestCase):
                 any("disagree" in p for p in problems), problems
             )
 
+    def test_a_marketplace_only_version_drift_fails(self):
+        # R23-ST-02. No committed test broke only the marketplace
+        # listing. A marketplace entry that drifted from the
+        # manifest must fail the gate through the marketplace
+        # check alone, so deleting the marketplace version
+        # comparison fails this test.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor-plugin" / "marketplace.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["plugins"][0]["version"] = "9.9.9"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "marketplace.json is at version" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_an_absolute_manifest_path_fails(self):
         # All manifest paths must be relative with no parent
         # traversal and no absolute paths.

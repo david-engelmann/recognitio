@@ -303,6 +303,28 @@ This unreleased work carries version 1.3.0.
   fields because they fall back silently. The brief at
   `docs/cursor-plugin-brief.md` is pinned by the gate in
   `scripts/check_cursor.py`. Decision 19 records the build.
+- Build 11, the CodeRabbit guidelines build. The brief at
+  `docs/coderabbit-review-brief.md` exploits the Code Guidelines
+  entry reading `.claude/rules/` with `paths` frontmatter,
+  pairing the packet with the autonomous fix loop for the review
+  fix cycle. Every guideline carries a derivation note naming the
+  canonical skill section or the primary CodeRabbit citation it
+  restates or the binding decision it follows, pinned by the gate
+  in `scripts/check_coderabbit.py`, so the scoped guidance cannot
+  become a rival instruction source. The brief records the rename
+  direction as primary, with Fix comments formerly Autofix and
+  Autofix formerly Autopilot and compat aliases kept. It records
+  the focus toggle table as the constraint, with high trimming
+  verbosity and never reading as deeper review, the focus and
+  profile axes named on every sentence, and the summary fold at
+  high pinned explicitly. It records the Quiet, Chill, and
+  Assertive profiles with the July 2 2026 Quiet launch, the pre
+  merge checks with Error mode merge blocking, the Automatic
+  Approvals surface, and the approval risk limits, the October
+  2026 Deep Scan and `reviews.allow_author_approval` entries, and
+  the guideline file provenance now shown in review summaries,
+  with `.claude/rules/` as the fourth guideline source. Decision
+  20 records the build.
 
 ### Fixed
 

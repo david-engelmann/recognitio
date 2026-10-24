@@ -633,3 +633,60 @@ scripts.
 Skill tightness holds. The brief, its gate script at
 `scripts/check_cursor.py`, and its tests live outside the
 canonical skill text, and the description protocol is untouched.
+
+## 20. Build 11, the CodeRabbit guidelines build
+
+Recorded on 2026-10-24 in round 23. The brief at
+`docs/coderabbit-review-brief.md` exploits the Code Guidelines
+entry reading `.claude/rules/` with `paths` frontmatter, pairing
+the packet with the autonomous fix loop for the review fix
+cycle. The guidelines section states five guidelines, and every
+guideline carries a derivation note naming the canonical skill
+section or the primary CodeRabbit citation it restates or the
+binding decision it follows. A guideline with neither is a rival
+instruction source and fails the round, which is the second
+packet guard the round 20 plan named. The gate at
+`scripts/check_coderabbit.py` pins the notes, so a later edit
+cannot add an underived guideline in silence, and the restraint
+test runs against the guidelines directly, with no invented
+finding, no claimed schedule, no deeper analysis reading of
+high, and no claimed coverage surviving.
+
+The brief records the rename direction as primary. Fix comments
+was Autofix and Autofix was Autopilot, with the old commands
+kept as compat aliases. It records the focus toggle table as
+the constraint. High trims verbosity and does not deepen
+analysis, and the brief must never treat high as deeper review.
+The focus axis governs review output verbosity while the
+profile axis governs feedback volume and scope, and every focus
+and profile sentence names its axis. The summary fold at high
+is pinned explicitly, so no reader counts it as added analysis.
+It records the Quiet, Chill, and Assertive profiles as primary,
+with the July 2 2026 Quiet launch. It records the pre merge
+checks with Error mode merge blocking, the Automatic Approvals
+surface, and the approval risk limits as primary. It records
+the October 2026 entries as primary. Deep Scan with linked
+repositories, the Deep Scan API on all plans, and
+`reviews.allow_author_approval`. It records the guideline file
+provenance now shown in review summaries, with each file listed
+as configured, auto discovered, or an Agent Skill, and
+`.claude/rules/` as the fourth guideline source with its
+`paths` scoping. The Deep Scan runtime verification sentence is
+skipped by choice, and the round 23 fix report records the skip
+for a later round.
+
+The round 23 red team proved the joint check plus test
+softening gap is not mechanically stoppable in full, so the
+gate gains a test vacuity guard at
+`scripts/check_test_vacuity.py`. Every test method must carry a
+real assertion and touch a fixture, which catches the
+demonstrated vacuous body attack shape. The guard does not catch
+a subtle tautology that argues about fixture derived values,
+and the spec lane diff review stays the guard for that shape.
+
+Decision 4 binds the build. The guidelines advise and never
+enforce, and enforcement stays on the shipped scripts.
+
+Skill tightness holds. The brief, its gate script at
+`scripts/check_coderabbit.py`, and its tests live outside the
+canonical skill text, and the description protocol is untouched.

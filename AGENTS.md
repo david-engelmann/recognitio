@@ -37,7 +37,9 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_mod.py`, the portable package check at
 `scripts/check_package.py`, the Codex review rules check at
 `scripts/check_codex.py`, the Cursor plugin check at
-`scripts/check_cursor.py`, and an end to end extractor smoke that must
+`scripts/check_cursor.py`, the CodeRabbit guidelines check at
+`scripts/check_coderabbit.py`, the test vacuity guard at
+`scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
 findings schema, the proof packet manifest, and the primary
@@ -133,6 +135,13 @@ not a gate.
   the canonical skill section or the primary Cursor citation it
   reports, pinned by the gate at `scripts/check_cursor.py`, so the
   scoped guidance cannot become a rival instruction source.
+- `docs/coderabbit-review-brief.md` holds the brief for Build 11,
+  the CodeRabbit guidelines build. Every guideline carries a
+  derivation note naming the canonical skill section or the
+  primary CodeRabbit citation it restates or the binding decision
+  it follows, pinned by the gate at
+  `scripts/check_coderabbit.py`, so the scoped guidance cannot
+  become a rival instruction source.
 - `.cursor-plugin/` holds the Cursor plugin manifest at
   `.cursor-plugin/plugin.json` and the marketplace listing at
   `.cursor-plugin/marketplace.json`. The skill ships as a real
@@ -333,4 +342,9 @@ and closed the round 21 findings. The round 22 pass then landed
 Build 10, the Cursor plugin with the real directory copy of the
 skill, the Bugbot rules with the effort and neutral pins, and
 the `.cursor/config/bugbot.yaml` repo config, and closed the
-round 22 findings.
+round 22 findings. The round 23 pass then landed Build 11, the
+CodeRabbit guidelines build with the derivation noted
+guidelines, the focus table constraint pins, and the rename
+direction pins, added the test vacuity guard against the joint
+check plus test softening attack, brought the Cursor plugin tree
+under the copy fence, and closed the round 23 findings.

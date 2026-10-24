@@ -22,15 +22,17 @@ contributor writes in them is.
 
 The fence is discovered by rule rather than listed by hand, so a
 new authored prose surface joins it by construction instead of
-waiting for someone to remember the list. Every Markdown file in
-the tree is prose, apart from the generated packets saved as eval
-fixtures, which are extractor output and not authored text. The
-description fields of the plugin manifests are prose a reader
-meets in a listing, so they are scanned as values. Every YAML
-file in the tree is discovered by the same rule as the Markdown
-files and scanned as YAML, apart from the files in the comment
-span class, whose values are code and whose prose lives in hash
-comments, and those are scanned by comment span.
+waiting for someone to remember the list. Every Markdown file
+and every Cursor rule file in the tree is prose, apart from the
+generated packets saved as eval fixtures, which are extractor
+output and not authored text, and the plugin skill copy, which
+is pinned byte identical to the canonical skill by its own gate
+script. The description fields of the plugin manifests are prose
+a reader meets in a listing, so they are scanned as values. Every
+YAML file in the tree is discovered by the same rule as the
+Markdown files and scanned as YAML, apart from the files in the
+comment span class, whose values are code and whose prose lives
+in hash comments, and those are scanned by comment span.
 
 Exits nonzero and lists every violation when the bar is broken.
 """
@@ -45,9 +47,14 @@ ROOT = Path(__file__).resolve().parents[1]
 # Hidden directories whose files are authored prose the bar
 # reaches. Every other hidden directory holds tool or dependency
 # state and stays outside the fence. The .cursor directory holds
-# the authored Bugbot rules and repo config beside the plugin
-# directory, so it joins the fence with them.
-_PUBLIC_DOT_DIRS = (".github", ".agents", ".claude", ".claude-plugin", ".cursor")
+# the authored Bugbot rules and repo config, and the
+# .cursor-plugin directory holds the authored plugin README, the
+# rule file, and the manifests, so both join the fence. The
+# plugin's skill copy subtree stays out by the rule below,
+# because its own gate script pins it byte identical to the
+# canonical skill the fence already scans.
+_PUBLIC_DOT_DIRS = (".github", ".agents", ".claude", ".claude-plugin",
+                    ".cursor", ".cursor-plugin")
 
 
 def is_fence_excluded(root, path):
@@ -64,7 +71,10 @@ def is_fence_excluded(root, path):
     output-styles directory at the plugin root holds the
     authored packet style for the same reason. The generated eval
     packets stay outside it for the reason the module docstring
-    records. Discovery and the fence completeness walk in the
+    records, and so does the plugin skill copy under
+    .cursor-plugin/skills, because scripts/check_cursor.py pins
+    that copy byte identical to the canonical skill the fence
+    already scans. Discovery and the fence completeness walk in the
     gate tests both call this one predicate, so the two can never
     encode opposite rules for the same locations again.
     """
@@ -81,6 +91,12 @@ def is_fence_excluded(root, path):
         return True
     if len(parts) == 4 and parts[:2] == ("evals", "tasks") \
             and parts[3] == "packet.md":
+        return True
+    if len(parts) >= 2 and parts[:2] == (".cursor-plugin", "skills"):
+        # The plugin skill copy is pinned byte identical to the
+        # canonical skill by scripts/check_cursor.py, and the
+        # canonical skill is already inside the fence, so the copy
+        # stays out by rule the way the generated eval packets do.
         return True
     if path.is_symlink():
         try:
@@ -113,16 +129,17 @@ def is_comment_span_file(root, path):
 def discover_prose_files(root=None):
     """Every authored prose file the bar reaches, found by rule.
 
-    Markdown files and YAML files are discovered the same way,
-    by location and suffix under the shared exclusion rule, so a
-    new YAML surface joins the fence by construction just as a
-    new Markdown file does. YAML files in the comment span class
-    stay out of this set because that scan already reaches them.
+    Markdown files, Cursor rule files, and YAML files are
+    discovered the same way, by location and suffix under the
+    shared exclusion rule, so a new YAML surface or a new rule
+    file joins the fence by construction just as a new Markdown
+    file does. YAML files in the comment span class stay out of
+    this set because that scan already reaches them.
     """
     root = ROOT if root is None else root
     found = []
     candidates = []
-    for pattern in ("*.md", "*.yml", "*.yaml"):
+    for pattern in ("*.md", "*.mdc", "*.yml", "*.yaml"):
         candidates.extend(root.rglob(pattern))
     for path in sorted(set(candidates)):
         if is_fence_excluded(root, path):

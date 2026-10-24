@@ -19,6 +19,8 @@ check:
 	$(PYTHON) scripts/check_package.py
 	$(PYTHON) scripts/check_codex.py
 	$(PYTHON) scripts/check_cursor.py
+	$(PYTHON) scripts/check_coderabbit.py
+	$(PYTHON) scripts/check_test_vacuity.py
 	$(PYTHON) scripts/smoke_extract.py
 
 test: check
