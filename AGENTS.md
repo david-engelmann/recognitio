@@ -35,7 +35,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_persona.py`, the fan-out run record validator at
 `scripts/check_fanout.py`, the mod contract check at
 `scripts/check_mod.py`, the portable package check at
-`scripts/check_package.py`, and an end to end extractor smoke that must
+`scripts/check_package.py`, the Codex review rules check at
+`scripts/check_codex.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
 findings schema, the proof packet manifest, and the primary
@@ -120,6 +121,12 @@ not a gate.
   extensions declared in the manifest. The package skill is a
   byte identical copy of the canonical skill, pinned by the
   gate, and the package carries no `mcp.json`.
+- `docs/codex-review-brief.md` holds the brief for Build 9, the
+  Codex review rules package. Every rule carries a derivation
+  note naming the canonical skill section or gate it restates or
+  the primary OpenAI citation it reports, pinned by the gate at
+  `scripts/check_codex.py`, so the scoped guidance cannot become
+  a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -299,4 +306,7 @@ the closed schema manifest, the byte pinned package skill, the
 omitted `mcp.json`, and the native shapes riding beside the
 portable core as per platform extensions, and closed the round
 19 findings. No release has
-been tagged yet.
+been tagged yet. The round 21 pass then landed Build 9, the
+Codex review rules package with the derivation noted rules, the
+primary grounded Security Cloud surfaces, and the CI example,
+and closed the round 21 findings.

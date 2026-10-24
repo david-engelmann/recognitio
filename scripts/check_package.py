@@ -18,7 +18,9 @@ omitted and its absence is pinned. Every repo relative path
 the extensions object names must resolve in the repo, and the
 brief at docs/agent-plugins-brief.md must state the honesty
 sentence, so the package cannot drift into claiming a native
-Claude Code install it does not have.
+Claude Code install it does not have, and must record the Agent
+Skills donation transfer as primary on both halves, so the round
+21 one sentence correction cannot quietly revert.
 """
 
 import json
@@ -60,6 +62,15 @@ HONESTY_SENTENCE = (
     "The package does not install natively in Claude Code on "
     "current evidence"
 )
+
+# The round 20 research closed the Agent Skills donation to
+# primary on both halves, so the brief records the transfer as
+# primary. The older secondary corroborated wording is stale and
+# must not come back.
+AAIF_SENTENCE = (
+    "the transfer is now recorded as primary on both halves"
+)
+STALE_AAIF = "secondary corroborated"
 
 # The digit classes are ASCII ranges on purpose, the same reason
 # scripts/check_version.py records. A backslash d class also
@@ -290,11 +301,22 @@ def brief_problems(root):
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:
         return ["cannot read docs/agent-plugins-brief.md, %s" % exc]
-    if HONESTY_SENTENCE not in re.sub(r"\s+", " ", raw):
+    text = re.sub(r"\s+", " ", raw)
+    if HONESTY_SENTENCE not in text:
         problems.append(
             "docs/agent-plugins-brief.md does not state the honesty "
             "sentence, so the brief could drift into claiming a "
             "native Claude Code install"
+        )
+    if AAIF_SENTENCE not in text:
+        problems.append(
+            "docs/agent-plugins-brief.md does not record the Agent "
+            "Skills donation transfer as primary on both halves"
+        )
+    if STALE_AAIF in text:
+        problems.append(
+            "docs/agent-plugins-brief.md still carries the stale "
+            "secondary corroborated wording for the donation transfer"
         )
     return problems
 

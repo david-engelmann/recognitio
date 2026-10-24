@@ -7,9 +7,11 @@ domain namespace the spec section 8 defines. These tests prove
 the pin fires for a real reason on every inversion the round 19
 lanes named. A Claude Code native key at the top level of the
 portable manifest, a drifted or reshaped package skill copy, a
-present mcp.json, a dangling extension path and a brief without
-the honesty sentence each fail the package gate, and an em dash
-in the portable description fails the copy gate.
+present mcp.json, a dangling extension path, a brief without
+the honesty sentence, a brief without the primary AAIF sentence,
+and a brief with the stale AAIF wording each fail the package
+gate, and an em dash in the portable description fails the copy
+gate.
 """
 
 import importlib.util
@@ -276,6 +278,49 @@ class TestCheckPackage(unittest.TestCase):
             problems = self.problems(root)
             self.assertTrue(
                 any("honesty sentence" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_brief_without_the_primary_aaif_sentence_fails(self):
+        # R21-ST-01. Round 20 closed the Agent Skills donation to
+        # primary on both halves, so the brief must keep recording
+        # the transfer as primary.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            brief = root / "docs" / "agent-plugins-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            sentence = (
+                "the transfer is now recorded\nas primary on both halves"
+            )
+            self.assertIn(sentence, text)
+            brief.write_text(
+                text.replace(sentence, "the transfer is recorded"),
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("primary on both halves" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_brief_with_the_stale_aaif_wording_fails(self):
+        # R21-ST-01. The secondary corroborated wording is stale by
+        # timing, and planting it back must fail the pin.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            brief = root / "docs" / "agent-plugins-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            self.assertNotIn("secondary corroborated", text)
+            broken = text.replace(
+                "the transfer is now recorded\nas primary on both halves",
+                "the transfer is recorded as secondary corroborated",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            brief.write_text(broken, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("stale" in problem for problem in problems),
                 problems,
             )
 

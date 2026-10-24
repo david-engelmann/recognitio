@@ -526,3 +526,60 @@ stays on the shipped scripts and the per platform extension.
 Skill tightness holds. The package, its gate script at
 `scripts/check_package.py`, and the brief live outside the
 canonical skill text, and the description protocol is untouched.
+
+## 18. Build 9, the Codex review rules package
+
+Recorded on 2026-10-24 in round 21. The brief at
+`docs/codex-review-brief.md` exploits OpenAI's custom code
+review rules surface, the primary codex-plugin-cc Stop gate
+with its usage loop warning, and the dedicated cloud
+environments reference. The rules section states seven rules,
+and every rule carries a derivation note naming the canonical
+skill section or gate it restates or the primary OpenAI
+citation it reports. A rule with neither is a rival instruction
+source and fails the round, which is the second packet guard
+the round 20 plan named. The gate at `scripts/check_codex.py`
+pins the notes, so a later edit cannot add an underived rule in
+silence, and the restraint test runs against the rules
+directly, with no invented finding, no claimed schedule, and no
+claimed coverage surviving.
+
+The brief rests the Security Cloud surface on the three primary
+citations. Scheduled scans through the GitHub Actions page with
+the cron plus max cost budget, one time scans, and continuous
+commit monitoring with the scan window, threat model scoping,
+pause, and resume. It states the no product native calendar
+schedule negative plainly. Continuous monitoring covers the
+default branch only, and a completed scan and complete coverage
+are separate claims, so exit 0 does not mean every file was
+reviewed. The two pauses are named separately, the per
+repository monitoring pause or enable toggle in Monitoring
+settings and the automatic pause when funding is unavailable.
+The model pins are dated and scoped to the surface they were
+read from. The Actions example defaults to gpt-6-sol at
+action-v0.3.0, the workbench recommends gpt-5.6-sol with xhigh
+reasoning effort, and CLI 0.161.0 made GPT-6.1 Sol the default
+model. The 98 percent rule guided against 58.3 percent baseline
+figures are flagged as OpenAI's on OpenAI's tasks. Codex Cloud
+Legacy is described as under active restriction with no
+retirement date promised, as a watch item for the external lane.
+The Guardian auto review keys, the review_model key, and
+project_doc_max_bytes at 32768 are primary on the
+configuration reference and the sample config, read on
+2026-10-24. The brief folds in the openai/codex-security CLI
+and SDK material, the bulk scan CSV schema, the exit code
+contract, the deep mode knobs, the policy command, and the
+ghcr.io image, the PR review artifact layout with the sealed
+scan manifest receipt and coverage.json, the threat model draft
+and edit loop, and the CI example with the same repo guard.
+SECURITY.md is policy context, not executable instructions.
+The Codex max diff size stays unfound on primary and is not
+load bearing.
+
+Decision 4 binds the build. The rules advise and never
+enforce, and enforcement stays on the shipped scripts and the
+per platform extension.
+
+Skill tightness holds. The brief, its gate script at
+`scripts/check_codex.py`, and its tests live outside the
+canonical skill text, and the description protocol is untouched.

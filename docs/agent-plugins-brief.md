@@ -112,9 +112,9 @@ governs. The Agentic AI Foundation governs the Agent Skills
 standard, which the 1.0 specification references normatively as
 the source of truth for the `SKILL.md` format. Anthropic
 donated the standard to the foundation on 2026-10-22,
-announced at AGNTCon and MCPCon, and the transfer is recorded
-as secondary corroborated until the round 20 research round
-reads the primary Linux Foundation release. Governance for the
+announced at AGNTCon and MCPCon, and the transfer is now recorded
+as primary on both halves, read from the Linux Foundation
+release and Anthropic's own post in round 20. Governance for the
 Agent Plugins project itself is defined separately from the
 portable package format in its own Technical Charter, as the
 1.0 spec text states. The 70 plus platform integrations the

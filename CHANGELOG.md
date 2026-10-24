@@ -271,8 +271,31 @@ This unreleased work carries version 1.3.0.
   the section 8 mechanism per shape, the single source rule for
   the package skill, and the two governances kept distinct.
   Decision 17 records the build.
+- The Codex review rules package at `docs/codex-review-brief.md`.
+  It exploits OpenAI's custom code review rules surface, the
+  codex-plugin-cc Stop gate with its usage loop warning, and the
+  dedicated cloud environments reference. Every rule carries a
+  derivation note naming the canonical skill section or gate it
+  restates or the primary OpenAI citation it reports, pinned by
+  the gate in `scripts/check_codex.py`, so the scoped guidance
+  cannot become a rival instruction source. The brief rests the
+  Security Cloud surface on the three primary citations, states
+  the no product native calendar schedule negative plainly,
+  carries the default branch only and completion versus coverage
+  limits, names the two pauses separately, dates and scopes each
+  model pin to its surface, and folds in the openai/codex-security
+  CLI and SDK material, the PR review artifact layout, the
+  review_model key, the Guardian auto review keys, the threat
+  model draft and edit loop, and the CI example with the same
+  repo guard. Decision 18 records the build.
 
 ### Fixed
+
+- The Build 8 brief now records the Agent Skills donation
+  transfer as primary on both halves, read from the Linux
+  Foundation release and Anthropic's own post in round 20. The
+  older secondary corroborated wording was stale by timing, and
+  the gate pins the corrected sentence.
 
 - The fan out validator now fails a second pass verdict
   that names a finding outside the merged set. A phantom
