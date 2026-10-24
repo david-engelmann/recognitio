@@ -300,7 +300,7 @@ def _match_home(parts, start):
     return len(parts) - 1, len(parts[-1])
 
 
-def _guard_prefix(parts, start, subject):
+def _guard_prefix(parts, start, subject, claim=None):
     """The text that may guard a match inside a window.
 
     R37F-RT-02. A negation guards a claim only from a
@@ -311,6 +311,13 @@ def _guard_prefix(parts, start, subject):
     guard the claim the window joins. The result is the
     subject sentences before the match sentence joined
     with the match sentence up to the match.
+
+    R37C-RT-01. A subject sentence guards only when it
+    also states the claim predicate, passed as the claim
+    pattern. A negation inside a subject sentence about
+    a different fact, membership in a branch or the
+    finality of an approval, negates that fact and not
+    the claim, so the sentence contributes nothing.
     """
     index, local = _match_home(parts, start)
     subjects = (subject,) if isinstance(subject, str) else subject
@@ -318,6 +325,7 @@ def _guard_prefix(parts, start, subject):
         part
         for part in parts[:index]
         if any(word in part for word in subjects)
+        and (claim is None or claim.search(part))
     ]
     guards.append(parts[index][:local])
     return " ".join(guards), index
@@ -424,12 +432,18 @@ def trust_problems(root=None):
             )
         )
         if not attributed:
+            claim = re.compile(
+                "|".join("(?:%s)" % item for item in patterns)
+            )
             for pattern in patterns:
                 match = re.search(pattern, sentence)
                 if not match:
                     continue
                 guard, index = _guard_prefix(
-                    parts, match.start(), "head branch"
+                    parts,
+                    match.start(),
+                    "head branch",
+                    claim=claim,
                 )
                 if re.search(
                     r"\b(not|never|no|nothing)\b|n't", guard
@@ -628,6 +642,9 @@ def approval_problems(root=None):
     # round 37 review split the approval and its firing
     # across three sentences with a filler sentence
     # between them.
+    claim = re.compile(
+        "|".join("(?:%s)" % item for item in patterns)
+    )
     for parts in _windows(_sentences(raw)):
         sentence = " ".join(parts)
         if "approval" not in sentence and "approved" not in sentence:
@@ -637,7 +654,10 @@ def approval_problems(root=None):
             if not match:
                 continue
             guard, index = _guard_prefix(
-                parts, match.start(), ("approval", "approved")
+                parts,
+                match.start(),
+                ("approval", "approved"),
+                claim=claim,
             )
             if re.search(r"\b(never|not|no)\b", guard):
                 continue

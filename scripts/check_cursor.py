@@ -791,9 +791,17 @@ def brief_negative_problems(root=None):
                     ):
                         continue
                 elif target.end() <= figure.start():
-                    between = low[target.end():figure.start()]
-                    if re.search(
-                        r"\b%s\b" % unit_words, between
+                    # Confirmation repair. Behind the
+                    # target the same position rule holds.
+                    # A unit word inside a parenthetical
+                    # between the target and the figure,
+                    # counting files separately, is not in
+                    # the figure's unit position, which
+                    # behind the target reads right after
+                    # the figure, so it does not rebind.
+                    if re.match(
+                        r"[\s,]*%s\b" % unit_words,
+                        low[figure.end():],
                     ):
                         continue
                 else:
@@ -828,6 +836,21 @@ def brief_negative_problems(root=None):
         # plant open no unit, so its effort and its pin
         # verb stay in one unit and still fail.
         effort_units = re.split(r",\s+(?:and|but)\s+|;\s*", low)
+        # R37C-RT-05. A sentence with no comma and no
+        # semicolon joins its units with the plain joint
+        # alone, so the split reads the plain and and but
+        # joints there too. A sentence carrying commas
+        # keeps the comma rule, because its commas may
+        # set off a parenthetical whose plain joints open
+        # no unit.
+        if "," not in low and ";" not in low:
+            effort_units = [
+                piece
+                for unit_text in effort_units
+                for piece in re.split(
+                    r"\s+(?:and|but)\s+", unit_text
+                )
+            ]
         for unit_text in effort_units:
             if (
                 "bugbot.yaml" in unit_text
@@ -871,9 +894,13 @@ def brief_negative_problems(root=None):
         # modifies an earlier verb joined by and, never
         # sits idle and blocks, negates that verb and not
         # the blocking one.
+        # R37C-RT-04. The stretch also stops at a comma,
+        # because a comma splice joins the verbs the same
+        # way and a negation before the comma modifies the
+        # earlier verb alone.
         if block and "neutral" in low and not re.search(
             r"\b(does not|do not|not|never|no)\b"
-            r"(?:(?!\band\b)[^.]){0,30}$",
+            r"(?:(?!\band\b)[^.,]){0,30}$",
             low[:block.start()],
         ):
             problems.append(

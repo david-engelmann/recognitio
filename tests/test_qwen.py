@@ -539,3 +539,13 @@ class TestCheckQwen(unittest.TestCase):
         )
         self.assertEqual(problems, [])
 
+    def test_round37_confirm2_figure_guard_as_clause_fails(self):
+        # R37C-RT-11. A basis clause appended with as and
+        # no comma stands outside the clause that holds
+        # the figure, so its guard phrase does not exempt
+        # the claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents together on this review "
+            "as the roster narrative records."
+        )
+        self.assertTrue(problems)

@@ -556,8 +556,12 @@ def semantic_problems(root=None):
                 r";|\bbut\b|\bhowever\b|\byet\b"
                 r"|,\s+and\s+(?:they|it|we|he|she"
                 r"|these|those)\b"
+                # Confirmation repair. A plain and clause
+                # opening on the claim's own noun subject,
+                # dismissed findings restated, is the same
+                # reset in noun form.
                 r"|\band\s+(?:they|it|we|he|she|these|those"
-                r"|are|is|was|were)\b",
+                r"|are|is|was|were|dismissed)\b",
                 low[:chain_match.start()],
             ):
                 stretch_start = max(stretch_start, reset.end())
@@ -566,16 +570,35 @@ def semantic_problems(root=None):
                     r"\b(not|never)\b|n't",
                     low[stretch_start:chain_match.end()],
                 )
-                and re.search(
-                    # R37F-RT-18. An aggregate noun heading
-                    # an of phrase, the resolved pool of
-                    # findings, heads the same membership
-                    # object as a listed tail word, while an
-                    # attributive resolved findings review
-                    # takes no of phrase and stays out.
-                    r"\s+(total|count|tally|number)\b"
-                    r"|\s+[a-z]+\s+of\b|[.,;:]",
-                    low[chain_match.end():chain_match.end() + 12],
+                and (
+                    re.search(
+                        # R37F-RT-18. An aggregate noun
+                        # heading an of phrase, the resolved
+                        # pool of findings, heads the same
+                        # membership object as a listed tail
+                        # word, while an attributive
+                        # resolved findings review takes no
+                        # of phrase and stays out.
+                        r"\s+(total|count|tally|number)\b"
+                        r"|[.,;:]",
+                        low[
+                            chain_match.end():
+                            chain_match.end() + 12
+                        ],
+                    )
+                    # Confirmation repair. The of phrase
+                    # tail reads on its own wider reach,
+                    # because a second aggregate word,
+                    # resolved grand pool of findings,
+                    # pushes the of past the shared window
+                    # while heading the same object.
+                    or re.search(
+                        r"\s+[a-z]+(?:\s+[a-z]+)?\s+of\b",
+                        low[
+                            chain_match.end():
+                            chain_match.end() + 24
+                        ],
+                    )
                 )
             )
         # Verb plus membership from S4. A listed verb within

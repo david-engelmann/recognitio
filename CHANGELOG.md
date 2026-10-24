@@ -574,6 +574,25 @@ This unreleased work carries version 1.3.0.
   then widened the Qwen figure windows to five sentences
   and closed the remaining fresh shapes of the same
   seams.
+- A filed confirmation repair closes the thirteen
+  findings and two unnumbered verified shapes of the
+  confirmation red team report as filed, beyond the
+  summary the fix lane first acted on. A Copilot subject
+  sentence now guards only when it also states the
+  claim predicate. The Kimi clause boundary and the
+  Cursor unit split and guard tail no longer require
+  the comma the joint may omit. The CodeRabbit windows
+  run to four sentences and the clause resets read the
+  claim noun subject beside the pronoun forms. The
+  ZCode execution reading judges the text on both
+  sides of a guard phrase, the inheritance binding
+  reads the deictic reference beside the inheritance
+  verbs, and the separated figure filler allowance
+  stands at a measured twelve plain words. The Qwen
+  figure guard clause now ends at an as joint as well
+  as at a comma. The Devin chain tail reads its of
+  phrase on a wider reach and its guard resets read
+  the noun subject beside the pronoun forms.
 
 ### Fixed
 

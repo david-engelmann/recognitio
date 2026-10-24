@@ -796,6 +796,52 @@ class TestCheckCoderabbit(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_round37_confirm2_platform_across_four_fails(self):
+        # R37C-RT-06. The platform claim split across four
+        # sentences with two fillers between the halves
+        # stands in no window of three, and the four
+        # sentence reading must catch it.
+        plant = (
+            "Deep Scan linked source runs in the scan "
+            "trigger flow. The packet lists each repository "
+            "beside its diff. The summary records that "
+            "reading in full. It also runs on self hosted "
+            "GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
+    def test_round37_confirm2_prefix_noun_subject_reset_fails(self):
+        # R37C-RT-07. A comma and clause opening on the
+        # claim noun subject restated is the same reset as
+        # the pronoun form, so the first clause negation
+        # does not guard the offer in the second.
+        plant = (
+            "Linked source is not a separate product in "
+            "the scan trigger flow, and linked source is "
+            "available on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

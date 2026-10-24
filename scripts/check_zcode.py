@@ -305,15 +305,30 @@ def negative_problems(root=None):
         # execution claim after it, register but also
         # executes, keeps the execution text under
         # judgement instead of dropping the whole clause.
+        # Confirmation repair. The text before the first
+        # guard phrase of a clause stays under judgement
+        # too, because an execution claim standing before
+        # a guard phrase in the same clause, executes the
+        # settings it declares and does not execute the
+        # borrowed ones, is a claim the guard does not
+        # govern either.
         judged_parts = []
         for text, offset in spans:
-            cut = 0
+            marks = []
             for guard in _CLAUSE_GUARDS:
-                if guard in text:
-                    cut = max(
-                        cut, text.rfind(guard) + len(guard)
-                    )
-            judged_parts.append(text[cut:])
+                pos = text.find(guard)
+                while pos >= 0:
+                    marks.append((pos, pos + len(guard)))
+                    pos = text.find(guard, pos + 1)
+            if marks:
+                judged_parts.append(
+                    text[:min(start for start, end in marks)]
+                )
+                judged_parts.append(
+                    text[max(end for start, end in marks):]
+                )
+            else:
+                judged_parts.append(text)
         judged = " ".join(judged_parts)
         problem = _execution_problem(judged)
         if problem is not None:
@@ -395,9 +410,14 @@ def _description_figures(sentence):
     # with the limit measured in characters, states the
     # same separated figure, so a few plain words may
     # stand between the comma and the qualifier.
+    # Confirmation repair. The filler allowance is a
+    # measured bound at twelve plain words. The
+    # confirmation plant states nine, with the limit for
+    # every plugin in the workspace measured, and the
+    # qualifier anchor stays the discipline past it.
     for match in re.finditer(
         r"(?<![\d.])(\d+)(?![\d.])\s*,\s*"
-        r"(?:\w+\s+){0,6}?"
+        r"(?:\w+\s+){0,12}?"
         r"(?:measured|counted|expressed|given|stated)"
         r"\s+in\s+(?:characters?|chars)\b",
         sentence,
@@ -522,9 +542,15 @@ def _description_problem(sentence, spans):
             # ZCode by reference. A sentence that has
             # ZCode inherit or adopt that cap states the
             # figure as the ZCode cap after all.
+            # Confirmation repair. The binding is the
+            # reference itself, an inheritance verb or a
+            # deictic naming of the cap or the limit, so
+            # uses that limit binds the same way inherits
+            # that cap does.
             if re.search(
-                r"\bzcode\b[^.]*\b(inherit\w*|adopt\w*"
-                r"|same|that cap|this cap)\b",
+                r"\bzcode\b[^.]*(\b(inherit\w*|adopt\w*)\b"
+                r"|\b(that|this)\s+(cap|limit)\b"
+                r"|\bsame\s+(cap|limit)\b)",
                 sentence,
             ):
                 pass

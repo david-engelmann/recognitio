@@ -275,12 +275,17 @@ def _prefix_negated(low, start):
     subject is a reset too. Two assertions joined that
     way are two claims, and a negation in the first
     negates its own claim only.
+
+    Confirmation repair. A comma and clause opening on
+    the claim's own noun subject, linked source or deep
+    scan restated, is the same reset in noun form.
     """
     prefix = low[:start]
     cut = 0
     for reset in re.finditer(
         r";|\bbut\b|\bhowever\b|\byet\b"
-        r"|,\s+and\s+(?:it|they|we|he|she|these|those)\b",
+        r"|,\s+and\s+(?:it|they|we|he|she|these|those"
+        r"|linked source|deep scan)\b",
         prefix,
     ):
         cut = max(cut, reset.end())
@@ -340,6 +345,20 @@ def linked_problems(root=None):
         [first, second, third]
         for first, second, third in zip(
             sentences, sentences[1:], sentences[2:]
+        )
+    ]
+    # Confirmation repair. Four sentence windows join
+    # too, because the confirmation pass split the
+    # platform claim across four sentences with two
+    # fillers between the halves, one unit past the
+    # triple reading.
+    windows += [
+        [first, second, third, fourth]
+        for first, second, third, fourth in zip(
+            sentences,
+            sentences[1:],
+            sentences[2:],
+            sentences[3:],
         )
     ]
     problems = []
@@ -548,7 +567,7 @@ def linked_problems(root=None):
                 for reset in re.finditer(
                     r";|\bbut\b|\bhowever\b|\byet\b"
                     r"|,\s+and\s+(?:it|they|we|he|she|these"
-                    r"|those)\b",
+                    r"|those|linked source|deep scan)\b",
                     pre,
                 ):
                     cut = max(cut, reset.end())
@@ -557,7 +576,7 @@ def linked_problems(root=None):
                 first_reset = re.search(
                     r";|\bbut\b|\bhowever\b|\byet\b"
                     r"|,\s+and\s+(?:it|they|we|he|she|these"
-                    r"|those)\b",
+                    r"|those|linked source|deep scan)\b",
                     post,
                 )
                 if first_reset is not None:

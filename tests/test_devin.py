@@ -706,6 +706,53 @@ class TestCheckDevin(unittest.TestCase):
                 problems,
             )
 
+    def test_round37_confirm2_second_aggregate_tail_fails(self):
+        # R37C-RT-12. A second aggregate word pushes the
+        # of past the shared tail window, and the of
+        # phrase tail reads on its own wider reach.
+        plant = (
+            "Dismissed findings are part of the "
+            "comprehensive audited resolved grand pool of "
+            "findings."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_confirm2_chain_noun_subject_reset_fails(self):
+        # R37C-RT-13. A plain and clause opening on the
+        # claim noun subject restated is the same reset as
+        # the pronoun form, so the first assertion
+        # negation does not guard the chain.
+        plant = (
+            "Dismissed findings are not in the audit trail "
+            "sample and dismissed findings are part of the "
+            "comprehensive audited resolved total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

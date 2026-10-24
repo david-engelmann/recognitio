@@ -1022,8 +1022,14 @@ def qualified_problems(root=None):
                 # invocation this clause states.
                 prefix = segment[:verb.start()]
                 boundary = 0
+                # Confirmation repair. The clause boundary
+                # is the coordinating joint itself, with or
+                # without its comma, because two clauses
+                # joined by a plain and are still two
+                # clauses and a negation in the first does
+                # not reach the invocation in the second.
                 for joint in re.finditer(
-                    r",\s+(?:and|but)\s+", prefix
+                    r",\s+(?:and|but)\s+|\s+and\s+", prefix
                 ):
                     boundary = joint.end()
                 if not _neg_before(
@@ -1279,6 +1285,19 @@ def _swap_problem(sentence):
         markers.append(("total", match.start(), match.end()))
     if not markers:
         return None
+    # Confirmation repair. A paired statement, the field
+    # figure standing beside its own field word, is the
+    # one form where an after figure total word binds on
+    # its own statement rather than on the field subject.
+    paired = any(
+        value2 == 32
+        and any(
+            other == "field"
+            and max(ostart - fend2, start2 - oend, 0) <= 30
+            for other, ostart, oend in markers
+        )
+        for value2, start2, fend2 in figures
+    )
     for value, fstart, fend in figures:
         # A field scope word standing before the figure is
         # the sentence subject for the figure, so an after
@@ -1325,6 +1344,19 @@ def _swap_problem(sentence):
                         and 0 <= ostart - mend <= 20
                         for other, ostart, oend in markers
                     )
+                ):
+                    decoy = 1
+                # R37C-RT-03. The same content naming with
+                # no of and no restatement, 64 KB total
+                # content under a field subject, still
+                # names the content the field holds, so the
+                # total word ranks as a decoy whenever the
+                # sentence carries no paired field figure
+                # statement of its own.
+                if (
+                    name == "total"
+                    and field_before
+                    and not paired
                 ):
                     decoy = 1
             else:

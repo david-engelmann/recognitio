@@ -1670,6 +1670,47 @@ class TestCheckKimi(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_round37_confirm2_plain_and_invoke_boundary_fails(self):
+        # R37C-RT-02. Two clauses joined by a plain and
+        # with no comma are still two clauses, so a
+        # negation in the first does not guard the bare
+        # name invocation in the second.
+        plant = (
+            "The bare name is never documented in Kimi and "
+            "a bare name still invokes a plugin skill."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("bare name" in p for p in problems),
+                problems,
+            )
+
+    def test_round37_confirm2_total_content_no_of_fails(self):
+        # R37C-RT-03 as filed. The content naming with no
+        # of and no restatement still names the content
+        # the field subject holds, so the figure binds to
+        # the field scope and the swap fails.
+        plant = (
+            "Each systemPrompt field in Kimi may hold up "
+            "to 64 KB total content."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "per field limit of 64" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

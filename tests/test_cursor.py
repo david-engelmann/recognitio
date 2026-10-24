@@ -691,6 +691,65 @@ class TestCheckCursor(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_round37_confirm2_neutral_comma_splice_fails(self):
+        # R37C-RT-04. A comma splice joins the verbs the
+        # same way a coordinating and does, so a negation
+        # before the comma modifies the earlier verb and
+        # does not guard the blocking verb.
+        plant = (
+            "Bugbot findings default to a neutral "
+            "conclusion. That conclusion never sits idle, "
+            "blocks merges in this repository."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("neutral" in p for p in problems), problems
+            )
+
+    def test_round37_confirm2_effort_plain_and_units_pass(self):
+        # R37C-RT-05. A comma free sentence joins its
+        # units with the plain joint alone, so effort in
+        # one unit and a pin verb in the next state no pin
+        # and the true sentence passes.
+        plant = (
+            "Bugbot effort is a dashboard setting and the "
+            "autofix mode is pinned in bugbot.yaml."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertFalse(
+                any("effort" in p for p in problems), problems
+            )
+
+    def test_round37_confirm2_cap_parenthetical_behind_fails(self):
+        # Unnumbered confirmation shape. A unit word in a
+        # parenthetical between the target and its figure
+        # is not in the figure unit position behind the
+        # target either, so the cap figure still binds.
+        plant = (
+            "Repositories in this workspace, counting files "
+            "separately, number 500 in this environment."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "repository cap figure of 500" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

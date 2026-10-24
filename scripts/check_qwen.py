@@ -542,15 +542,24 @@ def _figure_guarded(sentence):
     if span is None:
         return guarded(sentence)
     start = span[0]
+    # Confirmation repair. An as joint is a clause edge
+    # too, because a basis clause appended with as and
+    # no comma states the same subordinate basis the
+    # comma form states, and its guard phrase stands
+    # outside the clause that holds the figure.
+    as_before = sentence.rfind(" as ", 0, start)
     clause_start = max(
         sentence.rfind(",", 0, start),
         sentence.rfind(";", 0, start),
+        as_before + 3 if as_before != -1 else -1,
     ) + 1
+    as_after = sentence.find(" as ", start)
     ends = [
         index
         for index in (
             sentence.find(",", start),
             sentence.find(";", start),
+            as_after,
         )
         if index != -1
     ]

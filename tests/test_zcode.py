@@ -488,6 +488,71 @@ class TestCheckZcode(unittest.TestCase):
                 problems,
             )
 
+    def test_round37_confirm2_execution_before_guard_fails(self):
+        # R37C-RT-08. An execution claim standing before
+        # the guard phrase in the same clause stays under
+        # judgement, because the guard governs only its
+        # own phrase.
+        plant = (
+            "ZCode executes the settings it declares and "
+            "does not execute the settings it borrows."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("execute" in p for p in problems), problems
+            )
+
+    def test_round37_confirm2_inheritance_deictic_limit_fails(self):
+        # R37C-RT-09. The binding is the reference itself,
+        # so uses that limit binds the different host
+        # figure to ZCode the same way inherits that cap
+        # does.
+        plant = (
+            "A plugin description on a different host is "
+            "capped at 2048 characters, and ZCode uses that "
+            "limit for its plugin descriptions."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "cap of 2048 characters" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round37_confirm2_separated_filler_nine_fails(self):
+        # Unnumbered confirmation shape. Nine plain words
+        # of filler before the qualifier verb state the
+        # same separated figure inside the measured
+        # allowance of twelve.
+        plant = (
+            "On ZCode, a plugin description is capped at "
+            "2048, with the limit for every plugin in the "
+            "workspace measured in characters for every "
+            "plugin."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "cap of 2048 characters" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
