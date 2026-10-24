@@ -459,6 +459,21 @@ This unreleased work carries version 1.3.0.
   unpinned routes, and the docs gain the model policy API
   naming, the POST 403 derivation locator, the November 16
   re-check diary note, and the layout map completions.
+- The round 33 pass lands Build 15, the Qwen Code
+  marketplace presence, with its derivation noted brief
+  at `docs/qwen-code-brief.md` and its gate script at
+  `scripts/check_qwen.py`. The figure resolution is a
+  basis and scope table with no single figure as the
+  Qwen figure, the exit table scope keeps wrapper exits
+  0, 1, and 3 separate from internal verify exit 4, the
+  extension routes tested are the Qoder conversion and
+  the Agent Plugins v1 install with the scoped npm route
+  left untested, runtime invocation stays UNVERIFIED,
+  the README gains a Qwen install section with pinned
+  forms in the same section, and the layout map gains a
+  bullet naming the brief and the gate script. No Qwen
+  listing file ships in this round and the version stays
+  1.3.0.
 
 ### Fixed
 

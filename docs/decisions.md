@@ -943,6 +943,42 @@ QWEN_REVIEW_DEADLINE_COMPOSE_FLOOR_SECONDS with default 1200
 and 0 disabling the gate. No round 31 draft copies the
 unqualified exit 4 phrasing as a wrapper exit code.
 
+Round 33 note, recorded on 2026-10-24. The 12 versus 16
+conflict is not resolved to a single figure and not
+resolved by date. Both primary pages were live on
+2026-10-24 and neither shows a revision date. The code
+review page supplies the scoped table because the
+commands page itself points to it for full
+documentation, but that does not resolve the conflict.
+The commands page figure of 12 is a conflicting summary
+that is not used, and no single figure is ever
+presented as the Qwen figure. The scoped figures are
+Step 3A up to 16 agents, same repo up to 17 tasks,
+16 to 19 in practice with finders, and the local, file,
+and cross repo ranges, each labelled by page and by
+basis as roster narrative or token efficiency table.
+The wrapper exits are 0, 1, and 3, and the internal
+verify exit 4 belongs to the internal verifier gate at
+the compose floor, with
+QWEN_REVIEW_DEADLINE_COMPOSE_FLOOR_SECONDS default
+1200 and 0 disabling the gate. The decision 26 main
+paragraph is superseded for Build 15 purposes by the
+round 31 note and this round 33 note, and no Build 15
+sentence copies the main paragraph phrasing without
+that qualification. The Agent Plugins v1 matrix, the
+Qoder and scoped npm routes, the prefixed naming
+asymmetry with its cancellation exception, and the
+shared skills alias precedence are recorded in the
+Build 15 brief. Conversion file install fidelity holds
+for the skill tree only, runtime invocation stays
+UNVERIFIED, and the scoped npm route stays untested.
+The bundled CLI version line on the primary releases
+listing read on 2026-10-24 states 0.26.0, with no tag
+shown beside that entry, and no Qwen listing file
+ships in this round, and the version stays 1.3.0.
+Decision 4
+binds this build like every other build.
+
 ## 27. Build 16, the ZCode plugin build
 
 Recorded on 2026-10-24 in round 29. Recognitio ships on ZCode

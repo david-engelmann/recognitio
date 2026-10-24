@@ -43,7 +43,9 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copilot.py`, the Kimi managed plugin check at
 `scripts/check_kimi.py`, the ZCode plugin build check at
 `scripts/check_zcode.py`, the Devin playbook and coordinator
-build check at `scripts/check_devin.py`, the test vacuity guard at
+build check at `scripts/check_devin.py`, the Qwen Code
+marketplace presence build check at `scripts/check_qwen.py`,
+the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -235,6 +237,19 @@ not a gate.
   limit, the Copilot governance packet rule, and the Fusion
   chart caveat are pinned by the gate at
   `scripts/check_devin.py`, so the scoped guidance cannot
+  become a rival instruction source.
+- `docs/qwen-code-brief.md` holds the brief for Build
+  15, the Qwen Code marketplace presence. The figure
+  basis and scope table with no single figure as the
+  Qwen figure, the wrapper exits kept separate from the
+  internal verify exit, the Agent Plugins v1 matrix, the
+  Qoder and scoped npm routes, the prefixed naming rule
+  with its cancellation exception, the shared skills
+  alias precedence, the conversion fidelity record with
+  runtime invocation left UNVERIFIED, the bundled CLI
+  version, and the conditional publication draft with
+  no listing file shipped are pinned by the gate at
+  `scripts/check_qwen.py`, so the scoped guidance cannot
   become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
@@ -464,4 +479,9 @@ the round 31 findings. The round 32 pass then rewrote
 decision 13 to a single suspended status with a dated Build
 18 deferral, hardened the Devin, Copilot, and Kimi gates
 against fresh synonym plants, and closed the round 32
-findings.
+findings. The round 33 pass then landed Build 15, the
+Qwen Code marketplace presence with its derivation
+noted brief and gate script, the figure basis and
+scope table with no single figure as the Qwen figure,
+the wrapper and internal verify exit separation, and
+closed the round 33 findings.

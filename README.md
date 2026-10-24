@@ -48,6 +48,33 @@ The folder copy route still works by hand. Copy the skill folder into any skills
 cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 ```
 
+### Qwen Code
+
+The Qwen Code route is a conditional draft. The brief
+at docs/qwen-code-brief.md states the full Qwen
+contract, and the conditional publication decision
+stays with David. No Qwen listing file ships in this
+round.
+
+```bash
+git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
+git -C recognitio-qwen checkout COMMIT_SHA
+qwen extensions install ./recognitio-qwen/agent-plugins-package
+qwen extensions sources add david-engelmann/recognitio
+```
+
+Pin the Qwen route before use by cloning at a commit
+SHA you reviewed, as the commands above show.
+Replace COMMIT_SHA with the commit SHA you reviewed.
+
+The scoped npm form below is an unpinned test form in
+shape only. No scoped recognitio package is published
+in this round and the scoped npm route is untested.
+
+```bash
+qwen extensions install @scope/my-extension@1.2.0
+```
+
 Before running any route above, pin the install to a commit
 SHA and read the install script, because a skill ships
 executable code and an unpinned route can move under you.
