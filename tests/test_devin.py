@@ -362,6 +362,44 @@ class TestCheckDevin(unittest.TestCase):
                     (old, problems),
                 )
 
+    def test_a_sarif_version_swap_fails(self):
+        # R34-RT-06. A version swap that keeps SARIF in the
+        # sentence passed while the 2.1.0 pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nCode scan findings export as SARIF 1.0 "
+                "instead of SARIF 2.1.0.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("other than 2.1.0" in p for p in problems),
+                problems,
+            )
+
+    def test_resolved_rewordings_fail(self):
+        # R34-RT-06. Two resolved rewordings that use neither
+        # the dismissed before count order nor the includes
+        # order passed while the resolved pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nThe resolved count now counts "
+                "dismissed reviews as fixed. Devin Review "
+                "analytics count a finding as resolved when it "
+                "is dismissed.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("counts dismissed findings" in p
+                    for p in problems),
+                problems,
+            )
+
     def test_a_decision_record_without_decision_4_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

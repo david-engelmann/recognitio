@@ -234,7 +234,7 @@ def _sentences(section):
     """The rules section as lowercased sentences.
 
     Rule headings are labels, not claims, so they are
-    stripped before splitting: a heading remainder without
+    stripped before splitting. A heading remainder without
     a period would otherwise merge with the next sentence
     and carry its negation into it.
     """

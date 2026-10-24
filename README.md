@@ -60,12 +60,13 @@ round.
 git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
 git -C recognitio-qwen checkout COMMIT_SHA
 qwen extensions install ./recognitio-qwen/agent-plugins-package
-qwen extensions sources add david-engelmann/recognitio
 ```
 
 Pin the Qwen route before use by cloning at a commit
 SHA you reviewed, as the commands above show.
 Replace COMMIT_SHA with the commit SHA you reviewed.
+The marketplace source add stays a conditional draft
+form in the brief only.
 
 The scoped npm form below is an unpinned test form in
 shape only. No scoped recognitio package is published

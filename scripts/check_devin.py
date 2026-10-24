@@ -348,6 +348,35 @@ def semantic_problems(root=None):
                 "resolved count forbids"
             )
             seen.add("resolved")
+        correct_definition = bool(
+            re.search(
+                r"\b(excluded|only when|fixed in code|code fixed only)\b",
+                low,
+            )
+        )
+        if (
+            "resolved" not in seen
+            and not negated
+            and not correct_definition
+            and (
+                re.search(
+                    r"\bresolved\b.{0,60}\bcount\w*\b.{0,40}"
+                    r"\bdismissed\b",
+                    low,
+                )
+                or re.search(
+                    r"\bcount\w*\b.{0,60}\bresolved\b.{0,40}"
+                    r"\bdismissed\b",
+                    low,
+                )
+            )
+        ):
+            problems.append(
+                "a devin rule counts dismissed findings toward "
+                "the resolved total, which the code fixed only "
+                "resolved count forbids"
+            )
+            seen.add("resolved")
         if "bypass" not in seen and (
             re.search(r"without (any )?bypass", low)
             or re.search(r"\bno bypass\b", low)
@@ -384,6 +413,15 @@ def semantic_problems(root=None):
                 "2.1.0 export beside CSV forbids"
             )
             seen.add("sarif")
+        if "sarif" not in seen and "sarif" in low:
+            versions = re.findall(r"\b\d+\.\d+(?:\.\d+)?\b", low)
+            if any(version != "2.1.0" for version in versions):
+                problems.append(
+                    "a devin rule exports a SARIF version other "
+                    "than 2.1.0, which the SARIF 2.1.0 export "
+                    "beside CSV forbids"
+                )
+                seen.add("sarif")
     return problems
 
 

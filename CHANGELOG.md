@@ -455,8 +455,8 @@ This unreleased work carries version 1.3.0.
   count, the bypass surface, and the SARIF export shape.
   The Copilot and Kimi gates gain negatives for fresh
   trust, approval, precedence, and bare name phrasings.
-  The README prints pinned install forms beside the
-  unpinned routes, and the docs gain the model policy API
+  The README prints pinned install forms in a later
+  Pinned forms section for the older routes, and the docs gain the model policy API
   naming, the POST 403 derivation locator, the November 16
   re-check diary note, and the layout map completions.
 - The round 33 pass lands Build 15, the Qwen Code
@@ -474,6 +474,20 @@ This unreleased work carries version 1.3.0.
   bullet naming the brief and the gate script. No Qwen
   listing file ships in this round and the version stays
   1.3.0.
+- The round 34 pass consolidates the rounds 31 through
+  33 builds with no new build. It closes the round 34
+  audit findings, adds the rounds 15 through 24 sections
+  to the eval corpus index, and carries every round 33
+  residual in its current wording, with Qwen runtime
+  invocation UNVERIFIED, the scoped npm route UNTESTED,
+  release asset shapes beyond the introduction page
+  UNVERIFIED, Qwen docs snippet provenance UNVERIFIED
+  and unused, Open Code Review v1.13.3 with no claim
+  made, the round 28 silence detail as program record
+  only, and the round 32 external scoped shape guard
+  carried forward. The Copilot October 22 through
+  October 26 window re-read and the November 16
+  retirements recheck stay owed after their dates pass.
 
 ### Fixed
 

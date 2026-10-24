@@ -51,6 +51,18 @@ PLANTS = (
     "the .agents/skills copy may drift from the package copy",
     "any npm package installs, unscoped names work too",
     "the converted bundle is proven to run the full packet workflow in Qwen",
+    "sixteen agents working side by side",
+    "a dozen agents running together",
+    "16 agents at once on a large review",
+    "the outer gate exits with code 4 on refusal",
+    "internal verify exit 4 is listed as a wrapper exit",
+    "Qwen activates hooks for the recognitio plugin",
+    "Qwen activates commands for the recognitio plugin",
+    "Qwen activates agents for the recognitio plugin",
+    "Qwen activates client namespaces for the recognitio plugin",
+    "Qwen activates legacy SSE MCP for the recognitio plugin",
+    "in Qwen, skills at .agents/skills are automatically discovered across repositories",
+    "Qwen loads the .agents/skills copy as the winning copy on collision",
 )
 
 CONTROL = (
@@ -244,6 +256,32 @@ class TestCheckQwen(unittest.TestCase):
             problems = self.problems(root)
             self.assertTrue(
                 any("derivation" in p for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_r4_qoder_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "qwen extensions install ./recognitio-qwen/qoder-input",
+                "qwen extensions install ./recognitio-qwen/agent-plugins-package",
+            )
+            self.assertTrue(
+                any("R4 Qoder install path" in p for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_qoder_activation_unverified_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "Activation of preserved Qoder commands and agents in Qwen stays UNVERIFIED",
+                "Activation of preserved Qoder commands and agents in Qwen is verified",
+            )
+            self.assertTrue(
+                any("Qoder activation UNVERIFIED" in p for p in problems),
                 problems,
             )
 

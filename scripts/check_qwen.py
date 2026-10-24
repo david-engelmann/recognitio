@@ -95,6 +95,10 @@ PINNED = (
      "The portable route carries the SKILL ONLY"),
     ("the Qoder manifest path",
      ".qoder-plugin/plugin.json"),
+    ("the R4 Qoder install path",
+     "qwen extensions install ./recognitio-qwen/qoder-input"),
+    ("the Qoder activation UNVERIFIED",
+     "Activation of preserved Qoder commands and agents in Qwen stays UNVERIFIED"),
     ("the Qoder conversion",
      "converts the Qoder manifest to qwen-extension.json"),
     ("the scoped only rule",
@@ -235,12 +239,17 @@ def negative_problems(text):
     problems = []
     for raw in normalise(text).splitlines():
         line = raw.strip()
-        if not line or guarded(line):
+        if not line:
             continue
-        if re.search(r"\b(12|16|17|19)\b[^.]{0,60}\b(parallel|concurrent|simultaneous|reviewers|workers|bots)\b", line):
+        if not re.search(r"\b(never|no sentence|not a wrapper)\b", line):
+            if re.search(r"\b(wrapper|outer gate)\b[^.]{0,80}\b4\b", line):
+                problems.append("wrapper exit plant: " + line[:120])
+            elif re.search(r"\b4\b[^.]{0,80}\b(wrapper|outer gate)\b", line):
+                problems.append("wrapper exit plant: " + line[:120])
+        if guarded(line):
+            continue
+        if re.search(r"\b(12|16|17|19)\b[^.]{0,60}\b(parallel|concurrent|simultaneous|reviewers|workers|bots|side by side|together|at once)\b", line):
             problems.append("figure plant: " + line[:120])
-        if re.search(r"\bwrapper\b[^.]{0,80}\b4\b", line):
-            problems.append("wrapper exit plant: " + line[:120])
         if re.search(r"\breturns 4\b", line):
             problems.append("wrapper exit plant: " + line[:120])
         if re.search(r"skills\.disabled blocks only", line):
@@ -251,8 +260,17 @@ def negative_problems(text):
             problems.append("activation plant: " + line[:120])
         if re.search(r"\bcommands\b[^.]{0,40}\bagents\b[^.]{0,40}\bhooks\b[^.]{0,40}\b(light up|activat)", line):
             problems.append("activation plant: " + line[:120])
+        if not re.search(r"\bnot\b[^.]{0,25}\bactivat", line) and "unverified" not in line:
+            if re.search(r"\bactivat\w*\b[^.]{0,40}\b(hooks|commands|agents|client namespaces|legacy sse)\b", line):
+                problems.append("activation plant: " + line[:120])
+            elif re.search(r"\b(hooks|commands|agents|client namespaces|legacy sse)\b[^.]{0,40}\bactivat", line):
+                problems.append("activation plant: " + line[:120])
         if re.search(r"\.agents/skills[^.]{0,40}\bdrift\b", line):
             problems.append("alias drift plant: " + line[:120])
+        if re.search(r"\.agents/skills[^.]{0,60}\bdiscover\w*\b", line):
+            problems.append("alias discovery plant: " + line[:120])
+        if re.search(r"\.agents/skills[^.]{0,60}\b(winning|wins)\b", line):
+            problems.append("alias precedence plant: " + line[:120])
         if re.search(r"\bany npm package\b", line):
             problems.append("npm scope plant: " + line[:120])
         if re.search(r"\bunscoped\b[^.]{0,40}\b(work|install|valid)\b", line):

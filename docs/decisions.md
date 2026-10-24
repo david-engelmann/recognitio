@@ -979,6 +979,14 @@ ships in this round, and the version stays 1.3.0.
 Decision 4
 binds this build like every other build.
 
+Round 34 note, recorded on 2026-10-24. The brief R1
+table uses Effort table as a third basis label beside
+roster narrative and token efficiency table. The round
+33 note names only the first two labels, and this note
+records the third so a reader checking the table
+against the note finds every label named. No figure
+changes and no other note text changes.
+
 ## 27. Build 16, the ZCode plugin build
 
 Recorded on 2026-10-24 in round 29. Recognitio ships on ZCode

@@ -171,7 +171,7 @@ deduplicated.
 ```bash
 git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
 git -C recognitio-qwen checkout COMMIT_SHA
-qwen extensions install ./recognitio-qwen/agent-plugins-package
+qwen extensions install ./recognitio-qwen/qoder-input
 ```
 
 The Qoder conversion command above carries its pinned
@@ -180,6 +180,23 @@ commit SHA you reviewed, then build the Qoder input
 from that checkout. No Qoder manifest for recognitio
 ships in this repo, so a Qoder input is built from a
 checkout for a test and is not a shipped listing.
+Activation of preserved Qoder commands and agents in Qwen stays UNVERIFIED. The primary extension
+introduction page says the installer preserves those
+directories and does not state whether they activate.
+
+Agent Plugins v1 route. Qwen Code natively loads
+portable Agent Plugins v1 packages without converting
+or rewriting plugin.json, mcp.json, or SKILL.md files.
+
+```bash
+git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
+git -C recognitio-qwen checkout COMMIT_SHA
+qwen extensions install ./recognitio-qwen/agent-plugins-package
+```
+
+The Agent Plugins command above carries its pinned
+form in this same section. Replace COMMIT_SHA with the
+commit SHA you reviewed.
 
 Scoped npm route. Only scoped packages are supported.
 Registry resolution follows this priority in order.
