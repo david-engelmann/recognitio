@@ -339,6 +339,16 @@ Global skills live at `~/.traecli/skills`, project skills at
 description frontmatter, plus auto skills from
 `.agents/skills`.
 
+Round 31 note, recorded on 2026-10-24. The round 30 check
+found no primary Trae skill surface in any lane, so the
+primary Trae skill surface stays UNVERIFIED at primary
+level. The paths above are carried from round 15 and are
+not re-proven in round 30. Build 18 proceeds only after
+round 32 establishes the surface from Trae primary docs,
+and the merger is never cited as evidence of a Trae skill
+or plugin surface. No Trae brief, gate script, or manifest
+lands in round 31.
+
 ## 14. Build 5, the plugin reviewer persona as the main thread
 
 Recorded on 2026-10-23 in round 16. The plugin ships an agent
@@ -869,6 +879,19 @@ with David. No Qwen brief, gate script, or manifest lands in
 round 29, and no round 29 claim states otherwise. Decision 4
 binds this build like every other build.
 
+Round 31 note, recorded on 2026-10-24. The 16 parallel agents
+figure above stands as the deferred pin until round 33
+resolves the 12 versus 16 conflict from primary pages. The
+primary commands page states 12 and the primary code review
+page states up to 16, and the conflict is unresolved in this
+round. Exit 4 above is the internal verify refusal, not a
+wrapper exit. The wrapper exits are 0, 1, and 3, and exit 4
+belongs to the internal verifier gate at the compose floor.
+The compose floor variable is
+QWEN_REVIEW_DEADLINE_COMPOSE_FLOOR_SECONDS with default 1200
+and 0 disabling the gate. No round 31 draft copies the
+unqualified exit 4 phrasing as a wrapper exit code.
+
 ## 27. Build 16, the ZCode plugin build
 
 Recorded on 2026-10-24 in round 29. Recognitio ships on ZCode
@@ -886,3 +909,73 @@ at `scripts/check_zcode.py` pins the manifest path, the
 version bump sentence, the register but not execute sentence,
 the format limits, and the trust sentence. Decision 4 binds
 this build like every other build.
+
+## 28. Build 17, the Devin playbook and coordinator build
+
+Recorded on 2026-10-24 in round 31. Recognitio gains the Devin
+playbook and coordinator build, with the brief at
+`docs/devin-playbook-brief.md` and the gate at
+`scripts/check_devin.py`. Devin Review runs beside GitHub
+Enterprise Server and GitLab and now beside Bitbucket Cloud,
+with the automatic webhook install and the personal account
+link conditions. Devin Review analytics count a finding as
+resolved only when it was fixed in code, by a later push or
+by Devin, and dismissed findings and duplicates no longer
+count. Each finding carries a Quote in chat button, and a
+user whose GitHub account may bypass a repository merge
+requirement can merge a blocked pull request directly from
+Devin Review after confirming, so a packet workflow that
+treats Devin Review as read only must not assume the bypass
+path is absent. A pull request reviewed at an earlier commit
+offers a one off review of the latest commit without turning
+on automatic review. Code scan automations can be created
+and updated through the API with a service user API key
+where the service user role needs the relevant scan
+permission. Code scan findings export as SARIF 2.1.0 in
+addition to CSV. Repositories and blueprint endpoints are
+part of the stable v3 API, with the v3beta1 paths continuing
+to work. Code scan auto scan schedule routes are generally
+available in the v3 org and enterprise APIs, kept separate
+from the session schedules deprecation dated September 10,
+with the devin_schedule Terraform resource deprecated in
+favor of devin_automation and no end date published, so the
+time sensitive flag stays set. The coordinator surfaces are
+structured questions with clickable choices, shared Outpost
+runs, plain language schedule display, and Linear triggered
+child sessions. Devin Oncall is an adjacent incident surface
+only, with Lite mode noted, never a code review result.
+Devin Dynamic Workflows are a recorded, resumable script
+orchestration option, with the enterprise enablement
+condition carried as secondary. Targeted plugin saves name
+a specific uploaded plugin, and reinstall keeps version
+history as a new revision. Skills sit at
+`.agents/skills/skill-name/SKILL.md` with automatic
+discovery across connected repositories and user trigger
+and model trigger both enabled by default. A Devin Dynamic
+Workflows script in a skill is a Devin extension, not a
+portable Agent Skills core item, and auto suggested skill
+content passes human curation before entering packet
+procedure. Each stack layer and the integrated whole are
+verified separately. An AI Scan pass is signal and never a
+merge gate. Explicit Copilot feature choices are recorded
+rather than relying on a default set during the October 22
+through October 26 rollout window. The Fusion score claim
+carries the chart caveat and the higher Sonnet 5.5 figure
+from the same chart, never as a top score claim. The brief
+qualifies every Devin Dynamic Workflows mention with Devin,
+so the Build 6 Claude Code fan out surface is never
+confused with Devin Dynamic Workflows. Decision 4 binds
+this build like every other build.
+
+## Round 31 note. Graphite CLI changelog pin
+
+Recorded on 2026-10-24 in round 31. This note is the home
+for the future Graphite material, and no Graphite brief,
+gate script, or manifest lands in round 31. The Graphite
+CLI changelog newest block is 2026-05-04, with no entry
+after it found on primary in the round 30 sweep. The gt
+delete flags clarification sits in the 2025-11-14 block,
+not at the top of the changelog, so the round 25 pin
+naming it as newest is corrected here. The secondary
+acquisition context stays watch only on reviewer
+independence.
