@@ -1,17 +1,100 @@
 # Recognitio
 
+[![CI](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+
 Recognitio is an agent skill that pulls the relevant changes out of a pull request or a commit range and assembles them into a verified review packet. The packet holds the change plus the context a careful human reviewer would go and find, and it proves that nothing was left behind.
 
 Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
 
-What it does
+![A terminal session runs the extractor on a real commit, and the packet shows the whole enclosing function and the test files before the manifest reads verified true](docs/images/recognitio-demo.gif)
+
+In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. The full record lives in [the paired eval results](evals/RESULTS.md).
+
+## What it does
 
 - Pulls the change out of a pull request, a commit range or a single commit from the local clone
 - Gathers the call sites, imports, definitions and test files that belong with the change
 - Adds the history of the most changed files, with blame and earlier pull requests
 - Counts every file, hunk and line twice by separate git invocations and calls the packet verified only when both counts agree
 
-In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed.
+## See it on a real change
+
+Commit `991ac6a` in this repo changed two gate scripts. The raw diff for `scripts/check_devin.py` shows a six line window around the edit, with three lines of context on each side.
+
+```diff
+diff --git a/scripts/check_devin.py b/scripts/check_devin.py
+index 0327324..522392d 100644
+--- a/scripts/check_devin.py
++++ b/scripts/check_devin.py
+@@ -497,6 +497,15 @@ def semantic_problems(root=None):
+             r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
+             low,
+         ))
++        # Modifier chain from R36-E1-02. A membership phrase
++        # followed by a pure modifier chain and then
++        # resolved states the same membership at any gap
++        # length, so it fires beside the bounded form.
++        membership_modifier_chain = bool(re.search(
++            r"\b(" + MEMBERSHIP_PHRASES + r")\b"
++            + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
++            low,
++        ))
+         # Verb plus membership from S4. A listed verb within
+```
+
+The packet for the same commit shows the change inside its whole enclosing function. The function runs 163 lines at the base revision and the packet carries all of it.
+
+```text
+### scripts/check_devin.py
+
+Status: modified
+
+diff --git a/scripts/check_devin.py b/scripts/check_devin.py
+index 0327324..522392d 100644
+--- a/scripts/check_devin.py
++++ b/scripts/check_devin.py
+@@ -421,163 +421,173 @@ def naming_problems(root=None):
+ def semantic_problems(root=None):
+```
+
+The same packet names the test files that mention the changed code and closes with the recount.
+
+```text
+### Test files that mention the changed code
+
+#### tests/test_antigravity.py
+
+47:         self.mod = load_script("check_antigravity")
+
+#### tests/test_devin.py
+
+20: at scripts/check_devin.py. These tests prove the pin fires
+50:         self.mod = load_script("check_devin")
+
+No tier was dropped.
+
+Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
+```
+
+Both excerpts are trimmed for length. The full packet for this commit runs 579 lines, and the commands that produce one for any change are in the Usage section below.
+
+## How it works
+
+Extraction runs on the local clone and assembles the packet in four tiers. A separate recount of the files, hunks and lines then decides whether the packet may call itself verified, and a disagreement fails the run and leaves no packet standing.
+
+```mermaid
+flowchart LR
+    A[Pull request or commit range] --> B[Extract from the local clone]
+    B --> C[Assemble the packet in four tiers]
+    C --> D[Recount files, hunks and lines]
+    D -->|Counts agree| E[Verified packet]
+    D -->|Counts disagree| F[The run fails and no packet stands]
+    E --> G[The review reads the packet]
+```
+
+The tier model section below states what each tier holds, and the completeness guarantee section states what the recount proves.
 
 ## Why
 
@@ -110,6 +193,24 @@ The plugin ships an output style that shapes the review packet as the tiered sec
 
 The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use. A user's own `agent` setting overrides the plugin default, which is host behavior and not a defect. The brief at `docs/reviewer-persona.md` states the host rules and the persona bounds in full.
 
+## Platform adaptations
+
+The packet discipline travels. Each adaptation below restates it in the surface its platform reads, and on every row the guidance advises while enforcement stays on the shipped scripts.
+
+| Platform | What ships |
+| --- | --- |
+| Claude Code | The home platform plugin, carrying the canonical skill, the packet output style and the reviewer persona |
+| Codex | A review rules package, written as derivation noted rules in `docs/codex-review-brief.md` |
+| Cursor | A plugin under `.cursor-plugin/` with the skill as a real directory copy and one rule file, plus the Bugbot rules in `.cursor/` |
+| Copilot | A Copilot SDK agent build, written as derivation noted rules in `docs/copilot-sdk-brief.md` |
+| CodeRabbit | Review guidelines in `.coderabbit.yaml` at the repo root, with the derivation noted brief at `docs/coderabbit-review-brief.md` |
+| Kimi | A managed plugin build, written as derivation noted rules and the plugin contract in `docs/kimi-plugin-brief.md` |
+| ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace |
+| Devin | A playbook and coordinator build, written as derivation noted rules in `docs/devin-playbook-brief.md` |
+| Qwen | A conditional draft, with the brief at `docs/qwen-code-brief.md` and the install route in the Install section above |
+
+A Trae adaptation ships nothing. The round 32 check found no Trae skill or plugin surface in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
+
 ## Usage
 
 Extract a pull request by number. The base and head are resolved with the GitHub CLI and the extraction itself runs on local git objects. Both refs must already live in the local clone. When either one is missing the run stops and says to fetch it, because guessing from a same named local branch would build a packet for the wrong change.
@@ -181,5 +282,3 @@ A verified packet proves one thing. It proves the packet holds the whole change 
 ## The name
 
 Recognitio is a Latin word for a formal re-examination of a matter with the record open. Roman law used it when a case was looked at again by someone charged with getting it right. A pull request review is the same act in modern dress, and the packet this skill builds is the record the examination runs on.
-
-The measured evidence behind the packet claim lives in [the paired eval results](evals/RESULTS.md).
