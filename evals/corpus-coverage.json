@@ -88,6 +88,29 @@
       "test_style_sentences_stand_in_the_canonical_text",
       "test_the_old_layout_fails_the_vendor_resolution"
     ],
+    "Round 15": [],
+    "Round 16": [
+      "test_a_widened_tools_allowlist_fails_the_pin",
+      "test_the_pinned_persona_prose_is_word_for_word"
+    ],
+    "Round 17": [
+      "test_a_changed_agent_file_is_flagged_end_to_end",
+      "test_a_plugin_agent_file_is_instruction_bearing",
+      "test_an_empty_disallowed_tools_list_names_itself",
+      "test_an_undeclared_agent_file_fails",
+      "test_double_quoted_worktree_passes",
+      "test_single_quoted_worktree_passes",
+      "test_unquoted_worktree_passes"
+    ],
+    "Round 18": [
+      "test_a_verdict_for_an_unknown_finding_fails"
+    ],
+    "Round 19": [
+      "test_a_claude_code_key_at_the_top_level_fails",
+      "test_a_drifted_skill_copy_fails",
+      "test_a_present_mcp_json_fails",
+      "test_manifest_discovery_extends_to_a_new_manifest_by_rule"
+    ],
     "Round 2": [
       "test_a_decoy_carries_phrase_in_a_release_note_loses",
       "test_a_leading_zero_version_is_not_a_version",
@@ -105,6 +128,75 @@
       "test_packet_names_the_crafted_test_file_and_its_lines",
       "test_plugin_manifest_carries_the_owner_email",
       "test_wrong_typed_versions_are_problems_not_crashes"
+    ],
+    "Round 20": [],
+    "Round 21": [
+      "test_a_brief_with_the_stale_aaif_wording_fails",
+      "test_a_conflated_pause_fails",
+      "test_a_dropped_coverage_limit_fails",
+      "test_a_dropped_default_branch_limit_fails",
+      "test_a_dropped_no_calendar_negative_fails",
+      "test_a_dropped_security_md_note_fails",
+      "test_an_unqualified_model_pin_fails"
+    ],
+    "Round 22": [
+      "test_a_dropped_effort_split_pin_fails",
+      "test_a_dropped_fail_on_unresolved_pin_fails",
+      "test_a_dropped_neutral_pin_fails",
+      "test_a_dropped_security_review_pin_fails",
+      "test_a_symlinked_skill_copy_fails",
+      "test_a_variables_schema_violation_fails",
+      "test_an_unknown_bugbot_yaml_field_fails"
+    ],
+    "Round 23": [
+      "test_a_bare_pass_body_fails",
+      "test_a_constant_equality_without_a_fixture_fails",
+      "test_a_deeper_reading_of_high_fails",
+      "test_a_dropped_axis_naming_fails",
+      "test_a_dropped_claude_rules_pin_fails",
+      "test_a_dropped_provenance_pin_fails",
+      "test_a_dropped_rename_direction_fails",
+      "test_a_dropped_summary_fold_pin_fails",
+      "test_a_marketplace_only_version_drift_fails",
+      "test_a_softened_focus_constraint_fails",
+      "test_an_always_true_assertion_fails",
+      "test_an_assertion_without_a_fixture_touch_fails",
+      "test_em_dash_in_cursor_plugin_manifest_is_caught",
+      "test_em_dash_in_cursor_plugin_readme_is_caught",
+      "test_em_dash_in_cursor_plugin_rule_file_is_caught"
+    ],
+    "Round 24": [
+      "test_a_dangling_antigravity_path_fails",
+      "test_a_decision_record_without_a_decision_4_statement_fails",
+      "test_a_dropped_auto_approve_mapping_fails",
+      "test_a_dropped_claude_code_only_negative_fails",
+      "test_a_dropped_contract_terms_fails",
+      "test_a_dropped_degraded_state_fails",
+      "test_a_dropped_deny_mapping_fails",
+      "test_a_dropped_docs_lag_fails",
+      "test_a_dropped_extension_boundary_fails",
+      "test_a_dropped_force_ask_mapping_fails",
+      "test_a_dropped_four_keys_fails",
+      "test_a_dropped_honest_limit_fails",
+      "test_a_dropped_named_path_fails",
+      "test_a_dropped_namespace_placeholder_fails",
+      "test_a_dropped_pre_release_fails",
+      "test_a_dropped_renewal_dates_fails",
+      "test_a_dropped_skills_folder_rule_fails",
+      "test_a_dropped_sunset_halt_fails",
+      "test_a_dropped_v0_65_0_pin_fails",
+      "test_a_hook_without_auto_approve_fails",
+      "test_a_hook_without_deny_fails",
+      "test_a_hook_without_force_ask_fails",
+      "test_a_hook_without_pretooluse_fails",
+      "test_a_missing_decision_22_record_fails",
+      "test_a_missing_hook_file_fails",
+      "test_a_native_file_inside_the_portable_core_fails",
+      "test_a_passing_prose_derivation_mention_fails",
+      "test_a_pinned_page_stamp_reading_fails",
+      "test_a_second_namespace_with_a_dangling_path_fails",
+      "test_a_statement_without_a_derivation_note_fails",
+      "test_an_unparseable_hook_file_fails"
     ],
     "Round 3": [
       "test_a_line_matching_several_terms_prints_once_before_the_cap",
