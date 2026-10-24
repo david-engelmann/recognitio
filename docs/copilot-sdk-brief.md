@@ -37,8 +37,7 @@ this brief treats head branch content as a trusted source.
 
 Derives from canonical skill, Trust and limits, which keeps
 untrusted content outside the packet's verified boundary,
-and the primary GitHub release note for the July 17 2026
-change at github.com with its security note.
+and the primary GitHub release note for the July 17 2026 change at github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements with its security note.
 
 ### R2. Merge authority lives in base branch CODEOWNERS and rulesets
 
@@ -51,7 +50,7 @@ branch controls.
 Derives from canonical skill, The boundary, which keeps
 judgement with the review skill downstream and never lets
 the packet grant merge authority, and the primary GitHub
-release note for the July 17 2026 change at github.com with
+release note for the July 17 2026 change at github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements with
 its security note.
 
 ### R3. Never approve on a red packet
@@ -131,7 +130,7 @@ recommendation.
 Derives from the primary Microsoft Agent Framework
 documentation at learn.microsoft.com and the primary
 October 9 2026 weekly release notes at
-github.blog/changelog.
+github.blog/changelog/2026-10-09-github-copilot-weekly-releases-october-5/.
 
 ### R9. The code review API surface
 

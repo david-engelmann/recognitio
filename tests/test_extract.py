@@ -2746,6 +2746,31 @@ class TestRound6InstructionFiles(unittest.TestCase):
                 extract_mod.is_instruction_path(path), path
             )
 
+    def test_kimi_plugin_paths_flag_and_ordinary_kimi_files_do_not(self):
+        # R28-RT-08. A Kimi plugin agent, a plugin manifest with
+        # a systemPrompt, and a hook script steer or execute in
+        # the session, so they join the instruction name set.
+        # The skill file under a Kimi plugin already flagged by
+        # its basename, so it is not the proof here.
+        for path in (
+            ".kimi-plugin/agents/reviewer.md",
+            ".kimi-plugin/plugin.json",
+            ".kimi-plugin/kimi.plugin.json",
+            ".kimi-plugin/hooks/block.py",
+            "pkg/.kimi-plugin/agents/reviewer.md",
+        ):
+            self.assertTrue(
+                extract_mod.is_instruction_path(path), path
+            )
+        for path in (
+            ".kimi-plugin/README.md",
+            ".kimi-plugin/notes.txt",
+            "kimi-plugin/agents/reviewer.md",
+        ):
+            self.assertFalse(
+                extract_mod.is_instruction_path(path), path
+            )
+
     def test_packet_flags_instruction_files_in_triage_and_manifest(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [

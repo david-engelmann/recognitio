@@ -108,6 +108,9 @@ not a gate.
   key of the plugin manifest and named as the session agent
   under the manifest `settings` key. The directory holds
   exactly the declared file, pinned by the gate.
+- `output-styles/` holds the packet output style at
+  `output-styles/packet.md`, the Build 3 output style that
+  shapes how a packet reads to the review skill downstream.
 - `workflows/` holds the Build 6 review fan-out runbook at
   `workflows/review-fanout.md`, the findings schema at
   `workflows/findings.schema.json`, and the shipped proof run
@@ -399,4 +402,7 @@ Build 13, the Copilot SDK agent build with its derivation noted
 brief and gate script, and closed the round 26 findings. The
 round 27 pass then landed Build 14, the Kimi managed plugin
 with its derivation noted brief and gate script, and closed the
-round 27 findings.
+round 27 findings. The round 28 pass then hardened the Build 14
+gate against reworded contradictions, pinned the secondary
+sentences, flagged the Kimi plugin surfaces in the extractor,
+and closed the round 28 findings.

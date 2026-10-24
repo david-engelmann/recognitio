@@ -1133,6 +1133,19 @@ def is_instruction_path(path):
     if len(parts) >= 2 and parts[0] == "agents" \
             and name.endswith(".md"):
         return True
+    # A Kimi plugin surface under a .kimi-plugin directory
+    # steers the session agent and executes in the session
+    # exactly the way the flagged names do, so a change to
+    # it is flagged like a change to any instruction file.
+    # Agent files steer the session, hook scripts execute in
+    # it, and a plugin manifest can carry a systemPrompt.
+    if ".kimi-plugin" in parts:
+        if name in ("plugin.json", "kimi.plugin.json"):
+            return True
+        if "agents" in parts and name.endswith(".md"):
+            return True
+        if "hooks" in parts:
+            return True
     return False
 
 

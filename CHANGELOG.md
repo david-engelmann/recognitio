@@ -380,6 +380,16 @@ This unreleased work carries version 1.3.0.
   the six adversarial pins the round 27 red team proved, with a
   live blocking test over the four hook events. Decision 24
   records the build.
+- The Build 14 gate is hardened in round 28. Its negative checks
+  now forbid each pinned claim in any phrasing, not only in the
+  exact planted sentence, and every pinned claim now carries a
+  negative check. The derivation check covers unnumbered rule
+  headings and paragraphs after a derivation note, and a bare
+  citation no longer passes it. The decision record pins its
+  load bearing fragments, the extractor flags the Kimi plugin
+  surfaces as instruction bearing, the live hook probe runs pass
+  mode as well as fail mode, and the collision fixture contents
+  are pinned. Decision 25 records the hardening.
 
 ### Fixed
 

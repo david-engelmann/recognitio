@@ -33,8 +33,11 @@ The manifest `agents` field takes one or more `./` paths within
 the plugin root, pointing to agent files. When the field is
 omitted, an `agents/` directory at the plugin root is auto
 discovered. While the plugin is enabled, the plugin shipped
-agents are discovered automatically and can be delegated to as
-sub agents by the main agent.
+agents are discovered automatically, and the platform allows
+the main agent to delegate to plugin agents as sub agents.
+That sentence states a platform capability, not a promised
+recognitio delegation path, so no recognitio agent file
+needs a delegation handoff sentence for it.
 
 Derives from the primary Kimi plugins page at
 www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html,
@@ -158,16 +161,20 @@ Local installs are copied to the managed copy under
 from the managed copy, so editing the source directory after
 install has no effect until a reinstall. The managed package
 follows the reference layout of the alibaba/open-code-review
-`.kimi-plugin` package, which ships `plugin.json` beside
-`.claude-plugin` with a delegation mode where the host coding
-agent performs the review.
+package, which ships `.kimi-plugin/plugin.json` beside
+`.claude-plugin/` with a delegation mode where the host coding
+agent performs the review. The primary plugins page names
+exactly two valid manifest locations, `<plugin_root>/kimi.plugin.json`
+and `<plugin_root>/.kimi-plugin/plugin.json`, with
+`kimi.plugin.json` taking precedence when both exist. A bare
+`plugin.json` at the repo root is not a valid manifest location.
 
 Derives from the primary Kimi plugins page at
 www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins.html,
 which documents the per user install scope and the managed copy,
 and the alibaba/open-code-review repo at
-github.com/alibaba/open-code-review, whose `.kimi-plugin`
-directory ships `plugin.json` beside `.claude-plugin`.
+github.com/alibaba/open-code-review, whose `.kimi-plugin/plugin.json`
+sits beside `.claude-plugin/`.
 
 ## The Build 14 decision record
 

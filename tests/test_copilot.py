@@ -196,7 +196,9 @@ class TestCheckCopilot(unittest.TestCase):
                 "which keeps untrusted content outside the "
                 "packet's verified boundary, and the primary "
                 "GitHub release note for the July 17 2026 change "
-                "at github.com with its security note.",
+                "at github.blog/changelog/2026-07-17-copilot-code-"
+                "review-customization-and-configurability-"
+                "improvements with its security note.",
                 "Derives from a passing mention of Trust and limits "
                 "and nothing at all.",
             )

@@ -692,6 +692,8 @@ Skill tightness holds. The brief, its gate script at
 `scripts/check_coderabbit.py`, and its tests live outside the
 canonical skill text, and the description protocol is untouched.
 
+A note from round 28 on 2026-10-24. No decision 21 exists in this record. The numbering jumps from decision 20 to decision 22. No text in the tree references a decision 21. The gap is a numbering gap, not a deleted decision.
+
 ## 22. Build 12, the Antigravity plugin alteration
 
 Recorded on 2026-10-24 in round 24. The brief at
@@ -816,7 +818,10 @@ posture is the managed plugin's own contract, recorded here,
 not a platform behavior the primaries describe. The primaries
 describe the events as observation points. Plugins install per
 user and apply to all projects, and the reference layout is the
-alibaba/open-code-review `.kimi-plugin` package. Every rule
+alibaba/open-code-review package with `.kimi-plugin/plugin.json`
+beside `.claude-plugin/`. The primary plugins page names exactly
+two valid manifest locations, `<plugin_root>/kimi.plugin.json` and
+`<plugin_root>/.kimi-plugin/plugin.json`. Every rule
 carries a derivation note naming the canonical skill section or
 primary citation it reports, pinned by the gate at
 `scripts/check_kimi.py`, so the scoped guidance cannot become a
@@ -824,3 +829,24 @@ rival instruction source. Decision 4 binds this build like every
 other build. Skill tightness holds. The brief, its gate script,
 and its tests live outside the canonical skill text, and the
 description protocol is untouched.
+
+## 25. Build 14 gate hardening, round 28
+
+Recorded on 2026-10-24 in round 28. The Build 14 gate pins are
+semantic pins, not phrase lists. A negative check that names only
+the exact planted sentence is defeated by rewording, so every
+negative in scripts/check_kimi.py now forbids the claim in any
+phrasing, and every pinned claim now carries a negative check, so
+an added contradiction fails even while the original pin sentence
+stays in place. The derivation check covers every rule shaped
+heading and every paragraph after a derivation note, not only
+R numbered blocks, and a derivation note must name a specific
+primary page path and the claim it supports, not only a host stem
+or a decision number. The decision record pins its load bearing
+fragments, not only its decision 4 statement. The extractor flags
+the Kimi plugin surfaces under a .kimi-plugin directory, agents
+and hooks and the plugin manifest, as instruction bearing. The
+live hook probe runs pass mode as well as fail mode, so a fixture
+that always blocks fails the gate. The collision fixture contents
+are pinned, not only their directory names. Decision 4 binds this
+build like every other build.
