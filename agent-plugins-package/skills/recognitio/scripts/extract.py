@@ -1133,6 +1133,15 @@ def is_instruction_path(path):
     if len(parts) >= 2 and parts[0] == "agents" \
             and name.endswith(".md"):
         return True
+    # R29-RT-10, R29-SP-02, and R29-EX-02. The precedence
+    # manifest location is the plugin root kimi.plugin.json,
+    # which sits outside any .kimi-plugin directory, so it
+    # flags by basename wherever it sits, the way SKILL.md
+    # does. A change to it steers the next agent that loads
+    # the tree, and the nested manifest alone cannot carry
+    # the precedence claim.
+    if name == "kimi.plugin.json":
+        return True
     # A Kimi plugin surface under a .kimi-plugin directory
     # steers the session agent and executes in the session
     # exactly the way the flagged names do, so a change to

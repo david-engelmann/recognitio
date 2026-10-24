@@ -795,6 +795,295 @@ class TestCheckKimi(unittest.TestCase):
                 any("decision 21" in p for p in problems),
                 problems,
             )
+    def plant_intro(self, root, sentence):
+        # Insert a sentence in the pre-rules intro, the
+        # placement the round 29 red team used, so no rule
+        # block count changes and only the planted claim
+        # can fail the gate.
+        text = self.read_brief(root)
+        anchor = "## The Kimi rules"
+        self.assertIn(anchor, text)
+        self.write_brief(
+            root, text.replace(anchor, sentence + "\n\n" + anchor, 1)
+        )
+        return self.problems(root)
+
+    def test_an_auto_discovery_denial_fails(self):
+        # R29-RT-06 and R29-ST-01. The agents pin proves the
+        # auto discovery sentence exists, but a sentence
+        # denying it passed while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "An agents directory at the plugin root is not "
+                "auto discovered.",
+            )
+            self.assertTrue(
+                any("denies the agents auto discovery" in p
+                    for p in problems),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "The manifest agents field is ignored.",
+            )
+            self.assertTrue(
+                any("denies the agents auto discovery" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_built_in_override_drop_fails(self):
+        # R29-RT-06 and R29-ST-01. The override pin proves
+        # the sentence exists, but a sentence dropping the
+        # override passed while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Replacing a built in agent needs no override "
+                "flag.",
+            )
+            self.assertTrue(
+                any("without an override" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_events_denial_fails(self):
+        # R29-RT-06 and R29-ST-01. The events pin proves the
+        # four names exist, but a sentence denying one
+        # event or the configurability passed while the pin
+        # stayed in place.
+        cases = (
+            "The four hook events are not configurable in "
+            "config.toml.",
+            "Only three hook events exist.",
+            "Hook events are configurable only in a different "
+            "file, not config.toml.",
+            "SessionHeartbeat never fires a hook event.",
+        )
+        for sentence in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, sentence)
+                self.assertTrue(
+                    any("denies the four hook events" in p
+                        for p in problems),
+                    (sentence, problems),
+                )
+
+    def test_a_stay_alive_denial_fails(self):
+        # R29-RT-06 and R29-ST-01. The persona negative
+        # forbids a persona free run, but a sentence saying
+        # print mode exits after the first result passed
+        # while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Print mode exits after a single turn even "
+                "while background tasks are pending.",
+            )
+            self.assertTrue(
+                any("exits after a single turn" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_an_oversized_acceptance_fails(self):
+        # R29-RT-06. The limits pin proves the 32KB and 64KB
+        # sentences exist, but a sentence accepting
+        # oversized content passed while the pins stayed.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Oversized content is accepted and injected "
+                "anyway.",
+            )
+            self.assertTrue(
+                any("accepts oversized content" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_beyond_budget_injection_fails(self):
+        # R29-RT-06. The limits pin proves the skip sentence
+        # exists, but a sentence injecting beyond budget
+        # content passed while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Contributions beyond the budget are injected "
+                "anyway, not skipped.",
+            )
+            self.assertTrue(
+                any("injects beyond budget" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_delegation_denial_fails(self):
+        # R29-RT-06. The agents pin proves the delegation
+        # sentence exists, but a sentence denying
+        # delegation passed while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "The platform does not allow the main agent "
+                "to delegate to plugin agents.",
+            )
+            self.assertTrue(
+                any("denies delegation" in p for p in problems),
+                problems,
+            )
+
+    def test_an_unknown_fields_error_fails(self):
+        # R29-RT-06. The collision pin proves the ignored
+        # sentence exists, but a sentence erroring on
+        # unknown fields passed while the pin stayed.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Unknown agent frontmatter fields cause an "
+                "error.",
+            )
+            self.assertTrue(
+                any("errors on unknown fields" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_narrowing_fails(self):
+        # R29-RT-06. The layout pin proves the two locations
+        # exist, but a sentence narrowing them to one
+        # passed while the pin stayed in place.
+        cases = (
+            (
+                "A bare plugin.json at the repo root is a valid "
+                "manifest location.",
+                "bare root plugin.json",
+            ),
+            (
+                "Only one valid manifest location exists, "
+                "kimi.plugin.json.",
+                "only one manifest",
+            ),
+        )
+        for sentence, fragment in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, sentence)
+                self.assertTrue(
+                    any(fragment in p for p in problems),
+                    (sentence, problems),
+                )
+
+    def test_an_event_meaning_narrowing_fails(self):
+        # R29-RT-06. The events pin proves the four names
+        # exist, but a sentence observing only session
+        # starts passed while the pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "The four events observe only session starts, "
+                "not heartbeats.",
+            )
+            self.assertTrue(
+                any("narrows the four events" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_correct_negative_restatements_pass(self):
+        # R29-RT-15. A sentence that states the correct
+        # posture in negative form is a restatement, not a
+        # contradiction, and must not fail the gate.
+        cases = (
+            "Plugins do not install per project.",
+            "Source edits do not take effect immediately.",
+            "Print mode CI does not run without a persona.",
+            "The size limit is not 131072 bytes.",
+            "Each systemPrompt field is not 128 KiB.",
+            "The systemPrompt fields are not unlimited.",
+            "The size limit is never lifted.",
+        )
+        for sentence in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, sentence)
+                self.assertEqual(problems, [], (sentence, problems))
+
+    def test_a_decision_4_denial_fails(self):
+        # R29-RT-06. The decision 4 pin proves the sentence
+        # exists, but a sentence denying it passed while the
+        # pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "Decision 4 does not bind this build.",
+            )
+            self.assertTrue(
+                any("denies that decision 4 binds" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_live_all_events_fixture_fails_the_probe(self):
+        # R29-RT-14. A script that prints every event name
+        # on every invocation proved nothing about any
+        # single event, yet the probe passed it for all
+        # four events.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            script = (
+                root / "tests" / "fixtures" / "kimi-hooks"
+                / "blocking_check.py"
+            )
+            script.write_text(
+                "import sys\n"
+                "for event in (\"TurnStarted\", "
+                "\"UserPromptQueued\", \"TaskStarted\", "
+                "\"SessionHeartbeat\"):\n"
+                "    print('hook event ' + event)\n"
+                "sys.exit(1 if sys.argv[2] == 'fail' else 0)\n",
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verdict unverified" in p for p in problems),
+                problems,
+            )
+
+    def test_kimi_problems_includes_the_live_probe(self):
+        # R29-RT-17. A caller importing kimi_problems as the
+        # gate ran the whole contract without the live
+        # probe, because only main called it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            script = (
+                root / "tests" / "fixtures" / "kimi-hooks"
+                / "blocking_check.py"
+            )
+            script.write_text(
+                "import sys\n"
+                "print('hook event ' + sys.argv[1])\n"
+                "sys.exit(1)\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.kimi_problems(root)
+            self.assertTrue(
+                any("passing check" in p for p in problems),
+                problems,
+            )
 
 
 if __name__ == "__main__":

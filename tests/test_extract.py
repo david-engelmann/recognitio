@@ -2752,12 +2752,19 @@ class TestRound6InstructionFiles(unittest.TestCase):
         # the session, so they join the instruction name set.
         # The skill file under a Kimi plugin already flagged by
         # its basename, so it is not the proof here.
+        # R29-RT-10. The precedence manifest location is the
+        # plugin root kimi.plugin.json, which sits outside any
+        # .kimi-plugin directory, so it flags by basename
+        # wherever it sits.
         for path in (
             ".kimi-plugin/agents/reviewer.md",
             ".kimi-plugin/plugin.json",
             ".kimi-plugin/kimi.plugin.json",
             ".kimi-plugin/hooks/block.py",
             "pkg/.kimi-plugin/agents/reviewer.md",
+            "kimi.plugin.json",
+            "pkg/kimi.plugin.json",
+            "plugins/foo/kimi.plugin.json",
         ):
             self.assertTrue(
                 extract_mod.is_instruction_path(path), path

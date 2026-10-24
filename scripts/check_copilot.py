@@ -212,6 +212,19 @@ def rules_problems(root=None):
     return problems
 
 
+def _sentences(section):
+    """The rules section as lowercased sentences.
+
+    Rule headings are labels, not claims, so they are
+    stripped before splitting: a heading remainder without
+    a period would otherwise merge with the next sentence
+    and carry its negation into it.
+    """
+    body = re.sub(r"(?m)^#{1,6} .*$", "", section)
+    text = re.sub(r"\s+", " ", body).lower()
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+
+
 def trust_problems(root=None):
     """R26-RT-01. No sentence may grant head branch content trust
     or merge authority.
@@ -221,9 +234,13 @@ def trust_problems(root=None):
     approval authored by head branch instructions carries no
     base branch merge authority. A planted sentence that
     trusts head branch instructions or grants head branch
-    content merge authority must fail the gate. The regexes
-    are negation aware so the brief's own negative sentences
-    do not flag themselves.
+    content merge authority must fail the gate. The check
+    works sentence by sentence, so a rewording that drops
+    the single phrase "trusted input" for reliable,
+    trustworthy, or followable head branch content still
+    fails. Sentences that state the negative posture, such
+    as the brief's own untrusted input sentence, are
+    skipped.
     """
     root = ROOT if root is None else root
     raw = read_text(root / "docs" / "copilot-sdk-brief.md")
@@ -233,14 +250,36 @@ def trust_problems(root=None):
     if section is None:
         return []
     problems = []
-    text = re.sub(r"\s+", " ", section)
-    if re.search(r"\btrusted input\b", text):
-        problems.append(
-            "a copilot rule trusts head branch instructions, which "
-            "the untrusted input posture forbids"
-        )
+    # R29-RT-13. Trust is a meaning claim, not one phrase:
+    # reliable, trustworthy, followable, or trusted head
+    # branch content all state it.
+    patterns = (
+        r"\btrusted input\b",
+        r"\btrusted source\b",
+        r"\btrusted content\b",
+        r"\breliable\b",
+        r"\btrustworthy\b",
+        r"\bmay be followed\b",
+        r"\bcan be followed\b",
+        r"\bshould be followed\b",
+    )
+    for sentence in _sentences(section):
+        if "head branch" not in sentence:
+            continue
+        if "untrusted" in sentence:
+            continue
+        if re.search(r"\bnothing\b.{0,40}\btreats\b", sentence):
+            continue
+        for pattern in patterns:
+            if re.search(pattern, sentence):
+                problems.append(
+                    "a copilot rule trusts head branch "
+                    "instructions, which the untrusted input "
+                    "posture forbids"
+                )
+                return problems
     if re.search(r"(?<!no )carries base branch merge authority",
-                 text):
+                 re.sub(r"\s+", " ", section)):
         problems.append(
             "a copilot rule grants head branch content merge "
             "authority, which the base branch authority rule "
@@ -288,8 +327,14 @@ def approval_problems(root=None):
     fires on a red packet, including opt in approvals that
     count toward branch protection. A planted sentence that
     permits an approval firing on a red or unverified packet
-    must fail the gate. The regexes are negation aware so the
-    brief's own negative sentence does not flag itself.
+    must fail the gate. The check works sentence by sentence,
+    so a rewording that drops the verb fire for goes ahead
+    or granted still fails. The brief's own warning sentence
+    about an approval firing on an unverified packet states
+    a consequence, not a permission, and carries no
+    permission verb, so it is not flagged. A sentence that
+    negates its own permission verb is a correct
+    restatement.
     """
     root = ROOT if root is None else root
     raw = read_text(root / "docs" / "copilot-sdk-brief.md")
@@ -299,12 +344,32 @@ def approval_problems(root=None):
     if section is None:
         return []
     problems = []
+    # R29-RT-13. Permission is a meaning claim, not one
+    # verb: an approval that goes ahead, is granted,
+    # proceeds, or is allowed on a red packet states it.
+    patterns = (
+        r"\b(?:may|can|will|shall|does) fire\b",
+        r"\bgoes ahead\b",
+        r"\bgranted\b",
+        r"\bproceeds\b",
+        r"\ballowed\b",
+        r"\bpermitted\b",
+    )
+    for sentence in _sentences(section):
+        if "approval" not in sentence:
+            continue
+        for pattern in patterns:
+            match = re.search(pattern, sentence)
+            if match and not re.search(
+                r"\b(never|not|no)\b", sentence[:match.start()]
+            ):
+                problems.append(
+                    "a copilot rule permits an approval firing, "
+                    "which the never approve on a red packet "
+                    "rule forbids"
+                )
+                return problems
     text = re.sub(r"\s+", " ", section)
-    if re.search(r"\b(?:may|can|will|shall|does) fire\b", text):
-        problems.append(
-            "a copilot rule permits an approval firing, which the "
-            "never approve on a red packet rule forbids"
-        )
     if re.search(
         r"(?<!never )(?<!not )fires on an? (?:red|unverified) "
         r"packet",

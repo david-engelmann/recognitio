@@ -41,7 +41,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_coderabbit.py`, the Antigravity plugin contract check at
 `scripts/check_antigravity.py`, the Copilot SDK agent build check at
 `scripts/check_copilot.py`, the Kimi managed plugin check at
-`scripts/check_kimi.py`, the test vacuity guard at
+`scripts/check_kimi.py`, the ZCode plugin build check at
+`scripts/check_zcode.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -198,6 +199,16 @@ not a gate.
   primary citation it reports, pinned by the gate at
   `scripts/check_kimi.py`, so the scoped guidance cannot
   become a rival instruction source.
+- `.zcode-plugin/` holds the Build 16 ZCode plugin manifest
+  at `.zcode-plugin/plugin.json`, and `docs/zcode-plugin-brief.md`
+  holds the brief for the build. The in client plugin
+  marketplace distribution with the version bump rule, the
+  portable v1 shape losing output styles and settings on
+  ZCode, the register but not execute behavior for channels,
+  lspServers, outputStyles, and settings, and the 1024
+  character description cap with the 100KB body truncation
+  are pinned by the gate at `scripts/check_zcode.py`, so the
+  scoped guidance cannot become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -405,4 +416,14 @@ with its derivation noted brief and gate script, and closed the
 round 27 findings. The round 28 pass then hardened the Build 14
 gate against reworded contradictions, pinned the secondary
 sentences, flagged the Kimi plugin surfaces in the extractor,
-and closed the round 28 findings.
+and closed the round 28 findings. The round 29 pass then
+hardened the Build 14 gate further against reworded
+contradictions with a negative check for every pinned claim,
+made the limits negation aware so correct restatements pass,
+required the live hook probe output to prove the requested
+event ran and no other, folded the probe into the gate
+function, hardened the Copilot gate in the same meaning based
+style, flagged the plugin root `kimi.plugin.json` manifest in
+the extractor, landed Build 16, the ZCode plugin build, and
+deferred Build 15, the Qwen Code marketplace presence, by
+dated decision to round 33.

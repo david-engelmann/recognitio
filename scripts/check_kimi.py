@@ -175,6 +175,19 @@ DECISION_PINNED = (
     ("the per user install scope",
      "install per user and apply to all projects"),
     ("the reference layout", ".kimi-plugin/plugin.json"),
+    # R29-RT-11. These three sentences were stated in
+    # decision 24 and unpinned, so dropping them shipped in
+    # silence. They join the pin list with the stay alive
+    # sentence.
+    ("the built in override",
+     "replacing a built in agent requires an explicit"),
+    ("the four hook events",
+     "TurnStarted, UserPromptQueued, TaskStarted, and "
+     "SessionHeartbeat"),
+    ("the configurable hooks",
+     "configurable under `[[hooks]]` in `config.toml`"),
+    ("the stay alive",
+     "print mode stays alive while background tasks are pending"),
 )
 
 # The sentence that explains the decision numbering gap.
@@ -193,7 +206,118 @@ def read_text(path):
         return None
 
 
-def deliberate_source(note):
+# Negation words that can scope over a forbidden claim in the
+# same clause. A clause that negates its own forbidden verb is
+# a correct restatement, not a contradiction, so the negative
+# groups skip it. Negations that ARE the forbidden claim, such
+# as a failure said not to stop a turn, are matched by explicit
+# patterns before this skip is consulted.
+NEG_WORDS = (
+    "does not", "do not", "did not", "doesn't", "don't",
+    "never", "no longer", "cannot", "can't", "is not",
+    "are not", "was not", "were not", "will not", "won't",
+)
+
+
+def _sentences(text):
+    """Lowercase sentences of whitespace normalised text.
+
+    Every negative group runs on these sentences, so a
+    capitalised keyword at the start of a sentence matches the
+    same pattern as the same word mid sentence. R29-RT-12.
+    """
+    flat = re.sub(r"\s+", " ", text).lower()
+    return [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", flat)
+        if sentence.strip()
+    ]
+
+
+def _clauses(sentence):
+    """Clauses of one sentence, split on but, however, and
+    semicolons, so a negation carve out applies to its own
+    clause only and never swallows a later contradicting
+    clause in the same sentence. R29-RT-03."""
+    parts = re.split(
+        r"\s+but\s+|,\s*but\s+|;\s+|\s+however\s*,?\s*", sentence
+    )
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _neg_before(clause, index, window=50):
+    """Whether a negation word stands shortly before index in
+    the clause."""
+    before = clause[max(0, index - window):index]
+    if re.search(r"\bnot\b", before):
+        return True
+    return any(word in before for word in NEG_WORDS)
+
+
+def _brief_clauses(root):
+    """Every clause of the brief, lowercased, in order."""
+    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
+    if raw is None:
+        return None
+    clauses = []
+    for sentence in _sentences(raw):
+        clauses.extend(_clauses(sentence))
+    return clauses
+
+
+# Claim words each shipped derivation note carries, so a note
+# that names a path and a verb but never restates what the
+# rule claims is still a bare citation. R29-RT-08.
+NOTE_CLAIMS = {
+    "R1": ("delegation", "auto discovery"),
+    "R2": ("precedence", "scope order"),
+    "R3": ("bare name",),
+    "R4": ("project directory",),
+    "R5": ("four events",),
+    "R6": ("fails closed",),
+    "R7": ("32 kb", "64 kb"),
+    "R8": ("diagnostics",),
+    "R9": ("stay alive", "reviewer persona"),
+    "R10": ("managed copy", "per user"),
+}
+
+# Content sentence counts per shipped rule, counting only the
+# paragraphs between the rule title and its derivation note.
+# A sentence planted inside an existing content paragraph
+# changes the count, which is the only shape check that can
+# see it. R29-RT-07.
+RULE_CONTENT_SENTENCES = {
+    "R1": 4,
+    "R2": 5,
+    "R3": 2,
+    "R4": 3,
+    "R5": 2,
+    "R6": 4,
+    "R7": 4,
+    "R8": 2,
+    "R9": 4,
+    "R10": 6,
+}
+
+# Headings allowed after the rules section. Any other heading
+# after the rules section is a new section carrying unchecked
+# rule shaped text. R29-RT-07.
+POST_RULES_HEADINGS = (
+    "The Build 14 decision record",
+    "Skill tightness",
+)
+
+# Generic words that never count as restating a rule's claim.
+_GENERIC_WORDS = {
+    "plugin", "plugins", "agent", "agents", "kimi", "skill",
+    "skills", "rule", "rules", "brief", "page", "docs",
+    "document", "documents", "states", "state", "primary",
+    "canonical", "section", "build", "builds", "review",
+    "reviewer", "packet", "packets", "code", "mode",
+}
+
+
+def deliberate_source(note, rule=None, content=None):
     """Whether the derivation note names a source on purpose.
 
     R21-ST-01. A bare substring match lets a note mention a
@@ -205,35 +329,53 @@ def deliberate_source(note):
     specific page path and states the claim it supports, and
     Decision 4 counts only when the note says what it binds
     the rule to. A note that says only a host stem or only a
-    decision number derives from nothing.
+    decision number derives from nothing. R29-RT-08. A note
+    must also restate the rule's claim in its own words: a
+    shipped rule's note must carry one of its claim words,
+    and a new rule's note must carry one distinctive word
+    from its own content, so a path plus a verb with no claim
+    is still a bare citation.
     """
+    note = note.lower()
     claim_words = (
         "states", "documents", "announces", "lists", "sets",
         "describes", "works", "ships", "covers", "records",
         "names", "fails closed", "keeps",
     )
+    shaped = False
     for title in CANONICAL_SECTIONS:
         match = re.search(
-            r"canonical skill[^.;]{0,200}" + re.escape(title), note
+            r"canonical skill[^.;]{0,200}" + re.escape(title.lower()),
+            note,
         )
         if match:
             rest = note[match.end():]
             if len(rest.strip()) >= 15 and any(
                 word in rest for word in claim_words
             ):
-                return True
+                shaped = True
     if re.search(r"(kimi\.com|github\.com)/\S+", note):
         if len(note.strip()) >= 40 and any(
             word in note for word in claim_words
         ):
-            return True
-    if "Decision 4" in note:
-        rest = note.split("Decision 4", 1)[1]
+            shaped = True
+    if "decision 4" in note:
+        rest = note.split("decision 4", 1)[1]
         if len(rest.strip()) >= 20 and any(
             word in rest for word in claim_words
         ):
-            return True
-    return False
+            shaped = True
+    if not shaped:
+        return False
+    if rule in NOTE_CLAIMS:
+        return any(word in note for word in NOTE_CLAIMS[rule])
+    if content:
+        words = set()
+        for token in re.findall(r"[a-z0-9]+", content.lower()):
+            if len(token) >= 4 and token not in _GENERIC_WORDS:
+                words.add(token)
+        return any(word in note for word in words)
+    return True
 
 
 def rules_section(raw):
@@ -293,29 +435,34 @@ def rules_problems(root=None):
         problems.append(
             "docs/kimi-plugin-brief.md carries no R numbered rules"
         )
-    # R28-RT-06. A rule that does not volunteer for R numbering
-    # escapes the check above, so every other level 3 heading
-    # inside the rules section is itself a problem, and so is
-    # any rule shaped heading after the rules section.
-    for heading in re.findall(r"(?m)^### (.+)$", section):
-        if not re.match(r"R\d+\.", heading):
-            problems.append(
-                "docs/kimi-plugin-brief.md carries an unnumbered "
-                "rule heading %r inside the rules section, so it "
-                "escapes the derivation check" % heading
-            )
+    # R28-RT-06 and R29-RT-07. A rule that does not volunteer
+    # for R numbering escapes the check above, so every heading
+    # at any level inside the rules section that is not an R
+    # numbered heading is itself a problem, and so is any
+    # heading after the rules section that is not an R heading
+    # or a heading the shipped brief already carries.
+    for line in section.splitlines():
+        if re.match(r"^#{1,6} ", line):
+            if not re.match(r"^### R\d+\.", line):
+                problems.append(
+                    "docs/kimi-plugin-brief.md carries an "
+                    "unnumbered heading %r inside the rules "
+                    "section, so it escapes the derivation "
+                    "check" % line.strip()
+                )
     tail = raw[raw.find(RULES_HEADING):]
-    for heading in re.findall(r"(?m)^#{2,3} (.+)$", tail):
+    for heading in re.findall(r"(?m)^#{1,6} (.+)$", tail):
         if heading == "The Kimi rules":
             continue
         if re.match(r"R\d+\.", heading):
             continue
-        if "rule" in heading.lower():
-            problems.append(
-                "docs/kimi-plugin-brief.md carries a rule shaped "
-                "heading %r outside the R numbered rules, so it "
-                "escapes the derivation check" % heading
-            )
+        if heading in POST_RULES_HEADINGS:
+            continue
+        problems.append(
+            "docs/kimi-plugin-brief.md carries a heading %r "
+            "outside the R numbered rules, so it escapes the "
+            "derivation check" % heading
+        )
     intro = re.split(r"(?m)^### ", section, maxsplit=1)[0]
     if intro.strip():
         problems.append(
@@ -331,8 +478,63 @@ def rules_problems(root=None):
                 "would be a rival instruction source" % name
             )
             continue
+        paragraphs = [
+            para.strip()
+            for para in re.split(r"\n\s*\n", block)
+            if para.strip()
+        ]
+        note_index = None
+        for index, para in enumerate(paragraphs):
+            if "Derives from" in para:
+                note_index = index
+                break
+        if note_index is None:
+            continue
+        # R29-RT-07. A sentence appended to the note paragraph
+        # itself inherits the note for free, so every sentence
+        # after the first in that paragraph must itself be a
+        # derivation sentence or the Decision 4 binding
+        # sentence the shipped R6 note carries.
+        note_para = re.sub(r"\s+", " ", paragraphs[note_index])
+        note_sentences = re.split(
+            r"(?<=[.!?])\s+", note_para
+        )
+        for later in note_sentences[1:]:
+            low = later.strip().lower()
+            if low.startswith("derives from"):
+                continue
+            if low.startswith("decision 4 binds"):
+                continue
+            problems.append(
+                "kimi rule %s carries a sentence after its "
+                "derivation note that states no derivation, "
+                "so a planted rule sentence would escape the "
+                "check" % name
+            )
+            break
+        # R29-RT-07. A sentence planted inside an existing
+        # content paragraph is invisible to every heading and
+        # paragraph check, so the content sentence count per
+        # shipped rule is pinned. A new rule has no count and
+        # is judged by its derivation note instead.
+        if name in RULE_CONTENT_SENTENCES:
+            content_paras = paragraphs[1:note_index]
+            count = 0
+            for para in content_paras:
+                flat_para = re.sub(r"\s+", " ", para)
+                count += len(
+                    re.split(r"(?<=[.!?])\s+", flat_para)
+                )
+            if count != RULE_CONTENT_SENTENCES[name]:
+                problems.append(
+                    "kimi rule %s carries %d content sentences, "
+                    "not the pinned %d, so a planted sentence "
+                    "inside its content would escape the check"
+                    % (name, count, RULE_CONTENT_SENTENCES[name])
+                )
+        content_text = " ".join(paragraphs[1:note_index])
         note = flat.split("Derives from", 1)[1]
-        if not deliberate_source(note):
+        if not deliberate_source(note, rule=name, content=content_text):
             problems.append(
                 "kimi rule %s names no canonical skill section, "
                 "primary citation, or binding decision in its "
@@ -342,21 +544,12 @@ def rules_problems(root=None):
         # derivation note sits inside that rule's block and
         # inherits its note, so any paragraph after the note
         # paragraph is a rule shaped paragraph outside a rule.
-        paragraphs = [
-            para.strip()
-            for para in re.split(r"\n\s*\n", block)
-            if para.strip()
-        ]
-        for index, para in enumerate(paragraphs):
-            if "Derives from" in para:
-                for later in paragraphs[index + 1:]:
-                    problems.append(
-                        "kimi rule %s carries a paragraph after "
-                        "its derivation note, so a planted rule "
-                        "sentence would escape the check" % name
-                    )
-                    break
-                break
+        if note_index + 1 < len(paragraphs):
+            problems.append(
+                "kimi rule %s carries a paragraph after "
+                "its derivation note, so a planted rule "
+                "sentence would escape the check" % name
+            )
     return problems
 
 
@@ -372,15 +565,35 @@ def numbering_problems(root=None):
     raw = read_text(root / "docs" / "decisions.md")
     if raw is None:
         return ["docs/decisions.md is missing"]
-    headings = re.findall(r"(?m)^## (\d+)\.", raw)
-    if "21" in headings:
-        return []
-    if NUMBERING_NOTE in raw:
-        return []
-    return [
-        "docs/decisions.md jumps from decision 20 to decision "
-        "22 with no explanation for the missing decision 21"
-    ]
+    problems = []
+    # R29-RT-16. A decision heading and a note saying no such
+    # decision exists must not both pass, and an empty heading
+    # must not pass on its own. The two conditions are a
+    # coherence check, not two presence checks.
+    parts = re.split(r"(?m)^## (\d+)\.", raw)
+    bodies = {}
+    for index in range(1, len(parts), 2):
+        bodies[parts[index]] = parts[index + 1]
+    for number, body in bodies.items():
+        rest = re.split(r"(?m)^## ", body, maxsplit=1)[0]
+        if not rest.strip():
+            problems.append(
+                "docs/decisions.md carries an empty decision %s "
+                "heading, so the record claims a decision it "
+                "does not state" % number
+            )
+    if "21" in bodies and NUMBERING_NOTE in raw:
+        problems.append(
+            "docs/decisions.md both carries a decision 21 "
+            "heading and says no decision 21 exists, so the "
+            "numbering note and the headings disagree"
+        )
+    if "21" not in bodies and NUMBERING_NOTE not in raw:
+        problems.append(
+            "docs/decisions.md jumps from decision 20 to decision "
+            "22 with no explanation for the missing decision 21"
+        )
+    return problems
 
 
 def hook_problems(root=None):
@@ -395,50 +608,86 @@ def hook_problems(root=None):
     edit cannot soften the posture in passing.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
     problems = []
-    if re.search(r"\bnotification only\b", text):
-        problems.append(
-            "a kimi rule treats the hook events as notification "
-            "only, which the blocking posture forbids"
-        )
-    if re.search(r"\bnever block\b", text):
-        problems.append(
-            "a kimi rule says the hook events never block, which "
-            "the blocking posture forbids"
-        )
-    # R28-RT-01. The posture is defeated by rewording, so the
-    # check is semantic, not a phrase list. A failed check
-    # subject near a proceeds or continues verb, a hook
-    # failure called advisory, or a failure said never to
-    # stop a turn all state the same forbidden posture. The
-    # brief's own sentence pairs a failed check with stops,
-    # never with proceeds, so it does not flag itself.
-    hook_failure = (
-        r"(failed|failing|failure|failures|hook check|hook "
-        r"failures|a failed check)"
+    # R29-RT-01 and R29-RT-12. The posture is a meaning claim,
+    # not a verb list: a failed check described as
+    # non-blocking, tolerated, ignored, resumed, carried on,
+    # or proceeding in any word order states it, and a
+    # capitalised keyword states it too, because every clause
+    # is lowercased first. A clause that negates its own
+    # continuation verb is a correct restatement and is
+    # skipped, but a failure said not to prevent, stop, block,
+    # or halt a turn is itself the forbidden posture and is
+    # never skipped.
+    failure = re.compile(
+        r"\b(failed|failing|failure|failures)\b"
+        r"|\bcheck fails\b|\bhook fails\b"
     )
-    for pattern in (
-        hook_failure + r"[^.]{0,80}\b(proceeds|continues|goes ahead"
-        r"|is allowed through|passes through)\b",
-        r"\bhook (failures|failure) (are|is) advisory\b",
-        r"\b(failures|failure) (are|is) advisory\b",
-        r"\badvisory (only|check|hook)\b",
-        r"\bnever (stop|prevent|halt)\b[^.]{0,40}\b(turn|session)\b",
-        r"\bdoes not (block|stop|halt)\b[^.]{0,40}\b(turn|session)\b",
-        r"\bnot (block|stop|halt)\b[^.]{0,40}\b(turn|session)\b",
-        r"\bfailed check[^.]{0,60}\blog(s|ged)? a warning\b",
-    ):
-        if re.search(pattern, text):
+    continuation = re.compile(
+        r"\b(proceeds|proceed|proceeding|continues|continue"
+        r"|continuing|resumes|resume|resuming|carries on"
+        r"|carry on|goes on|goes ahead|passes through"
+        r"|pass through|allowed through|moves on"
+        r"|moves forward|keeps going)\b"
+    )
+    for clause in clauses:
+        if "notification only" in clause:
             problems.append(
-                "a kimi rule lets a failed hook check pass the "
-                "turn through, which the blocking posture "
-                "forbids"
+                "a kimi rule calls the four hook events "
+                "notification only, which the blocking "
+                "posture forbids"
             )
             break
+        if re.search(r"\bnever (block|stop|halt)\b", clause):
+            if "hook" in clause or "event" in clause or failure.search(clause):
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+        failed = failure.search(clause)
+        if failed:
+            if re.search(
+                r"\b(does not|do not|never)\s+(prevent|stop|block|halt)\b",
+                clause,
+            ):
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+            match = continuation.search(clause)
+            if match and not _neg_before(clause, match.start()):
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+            if re.search(
+                r"\b(tolerated|ignored|dismissed|overlooked"
+                r"|advisory)\b",
+                clause,
+            ):
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
+        if re.search(r"\bnon[-\s]?blocking\b", clause):
+            if "hook" in clause or "check" in clause:
+                problems.append(
+                    "a kimi rule lets a failed hook check pass "
+                    "the turn through, which the blocking "
+                    "posture forbids"
+                )
+                break
     return problems
 
 
@@ -458,40 +707,72 @@ def collision_problems(root=None):
     level agent.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
     problems = []
-    if re.search(
-        r"plugin[-\s]?provided agent[^.]{0,80}\bwins over\b", text
-    ):
-        problems.append(
-            "a kimi rule lets the plugin provided agent win a "
-            "name collision, which the precedence rule forbids"
-        )
-    # R28-RT-02. The precedence is defeated by rewording, so
-    # the check is semantic. A plugin subject paired with a
-    # winning verb, or a resolution to the plugin copy, states
-    # the same forbidden win. The brief's own sentence puts
-    # the plugin agent after win over, as the loser, so it
-    # does not flag itself.
-    plugin_subject = (
-        r"plugin[-\s]?(provided )?(agent|copy)"
+    # R29-RT-02 and R29-RT-12. The precedence is an ordering
+    # claim, not a verb list: any clause that puts the plugin
+    # above the user, the user below the plugin, or the
+    # collision resolving to the plugin in any noun form
+    # states it. The brief's own sentences put the plugin
+    # below the user, or outranking only the built in agents,
+    # and are skipped on those shapes.
+    ordering = re.compile(
+        r"\bplugin\b.{0,60}\b(wins|win|outranks|outrank"
+        r"|prevails|prevail|overrides|override|favours"
+        r"|favors|favour|favor|takes precedence"
+        r"|takes priority|is selected|is chosen"
+        r"|is preferred|rank above|ranks above)\b"
     )
-    for pattern in (
-        plugin_subject + r"[^.]{0,80}\b(wins|resolves|takes "
-        r"precedence|takes priority|prevails|overrides|is "
-        r"selected|is chosen|is preferred)\b",
-        r"\b(resolves to|selects|chooses|picks) the plugin "
-        r"(copy|agent)\b",
-        r"\bplugin (copy|agent) is (selected|chosen|preferred)\b",
-        r"\bcollision[^.]{0,80}\bplugin (copy|agent) wins\b",
-    ):
-        if re.search(pattern, text):
+    for clause in clauses:
+        if "win over the plugin" in clause:
+            continue
+        match = ordering.search(clause)
+        if match:
+            if re.search(
+                r"outranks? only the built in", clause
+            ):
+                pass
+            elif not _neg_before(clause, match.start()):
+                problems.append(
+                    "a kimi rule lets the plugin provided agent "
+                    "win a name collision, which the precedence "
+                    "rule forbids"
+                )
+                break
+            else:
+                continue
+        if re.search(
+            r"\b(resolves to|resolving to|resolution)\b"
+            r".{0,40}\bplugin\b",
+            clause,
+        ):
             problems.append(
-                "a kimi rule lets the plugin provided agent win a "
-                "name collision, which the precedence rule "
+                "a kimi rule lets the plugin provided agent win "
+                "a name collision, which the precedence rule "
+                "forbids"
+            )
+            break
+        if re.search(
+            r"\bplugin (copy|agent)\b.{0,40}\bis the one that "
+            r"(runs|executes)\b",
+            clause,
+        ):
+            problems.append(
+                "a kimi rule lets the plugin provided agent win "
+                "a name collision, which the precedence rule "
+                "forbids"
+            )
+            break
+        if re.search(
+            r"\buser\b.{0,40}\b(loses|loses to|defers?|defer"
+            r"|yields?|bows?)\b.{0,30}\bplugin\b",
+            clause,
+        ):
+            problems.append(
+                "a kimi rule lets the plugin provided agent win "
+                "a name collision, which the precedence rule "
                 "forbids"
             )
             break
@@ -552,52 +833,80 @@ def qualified_problems(root=None):
     raw = read_text(root / "docs" / "kimi-plugin-brief.md")
     if raw is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
     problems = []
-    for pattern in (
-        r"\bby its bare skill name\b",
-        r"\bbare name resolves\b",
-        r"\bqualified name is optional\b",
-    ):
-        if re.search(pattern, text):
-            problems.append(
-                "a kimi rule accepts a bare name plugin skill "
-                "invocation, which the qualified names rule "
-                "forbids"
-            )
-            break
-    # R28-RT-03. The rule is defeated by rewording, so a bare
-    # name subject paired with an acceptance verb is forbidden
-    # in any phrasing. A segment that says the bare name no
-    # longer works, or does not work, is the brief's own
-    # negative sentence and is skipped.
-    for match in re.finditer(
-        r"\bbare name\b[^.]{0,60}\b(works|is accepted|accepted|"
-        r"resolves|is sufficient|is allowed|is enough)\b", text
-    ):
-        segment = match.group(0)
-        if "no longer" in segment or "does not" in segment:
-            continue
-        if re.search(r"\bnot\b[^.]{0,20}$", segment):
-            continue
-        problems.append(
-            "a kimi rule accepts a bare name plugin skill "
-            "invocation, which the qualified names rule "
-            "forbids"
-        )
-        break
-    for pattern in (
-        r"\binvoke (a plugin skill )?by the bare name\b",
-        r"\binvoking (a plugin skill )?by the bare name\b",
-        r"\bbare name invocation is (allowed|accepted)\b",
-    ):
-        if re.search(pattern, text):
-            segment = text[
-                max(0, re.search(pattern, text).start() - 30):
-                re.search(pattern, text).end() + 30
-            ]
-            if "no longer" in segment:
-                continue
+    # R29-RT-03 and R29-RT-12. Bare name acceptance is a
+    # meaning claim across number, synonym, and word order:
+    # bare names in the plural, unqualified names, short
+    # names, names alone, and a qualification requirement
+    # being absent all state it. Negation is judged per
+    # segment, so a sentence that negates the bare name in
+    # one clause and accepts it in the next still fails.
+    bare = re.compile(
+        r"\bbare (name|names|skill name|skill names)\b"
+    )
+    acceptance = re.compile(
+        r"\b(works|work|is accepted|accepted|resolves|resolve"
+        r"|is sufficient|is allowed|is enough)\b"
+    )
+    for sentence in _sentences(raw):
+        segments = _clauses(sentence)
+        earlier_bare = False
+        hit = False
+        for segment in segments:
+            if re.search(
+                r"\b(unqualified names?|short names?)\b"
+                r".{0,40}\b(works|work|accepted|accept|resolves?"
+                r"|sufficient|allowed|enough)\b",
+                segment,
+            ):
+                match = re.search(
+                    r"\b(works|work|accepted|accept|resolves?"
+                    r"|sufficient|allowed|enough)\b",
+                    segment,
+                )
+                if not _neg_before(segment, match.start()):
+                    hit = True
+            if re.search(
+                r"\bqualification is (optional|not required)\b"
+                r"|\bno qualification (is )?required\b"
+                r"|\bqualified name is optional\b",
+                segment,
+            ):
+                hit = True
+            if "name alone" in segment and (
+                "call" in segment or "invok" in segment
+            ):
+                hit = True
+            if re.search(
+                r"\binvoke (a plugin skill )?by the bare name\b"
+                r"|\binvoking (a plugin skill )?by the bare name\b"
+                r"|\bbare name invocation is (allowed|accepted)\b",
+                segment,
+            ):
+                match = re.search(
+                    r"\bby the bare name\b|\binvocation is\b",
+                    segment,
+                )
+                if not _neg_before(segment, match.start()):
+                    hit = True
+            if "by its bare skill name" in segment:
+                hit = True
+            has_bare = bool(bare.search(segment))
+            for match in acceptance.finditer(segment):
+                if has_bare and not _neg_before(
+                    segment, match.start()
+                ):
+                    hit = True
+                if (
+                    not has_bare
+                    and earlier_bare
+                    and "plugin skill" in segment
+                    and not _neg_before(segment, match.start())
+                ):
+                    hit = True
+            if has_bare:
+                earlier_bare = True
+        if hit:
             problems.append(
                 "a kimi rule accepts a bare name plugin skill "
                 "invocation, which the qualified names rule "
@@ -624,46 +933,51 @@ def workdir_problems(root=None):
     raw = read_text(root / "docs" / "kimi-plugin-brief.md")
     if raw is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
     problems = []
-    if re.search(
-        r"(?<!not the )directory the server was started from", text
-    ):
-        problems.append(
-            "a kimi rule puts hooks in the server start "
-            "directory, which the working directory rule "
-            "forbids"
-        )
-    # R28-RT-04. The same claim in noun form defeats the
-    # clause form above, so the noun form is forbidden too.
-    # A noun form preceded by a negation is the brief's own
-    # distinction and is skipped.
-    for match in re.finditer(
-        r"\bserver[-\s]?start directory\b", text
-    ):
-        before = text[max(0, match.start() - 30):match.start()]
-        if re.search(r"\bnot (the )?$" , before):
-            continue
-        if "not the" in before[-12:]:
-            continue
-        problems.append(
-            "a kimi rule puts hooks in the server start "
-            "directory, which the working directory rule "
-            "forbids"
-        )
-        break
-    for match in re.finditer(
-        r"\bserver's start directory\b", text
-    ):
-        before = text[max(0, match.start() - 30):match.start()]
-        if re.search(r"\bnot (the )?$" , before):
-            continue
-        problems.append(
-            "a kimi rule puts hooks in the server start "
-            "directory, which the working directory rule "
-            "forbids"
-        )
-        break
+    # R29-RT-04 and R29-RT-12. The working directory claim is
+    # a location claim, not two noun phrases: any sentence
+    # that places hooks in a server directory, a server
+    # working directory, a startup directory, or a launch
+    # directory states it, in any case. A location preceded
+    # by a negation is the brief's own distinction and is
+    # skipped, and a plugin hook said to run in the session
+    # project directory contradicts the plugin root scope.
+    location = re.compile(
+        r"\bserver\b.{0,50}\bdirectory\b"
+        r"|\bdirectory\b.{0,50}\bserver was (started|launched)\b"
+    )
+    for sentence in _sentences(raw):
+        for clause in _clauses(sentence):
+            match = location.search(clause)
+            if match:
+                negated = _neg_before(clause, match.start())
+                negated = negated or bool(
+                    re.search(
+                        r"\b(not|never)\b",
+                        clause[match.start():match.end()],
+                    )
+                )
+                if not negated:
+                    problems.append(
+                        "a kimi rule puts hooks in the server "
+                        "start directory, which the working "
+                        "directory rule forbids"
+                    )
+                    break
+            if re.search(
+                r"\bplugin hooks?\b.{0,40}\bsession\b"
+                r".{0,30}\bproject directory\b",
+                clause,
+            ):
+                if not _neg_before(clause, 0):
+                    problems.append(
+                        "a kimi rule puts hooks in the server "
+                        "start directory, which the working "
+                        "directory rule forbids"
+                    )
+                    break
+        if problems:
+            break
     return problems
 
 
@@ -677,24 +991,105 @@ def limits_problems(root=None):
     an inflated limit.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
     problems = []
-    for match in re.finditer(r"(\d+)\s*KB", text):
-        if int(match.group(1)) not in (32, 64):
-            problems.append(
-                "a kimi rule states a size limit of %s KB, "
-                "which inflates the pinned 32KB and 64KB "
-                "limits" % match.group(1)
+    # R29-RT-05 and R29-RT-12. A limit stated in bytes, in
+    # KiB, in words, or as lifted or unlimited is still an
+    # inflated limit, and a lowercased figure matches the
+    # same pattern as an uppercased one.
+    for clause in clauses:
+        hit = None
+        for match in re.finditer(r"(\d+)\s*kb\b", clause):
+            if int(match.group(1)) not in (32, 64):
+                if not _neg_before(clause, match.start(), 15):
+                    hit = (
+                        "a kimi rule states a size limit of %s "
+                        "KB, which inflates the pinned 32KB and "
+                        "64KB limits" % match.group(1)
+                    )
+        if hit is None and re.search(r"\d+\s*mb\b", clause):
+            match = re.search(r"\d+\s*mb\b", clause)
+            if not _neg_before(clause, match.start(), 15):
+                hit = (
+                    "a kimi rule states a size limit in "
+                    "megabytes, which inflates the pinned "
+                    "32KB and 64KB limits"
+                )
+        if hit is None:
+            match = re.search(
+                r"(?<![\w-])(\d[\d,]*)\s*bytes\b", clause
             )
+            if match:
+                value = int(match.group(1).replace(",", ""))
+                if value not in (32768, 65536):
+                    if not _neg_before(clause, match.start(), 15):
+                        hit = (
+                            "a kimi rule states a size limit "
+                            "of %s bytes, which inflates the "
+                            "pinned 32KB and 64KB limits"
+                            % match.group(1)
+                        )
+        if hit is None:
+            match = re.search(r"(\d+)\s*kib\b", clause)
+            if match and int(match.group(1)) not in (32, 64):
+                if not _neg_before(clause, match.start(), 15):
+                    hit = (
+                        "a kimi rule states a size limit of "
+                        "%s KiB, which inflates the pinned "
+                        "32KB and 64KB limits"
+                        % match.group(1)
+                    )
+        if hit is None and "kilobyte" in clause:
+            spelled = (
+                "thirty" in clause and "two" in clause
+            ) or (
+                "sixty" in clause and "four" in clause
+            )
+            if not spelled and (
+                "systemprompt" in clause or "prompt" in clause
+                or "field" in clause or "limit" in clause
+            ):
+                kilo_at = clause.find("kilobyte")
+                if not _neg_before(clause, kilo_at, 50):
+                    hit = (
+                        "a kimi rule states a size limit in "
+                        "words above the pinned 32KB and 64KB "
+                        "limits, which inflates the pinned "
+                        "32KB and 64KB limits"
+                    )
+        if hit is None and re.search(
+            r"\b(unlimited|no limit|without a limit"
+            r"|without any limit)\b",
+            clause,
+        ):
+            if (
+                "systemprompt" in clause or "prompt" in clause
+                or "field" in clause or "size" in clause
+            ):
+                if not re.search(
+                    r"\b(not|never) unlimited\b", clause
+                ) and not re.search(
+                    r"\b(not|never) (have )?no limit\b", clause
+                ):
+                    hit = (
+                        "a kimi rule states a size limit with "
+                        "no limit, which inflates the pinned "
+                        "32KB and 64KB limits"
+                    )
+        if hit is None and re.search(
+            r"\blimit(s)? (is|are) lifted\b", clause
+        ):
+            if not re.search(r"\b(not|never) lifted\b", clause):
+                hit = (
+                    "a kimi rule states a size limit that is "
+                    "lifted, which inflates the pinned 32KB "
+                    "and 64KB limits"
+                )
+        if hit is not None:
+            problems.append(hit)
             break
-    if re.search(r"\d+\s*MB", text):
-        problems.append(
-            "a kimi rule states a size limit in megabytes, "
-            "which inflates the pinned 32KB and 64KB limits"
-        )
     return problems
 
 
@@ -707,22 +1102,35 @@ def persona_problems(root=None):
     passes while the pin stays in place.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
-    for pattern in (
-        r"\bwithout (any |a )?persona\b",
+    # R29-RT-05, R29-RT-12, and R29-RT-15. A different
+    # persona, a persona-less run, a skipped persona step, or
+    # no agent selected all contradict the reviewer persona
+    # pin, and a capitalised keyword matches too. A clause
+    # that negates its own persona absence, such as a run
+    # that does not run without a persona, is a correct
+    # restatement and is skipped.
+    patterns = (
+        r"\bwithout (any |a |an )?persona\b",
         r"\bno persona\b",
-        r"\bpersona[-\s]?free\b",
-        r"\bruns without\b[^.]{0,40}\bpersona\b",
-    ):
-        if re.search(pattern, text):
-            return [
-                "a kimi rule runs print mode CI without a "
-                "persona, which the print mode persona rule "
-                "forbids"
-            ]
+        r"\bpersona[-\s]?(free|less)\b",
+        r"\bdefault persona\b",
+        r"\bskips? (the )?persona (step)?\b",
+        r"\bpersona step (is )?skipped\b",
+        r"\bno agent (selected|chosen)?\b",
+        r"\bwithout (an )?agent\b",
+    )
+    for clause in clauses:
+        for pattern in patterns:
+            match = re.search(pattern, clause)
+            if match and not _neg_before(clause, match.start()):
+                return [
+                    "a kimi rule runs print mode CI without a "
+                    "persona, which the print mode persona rule "
+                    "forbids"
+                ]
     return []
 
 
@@ -734,17 +1142,29 @@ def unsupported_problems(root=None):
     while the pin stays in place.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
-    for pattern in (
-        r"\bunsupported[^.]{0,80}\b(honour|honor|execut|appl"
-        r"y|enforc)",
-        r"\bhonour(ed)? and executed\b",
-        r"\bhonor(ed)? and executed\b",
-    ):
-        if re.search(pattern, text):
+    # R29-RT-05 and R29-RT-12. An unsupported field taking
+    # effect states the forbidden claim in either word order,
+    # and so does a field beyond the supported set being
+    # executed, so the clause is judged by the pair of tokens
+    # it carries, not by their order. A clause that negates
+    # its own effect verb is a correct restatement.
+    effect = re.compile(
+        r"\b(honour\w*|honor\w*|execut\w*|appl\w*|enforc\w*"
+        r"|respect\w*|used|takes? effect|in effect)\b"
+    )
+    for clause in clauses:
+        unsupported = (
+            "unsupported" in clause
+            or "beyond the supported set" in clause
+            or "outside the supported set" in clause
+        )
+        if not unsupported:
+            continue
+        match = effect.search(clause)
+        if match and not _neg_before(clause, match.start()):
             return [
                 "a kimi rule honours unsupported runtime "
                 "fields, which the diagnostics rule forbids"
@@ -762,21 +1182,52 @@ def managed_problems(root=None):
     in place.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
-    for pattern in (
-        r"\btakes? effect immediately\b",
-        r"\bwithout a reinstall\b",
-        r"\bsource (directory|edit)[^.]{0,60}\btakes? effect\b",
-    ):
-        if re.search(pattern, text):
-            return [
-                "a kimi rule lets a source edit take effect "
-                "without a reinstall, which the managed copy "
-                "rule forbids"
-            ]
+    # R29-RT-05 and R29-RT-15. A source edit taking effect, a
+    # CLI running from the source, a live pickup, a hot
+    # reload, or an edit landing with no reinstall all state
+    # the same forbidden claim, with or without the words
+    # immediately or directory. A clause that negates its own
+    # take effect verb, such as an edit that does not take
+    # effect immediately, is a correct restatement.
+    problem = (
+        "a kimi rule lets a source edit take effect "
+        "without a reinstall, which the managed copy "
+        "rule forbids"
+    )
+    for clause in clauses:
+        has_source = (
+            "source" in clause or "managed copy" in clause
+        )
+        if not has_source:
+            continue
+        negated_take = bool(
+            re.search(
+                r"\b(does not|do not|never)\b.{0,30}"
+                r"\btakes? effect\b",
+                clause,
+            )
+        )
+        if not negated_take and re.search(
+            r"\btakes? effect\b", clause
+        ):
+            return [problem]
+        if re.search(r"\bruns? from the source\b", clause):
+            return [problem]
+        if re.search(
+            r"\b(picked up|hot[-\s]?reloads?|live reloads?)\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\bwithout (a )?reinstall\b"
+            r"|\bwithout reinstalling\b"
+            r"|\bno reinstall\b",
+            clause,
+        ):
+            return [problem]
     return []
 
 
@@ -788,21 +1239,39 @@ def scope_problems(root=None):
     pin stays in place.
     """
     root = ROOT if root is None else root
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is None:
+    clauses = _brief_clauses(root)
+    if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
-    text = re.sub(r"\s+", " ", raw)
-    for pattern in (
-        r"\binstall(?:s|ed|ing)? per project\b",
-        r"\bper project (only|scope|install)",
-        r"\bappl(?:y|ies) to one project only\b",
+    # R29-RT-05, R29-RT-12, and R29-RT-15. A project scope
+    # claim in any of its shapes, a single project, each
+    # project, a project level scope, or a per workspace
+    # install, states the same forbidden claim. The brief's
+    # own sentence, that project level scope is not yet
+    # supported, is skipped, and a clause that negates its
+    # own scope claim, such as plugins that do not install
+    # per project, is a correct restatement.
+    problem = (
+        "a kimi rule installs plugins per project, "
+        "which the per user scope rule forbids"
+    )
+    patterns = (
+        r"\binstall\w*.{0,30}\b(per project|per workspace"
+        r"|each project|for each project)\b",
+        r"\bscoped? (to|at|for) (a )?(single|one|each) project\b",
+        r"\bscope\b.{0,30}\bproject level\b",
+        r"\bproject level\b.{0,30}\bscope\b",
+        r"\bappl\w* to (a )?(single|one) project\b",
+        r"\bappl\w*.{0,20}\bper workspace\b",
         r"\bone project only\b",
-    ):
-        if re.search(pattern, text):
-            return [
-                "a kimi rule installs plugins per project, "
-                "which the per user scope rule forbids"
-            ]
+        r"\bproject (level )?scope is (supported|available)\b",
+    )
+    for clause in clauses:
+        if "not yet supported" in clause:
+            continue
+        for pattern in patterns:
+            match = re.search(pattern, clause)
+            if match and not _neg_before(clause, match.start()):
+                return [problem]
     return []
 
 
@@ -826,19 +1295,439 @@ def fixture_content_problems(root=None):
             "the kimi collision fixture is missing the user and "
             "plugin reviewer pair"
         ]
-    if "wins" not in user_text:
+    # R29-RT-09. Word presence is not meaning: a fixture
+    # that says the plugin wins still contains the word wins,
+    # so each fixture must state its own side's outcome in a
+    # sentence whose subject and outcome agree, and neither
+    # fixture may carry a hostile instruction line.
+    hostile = re.compile(
+        r"ignore (all )?prior instructions"
+        r"|ignore (all )?previous instructions"
+        r"|disregard (all )?(prior|previous) instructions"
+        r"|approve every packet"
+    )
+    for label, text in (
+        ("user", user_text),
+        ("plugin", plugin_text),
+    ):
+        if hostile.search(text.lower()):
+            problems.append(
+                "the %s collision fixture carries a hostile "
+                "instruction, so the fixture pair no longer "
+                "proves the precedence" % label
+            )
+    user_sentences = _sentences(user_text)
+    # The fixture file itself supplies the subject: the user
+    # fixture must carry a sentence where the win lands over
+    # the plugin, and the plugin fixture one where the loss
+    # lands to the user. A sentence where the plugin wins is
+    # the inverted precedence even though it contains wins.
+    user_win = any(
+        re.search(
+            r"\bwins\b.{0,40}\bplugin\b",
+            sentence,
+        )
+        for sentence in user_sentences
+    )
+    user_inverted = any(
+        re.search(
+            r"\bplugin\b.{0,50}\bwins\b",
+            sentence,
+        )
+        for sentence in user_sentences
+    )
+    if not user_win or user_inverted:
         problems.append(
             "the user collision fixture does not state the "
             "user win, so the fixture pair no longer proves "
             "the precedence"
         )
-    if "loses" not in plugin_text:
+    plugin_sentences = _sentences(plugin_text)
+    plugin_loss = any(
+        re.search(
+            r"\bloses\b.{0,40}\buser\b",
+            sentence,
+        )
+        for sentence in plugin_sentences
+    )
+    plugin_inverted = any(
+        re.search(
+            r"\buser\b.{0,50}\bloses\b.{0,40}\bplugin\b",
+            sentence,
+        )
+        for sentence in plugin_sentences
+    )
+    if not plugin_loss or plugin_inverted:
         problems.append(
             "the plugin collision fixture does not state the "
             "plugin loss, so the fixture pair no longer proves "
             "the precedence"
         )
     return problems
+
+
+def autodiscovery_problems(root=None):
+    """R29-RT-06 and R29-ST-01. No sentence may deny the
+    agents auto discovery or say the agents field is
+    ignored.
+
+    The presence pins prove the auto discovery sentence
+    and the agents field sentence exist, but an added
+    sentence denying either passes while the pins stay in
+    place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    problem = (
+        "a kimi rule denies the agents auto discovery, "
+        "which the agents field rule forbids"
+    )
+    for clause in clauses:
+        if "agents" not in clause:
+            continue
+        if re.search(
+            r"\bagents? (directory|field)\b.{0,60}"
+            r"\bnot (auto )?discover\w*\b",
+            clause,
+        ):
+            return [problem]
+        match = re.search(
+            r"\bagents field\b.{0,40}"
+            r"\b(ignored|disregarded|unused)\b",
+            clause,
+        )
+        if match and "not " not in clause[:match.start()][-12:]:
+            return [problem]
+    return []
+
+
+def builtin_override_problems(root=None):
+    """R29-RT-06 and R29-ST-01. No sentence may replace a
+    built in agent without an override.
+
+    The presence pin proves the override sentence exists,
+    but an added sentence dropping the override passes
+    while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    patterns = (
+        r"\bneeds? no override\b",
+        r"\bwithout (an |the )?override\b",
+        r"\bdoes not (need|require) an override\b",
+        r"\boverride (is )?not required\b",
+        r"\boverride (is )?optional\b",
+        r"\bno override (flag )?needed\b",
+    )
+    for clause in clauses:
+        if "built" not in clause or "override" not in clause:
+            continue
+        for pattern in patterns:
+            if re.search(pattern, clause):
+                return [
+                    "a kimi rule replaces a built in agent "
+                    "without an override, which the collision "
+                    "precedence rule forbids"
+                ]
+    return []
+
+
+def hook_events_problems(root=None):
+    """R29-RT-06 and R29-ST-01. No sentence may deny the
+    four hook events, their configurability, or one
+    event firing.
+
+    The hook negative forbids calling the events
+    notification only, but a sentence saying one event
+    never fires or that only three events exist passes
+    while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    problem = (
+        "a kimi rule denies the four hook events, which "
+        "the hook events rule forbids"
+    )
+    for clause in clauses:
+        if "event" not in clause:
+            continue
+        if re.search(
+            r"\bhook events?\b.{0,60}\bnot configurable\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\bonly (three|two|one|3|2|1) hook events?\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\bconfigurable only in a different file\b",
+            clause,
+        ):
+            return [problem]
+        if re.search(
+            r"\b(turnstarted|userpromptqueued|taskstarted"
+            r"|sessionheartbeat)\b.{0,40}"
+            r"\bnever (fires?|runs?|triggers?)\b",
+            clause,
+        ):
+            return [problem]
+    return []
+
+
+def stayalive_problems(root=None):
+    """R29-RT-06 and R29-ST-01. No sentence may say print
+    mode exits after a single turn or never stays alive.
+
+    The persona negative forbids a persona free CI run,
+    but a sentence saying print mode exits after the
+    first result passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    problem = (
+        "a kimi rule says print mode exits after a single "
+        "turn, which the print mode persona rule forbids"
+    )
+    for clause in clauses:
+        if "print mode" not in clause:
+            continue
+        match = re.search(r"\bexits?\b", clause)
+        if match and not _neg_before(clause, match.start()):
+            return [problem]
+        if re.search(
+            r"\b(never|does not|do not) stays? alive\b",
+            clause,
+        ):
+            return [problem]
+    return []
+
+
+def oversized_problems(root=None):
+    """R29-RT-06. No sentence may say oversized content
+    is accepted or injected.
+
+    The limits pin proves the 32KB and 64KB sentences
+    exist, but an added sentence accepting oversized
+    content passes while the pins stay in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "oversized" not in clause:
+            continue
+        if re.search(
+            r"\b(accepted|injected|included|used)\b",
+            clause,
+        ):
+            return [
+                "a kimi rule accepts oversized content, "
+                "which the size limits rule forbids"
+            ]
+        if re.search(r"\bnot ignored\b", clause):
+            return [
+                "a kimi rule accepts oversized content, "
+                "which the size limits rule forbids"
+            ]
+    return []
+
+
+def skipped_problems(root=None):
+    """R29-RT-06. No sentence may say beyond budget
+    contributions are injected anyway.
+
+    The limits pin proves the skip sentence exists, but
+    an added sentence injecting beyond budget content
+    passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "budget" not in clause:
+            continue
+        if re.search(r"\binjected\b", clause):
+            return [
+                "a kimi rule injects beyond budget "
+                "contributions, which the size limits "
+                "rule forbids"
+            ]
+        if re.search(r"\bnot skipped\b", clause):
+            return [
+                "a kimi rule injects beyond budget "
+                "contributions, which the size limits "
+                "rule forbids"
+            ]
+    return []
+
+
+def delegation_problems(root=None):
+    """R29-RT-06. No sentence may deny delegation to
+    plugin agents.
+
+    The agents pin proves the delegation sentence
+    exists, but an added sentence denying delegation
+    passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "delegat" not in clause:
+            continue
+        if re.search(
+            r"\b(does not|do not|never) (allow|permit|support)"
+            r"\b.{0,60}\bdelegat\w*\b",
+            clause,
+        ):
+            return [
+                "a kimi rule denies delegation to plugin "
+                "agents, which the agents field rule "
+                "forbids"
+            ]
+        if re.search(r"\bno delegation\b", clause):
+            return [
+                "a kimi rule denies delegation to plugin "
+                "agents, which the agents field rule "
+                "forbids"
+            ]
+    return []
+
+
+def unknownfields_problems(root=None):
+    """R29-RT-06. No sentence may say unknown fields
+    cause an error or are rejected.
+
+    The collision pin proves the ignored sentence
+    exists, but an added sentence erroring on unknown
+    fields passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "unknown" not in clause or "field" not in clause:
+            continue
+        if re.search(
+            r"\b(cause an error|error|rejected|fails?)\b",
+            clause,
+        ):
+            return [
+                "a kimi rule errors on unknown fields, "
+                "which the collision precedence rule "
+                "forbids"
+            ]
+    return []
+
+
+def manifest_problems(root=None):
+    """R29-RT-06. No sentence may claim a bare root
+    plugin.json is valid or that only one manifest
+    location exists.
+
+    The reference layout pin proves the two locations
+    exist, but an added sentence narrowing them to one
+    passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "manifest" not in clause and "plugin.json" not in clause:
+            continue
+        if re.search(
+            r"\bbare plugin\.json\b.{0,60}\bvalid\b",
+            clause,
+        ):
+            return [
+                "a kimi rule claims a bare root plugin.json "
+                "is valid, which the reference layout rule "
+                "forbids"
+            ]
+        if re.search(
+            r"\bonly one (valid )?manifest location\b",
+            clause,
+        ):
+            return [
+                "a kimi rule claims only one manifest "
+                "location exists, which the reference "
+                "layout rule forbids"
+            ]
+    return []
+
+
+def eventmeaning_problems(root=None):
+    """R29-RT-06. No sentence may narrow the four events
+    to session starts only.
+
+    The events pin proves the four event names exist,
+    but an added sentence observing only session starts
+    passes while the pin stays in place.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "event" not in clause:
+            continue
+        if re.search(
+            r"\b(observe|cover|track|watch)\b.{0,40}"
+            r"\bonly session starts\b",
+            clause,
+        ):
+            return [
+                "a kimi rule narrows the four events to "
+                "session starts, which the hook events "
+                "rule forbids"
+            ]
+        if re.search(r"\bonly session starts\b", clause):
+            return [
+                "a kimi rule narrows the four events to "
+                "session starts, which the hook events "
+                "rule forbids"
+            ]
+    return []
+
+
+def decision4_problems(root=None):
+    """R29-RT-06. No sentence may deny that decision 4 binds.
+
+    The presence pin proves the decision 4 sentence exists
+    in the brief, but an added sentence denying it passed
+    while the pin stayed in place, which left the decision
+    25 universal sentence one claim short of true.
+    """
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    for clause in clauses:
+        if "decision 4" not in clause:
+            continue
+        if re.search(
+            r"\b(does not|do not|never) binds?\b", clause
+        ):
+            return [
+                "a kimi rule denies that decision 4 binds, "
+                "which the decision 4 statement forbids"
+            ]
+    return []
 
 
 def decision_problems(root=None):
@@ -871,6 +1760,23 @@ def decision_problems(root=None):
                 "the Build 14 decision record does not state "
                 "%s" % label
             )
+    # R29-RT-11. Fragment presence cannot tell affirmation
+    # from negation, so a record that keeps its fragments
+    # and disowns them must fail on the disowning sentence.
+    low = flat.lower()
+    for pattern in (
+        r"none of the sentences above",
+        r"none of the above states",
+        r"does not state the current contract",
+        r"is not the current contract",
+    ):
+        if re.search(pattern, low):
+            problems.append(
+                "the Build 14 decision record disowns its own "
+                "statements, so keeping its fragments states "
+                "no contract"
+            )
+            break
     return problems
 
 
@@ -881,7 +1787,10 @@ def hook_turn_verdict(event, mode, root=None):
     prints the event it ran and exits nonzero on a failed
     check. A nonzero exit is a blocked turn, which the Build
     14 blocking posture pins. Returns "blocked", "proceeds",
-    or "unverified" when the check did not run the event.
+    or "unverified" when the check did not prove it ran the
+    requested event and no other. A script that prints every
+    event name on every invocation proves nothing about any
+    single event, so its verdict is unverified.
     """
     root = ROOT if root is None else root
     script = root / "tests" / "fixtures" / "kimi-hooks" / "blocking_check.py"
@@ -896,6 +1805,12 @@ def hook_turn_verdict(event, mode, root=None):
         return "unverified"
     if event not in proc.stdout:
         return "unverified"
+    # R29-RT-14. The output must prove the requested event
+    # ran and no other event did, or an echo of every event
+    # name passes the probe for an event it never checked.
+    for other in HOOK_EVENTS:
+        if other != event and other in proc.stdout:
+            return "unverified"
     return "blocked" if proc.returncode != 0 else "proceeds"
 
 
@@ -928,7 +1843,12 @@ def live_hook_problems(root=None):
 
 
 def kimi_problems(root=None):
-    """Every Build 14 Kimi managed plugin problem."""
+    """Every Build 14 Kimi managed plugin problem.
+
+    R29-RT-17. The live hook probe is part of the gate,
+    not a side call in main, so a caller importing this
+    function runs the whole contract including the probe.
+    """
     problems = []
     problems.extend(brief_problems(root))
     problems.extend(rules_problems(root))
@@ -941,15 +1861,26 @@ def kimi_problems(root=None):
     problems.extend(unsupported_problems(root))
     problems.extend(managed_problems(root))
     problems.extend(scope_problems(root))
+    problems.extend(autodiscovery_problems(root))
+    problems.extend(builtin_override_problems(root))
+    problems.extend(hook_events_problems(root))
+    problems.extend(stayalive_problems(root))
+    problems.extend(oversized_problems(root))
+    problems.extend(skipped_problems(root))
+    problems.extend(delegation_problems(root))
+    problems.extend(unknownfields_problems(root))
+    problems.extend(manifest_problems(root))
+    problems.extend(eventmeaning_problems(root))
+    problems.extend(decision4_problems(root))
     problems.extend(fixture_content_problems(root))
     problems.extend(decision_problems(root))
     problems.extend(numbering_problems(root))
+    problems.extend(live_hook_problems(root))
     return problems
 
 
 def main(root=None):
     problems = kimi_problems(root)
-    problems.extend(live_hook_problems(root))
     if problems:
         for problem in problems:
             print("check_kimi: %s" % problem, file=sys.stderr)

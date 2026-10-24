@@ -49,9 +49,11 @@ branch controls.
 
 Derives from canonical skill, The boundary, which keeps
 judgement with the review skill downstream and never lets
-the packet grant merge authority, and the primary GitHub
-release note for the July 17 2026 change at github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements with
-its security note.
+the packet grant merge authority, for the CODEOWNERS and
+rulesets half, and the primary GitHub release note for the
+July 17 2026 change at
+github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements
+with its security note for the head branch approval half.
 
 ### R3. Never approve on a red packet
 
@@ -128,8 +130,12 @@ weekly releases strengthens the containerized run
 recommendation.
 
 Derives from the primary Microsoft Agent Framework
-documentation at learn.microsoft.com and the primary
-October 9 2026 weekly release notes at
+documentation at learn.microsoft.com, the primary Microsoft
+Agent Framework devblog at
+devblogs.microsoft.com/agent-framework/build-production-ready-agents-with-the-github-copilot-harness-and-agent-framework/
+which states the integration is stable for both .NET and
+Python, and the primary October 9 2026 weekly release notes
+at
 github.blog/changelog/2026-10-09-github-copilot-weekly-releases-october-5/.
 
 ### R9. The code review API surface

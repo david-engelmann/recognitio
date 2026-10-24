@@ -850,3 +850,39 @@ live hook probe runs pass mode as well as fail mode, so a fixture
 that always blocks fails the gate. The collision fixture contents
 are pinned, not only their directory names. Decision 4 binds this
 build like every other build.
+
+## 26. Build 15 deferral, round 29
+
+Recorded on 2026-10-24 in round 29. Build 15, the Qwen Code
+marketplace presence, was scheduled for round 28 and did not
+land, and the round 28 fix report recorded no deferral for it,
+so the round 29 spec lane filed the silence as a finding. This
+decision closes the silence without landing the build. Build 15
+lands in round 33, the next build round after Build 17 in round
+31 and Build 18 in round 32, with the interactive review high
+effort figure of 16 parallel agents, the Agent Plugins v1 native
+path with its exact support matrix, exit 4 in the headless CI
+gate table, the extension skill prefixed naming rule, and the
+shared `.agents/skills` alias, with conversion runtime fidelity
+still UNVERIFIED and the conditional publication decision still
+with David. No Qwen brief, gate script, or manifest lands in
+round 29, and no round 29 claim states otherwise. Decision 4
+binds this build like every other build.
+
+## 27. Build 16, the ZCode plugin build
+
+Recorded on 2026-10-24 in round 29. Recognitio ships on ZCode
+as a native plugin with its manifest at
+`.zcode-plugin/plugin.json`, distributed through the in client
+plugin marketplace with the version bump rule, so no bump means
+no update offered. The portable v1 shape loses output styles
+and settings on ZCode, and channels, lspServers, outputStyles,
+and settings register but do not execute. The format limits are
+a 1024 character description cap and a 100KB body truncation.
+The trust posture and the trust text requirement stand
+unchanged. The brief at `docs/zcode-plugin-brief.md` records
+the contract with a derivation note on every rule, and the gate
+at `scripts/check_zcode.py` pins the manifest path, the
+version bump sentence, the register but not execute sentence,
+the format limits, and the trust sentence. Decision 4 binds
+this build like every other build.

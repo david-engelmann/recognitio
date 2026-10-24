@@ -390,6 +390,24 @@ This unreleased work carries version 1.3.0.
   surfaces as instruction bearing, the live hook probe runs pass
   mode as well as fail mode, and the collision fixture contents
   are pinned. Decision 25 records the hardening.
+- The round 29 pass hardens the Build 14 gate further against
+  reworded contradictions, with a negative check for every
+  pinned claim including the agents auto discovery, the built
+  in override, the four hook events, the print mode stay alive,
+  and the decision 4 statement, and with negation aware limits
+  so a correct restatement in negative form passes. The live
+  hook probe now requires the output to prove the requested
+  event ran and no other, and the probe is part of the gate
+  function itself. The Copilot gate is hardened in the same
+  meaning based style for head branch trust and approval
+  permission. The extractor flags the plugin root
+  `kimi.plugin.json` manifest by basename wherever it sits.
+  Build 16, the ZCode plugin build, lands with its native
+  manifest at `.zcode-plugin/plugin.json`, the marketplace
+  version bump rule, the register but not execute behavior,
+  and the format limits. Build 15, the Qwen Code marketplace
+  presence, is deferred by dated decision to round 33.
+  Decisions 26 and 27 record the deferral and the build.
 
 ### Fixed
 
