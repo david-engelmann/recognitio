@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 14, with each round
+found, from the first cycle through round 24, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -330,6 +330,172 @@ the reviews folder as a record of this change and no test pins
 it. The round 11, 12 and 13 fix review records were written
 retrospectively in round 14 from their fix reports with the
 caveat stated, and no test pins any of them.
+
+## Round 15 incidents
+
+Round 15 was a research and plan refinement round and
+raised no code incidents of its own. Its plan handed
+the Build 5, Build 6, Build 7, and Build 8 adaptation
+builds to rounds 16 through 19, and the plan
+corrections the round 16 audits raised stand in the
+round 16 section as record items. This section stands
+so the head of this index can say that each round has
+its own section and a reader can tell that round 15
+was checked rather than skipped.
+
+## Round 16 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The plugin reviewer persona shipped with no pin on its surface, so a widened tools allowlist and free push rights prose passed the gate (R16-RT-01) | `test_a_widened_tools_allowlist_fails_the_pin` and `test_the_pinned_persona_prose_is_word_for_word` in the gate script suite |
+| The persona prose segmentation had no word for word pin, so a naive segmentation helper passed unnoticed (R16-ST-01) | `test_the_pinned_persona_prose_is_word_for_word` in the gate script suite |
+
+Two round 16 repairs stand as records only with no test
+of their own, and this section records them as uncovered
+in the open under the rule at the head of this file. The
+plan-round15 section 2 correction (R16-RT-02) and the
+Build 16 and Build 18 decision changes (R16-SF-01 and
+R16-SF-02) are program record prose and decision entries,
+and no test pins a plan sentence or a decision entry.
+
+## Round 17 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The extractor instruction file set missed the plugin agents folder, so a widened agent file read as ordinary code (R17-RT-01) | `test_a_plugin_agent_file_is_instruction_bearing` and `test_a_changed_agent_file_is_flagged_end_to_end` in tests/test_fanout.py |
+| An undeclared agent file in the agents directory passed the persona gate (R17-RT-02) | `test_an_undeclared_agent_file_fails` in tests/test_fanout.py |
+| The isolation pin read only the double quoted worktree form, and an empty disallowed tools list reported a misleading message (R17-ST-01) | `test_single_quoted_worktree_passes` and `test_double_quoted_worktree_passes` and `test_unquoted_worktree_passes` and `test_an_empty_disallowed_tools_list_names_itself` in tests/test_fanout.py |
+
+## Round 18 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A confirm or contest verdict naming a finding outside the merged set passed the fan-out validator (R18-ST-01) | `test_a_verdict_for_an_unknown_finding_fails` in tests/test_fanout.py |
+
+One round 18 repair stands as a record only with no test
+of its own, and this section records it as uncovered in
+the open under the rule at the head of this file. The
+struck onFailure correction in the round 10 plan and
+research documents (R18-RT-01) is a program record
+correction under the round 14 retrospective correction
+convention, and no test pins a plan sentence.
+
+## Round 19 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A package carrying an mcp.json file passed the portable package gate, against the recorded omission disposition (R19-RT-02) | `test_a_present_mcp_json_fails` in tests/test_package.py |
+| A drifted package skill copy passed the byte identity pin (R19-RT-03) | `test_a_drifted_skill_copy_fails` in tests/test_package.py |
+| A Claude Code key at the top level of the portable manifest passed the closed schema pin (R19-SP-01) | `test_a_claude_code_key_at_the_top_level_fails` in tests/test_package.py |
+| The copy fence hand listed manifests instead of discovering them by rule, so a new manifest stood outside the fence (R19-ST-01) | `test_manifest_discovery_extends_to_a_new_manifest_by_rule` in the gate script suite |
+
+Four round 19 repairs stand as records only with no test
+of their own, and this section records them as uncovered
+in the open under the rule at the head of this file. The
+plan-round10 Build 8 paragraph correction (R19-RT-01)
+and the plan-round15 section 4 rewrite on the AAIF
+donation (R19-EX-01) are program record prose. The AAIF
+governance split and integrations naming (R19-EX-02)
+stand as brief prose. The gate conventions repair
+(R19-ST-02) is process prose. No test pins a plan
+sentence or a convention.
+
+## Round 20 incidents
+
+Round 20 was a research and plan refinement round and
+raised no code incidents of its own. Its plan handed
+the Build 9, Build 10, Build 11, and Build 12
+adaptation builds to rounds 21 through 24, and the
+findings those rounds raised stand in their own
+sections below. This section stands so the head of
+this index can say that each round has its own
+section and a reader can tell that round 20 was
+checked rather than skipped.
+
+## Round 21 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A model pin without a surface scope passed the Codex brief gate (R21-RT-01) | `test_an_unqualified_model_pin_fails` in tests/test_codex.py |
+| A monitoring claim without the default branch limit and a coverage claim without its limit passed the Codex brief gate (R21-RT-02) | `test_a_dropped_default_branch_limit_fails` and `test_a_dropped_coverage_limit_fails` in tests/test_codex.py |
+| Two pauses with different meanings were conflated in the Codex brief (R21-RT-03) | `test_a_conflated_pause_fails` in tests/test_codex.py |
+| A dropped no-calendar negative in the Security Cloud story passed the Codex brief gate | `test_a_dropped_no_calendar_negative_fails` in tests/test_codex.py |
+| A dropped SECURITY.md policy context note passed the Codex brief gate | `test_a_dropped_security_md_note_fails` in tests/test_codex.py |
+| Stale AAIF donation wording passed the package gate (R21-ST-01) | `test_a_brief_with_the_stale_aaif_wording_fails` in tests/test_package.py |
+
+One round 21 repair stands as a record only with no test
+of its own, and this section records it as uncovered in
+the open under the rule at the head of this file. The
+Guardian auto_review keys promotion and the review_model
+and project_doc_max_bytes entries (R21-EX-01) stand as
+brief prose with primary citations, and this section
+names no pinning test for those entries by name.
+
+## Round 22 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A symlinked skill copy passed the Cursor plugin gate, against the real directory copy rule (R22-RT-01) | `test_a_symlinked_skill_copy_fails` in tests/test_cursor.py |
+| An effort value written as a BUGBOT.md setting passed, against the Teams dashboard setting rule (R22-RT-02) | `test_a_dropped_effort_split_pin_fails` in tests/test_cursor.py |
+| A dropped neutral default and a dropped fail on unresolved pin passed the Cursor plugin gate (R22-RT-03) | `test_a_dropped_neutral_pin_fails` and `test_a_dropped_fail_on_unresolved_pin_fails` in tests/test_cursor.py |
+| A platform provided variable used as a schema variable passed the Cursor plugin gate (R22-RT-04) | `test_a_variables_schema_violation_fails` in tests/test_cursor.py |
+| An unknown bugbot.yaml field passed the Cursor plugin gate (R22-RT-05) | `test_an_unknown_bugbot_yaml_field_fails` in tests/test_cursor.py |
+| A dropped Security Review separation pin passed the Cursor plugin gate | `test_a_dropped_security_review_pin_fails` in tests/test_cursor.py |
+
+The review latency risk (R22-RT-06) stays carried as an
+unbounded risk in the brief and decision record, and the
+real client run noted in the R22-RT-01 row stays owed
+because no Cursor client runs on this box. The caps and
+packaging rules (R22-RT-07 and R22-RT-08) and the half
+primary pin and canvases sentence (R22-EX-01 and
+R22-EX-02) stand as brief and decision record prose in
+the same change, and this section records them without
+a pinning test of their own.
+
+## Round 23 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A test with a vacuous body or an assertion that argues about nothing passed the suite (R23-RT-01) | `test_a_bare_pass_body_fails` and `test_an_always_true_assertion_fails` and `test_a_constant_equality_without_a_fixture_fails` and `test_an_assertion_without_a_fixture_touch_fails` in tests/test_vacuity.py |
+| A Cursor plugin file stood outside the copy fence (R23-ST-01) | `test_em_dash_in_cursor_plugin_readme_is_caught` and `test_em_dash_in_cursor_plugin_rule_file_is_caught` and `test_em_dash_in_cursor_plugin_manifest_is_caught` in the gate script suite |
+| A marketplace only version drift passed the Cursor plugin gate (R23-ST-02) | `test_a_marketplace_only_version_drift_fails` in tests/test_cursor.py |
+| A focus or profile sentence naming no axis passed the CodeRabbit brief gate (R23-SP-A1) | `test_a_dropped_axis_naming_fails` in tests/test_coderabbit.py |
+| A dropped summary fold pin passed the CodeRabbit brief gate (R23-SP-A2) | `test_a_dropped_summary_fold_pin_fails` in tests/test_coderabbit.py |
+| A deeper analysis reading of high and a softened focus constraint passed the CodeRabbit brief gate | `test_a_deeper_reading_of_high_fails` and `test_a_softened_focus_constraint_fails` and `test_a_dropped_rename_direction_fails` in tests/test_coderabbit.py |
+| A dropped guideline provenance pin and a dropped claude rules pin passed the CodeRabbit brief gate (R23-EX-01) | `test_a_dropped_provenance_pin_fails` and `test_a_dropped_claude_rules_pin_fails` in tests/test_coderabbit.py |
+
+The vacuity guard limit stands as a recorded limit. The
+guard catches vacuous bodies and not subtle tautologies
+over fixture derived values, and the spec lane diff
+review stays the guard for that shape. The Deep Scan
+runtime verification sentence (R23-EX-02) was skipped by
+choice, and the skip is recorded in the decision record
+for a later round. The Build 13 citation upgrades
+(R23-EX-03, R23-EX-04, and R23-EX-05) were handed
+forward to round 26 and stand outside this section.
+
+## Round 24 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A native platform file inside the portable core passed the package gate (R24-RT-01) | `test_a_native_file_inside_the_portable_core_fails` in tests/test_package.py |
+| A second extensions namespace with a dangling shape path passed the package gate (R24-RT-02) | `test_a_second_namespace_with_a_dangling_path_fails` and `test_a_dangling_antigravity_path_fails` in tests/test_package.py |
+| A removed or corrupted PreToolUse hook file passed the gate while the manifest still declared it (R24-RT-03) | `test_a_missing_hook_file_fails` and `test_an_unparseable_hook_file_fails` and `test_a_hook_without_pretooluse_fails` and `test_a_hook_without_deny_fails` and `test_a_hook_without_force_ask_fails` and `test_a_hook_without_auto_approve_fails` in tests/test_antigravity.py |
+| The deny, force_ask, and auto_approve harness contract stood without pins (R24-RT-04) | `test_a_dropped_deny_mapping_fails` and `test_a_dropped_force_ask_mapping_fails` and `test_a_dropped_auto_approve_mapping_fails` and `test_a_dropped_honest_limit_fails` in tests/test_antigravity.py |
+| The Build 7 mod hooks were treated as portable although the primary hooks page names no agent.spawn event (R24-RT-06) | `test_a_dropped_claude_code_only_negative_fails` in tests/test_antigravity.py |
+| A pinned page stamp reading passed the dated evidence gate although the sunset page stamp had drifted (R24-RT-02, dated evidence lane) | `test_a_pinned_page_stamp_reading_fails` and `test_a_dropped_sunset_halt_fails` and `test_a_dropped_contract_terms_fails` and `test_a_dropped_renewal_dates_fails` and `test_a_dropped_named_path_fails` and `test_a_dropped_v0_65_0_pin_fails` and `test_a_dropped_docs_lag_fails` in tests/test_antigravity.py |
+| Dated evidence sentences stood without pins, so a quiet drop of the sunset date, the halt, or the docs lag caveat passed (R24-RT-03, dated evidence lane) | `test_a_dropped_pre_release_fails` and `test_a_dropped_extension_boundary_fails` and `test_a_dropped_namespace_placeholder_fails` and `test_a_dropped_skills_folder_rule_fails` and `test_a_dropped_degraded_state_fails` and `test_a_statement_without_a_derivation_note_fails` and `test_a_passing_prose_derivation_mention_fails` and `test_a_missing_decision_22_record_fails` and `test_a_decision_record_without_a_decision_4_statement_fails` in tests/test_antigravity.py |
+| The canonical skill frontmatter four keys claim stood without a pin (R24-SP-02) | `test_a_dropped_four_keys_fails` in tests/test_antigravity.py |
+
+The preserved lane R24-RT-04 vacuity guard limit and the
+focus pins presence only limit (R24-RT-05) stand as
+recorded guard limits with the spec lane diff review as
+the guard for those shapes. The missing Build 11 bullet
+repair (R24-ST-01) stands as prose. The per-sentence axis
+claim (R24-SP-01) has no recorded closure in the round 24
+fix report, so it stands here as an open record item. The
+Build 13 citation upgrades handed forward to round 26
+stand outside this section.
 
 ## Disclosure incidents with no test of their own
 
