@@ -227,6 +227,26 @@ This unreleased work carries version 1.3.0.
   Agent Skills support is now primary confirmed. Both land as
   decisions 12 and 13 under the retrospective correction
   convention.
+- Build 6, dynamic workflows for review fan out. One reviewer
+  reads each file group and an adversarial second pass re
+  reads every finding, exploiting the `multiagent_20261001`
+  default with schema validated JSON findings through
+  `claude -p --json-schema`. The runbook lives at
+  `workflows/review-fanout.md` beside the portable core, the
+  findings schema at `workflows/findings.schema.json`, and a
+  new gate script at `scripts/check_fanout.py` fails a run
+  whose groups drop a file, whose merge did not dedupe, whose
+  second pass left a finding without an evidenced verdict, or
+  whose concurrency caps exceed the primary numbers of 16
+  concurrent locally and 64 on managed runs with 1000 agents
+  per run. A shipped proof run under `workflows/proof-run/`
+  shows overlapping groups, a merged finding, a contested
+  finding, and a planted defect the first pass missed and the
+  second pass caught. Decision 15 records the build.
+- A change to a plugin agent file under `agents/` is now
+  flagged as a change to an instruction bearing file, the way
+  decision 10 did for the output style. The gate pins the
+  `agents/` directory to exactly the declared agent file.
 
 ### Fixed
 

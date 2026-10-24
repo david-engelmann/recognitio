@@ -105,8 +105,10 @@ LOCKFILE_NAMES = {
 # The set is name based and deterministic. It covers the agent
 # guidance names hosts load at any depth, the Copilot instructions
 # file name, the path specific Copilot instructions files under
-# .github/instructions, the Cursor rules names, and the Claude
-# rules files under .claude/rules.
+# .github/instructions, the Cursor rules names, the Claude
+# rules files under .claude/rules, and the plugin surfaces
+# below in is_instruction_path, the output styles and the
+# plugin agent files at the plugin root.
 INSTRUCTION_BASENAMES = {
     "AGENTS.md",
     "CLAUDE.md",
@@ -1120,6 +1122,16 @@ def is_instruction_path(path):
         and parts[1] == "output-styles"
         and name.endswith(".md")
     ):
+        return True
+    # A plugin agent file under the plugin root's agents folder
+    # steers the session agent's system prompt exactly the way
+    # the flagged names steer the next agent that loads the
+    # tree, so a change to it is flagged like a change to any
+    # instruction file. The rule mirrors the output-styles rule
+    # above, root level and Markdown only, because no primary
+    # source covers a deeper agents folder as a plugin surface.
+    if len(parts) >= 2 and parts[0] == "agents" \
+            and name.endswith(".md"):
         return True
     return False
 

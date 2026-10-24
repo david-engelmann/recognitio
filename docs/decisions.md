@@ -258,6 +258,18 @@ the flagged names do, so the extractor flags it in triage and
 in the manifest, and the copy fence scans the plugin directory
 by rule.
 
+Recorded on 2026-10-23 in round 17. The plugin agent files
+join the same set. A change to a file under the plugin root
+`agents/` folder steers the session agent's system prompt,
+which is the same steering with higher privilege under the
+manifest `settings` key, so the extractor flags it the way
+decision 10 flags the style. The rule mirrors the style rule,
+root level and Markdown only, because no primary source
+covers a deeper `agents/` folder as a plugin surface. The
+round 17 red team demonstrated the gap live with a planted
+system prompt widening the extractor did not flag, and the
+regression test carries that plant.
+
 ## 11. Build 4, the headless print mode CI shape
 
 Recorded on 2026-10-23 in round 14. The unattended review shape
@@ -346,3 +358,51 @@ persona prose. The brief lives at
 every other build. The `disable-model-invocation` field
 stays at its default false, so scheduled runs through
 `/loop` keep working.
+
+## 15. Build 6, dynamic workflows for review fan out
+
+Recorded on 2026-10-23 in round 17. The review fans out one
+reviewer per file group with an adversarial second pass,
+exploiting the `multiagent_20261001` default the round 15
+research confirmed on primary, with subagents and workflows
+both enabled by default, and schema validated JSON findings
+through `claude -p --json-schema`, which returns structured
+output in the `structured_output` field.
+
+The runbook at `workflows/review-fanout.md` orders three
+phases. The extractor builds a verified packet and
+`scripts/check_packet.py` validates it before any reviewer
+spawns. One reviewer per group returns structured output
+against the findings schema at
+`workflows/findings.schema.json`. The adversarial second
+pass re reads every finding, confirms or contests each one
+with cited evidence, and raises what the first pass missed
+as new findings. Groups may overlap, and findings merge by
+the identity of file, line, and rule.
+
+Decision 4 binds the build. The run record validator at
+`scripts/check_fanout.py` gates the stamp after the second
+pass, and no model judgment replaces it. The validator
+proves coverage group by group, proves the merge deduped,
+requires an evidenced verdict for every finding, and pins
+the concurrency caps at or under the primary numbers, 16
+concurrent locally and 64 on managed runs with 1000 agents
+started per run. A run may use fewer agents and never more.
+
+Three platform limits are recorded, all read on primary.
+The 64 figure carries the platform's own note that the API
+does not guarantee the number, so the caps are planning
+numbers. A run can create more than one thread for the same
+piece of work, so the dedupe rule is the answer to the
+double count. A run can end completed even though work on
+its threads failed, so the validator proves coverage
+instead of trusting the run's end state.
+
+Skill tightness holds. The runbook, the schema, the
+validator, and the shipped proof run under
+`workflows/proof-run/` live outside the canonical skill
+text, and the description protocol is untouched. The proof
+run shows overlapping groups, a merged finding, a
+contested finding, and a planted defect the first pass
+missed and the second pass caught, and the gate validates
+it on every run.

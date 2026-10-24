@@ -32,8 +32,14 @@ skill validator at `scripts/check_skill.py`, the version coherence
 check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
 `scripts/check_evals.py`, the persona pin check at
-`scripts/check_persona.py`, and an end to end extractor smoke that must
-produce a verified manifest. The eval integrity check reads the
+`scripts/check_persona.py`, the fan-out run record validator at
+`scripts/check_fanout.py`, and an end to end extractor smoke that must
+produce a verified manifest. The fan-out validator reads the shipped
+proof run at `workflows/proof-run/run-record.json` against the
+findings schema, the proof packet manifest, and the primary
+concurrency caps, and fails a run whose groups drop a file, whose
+merge did not dedupe, whose second pass left a finding without an
+evidenced verdict, or whose caps exceed the primary numbers. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
 the results file, the per pass notes and the corpus index, and
 fails on the first file whose bytes moved. The record loads
@@ -86,7 +92,14 @@ not a gate.
 - `agents/` holds the plugin agent files. The reviewer persona
   lives at `agents/reviewer.md`, declared under the `agents`
   key of the plugin manifest and named as the session agent
-  under the manifest `settings` key.
+  under the manifest `settings` key. The directory holds
+  exactly the declared file, pinned by the gate.
+- `workflows/` holds the Build 6 review fan-out runbook at
+  `workflows/review-fanout.md`, the findings schema at
+  `workflows/findings.schema.json`, and the shipped proof run
+  under `workflows/proof-run/`. The fan out is a home platform
+  extension beside the portable core, not a change to the
+  canonical skill text.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 

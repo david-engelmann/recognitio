@@ -14,6 +14,7 @@ check:
 	$(PYTHON) scripts/check_copy.py
 	$(PYTHON) scripts/check_evals.py
 	$(PYTHON) scripts/check_persona.py
+	$(PYTHON) scripts/check_fanout.py
 	$(PYTHON) scripts/smoke_extract.py
 
 test: check

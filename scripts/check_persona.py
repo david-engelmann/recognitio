@@ -158,7 +158,7 @@ def frontmatter_problems(text):
     if denied is not None:
         problems.extend(disallowed_tools_problems(denied))
     isolation = fields.get("isolation")
-    if isolation is not None and isolation.strip('"') != "worktree":
+    if isolation is not None and isolation.strip("\"'") != "worktree":
         problems.append(
             "frontmatter isolation is %r, and worktree is the only "
             "valid value" % isolation
@@ -175,7 +175,10 @@ def disallowed_tools_problems(value):
             % value
         ]
     problems = []
-    for entry in stripped[1:-1].split(","):
+    inner = stripped[1:-1].strip()
+    if not inner:
+        return ["frontmatter disallowedTools is an empty list"]
+    for entry in inner.split(","):
         name = entry.strip().strip("\"'")
         if not name:
             problems.append(
@@ -254,12 +257,40 @@ def manifest_problems(root):
     return problems
 
 
+def agent_dir_problems(root):
+    """The agents directory holds exactly the declared file.
+
+    The manifest pin already requires the agents key to name
+    the shipped file only, but a file can sit in the directory
+    without a declaration and stay invisible to that pin. The
+    host loads only declared agents, so the stray file is
+    inert, yet a later manifest change could name it and turn
+    dead weight into a live persona no gate step ever read.
+    """
+    directory = root / "agents"
+    try:
+        names = sorted(
+            entry.name for entry in directory.iterdir() if entry.is_file()
+        )
+    except OSError as exc:
+        return ["cannot read the agents directory: %s" % exc]
+    if names != ["reviewer.md"]:
+        return [
+            "the agents directory holds %r, not just the shipped "
+            "agent file" % (names,)
+        ]
+    return []
+
+
 def persona_problems(root):
     """Every persona pin against one tree root."""
     problems = [
         "manifest: %s" % problem
         for problem in manifest_problems(root)
     ]
+    problems.extend(
+        "agent dir: %s" % problem for problem in agent_dir_problems(root)
+    )
     agent = root / "agents" / "reviewer.md"
     try:
         text = agent.read_text(encoding="utf-8")
