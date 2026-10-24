@@ -48,6 +48,10 @@ The extractor needs Python 3.10 or newer and git, and pull request mode also nee
 
 The plugin ships an output style that shapes the review packet as the tiered section document the extractor writes. The style sets `force-for-plugin`, so it applies to every response in the session while the plugin is enabled and it overrides the output style chosen in your own settings. It reaches the main conversation and the forked extraction run, because the skill runs its extraction in a fork and a fork inherits the session style. It does not reach other subagents, which run their own system prompt. If another enabled plugin forces its own style and loads first, that style wins and the review falls back to the prose packet, which enforces every guarantee unchanged. The style is a format only. Every enforcement claim stays on the shipped scripts and the skill workflow.
 
+### The reviewer persona
+
+The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use. A user's own `agent` setting overrides the plugin default, which is host behavior and not a defect. The brief at `docs/reviewer-persona.md` states the host rules and the persona bounds in full.
+
 ## Usage
 
 Extract a pull request by number. The base and head are resolved with the GitHub CLI and the extraction itself runs on local git objects. Both refs must already live in the local clone. When either one is missing the run stops and says to fetch it, because guessing from a same named local branch would build a packet for the wrong change.

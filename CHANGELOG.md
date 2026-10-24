@@ -206,6 +206,27 @@ This unreleased work carries version 1.3.0.
   message, the presence of `structured_output`, schema
   conformance and evidence standing in the packet manifest.
   Fifteen tests form its adversarial pass.
+- Build 5, the plugin reviewer persona as the main thread. The
+  plugin ships an agent file at `agents/reviewer.md`, declares
+  it under the `agents` key of the plugin manifest, and names
+  it as the session agent under the manifest `settings` key,
+  so the host runs the reviewer persona as the session's main
+  thread. The persona changes the persona and not the tool
+  access. A new gate script at `scripts/check_persona.py`
+  pins the manifest keys and the agent frontmatter field by
+  field, and forbids a tool allowlist and a permission mode as
+  defense in depth, and the gate fails any persona sentence
+  that is not a sentence the canonical skill text carries
+  beside the pinned persona prose. The brief lives at
+  `docs/reviewer-persona.md`, and decision 14 records the
+  build.
+- Two program record corrections from the round 15 plan. The
+  Build 16 posture flips from plugin on hold to plugin build,
+  because the ZCode plugin API is now fully primary
+  documented, and the Build 18 condition lifts, because Trae
+  Agent Skills support is now primary confirmed. Both land as
+  decisions 12 and 13 under the retrospective correction
+  convention.
 
 ### Fixed
 

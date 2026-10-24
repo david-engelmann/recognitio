@@ -3320,5 +3320,403 @@ class TestOutputStyle(unittest.TestCase):
             problems,
         )
 
+    def test_split_sentences_pins_a_known_fixture(self):
+        # R16-ST-01. The style sentence check runs both sides of
+        # its comparison through this one helper, so a bug in the
+        # helper would shift both sides together and stay
+        # invisible to the check. This test pins the helper
+        # itself against a fixture whose sentence boundaries were
+        # read by a human, so a segmentation bug fails here even
+        # when the comparison check stays green. The
+        # counterweight the round 16 standards lane recorded
+        # stands beside it. The round 14 adversarial pass planted
+        # real defects against the check, so the check is
+        # exercised by plants rather than trusted by
+        # construction.
+        fixture = (
+            "First sentence. Second sentence.\n"
+            "- A bullet sentence.\n"
+            "A sentence  with   wide spacing.\n"
+            "A sentence at the very end."
+        )
+        self.assertEqual(
+            split_sentences(fixture),
+            [
+                "First sentence",
+                "Second sentence",
+                "A bullet sentence",
+                "A sentence with wide spacing",
+                "A sentence at the very end",
+            ],
+        )
+
+
+class TestPersonaBuild(unittest.TestCase):
+    """Build 5, the plugin reviewer persona as the main thread.
+
+    The plugin ships the reviewer agent file at
+    agents/reviewer.md, declares it under the `agents` key of
+    the plugin manifest, and names it as the session agent
+    under the manifest `settings` key. The gate script pins
+    the manifest keys and the agent frontmatter field by
+    field, and the sentence discipline that guards the output
+    style prose reaches the persona prose. These tests run
+    the round 16 red team plant against the pins. A widened
+    `tools` allowlist beside prose claiming free push rights
+    stayed green at 308 tests, and it must fail here.
+    """
+
+    PERSONA_REL = Path("agents") / "reviewer.md"
+
+    # The persona prose, pinned word for word. The persona
+    # carries no instruction the canonical skill text does not
+    # carry, apart from this block, which states the persona
+    # side bound of R16-SF-01. The precedence rules stay out
+    # of the persona prose and live in docs/reviewer-persona.md
+    # as host behavior.
+    PERSONA_PROSE = (
+        "This persona changes the voice and posture of the session, "
+        "not its tool access. It declares no tool allowlist and no "
+        "permission mode, so it cannot widen what the session may do."
+    )
+
+    def setUp(self):
+        self.persona = load_script("check_persona")
+        self.agent_text = (
+            ROOT / self.PERSONA_REL
+        ).read_text(encoding="utf-8")
+        self.skill_text = (
+            ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+
+    def make_tree(self, tmp, agent_text=None, manifest=None):
+        root = Path(tmp) / "root"
+        plugin_dir = root / ".claude-plugin"
+        plugin_dir.mkdir(parents=True)
+        agent_dir = root / "agents"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "reviewer.md").write_text(
+            self.agent_text if agent_text is None else agent_text,
+            encoding="utf-8",
+        )
+        if manifest is None:
+            manifest = {
+                "name": "recognitio",
+                "agents": ["./agents/reviewer.md"],
+                "settings": {"agent": "reviewer"},
+                "version": "1.3.0",
+            }
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        return root
+
+    def frontmatter_insert(self, text, line):
+        head, _, rest = text.partition("---\n")
+        front, sep, body = rest.partition("---")
+        self.assertTrue(sep, "the agent text carries frontmatter")
+        return head + "---\n" + front + line + "\n" + sep + body
+
+    def persona_body(self, text):
+        """The persona without frontmatter, headings, or fences."""
+        if text.startswith("---"):
+            end = text.index("---", 3)
+            text = text[end + 3 :]
+        kept = []
+        in_fence = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence or stripped.startswith("#"):
+                continue
+            kept.append(line)
+        return "\n".join(kept)
+
+    def canonical_sentences(self):
+        """The canonical skill text segmented like the persona."""
+        lines = []
+        in_fence = False
+        for line in self.skill_text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence or stripped.startswith("#"):
+                continue
+            lines.append(line)
+        return set(split_sentences("\n".join(lines)))
+
+    def foreign_sentences(self, agent_text):
+        """Persona sentences outside the canonical set and the pin."""
+        sentences = split_sentences(self.persona_body(agent_text))
+        canonical = self.canonical_sentences()
+        pinned = set(split_sentences(self.PERSONA_PROSE))
+        return [
+            sentence
+            for sentence in sentences
+            if sentence not in canonical and sentence not in pinned
+        ]
+
+    def test_the_shipped_persona_passes_the_gate_script(self):
+        self.assertEqual(self.persona.persona_problems(ROOT), [])
+
+    def test_a_widened_tools_allowlist_fails_the_pin(self):
+        # R16-RT-01, the script half of the red team plant. The
+        # plant declared a tools allowlist of Bash, Write, Edit,
+        # WebFetch and Task beside prose claiming free push
+        # rights, and the full gate stayed green. The pin must
+        # name the widening.
+        planted = self.frontmatter_insert(
+            self.agent_text, "tools: Bash, Write, Edit, WebFetch, Task"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any(
+                "tools" in problem and "must never carry" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_free_push_prose_fails_the_sentence_discipline(self):
+        # R16-RT-01, the prose half of the red team plant. The
+        # persona may carry no sentence the canonical skill text
+        # does not carry beside the pinned persona prose, so the
+        # planted claim fails the discipline.
+        planted = self.agent_text + (
+            "\nYou may push fixes freely whenever the review asks.\n"
+        )
+        foreign = self.foreign_sentences(planted)
+        self.assertEqual(len(foreign), 1, foreign)
+        self.assertIn("push fixes freely", foreign[0])
+
+    def test_the_shipped_persona_prose_passes_the_discipline(self):
+        self.assertEqual(self.foreign_sentences(self.agent_text), [])
+
+    def test_the_pinned_persona_prose_is_word_for_word(self):
+        normalized = re.sub(r"\s+", " ", self.agent_text)
+        self.assertIn(self.PERSONA_PROSE, normalized)
+
+    def test_a_bypass_permission_mode_is_forbidden(self):
+        # Defense in depth. The host ignores permissionMode on
+        # plugin agents, but a shipped bypass declaration must
+        # still fail, because a host that honored it would hand
+        # the persona the widest tool access.
+        planted = self.frontmatter_insert(
+            self.agent_text, "permissionMode: bypassPermissions"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("permissionMode" in problem for problem in problems),
+            problems,
+        )
+
+    def test_each_ignored_host_field_is_forbidden(self):
+        for key in ("hooks", "mcpServers", "initialPrompt"):
+            planted = self.frontmatter_insert(
+                self.agent_text, "%s: {}" % key
+            )
+            with RetryingTemporaryDirectory() as tmp:
+                root = self.make_tree(tmp, agent_text=planted)
+                problems = self.persona.persona_problems(root)
+            self.assertTrue(
+                any(key in problem for problem in problems),
+                (key, problems),
+            )
+
+    def test_an_unknown_frontmatter_key_fails(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, "systemPrompt: be nice"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("systemPrompt" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_non_worktree_isolation_fails(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, "isolation: container"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("isolation" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_worktree_isolation_passes(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, "isolation: worktree"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def test_a_bad_effort_fails(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, "effort: extreme"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("effort" in problem for problem in problems), problems
+        )
+
+    def test_a_non_positive_max_turns_fails(self):
+        for value in ("0", "-3", "many"):
+            planted = self.frontmatter_insert(
+                self.agent_text, "maxTurns: %s" % value
+            )
+            with RetryingTemporaryDirectory() as tmp:
+                root = self.make_tree(tmp, agent_text=planted)
+                problems = self.persona.persona_problems(root)
+            self.assertTrue(
+                any("maxTurns" in problem for problem in problems),
+                (value, problems),
+            )
+
+    def test_a_malformed_disallowed_tools_fails(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, "disallowedTools: Bash"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("disallowedTools" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_well_formed_disallowed_tools_passes(self):
+        planted = self.frontmatter_insert(
+            self.agent_text, 'disallowedTools: ["Bash", "Write"]'
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def test_a_duplicate_frontmatter_key_fails(self):
+        planted = self.agent_text.replace(
+            "name: reviewer",
+            "name: reviewer\nname: reviewer",
+            1,
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("duplicate" in problem for problem in problems),
+            problems,
+        )
+
+    def test_an_unclosed_frontmatter_fails(self):
+        planted = self.agent_text.replace("---\n", "", 1)
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(problems, "expected a frontmatter problem")
+
+    def test_a_renamed_agent_fails_the_pin(self):
+        planted = self.agent_text.replace(
+            "name: reviewer", "name: auditor", 1
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, agent_text=planted)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("reviewer" in problem for problem in problems),
+            problems,
+        )
+
+    def test_settings_with_an_extra_key_fails(self):
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./agents/reviewer.md"],
+            "settings": {"agent": "reviewer", "theme": "dark"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("theme" in problem for problem in problems), problems
+        )
+
+    def test_settings_naming_another_agent_fails(self):
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./agents/reviewer.md"],
+            "settings": {"agent": "auditor"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("auditor" in problem for problem in problems), problems
+        )
+
+    def test_a_missing_agents_key_fails(self):
+        manifest = {
+            "name": "recognitio",
+            "settings": {"agent": "reviewer"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("agents" in problem for problem in problems), problems
+        )
+
+    def test_an_agent_path_pointing_at_a_missing_file_fails(self):
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./agents/missing.md"],
+            "settings": {"agent": "reviewer"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(problems, "expected a resolution problem")
+
+    def test_an_agent_path_escaping_the_plugin_root_fails(self):
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./../outside/reviewer.md"],
+            "settings": {"agent": "reviewer"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(problems, "expected a resolution problem")
+
+    def test_persona_frontmatter_is_host_readable(self):
+        self.assertEqual(
+            style_frontmatter_problems(self.agent_text), []
+        )
+
+    def test_the_copy_fence_scans_the_persona_file(self):
+        copy_mod = load_script("check_copy")
+        found = copy_mod.discover_prose_files(ROOT)
+        self.assertIn(ROOT / self.PERSONA_REL, found)
+        self.assertIn(ROOT / "docs" / "reviewer-persona.md", found)
+
+
 if __name__ == "__main__":
     unittest.main()

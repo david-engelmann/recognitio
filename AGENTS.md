@@ -31,7 +31,8 @@ to use while working. The gate runs the extractor test suite, the
 skill validator at `scripts/check_skill.py`, the version coherence
 check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
-`scripts/check_evals.py`, and an end to end extractor smoke that must
+`scripts/check_evals.py`, the persona pin check at
+`scripts/check_persona.py`, and an end to end extractor smoke that must
 produce a verified manifest. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
 the results file, the per pass notes and the corpus index, and
@@ -82,6 +83,10 @@ not a gate.
   corpus index and their recorded results.
 - `.claude-plugin/` holds the plugin manifest and the marketplace
   listing for the skill.
+- `agents/` holds the plugin agent files. The reviewer persona
+  lives at `agents/reviewer.md`, declared under the `agents`
+  key of the plugin manifest and named as the session agent
+  under the manifest `settings` key.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -158,7 +163,8 @@ this map instead.
 - A change to the plugin manifest or the marketplace listing
   beyond a version string updates the install section of
   README.md and CHANGELOG.md in the same change, and the
-  gate tests that pin the manifest shape move with it.
+  gate tests that pin the manifest shape move with it. A
+  persona build change also updates `docs/reviewer-persona.md`.
 
 ## Current state
 
@@ -242,4 +248,11 @@ messages to the file's colon free convention, and amended the
 first event of decision 3 after the standalone tool ruling
 cancelled it. The owner dropped
 the branch ceremony on 2026-10-22 and `main` became the working
-branch the same evening. No release has been tagged yet.
+branch the same evening. The round 16 pass then landed Build 5,
+the plugin reviewer persona as the main thread, with the agent
+file under `agents/`, the `agents` and `settings` manifest
+keys, a gate script pinning the persona surface field by
+field, and the sentence discipline extended to the persona
+prose, and recorded the Build 16 posture reversal and the
+Build 18 condition lift as decisions 12 and 13. No release has
+been tagged yet.

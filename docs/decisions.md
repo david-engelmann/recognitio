@@ -295,3 +295,54 @@ adversarial pass runs against fixtures, and the doc says so in
 the open. Decision 4 still binds the shape. The headless run
 is a review consumer of the packet, and no model judgment in
 it replaces a script check.
+
+## 12. Build 16, the ZCode plugin build, posture reversed
+
+Recorded on 2026-10-23 in round 16 under the retrospective
+correction convention. The round 15 plan proposed this change
+and the round 16 fix lane records it. The "plugin on hold"
+posture is withdrawn, because the ZCode plugin API is now
+fully primary documented. The build ships recognitio as a
+ZCode plugin with the manifest at
+`.zcode-plugin/plugin.json`, the flat skills layout, and a
+custom marketplace through a GitHub repo carrying
+`marketplace.json`. The brief respects the format limits, a
+1024 character description cap and 100KB body truncation, and
+notes that ZCode preloads the Claude Code marketplace and
+reads `.claude-plugin/plugin.json` as a fallback. The trust
+posture the plan already required stands unchanged. The data
+upload controversy means the trust text must be explicit that
+the skill is local git only and exfiltrates nothing.
+
+## 13. Build 18, the Trae skill build, condition lifted
+
+Recorded on 2026-10-23 in round 16 under the retrospective
+correction convention. The round 15 plan proposed this change
+and the round 16 fix lane records it. The round 15 research
+primary confirmed Agent Skills support in Trae CLI and IDE,
+so the condition lifts and the build proceeds as documented.
+Global skills live at `~/.traecli/skills`, project skills at
+`.traecli/skills/`, IDE skills at `.trae/skills/` and
+`~/.traecn/skills`, with `SKILL.md` carrying name and
+description frontmatter, plus auto skills from
+`.agents/skills`.
+
+## 14. Build 5, the plugin reviewer persona as the main thread
+
+Recorded on 2026-10-23 in round 16. The plugin ships an agent
+file at `agents/reviewer.md`, declares it under the `agents`
+key of the plugin manifest, and names it as the session
+agent under the manifest `settings` key, exploiting the host
+`agent` key the round 15 research confirmed on the primary
+plugin components page. The persona changes the persona and
+not the tool access. The precedence rules are written as
+host behavior and the cannot widen statement sits on the
+persona side, per the round 16 spec finding. The gate pins
+the manifest keys, the agent frontmatter field by field,
+and forbids a tool allowlist and a permission mode as
+defense in depth, and the sentence discipline reaches the
+persona prose. The brief lives at
+`docs/reviewer-persona.md`. Decision 4 binds the build like
+every other build. The `disable-model-invocation` field
+stays at its default false, so scheduled runs through
+`/loop` keep working.
