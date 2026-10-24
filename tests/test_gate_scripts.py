@@ -1162,7 +1162,12 @@ class TestCheckVersion(unittest.TestCase):
         self.assertEqual(self.mod.changelog_version(text), "1.3.0")
 
     def run_main_on_texts(self, plugin_text, marketplace_text,
-                          changelog_text):
+                          changelog_text, readme_text=None):
+        if readme_text is None:
+            readme_text = (
+                "[![Version](https://img.shields.io/badge/"
+                "version-1.3.0-blue.svg)](CHANGELOG.md)\n"
+            )
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
@@ -1175,14 +1180,18 @@ class TestCheckVersion(unittest.TestCase):
             )
             log = root / "CHANGELOG.md"
             log.write_text(changelog_text, encoding="utf-8")
+            readme = root / "README.md"
+            readme.write_text(readme_text, encoding="utf-8")
             original = (
                 self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
                 self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+                self.mod.README_MD,
             )
             self.mod.PLUGIN_JSON = plugin
             self.mod.MARKETPLACE_JSON = market
             self.mod.EXTRACT_PY = extract
             self.mod.CHANGELOG_MD = log
+            self.mod.README_MD = readme
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
@@ -1190,8 +1199,34 @@ class TestCheckVersion(unittest.TestCase):
                 (
                     self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
                     self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+                    self.mod.README_MD,
                 ) = original
             return code, captured.getvalue()
+
+    def test_main_fails_on_a_stale_readme_badge(self):
+        plugin = '{"version": "1.3.0"}'
+        market = (
+            '{"metadata": {"version": "1.3.0"}, "plugins": '
+            '[{"name": "x", "version": "1.3.0"}]}'
+        )
+        log = (
+            "## [Unreleased]\n\nThis work carries version 1.3.0.\n"
+        )
+        stale = (
+            "[![Version](https://img.shields.io/badge/"
+            "version-1.2.0-blue.svg)](CHANGELOG.md)\n"
+        )
+        code, err = self.run_main_on_texts(
+            plugin, market, log, readme_text=stale
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("README.md version badge", err)
+        missing = "a README with no badge at all\n"
+        code, err = self.run_main_on_texts(
+            plugin, market, log, readme_text=missing
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("README.md version badge", err)
 
     def test_manifest_conflict_problems_names_the_broken_pair(self):
         plugin = '{"name": "x", "skills": ["./skills/x/"]}'
