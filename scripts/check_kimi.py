@@ -987,6 +987,21 @@ def qualified_problems(root=None):
                     hit = True
             if "by its bare skill name" in segment:
                 hit = True
+            # R36-RT-02. Bare name acceptance stated with the
+            # bare name as the subject of an invocation verb
+            # states the same acceptance. The shipped record
+            # puts the verb before the bare name and then
+            # negates the working of it, so this branch needs
+            # the bare name first and no no longer after it.
+            invoke_match = re.search(
+                r"\bbare (skill )?names?\b[^.]{0,40}"
+                r"\binvok\w*\b",
+                segment,
+            )
+            if invoke_match and "no longer" not in segment:
+                verb = re.search(r"\binvok\w*\b", segment)
+                if not _neg_before(segment, verb.start()):
+                    hit = True
             has_bare = bool(bare.search(segment))
             for match in acceptance.finditer(segment):
                 if has_bare and not _neg_before(
@@ -1108,7 +1123,10 @@ def limits_problems(root=None):
     stated, but an added sentence stating a larger limit
     passes while the pins stay in place. Any kilobyte figure
     other than 32 or 64, and any megabyte figure at all, is
-    an inflated limit.
+    an inflated limit. A swapped figure, the total figure
+    bound to the per field scope or the per field figure
+    bound to the total scope, is the same inflation stated
+    with both figures inside the allowed pair.
     """
     root = ROOT if root is None else root
     clauses = _brief_clauses(root)

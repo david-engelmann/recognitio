@@ -700,6 +700,85 @@ def brief_problems(root=None):
     return problems
 
 
+def brief_negative_problems(root=None):
+    """R36-RT-03. No brief sentence may state a repository cap
+    figure, a bugbot.yaml effort pin, or a merge blocking
+    neutral conclusion.
+
+    The pins prove the correct sentences are stated, but an
+    added sentence passes while the pins stay in place,
+    because no check read the contradicting sentence. The
+    repository cap conflict R35-C-01 stands unresolved on
+    the primary pages, so a sentence may state a cap figure
+    only with the conflict named beside it in the same
+    sentence, and the safer form names no figure. Effort is
+    a dashboard setting only, so a sentence that pins or
+    sets effort in bugbot.yaml in the brief's own voice
+    fails, while the shipped sentences that report and
+    reject a secondary claim about such a field are skipped
+    on their attribution words. Findings default to a
+    neutral conclusion and requiring the status alone does
+    not block merges, so a sentence that has a neutral
+    conclusion blocking merges without a negation fails.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "cursor-plugin-brief.md")
+    if raw is None:
+        return ["docs/cursor-plugin-brief.md is missing"]
+    body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
+    text = re.sub(r"\s+", " ", body)
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        if sentence.strip()
+    ]
+    problems = []
+    for sentence in sentences:
+        low = sentence.lower()
+        cap = re.search(r"(\d+)\s+repositories\b", low)
+        if cap and re.search(
+            r"\b(up to|supports?|supported|cap|limit|maximum"
+            r"|at most)\b",
+            low,
+        ):
+            figures = set(re.findall(r"\b(300|500)\b", low))
+            if "conflict" not in low and len(figures) < 2:
+                problems.append(
+                    "the cursor brief states a repository cap "
+                    "figure of %s with no R35-C-01 conflict "
+                    "note beside it" % cap.group(1)
+                )
+                return problems
+        if (
+            "effort" in low
+            and "bugbot.yaml" in low
+            and re.search(r"\b(pin\w*|set|configur\w*)\b", low)
+            and not re.search(
+                r"\b(claims|secondary|no such|inventing"
+                r"|not|never)\b",
+                low,
+            )
+        ):
+            problems.append(
+                "the cursor brief pins Bugbot effort in "
+                "bugbot.yaml, which the dashboard only effort "
+                "pin forbids"
+            )
+            return problems
+        block = re.search(r"\bblocks?\b", low)
+        if block and "neutral" in low and not re.search(
+            r"\b(does not|do not|not|never|no)\b[^.]{0,30}$",
+            low[:block.start()],
+        ):
+            problems.append(
+                "the cursor brief has a neutral Bugbot "
+                "conclusion blocking merges, which the "
+                "neutral default pin forbids"
+            )
+            return problems
+    return problems
+
+
 def decision_problems(root=None):
     """Problems with the Build 10 decision record."""
     root = ROOT if root is None else root
