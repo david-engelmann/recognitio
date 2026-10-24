@@ -259,6 +259,61 @@ def guidelines_problems(root=None):
     return problems
 
 
+def linked_problems(root=None):
+    """R36-RT-04. No sentence may promise Deep Scan linked
+    source on an excluded platform or above the 20 limit.
+
+    The brief states the platform limit beside the linked
+    context sentence, that linked source is available in
+    the scan trigger flow on GitHub Cloud and GitHub
+    Enterprise Server and GitLab Cloud and is not available
+    in that flow for self hosted GitLab or Azure DevOps or
+    Bitbucket. A planted sentence that offers linked source
+    on one of the excluded platforms without the negation,
+    or that raises the linked repository limit above 20,
+    must fail the gate. The shipped limit sentence carries
+    its own negation, so it is skipped.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "coderabbit-review-brief.md")
+    if raw is None:
+        return ["docs/coderabbit-review-brief.md is missing"]
+    body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
+    text = re.sub(r"\s+", " ", body)
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        if sentence.strip()
+    ]
+    problems = []
+    for sentence in sentences:
+        low = sentence.lower()
+        for match in re.finditer(r"(\d+)\s+linked repositories", low):
+            if int(match.group(1)) != 20:
+                problems.append(
+                    "the coderabbit brief states %s linked "
+                    "repositories, above the pinned limit of 20"
+                    % match.group(1)
+                )
+                return problems
+        if (
+            ("linked" in low or "deep scan" in low)
+            and re.search(
+                r"\b(self hosted gitlab|azure devops|bitbucket)\b",
+                low,
+            )
+            and "available" in low
+            and "not available" not in low
+        ):
+            problems.append(
+                "the coderabbit brief promises Deep Scan "
+                "linked source on a platform the scan trigger "
+                "flow does not offer it on"
+            )
+            return problems
+    return problems
+
+
 def decision_problems(root=None):
     """Problems with the Build 11 decision record."""
     root = ROOT if root is None else root
@@ -286,6 +341,7 @@ def coderabbit_problems(root=None):
     problems = []
     problems.extend(brief_problems(root))
     problems.extend(guidelines_problems(root))
+    problems.extend(linked_problems(root))
     problems.extend(decision_problems(root))
     return problems
 

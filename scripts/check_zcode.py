@@ -250,6 +250,73 @@ def body_problems(root=None):
     return []
 
 
+def negative_problems(root=None):
+    """R36-RT-05. No sentence may execute the registered
+    fields or raise the description cap.
+
+    The pins prove the correct sentences are stated, but an
+    added sentence passes while the pins stay in place,
+    because no check read the contradicting sentence. The
+    brief states the register but do not execute behavior
+    for channels, lspServers, outputStyles, and settings,
+    and a description cap of 1024 characters. A planted
+    sentence that has ZCode executing settings from a
+    plugin manifest, or that states a description figure
+    other than 1024 characters, must fail the gate. The
+    shipped sentences that state the negative posture, or
+    that hold execution in a future conditional, carry
+    their guard words and are skipped.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "zcode-plugin-brief.md")
+    if raw is None:
+        return ["docs/zcode-plugin-brief.md is missing"]
+    body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
+    text = re.sub(r"\s+", " ", body)
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        if sentence.strip()
+    ]
+    guards = (
+        "do not execute",
+        "does not execute",
+        "not execute",
+        "never execute",
+        "register but",
+        "runs no code",
+        "unexecuted",
+        "until zcode executes",
+    )
+    problems = []
+    for sentence in sentences:
+        low = sentence.lower()
+        if any(guard in low for guard in guards):
+            continue
+        if re.search(r"\bzcode\s+execut\w*\b", low) or re.search(
+            r"\bexecut\w*\b[^.]{0,40}\b(settings|channels"
+            r"|lspservers|outputstyles)\b",
+            low,
+        ):
+            problems.append(
+                "the zcode brief has ZCode executing a "
+                "registered plugin field, which the register "
+                "but do not execute rule forbids"
+            )
+            return problems
+        if "description" in low:
+            for match in re.finditer(r"(\d+)\s*characters", low):
+                if int(match.group(1)) != 1024:
+                    problems.append(
+                        "the zcode brief states a plugin "
+                        "description cap of %s characters, "
+                        "above the pinned cap of 1024"
+                        % match.group(1)
+                    )
+                    return problems
+    return problems
+
+
 def decision_problems(root=None):
     """Problems with the Build 16 decision record."""
     root = ROOT if root is None else root
