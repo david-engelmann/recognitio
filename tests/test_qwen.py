@@ -63,6 +63,38 @@ PLANTS = (
     "Qwen activates legacy SSE MCP for the recognitio plugin",
     "in Qwen, skills at .agents/skills are automatically discovered across repositories",
     "Qwen loads the .agents/skills copy as the winning copy on collision",
+    "Qwen fields agents working side by side, 16 of them on a large review",
+    "Qwen runs 16 agents working concurrently on a large review",
+    "Qwen runs 16 agents simultaneously on a large review",
+    "Qwen runs 16 agents in tandem on a large review",
+    "Qwen runs 16 agents at the same time on a large review",
+    "Qwen runs 18 agents at once on a large review",
+    "Qwen runs 16 agents, each reviewing a different file in the same repository under the same deadline, working side by side",
+    "The outer shell exits with code 4 on refusal",
+    "The outer layer exits with code 4 on refusal",
+    "Qwen enables hooks for the recognitio plugin",
+    "Qwen turns on hooks for the recognitio plugin",
+    "Qwen activates hooks for the recognitio plugin, provenance unverified",
+    "Qwen activates, for the recognitio plugin and its companion tools in the same review, the hooks",
+    "Qwen discovers skills at .agents/skills automatically across repositories",
+    "The winning copy on collision is the .agents/skills copy",
+    "Qwen prefers the .agents/skills copy on collision",
+    "The .qwen/skills copy loses on collision",
+    "Qwen runs 16 agents side-by-side on a large review",
+    "Qwen runs 16 side-by-side agents on a large review",
+    "Qwen runs 16 agents shoulder to shoulder on a large review",
+    "The shell exits with code 4 on refusal",
+    "Qwen switches hooks on for the recognitio plugin",
+    "Qwen powers up hooks for the recognitio plugin",
+    "Qwen picks up skills at .agents/skills automatically across repositories",
+    "The .agents/skills copy outranks the .qwen/skills copy on collision",
+    "Qwen runs 16 agents\nworking side by side on a large review",
+    "Qwen runs 16 agents alongside each other on a large review",
+    "Qwen brings hooks online for the recognitio plugin",
+    "Qwen finds skills at .agents/skills automatically across repositories",
+    "The .qwen/skills copy is beaten on collision",
+    "Qwen runs twenty parallel agents on a large review",
+    "Qwen runs two parallel agents on a large review",
 )
 
 CONTROL = (
@@ -131,6 +163,54 @@ class TestCheckQwen(unittest.TestCase):
 
     def test_the_control_passes(self):
         self.assertEqual(self.mod.negative_problems(CONTROL), [])
+
+    def test_the_shipped_qoder_unverified_sentence_passes(self):
+        self.assertEqual(self.mod.negative_problems(
+            "Activation of preserved Qoder commands and agents "
+            "in Qwen stays UNVERIFIED."), [])
+
+    def test_the_wrapped_qoder_unverified_sentence_passes(self):
+        self.assertEqual(self.mod.negative_problems(
+            "Activation of preserved Qoder commands and agents "
+            "in Qwen stays UNVERIFIED."), [])
+        self.assertEqual(self.mod.negative_problems(
+            "Activation of preserved Qoder commands and agents\n"
+            "in Qwen stays UNVERIFIED."), [])
+
+    def test_false_positive_probes_pass(self):
+        probes = (
+            "Qwen runs 5 reviewers on a small review.",
+            "The wrapper supports 4 tools.",
+        )
+        for probe in probes:
+            self.assertEqual(self.mod.negative_problems(probe), [], probe)
+
+    def test_passive_beaten_fails_and_active_beats_passes(self):
+        # S2. Only the passive beaten form states losing, so
+        # the active beats form that states the shipped
+        # precedence must pass while every passive form fails.
+        self.assertEqual(self.mod.negative_problems(
+            "The .qwen/skills copy beats the .agents/skills "
+            "copy on collision."), [])
+        for plant in (
+            "The .qwen/skills copy is beaten on collision.",
+            "The .qwen/skills copy was beaten on collision.",
+            "The .qwen/skills copy will be beaten on collision.",
+        ):
+            self.assertTrue(self.mod.negative_problems(plant), plant)
+
+    def test_negated_bring_online_passes(self):
+        # S3. The negation guard must cover bring just as it
+        # covers turn, while the positive bring form still fails.
+        self.assertEqual(self.mod.negative_problems(
+            "Qwen does not bring hooks online for the "
+            "recognitio plugin."), [])
+        self.assertEqual(self.mod.negative_problems(
+            "Qwen does not turn hooks on for the "
+            "recognitio plugin."), [])
+        self.assertTrue(self.mod.negative_problems(
+            "Qwen brings hooks online for the "
+            "recognitio plugin."))
 
     def test_the_number_normalisation_fires(self):
         problems = self.mod.negative_problems(

@@ -194,12 +194,34 @@ CHANGELOG_PINS = (
 
 NUMBER_WORDS = (
     ("nineteen", "19"),
+    ("eighteen", "18"),
     ("seventeen", "17"),
     ("sixteen", "16"),
+    ("fifteen", "15"),
+    ("fourteen", "14"),
+    ("thirteen", "13"),
     ("twelve", "12"),
+    ("eleven", "11"),
+    ("ten", "10"),
     ("dozen", "12"),
+    ("twenty", "20"),
+    ("nine", "9"),
+    ("eight", "8"),
+    ("seven", "7"),
+    ("six", "6"),
+    ("five", "5"),
     ("four", "4"),
+    ("three", "3"),
+    ("two", "2"),
 )
+
+# Spelled numbers from round 34 repair round two.
+# The digit range runs from 2 to 29, so the spelled list now
+# runs from two to twenty in single word form. A hyphenated
+# twenty one through twenty nine becomes twenty plus a unit
+# word after hyphen normalisation, and the twenty token
+# itself is already in range, so those forms fire too.
+# One stays out, because a single agent is no figure claim.
 
 # Lines carrying one of these words are statements about the
 # correct record, not plants, so the negative patterns skip
@@ -222,12 +244,227 @@ GUARD_WORDS = (
 )
 
 
+QODER_UNVERIFIED_SHAPE = (
+    "activation of preserved qoder commands and agents "
+    "in qwen stays unverified"
+)
+
+# Figure adverbs from G-01 and R-01.
+# Shoulder to shoulder is the R-01 idiom for side by side.
+# Alongside each other is the Y-01 idiom for side by side.
+# Hyphen normalisation turns side by side in hyphen form
+# into the spaced form before matching, so the attributive
+# spelling fires as well as the spaced spelling.
+FIGURE_ADVERBS = (
+    "parallel|concurrent\\w*|simultaneous\\w*|"
+    "side by side|together|at once|"
+    "at the same time|in tandem|shoulder to shoulder|"
+    "alongside each other"
+)
+
+# Generic agent nouns from G-01 and B2.
+# A noun alone is ordinary roster prose, so the noun branch
+# of the figure check also needs a scope word from
+# FIGURE_SCOPE in the same sentence.
+FIGURE_AGENTS = "reviewers?|workers?|bots?"
+
+# Scope words that turn a generic agent count into a
+# figure claim. Large and practice cover the G-01 scope
+# shapes, high effort and top effort cover the shipped
+# effort shapes, and same repository and same deadline
+# cover the long F-Q17 shape.
+FIGURE_SCOPE = (
+    "large|high effort|top effort|practice|"
+    "same repository|same deadline"
+)
+
+FIGURE_WORDS = FIGURE_ADVERBS + "|" + FIGURE_AGENTS
+
+# Wrapper nouns from G-02 and R-02.
+# Bare shell is the R-02 noun. A bare shell mention alone
+# does not fire, because the wrapper check also needs an
+# exit or code token in the same sentence.
+WRAPPER_WORDS = "wrapper|outer gate|outer shell|outer layer|shell"
+
+# Activation verbs from G-03 and R-03.
+# Power up is the R-03 verb. Turn, switch, and power also
+# appear in split form with the target before the particle,
+# and the split pattern in negative_problems covers that
+# shape, so the immediate particle forms here are not the
+# only shapes that fire. Bring online is the Y-02 verb
+# in split form, with the target between the stem and
+# the online particle.
+ACTIVATION_VERBS = (
+    "activat\\w*|enabl\\w*|turn\\w* on|switch\\w* on|power\\w* up|"
+    "bring\\w* online"
+)
+
+# Verb stems for the split activation shape.
+# A stem plus a target plus an on or up particle in the
+# same sentence fires, which covers switches hooks on and
+# turns hooks on without listing every word order.
+# Bring is the Y-02 stem, and its particle is online
+# rather than on or up.
+ACTIVATION_PARTICLE_VERBS = "turn\\w*|switch\\w*|power\\w*|bring\\w*"
+
+ACTIVATION_TARGETS = (
+    "hooks|commands|agents|client namespaces|legacy sse"
+)
+
+# Discovery verbs from G-04 and R-04.
+# Picks up is the R-04 verb, in both word orders.
+# Find is the Y-03 verb, in both word orders.
+DISCOVERY_VERBS = "discover\\w*|pick\\w* up|find\\w*"
+
+# Precedence verbs from G-04 and R-04.
+# Outranks is the R-04 verb, in both word orders.
+# Beaten is the Y-04 losing side form in passive shape
+# only, used only in the losing side branch below, never
+# as a winning verb. Active beats states winning, so it
+# stays out and the shipped precedence sentence passes.
+PRECEDENCE_VERBS = "winning|wins|prefer\\w*|outrank\\w*"
+
+# Bounded window from B2.
+# The longest G-01 plant puts its figure word about 100
+# characters after its number, and the longest G-03 plant
+# puts its target about 85 characters after its verb, so
+# a 120 character window covers both with room to spare
+# without letting a token anywhere in a long sentence fire.
+WINDOW = "[^.]{0,120}"
+
+FIGURE_NUMBER = "([2-9]|1[0-9]|2[0-9])"
+
+
 def normalise(text):
     """Lowercase text with spelled out numbers as digits."""
-    out = text.lower()
+    out = text.lower().replace("-", " ")
     for word, digit in NUMBER_WORDS:
         out = re.sub(r"\b" + word + r"\b", digit, out)
     return out
+
+
+def sentence_units(text):
+    """Split normalised text into sentences for matching.
+
+    Prose paragraphs join across wrapped lines, so a claim
+    split across lines fires as one sentence. Table rows,
+    headings, and code lines stay as their own units, so a
+    table row cannot combine with the next paragraph into
+    a false claim. Sentences inside a paragraph split on
+    a terminator followed by whitespace, so a multi
+    sentence line does not leak tokens across sentences.
+    """
+    units = []
+    buffer = []
+    in_code = False
+
+    def flush():
+        if not buffer:
+            return
+        joined = " ".join(buffer)
+        buffer.clear()
+        for sentence in re.split(r"(?<=[.!?])\s+", joined.strip()):
+            if sentence.strip():
+                units.append(sentence.strip())
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            flush()
+            continue
+        if line.startswith("```"):
+            flush()
+            in_code = not in_code
+            continue
+        if in_code:
+            flush()
+            units.append(line)
+            continue
+        if line.startswith("|") or line.startswith("#"):
+            flush()
+            units.append(line)
+            continue
+        buffer.append(line)
+    flush()
+    return units
+
+
+def figure_problem(sentence):
+    """Whether a sentence states a single Qwen figure."""
+    if re.search(
+        r"\b" + FIGURE_NUMBER + r"\b" + WINDOW + r"\b("
+        + FIGURE_ADVERBS + r")\b", sentence
+    ):
+        return True
+    if re.search(
+        r"\b(" + FIGURE_ADVERBS + r")\b" + WINDOW + r"\b"
+        + FIGURE_NUMBER + r"\b", sentence
+    ):
+        return True
+    if not re.search(
+        r"\b(" + FIGURE_SCOPE + r")\b", sentence
+    ):
+        return False
+    if re.search(
+        r"\b" + FIGURE_NUMBER + r"\b" + WINDOW + r"\b("
+        + FIGURE_AGENTS + r")\b", sentence
+    ):
+        return True
+    return bool(re.search(
+        r"\b(" + FIGURE_AGENTS + r")\b" + WINDOW + r"\b"
+        + FIGURE_NUMBER + r"\b", sentence
+    ))
+
+
+def wrapper_problem(sentence):
+    """Whether a sentence states a wrapper exit of 4.
+
+    A wrapper noun plus a bare 4 is not enough. The
+    sentence must also carry an exit, code, or return
+    token, so a sentence about a wrapper supporting 4
+    tools passes while an exit claim fires.
+    """
+    if not re.search(
+        r"\b(exit\w*|code|return\w*)\b", sentence
+    ):
+        return False
+    if re.search(
+        r"\b(" + WRAPPER_WORDS + r")\b" + WINDOW + r"\b4\b",
+        sentence,
+    ):
+        return True
+    return bool(re.search(
+        r"\b4\b" + WINDOW + r"\b(" + WRAPPER_WORDS + r")\b",
+        sentence,
+    ))
+
+
+def activation_problem(sentence):
+    """Whether a sentence activates a Qwen target."""
+    if re.search(
+        r"\b(" + ACTIVATION_VERBS + r")\b" + WINDOW + r"\b("
+        + ACTIVATION_TARGETS + r")\b", sentence
+    ):
+        return True
+    if re.search(
+        r"\b(" + ACTIVATION_TARGETS + r")\b" + WINDOW + r"\b("
+        + ACTIVATION_VERBS + r")\b", sentence
+    ):
+        return True
+    if re.search(r"\b(on|up|online)\b", sentence):
+        if re.search(
+            r"\b(" + ACTIVATION_PARTICLE_VERBS + r")\b"
+            + WINDOW + r"\b(" + ACTIVATION_TARGETS + r")\b",
+            sentence,
+        ):
+            return True
+        if re.search(
+            r"\b(" + ACTIVATION_TARGETS + r")\b" + WINDOW
+            + r"\b(" + ACTIVATION_PARTICLE_VERBS + r")\b",
+            sentence,
+        ):
+            return True
+    return False
 
 
 def guarded(line):
@@ -235,41 +472,58 @@ def guarded(line):
 
 
 def negative_problems(text):
-    """Meaning based negatives over one line at a time."""
+    """Meaning based negatives over sentences, not lines.
+
+    Sentence scoping is the R-07 fix. A claim wrapped
+    across lines joins into one sentence, so the number
+    and the figure word share a sentence even when they
+    never share a line. The shipped Qoder sentence keeps
+    its exemption at sentence scope, because its shape is
+    still present in its own sentence after joining, and
+    a rewrap of that sentence keeps the exemption too.
+    """
     problems = []
-    for raw in normalise(text).splitlines():
-        line = raw.strip()
-        if not line:
-            continue
+    for line in sentence_units(normalise(text)):
         if not re.search(r"\b(never|no sentence|not a wrapper)\b", line):
-            if re.search(r"\b(wrapper|outer gate)\b[^.]{0,80}\b4\b", line):
-                problems.append("wrapper exit plant: " + line[:120])
-            elif re.search(r"\b4\b[^.]{0,80}\b(wrapper|outer gate)\b", line):
+            if wrapper_problem(line):
                 problems.append("wrapper exit plant: " + line[:120])
         if guarded(line):
             continue
-        if re.search(r"\b(12|16|17|19)\b[^.]{0,60}\b(parallel|concurrent|simultaneous|reviewers|workers|bots|side by side|together|at once)\b", line):
+        if figure_problem(line):
             problems.append("figure plant: " + line[:120])
-        if re.search(r"\breturns 4\b", line):
+        if re.search(r"\breturns? 4\b", line) and re.search(
+            r"\b(" + WRAPPER_WORDS + r"|exit\w*)\b", line
+        ):
             problems.append("wrapper exit plant: " + line[:120])
         if re.search(r"skills\.disabled blocks only", line):
             problems.append("disabled naming plant: " + line[:120])
         if re.search(r"skills\.enabled[^.]{0,80}\bbare name\b", line) and "prefixed" not in line:
             problems.append("enabled naming plant: " + line[:120])
-        if re.search(r"legacy sse[^.]{0,40}\bactivat", line):
+        if re.search(r"legacy sse" + WINDOW + r"\b(" + ACTIVATION_VERBS + r")\b", line):
             problems.append("activation plant: " + line[:120])
-        if re.search(r"\bcommands\b[^.]{0,40}\bagents\b[^.]{0,40}\bhooks\b[^.]{0,40}\b(light up|activat)", line):
+        if re.search(
+            r"\bcommands\b" + WINDOW + r"\bagents\b" + WINDOW
+            + r"\bhooks\b" + WINDOW + r"\b(light up|"
+            + ACTIVATION_VERBS + r")\b", line
+        ):
             problems.append("activation plant: " + line[:120])
-        if not re.search(r"\bnot\b[^.]{0,25}\bactivat", line) and "unverified" not in line:
-            if re.search(r"\bactivat\w*\b[^.]{0,40}\b(hooks|commands|agents|client namespaces|legacy sse)\b", line):
+        if not re.search(
+            r"\bnot\b[^.]{0,25}\b(activat\w*|enabl\w*|turn\w*|switch\w*|power\w*|bring\w*)",
+            line,
+        ) and QODER_UNVERIFIED_SHAPE not in line:
+            if activation_problem(line):
                 problems.append("activation plant: " + line[:120])
-            elif re.search(r"\b(hooks|commands|agents|client namespaces|legacy sse)\b[^.]{0,40}\bactivat", line):
-                problems.append("activation plant: " + line[:120])
-        if re.search(r"\.agents/skills[^.]{0,40}\bdrift\b", line):
+        if re.search(r"\.agents/skills" + WINDOW + r"\bdrift\b", line):
             problems.append("alias drift plant: " + line[:120])
-        if re.search(r"\.agents/skills[^.]{0,60}\bdiscover\w*\b", line):
+        if re.search(r"\.agents/skills" + WINDOW + r"\b(?:" + DISCOVERY_VERBS + r")\b", line):
             problems.append("alias discovery plant: " + line[:120])
-        if re.search(r"\.agents/skills[^.]{0,60}\b(winning|wins)\b", line):
+        elif re.search(r"\b(?:" + DISCOVERY_VERBS + r")\b" + WINDOW + r"\.agents/skills", line):
+            problems.append("alias discovery plant: " + line[:120])
+        if re.search(r"\.agents/skills" + WINDOW + r"\b(" + PRECEDENCE_VERBS + r")\b", line):
+            problems.append("alias precedence plant: " + line[:120])
+        elif re.search(r"\b(" + PRECEDENCE_VERBS + r")\b" + WINDOW + r"\.agents/skills", line):
+            problems.append("alias precedence plant: " + line[:120])
+        elif re.search(r"\.qwen/skills" + WINDOW + r"\b(los\w*|beaten)\b", line):
             problems.append("alias precedence plant: " + line[:120])
         if re.search(r"\bany npm package\b", line):
             problems.append("npm scope plant: " + line[:120])

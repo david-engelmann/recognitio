@@ -348,7 +348,7 @@ was checked rather than skipped.
 | Incident | Covered by |
 | --- | --- |
 | The plugin reviewer persona shipped with no pin on its surface, so a widened tools allowlist and free push rights prose passed the gate (R16-RT-01) | `test_a_widened_tools_allowlist_fails_the_pin` and `test_the_pinned_persona_prose_is_word_for_word` in the gate script suite |
-| The persona prose segmentation had no word for word pin, so a naive segmentation helper passed unnoticed (R16-ST-01) | `test_the_pinned_persona_prose_is_word_for_word` in the gate script suite |
+| The persona prose segmentation had no word for word pin, so a naive segmentation helper passed unnoticed (R16-ST-01 in the round 16 fix report series, not the round 16 standards lane report which reuses the same ID for mode only commit titles) | `test_the_pinned_persona_prose_is_word_for_word` in the gate script suite |
 
 Two round 16 repairs stand as records only with no test
 of their own, and this section records them as uncovered
