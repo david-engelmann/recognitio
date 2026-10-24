@@ -528,6 +528,12 @@ This unreleased work carries version 1.3.0.
   adaptation table stand further down. The version
   gate now reads the README version badge as one of
   the surfaces that must agree.
+- The README demo is now an agent session. A
+  real model reviews the range from 365da81e to
+  ecdda4c8 from the packet the extractor built
+  for it in the same run. The loop opens on the
+  raw diff of the range, all 3,233 lines of it,
+  before the packet distills it.
 
 ### Fixed
 

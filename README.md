@@ -8,7 +8,7 @@ Recognitio is an agent skill that pulls the relevant changes out of a pull reque
 
 Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
 
-![A terminal session runs the extractor on a real commit, and the packet view shows the enclosing function span and the test files it names before the manifest reads verified true](docs/images/recognitio-demo.gif)
+![A 3,233 line diff floods an agent session in this repository, the recognitio skill distills it into a verified packet, and the model reviews the packet and returns the meat only](docs/images/recognitio-demo.gif)
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. The full record lives in [the paired eval results](evals/RESULTS.md).
 
