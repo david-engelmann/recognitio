@@ -468,6 +468,64 @@ class TestCheckCoderabbit(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_review_linked_source_restated_plants_fail(self):
+        # Gate review repair. The first platform branch
+        # required the word available as a substring and
+        # the figure branch read digits only, so the
+        # review restated the promise with works and
+        # offered and supported, raised the limit in
+        # words, and hid the figure behind the verb link,
+        # and each passed.
+        cases = (
+            ("Deep Scan linked source works in the scan "
+             "trigger flow for self hosted GitLab.",
+             "promises Deep Scan linked source"),
+            ("Deep Scan linked source is offered in the "
+             "scan trigger flow on Bitbucket.",
+             "promises Deep Scan linked source"),
+            ("Linked repositories are supported in the "
+             "scan trigger flow on Azure DevOps.",
+             "promises Deep Scan linked source"),
+            ("A Deep Scan can read up to fifty linked "
+             "repositories on any plan.",
+             "linked repositories, above the pinned limit"),
+            ("A Deep Scan can read up to twenty one linked "
+             "repositories on any plan.",
+             "linked repositories, above the pinned limit"),
+            ("A Deep Scan can link 50 repositories to a "
+             "primary repository on any plan.",
+             "linked repositories, above the pinned limit"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_gate_review_linked_source_true_sentences_pass(self):
+        # Gate review repair. The substring read of the
+        # word available fired on unavailable, and the
+        # sentence level read fired where an included
+        # platform carried the offer and an excluded
+        # platform stood under its own negation.
+        cases = (
+            "Linked source is unavailable in the scan "
+            "trigger flow for self hosted GitLab.",
+            "Linked source is available on GitHub Cloud, "
+            "and self hosted GitLab is not among the "
+            "supported platforms.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                self.assertEqual(self.problems(root), [])
 
 if __name__ == "__main__":
     unittest.main()

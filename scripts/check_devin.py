@@ -226,16 +226,18 @@ MEMBERSHIP_PHRASES = "part of|go into|belong in"
 # far past the 15 and 20 character bounds, while the B3
 # probe puts a noun phrase there, the audit trail, which
 # starts a second claim unit and so stays out. Modifier
-# shaped means an article or conjunction or a word
-# carrying a derivational adjective or adverb suffix. A
+# shaped means an article or conjunction or a plain
+# degree adverb or a word carrying a derivational
+# adjective or adverb suffix. A
 # gap holding any other word shape is not a modifier
 # chain and this branch does not fire on it, so filler
 # that smuggles a noun or a verb into the gap still
 # escapes by design, as the bound comment above records
 # for its own zone.
 MODIFIER_WORD = (
-    r"(?:the|and|or|[a-z]+(?:ly|ous|ive|al|ic|ed|ing|ful"
-    r"|less|able|ible|ent|ant|ary|ory))"
+    r"(?:the|and|or|very|quite|rather|so|too|just|even"
+    r"|still|more|most|[a-z]+(?:ly|ous|ive|al|ic|ed|ing"
+    r"|ful|less|able|ible|ent|ant|ary|ory))"
 )
 MEMBERSHIP_MODIFIER_GAP = (
     r"(?:\s+" + MODIFIER_WORD + r")*\s+"
@@ -501,11 +503,31 @@ def semantic_problems(root=None):
         # followed by a pure modifier chain and then
         # resolved states the same membership at any gap
         # length, so it fires beside the bounded form.
-        membership_modifier_chain = bool(re.search(
+        # Gate review repair. The chain word list gains the
+        # plain degree adverbs, very and quite and their
+        # kin, which carry no suffix shape. The chain fires
+        # only where the matched span carries no negation
+        # and the word resolved heads a total or a count,
+        # because the plain negation of the plant shape and
+        # an attributive resolved findings review both
+        # matched the first form while stating no
+        # membership in the resolved total.
+        chain_match = re.search(
             r"\b(" + MEMBERSHIP_PHRASES + r")\b"
             + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
             low,
-        ))
+        )
+        membership_modifier_chain = bool(
+            chain_match
+            and not re.search(
+                r"\b(not|never)\b|n't",
+                low[max(0, chain_match.start() - 20):chain_match.end()],
+            )
+            and re.search(
+                r"\s+(total|count|tally|number)\b|[.,;:]",
+                low[chain_match.end():chain_match.end() + 12],
+            )
+        )
         # Verb plus membership from S4. A listed verb within
         # 30 of a membership phrase with resolved within 20
         # of the phrase restores the long filler verb shape.

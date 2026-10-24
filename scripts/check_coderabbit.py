@@ -288,30 +288,127 @@ def linked_problems(root=None):
     problems = []
     for sentence in sentences:
         low = sentence.lower()
-        for match in re.finditer(r"(\d+)\s+linked repositories", low):
-            if int(match.group(1)) != 20:
+        # R36 gate repair. The figure branch reads spelled
+        # figures as well as digits, and reads a figure
+        # bound to the word repositories by a link verb as
+        # well as by the linked pair, because the review
+        # restated the raised limit in words and behind the
+        # verb link and both passed the digit pair form.
+        figure_texts = [
+            match.group(1)
+            for match in re.finditer(
+                r"(\d+)\s+linked repositories", low
+            )
+        ]
+        figure_texts.extend(
+            match.group(1)
+            for match in re.finditer(
+                r"(" + _NUMBER_WORDS + r")\s+linked repositories",
+                low,
+            )
+        )
+        figure_texts.extend(
+            match.group(1)
+            for match in re.finditer(
+                r"\blink\w*\b[^.]{0,20}?(\d+|"
+                + _NUMBER_WORDS
+                + r")\s+repositories\b",
+                low,
+            )
+        )
+        for figure_text in figure_texts:
+            value = (
+                int(figure_text)
+                if figure_text.isdigit()
+                else _word_value(figure_text)
+            )
+            if value != 20:
                 problems.append(
                     "the coderabbit brief states %s linked "
                     "repositories, above the pinned limit of 20"
-                    % match.group(1)
+                    % figure_text
                 )
                 return problems
-        if (
-            ("linked" in low or "deep scan" in low)
-            and re.search(
-                r"\b(self hosted gitlab|azure devops|bitbucket)\b",
-                low,
-            )
-            and "available" in low
-            and "not available" not in low
-        ):
-            problems.append(
-                "the coderabbit brief promises Deep Scan "
-                "linked source on a platform the scan trigger "
-                "flow does not offer it on"
-            )
-            return problems
+        # R36 gate repair. The platform branch binds an
+        # availability word to an excluded platform by
+        # closeness in either direction, with any negation
+        # inside the span between them guarding the pair.
+        # The first repair required the word available as a
+        # substring, which both missed works and offered
+        # and supported and fired on unavailable and on a
+        # sentence that offered linked source on an
+        # included platform while naming an excluded one
+        # under its own negation.
+        if "linked" in low or "deep scan" in low:
+            platforms = [
+                match
+                for match in re.finditer(
+                    r"\b(self hosted gitlab|azure devops"
+                    r"|bitbucket)\b",
+                    low,
+                )
+            ]
+            offers = [
+                match
+                for match in re.finditer(
+                    r"\b(available|works|offered|supported"
+                    r"|runs|enabled|provided|usable)\b",
+                    low,
+                )
+            ]
+            for platform in platforms:
+                for offer in offers:
+                    start = min(platform.start(), offer.start())
+                    end = max(platform.end(), offer.end())
+                    if end - start > 80:
+                        continue
+                    span = low[max(0, start - 6):end + 12]
+                    if re.search(
+                        r"\b(not|never|no)\b|n't"
+                        r"|\bunavailable\b",
+                        span,
+                    ):
+                        continue
+                    problems.append(
+                        "the coderabbit brief promises Deep "
+                        "Scan linked source on a platform the "
+                        "scan trigger flow does not offer it on"
+                    )
+                    return problems
     return problems
+
+
+_NUMBER_WORDS = (
+    r"(?:twenty|thirty|forty|fifty|sixty|seventy|eighty"
+    r"|ninety)(?:\s+(?:one|two|three|four|five|six|seven"
+    r"|eight|nine))?|(?:one|two|three|four|five|six|seven"
+    r"|eight|nine|ten|eleven|twelve|thirteen|fourteen"
+    r"|fifteen|sixteen|seventeen|eighteen|nineteen)"
+)
+
+_WORD_ONES = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13,
+    "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19,
+}
+
+_WORD_TENS = {
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+    "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}
+
+
+def _word_value(phrase):
+    """The value of a spelled number phrase under a hundred."""
+    value = 0
+    for token in phrase.split():
+        if token in _WORD_TENS:
+            value += _WORD_TENS[token]
+        elif token in _WORD_ONES:
+            value += _WORD_ONES[token]
+    return value
 
 
 def decision_problems(root=None):

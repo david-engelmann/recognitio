@@ -279,6 +279,7 @@ def trust_problems(root=None):
         r"\btrusted input\b",
         r"\btrusted source\b",
         r"\btrusted content\b",
+        r"\btrusted\b",
         r"\breliable\b",
         r"\btrustworthy\b",
         r"\bdependable\b",
@@ -294,22 +295,55 @@ def trust_problems(root=None):
         # trustworthy words.
         r"\bcredible\b",
         r"\bendorse\w*\b",
+        # Gate review repair. Trust stated as obedience to
+        # head branch instructions states the same trust.
+        r"\bobey\w*\b",
     )
-    for sentence in _sentences(raw):
+    # Gate review repair. The scan reads sentences and the
+    # pairs of sentences that stand next to each other,
+    # because the review split the trust claim across a
+    # sentence boundary with a pronoun carrying it and the
+    # single sentence scan passed both halves. A trust word
+    # under a negation before it states the negative
+    # posture and is skipped, and a sentence that reports
+    # a source claim and rejects it in the same breath is
+    # attribution, not a rule, and is skipped.
+    sentences = _sentences(raw)
+    units = list(sentences)
+    for first, second in zip(sentences, sentences[1:]):
+        units.append(first + " " + second)
+    for sentence in units:
         if "head branch" not in sentence:
             continue
         if "untrusted" in sentence:
             continue
         if re.search(r"\bnothing\b.{0,40}\btreats\b", sentence):
             continue
-        for pattern in patterns:
-            if re.search(pattern, sentence):
-                problems.append(
-                    "a copilot rule trusts head branch "
-                    "instructions, which the untrusted input "
-                    "posture forbids"
-                )
-                return problems
+        attributed = bool(
+            re.search(
+                r"\b(called|claimed|claims|reported|records"
+                r"|stated|said|wrote|according)\b",
+                sentence,
+            )
+            and re.search(
+                r"\b(reject\w*|deni\w*|disagree\w*|not|never"
+                r"|false)\b",
+                sentence,
+            )
+        )
+        if not attributed:
+            for pattern in patterns:
+                match = re.search(pattern, sentence)
+                if match and not re.search(
+                    r"\b(not|never|no|nothing)\b|n't",
+                    sentence[:match.start()],
+                ):
+                    problems.append(
+                        "a copilot rule trusts head branch "
+                        "instructions, which the untrusted input "
+                        "posture forbids"
+                    )
+                    return problems
         # R31-RT-05. Merge authority without the base branch
         # qualifier, and a merge approval authored by head
         # branch instructions said to be valid, grant the
@@ -333,6 +367,28 @@ def trust_problems(root=None):
             "merge" in sentence
             and re.search(r"\bvalid\b", sentence)
             and not re.search(r"\b(no|not|never)\b.{0,30}\bvalid\b", sentence)
+        ):
+            problems.append(
+                "a copilot rule grants head branch content merge "
+                "authority, which the base branch authority rule "
+                "forbids"
+            )
+            return problems
+        # Gate review repair. Merge authority stated as
+        # head branch CODEOWNERS and rulesets deciding
+        # whether a merge proceeds grants the same
+        # authority without the authority phrase.
+        decide = re.search(
+            r"\b(decid\w*|determin\w*|govern\w*|control\w*)\b",
+            sentence,
+        )
+        if (
+            decide
+            and "merge" in sentence
+            and re.search(r"\b(codeowners|rulesets)\b", sentence)
+            and not re.search(
+                r"\b(no|not|never)\b", sentence[:decide.start()]
+            )
         ):
             problems.append(
                 "a copilot rule grants head branch content merge "
@@ -434,9 +490,29 @@ def approval_problems(root=None):
         r"\bgoes through\b",
         r"\bgreenlight\w*\b",
         r"\bis valid\b",
+        # Gate review repair. An approval that fires with
+        # a pronoun carrying the packet, or that can be
+        # approved in the passive form, permits the same
+        # firing. The brief's own never fires sentence is
+        # skipped on the negation before the verb, as
+        # every pattern here is.
+        r"\bfires\b",
+        r"\bcan be approved\b",
+        r"\bmay be approved\b",
+        r"\bis approved\b",
+        r"\bare approved\b",
     )
-    for sentence in _sentences(raw):
-        if "approval" not in sentence:
+    # Gate review repair. The scan reads sentences and
+    # the pairs of sentences that stand next to each
+    # other, because the review split the red packet
+    # presence and the approval firing across a sentence
+    # boundary and the single sentence scan passed both.
+    sentences = _sentences(raw)
+    units = list(sentences)
+    for first, second in zip(sentences, sentences[1:]):
+        units.append(first + " " + second)
+    for sentence in units:
+        if "approval" not in sentence and "approved" not in sentence:
             continue
         for pattern in patterns:
             match = re.search(pattern, sentence)

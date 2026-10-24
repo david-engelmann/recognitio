@@ -278,43 +278,156 @@ def negative_problems(root=None):
         for sentence in re.split(r"(?<=[.!?])\s+", text)
         if sentence.strip()
     ]
-    guards = (
-        "do not execute",
-        "does not execute",
-        "not execute",
-        "never execute",
-        "register but",
-        "runs no code",
-        "unexecuted",
-        "until zcode executes",
-    )
     problems = []
     for sentence in sentences:
         low = sentence.lower()
-        if any(guard in low for guard in guards):
+        # R36 gate repair. Guards judge one clause at a
+        # time, never the whole sentence, because the
+        # review rode a guard phrase in a first clause
+        # while a second clause asserted the execution the
+        # guard belongs to. The execution patterns read
+        # the passive order and the verb runs beside the
+        # execute stem. The description branch reads the
+        # singular character form, the short chars form,
+        # and spelled figures beside the digit form, and a
+        # clause that scopes its figure to a different host
+        # states no ZCode cap and is skipped.
+        clauses = [
+            clause.strip()
+            for clause in re.split(r",\s+and\s+|,\s+|;\s*", low)
+            if clause.strip()
+        ]
+        for clause in clauses:
+            problem = _negative_clause_problem(clause)
+            if problem is not None:
+                problems.append(problem)
+                return problems
+    return problems
+
+
+_CLAUSE_GUARDS = (
+    "do not execute",
+    "does not execute",
+    "not execute",
+    "never execute",
+    "register but",
+    "runs no code",
+    "unexecuted",
+    "until zcode executes",
+)
+
+_WORD_ONES = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13,
+    "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19,
+}
+
+_WORD_TENS = {
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+    "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}
+
+
+def _word_number_value(tokens):
+    """The value of a spelled number token run, or None."""
+    total = 0
+    current = 0
+    for token in tokens:
+        if token in _WORD_ONES:
+            current += _WORD_ONES[token]
+        elif token in _WORD_TENS:
+            current += _WORD_TENS[token]
+        elif token == "hundred":
+            current *= 100
+        elif token == "thousand":
+            total += (current or 1) * 1000
+            current = 0
+        elif token == "and":
             continue
-        if re.search(r"\bzcode\s+execut\w*\b", low) or re.search(
+        else:
+            return None
+    return total + current
+
+
+def _description_figures(clause):
+    """Every character figure in a clause, digits or words."""
+    figures = []
+    covered = []
+    for match in re.finditer(
+        r"(\d+)\s*(?:character|characters|chars)\b", clause
+    ):
+        figures.append(match.group(1))
+        covered.append((match.start(), match.end()))
+    for match in re.finditer(
+        r"\b(?:character|characters|chars)\b", clause
+    ):
+        if any(
+            start <= match.start() < end for start, end in covered
+        ):
+            continue
+        tokens = clause[:match.start()].split()
+        run = []
+        for token in reversed(tokens):
+            if (
+                token in _WORD_ONES
+                or token in _WORD_TENS
+                or token in ("hundred", "thousand", "and")
+            ):
+                run.append(token)
+            else:
+                break
+        run.reverse()
+        while run and run[-1] == "and":
+            run.pop()
+        if run:
+            value = _word_number_value(run)
+            if value is not None:
+                figures.append(str(value))
+    return figures
+
+
+def _negative_clause_problem(clause):
+    """Whether one clause executes a field or raises the cap."""
+    if any(guard in clause for guard in _CLAUSE_GUARDS):
+        return None
+    if (
+        re.search(
+            r"\bzcode\s+(execut\w*|runs?|ran)\b[^.]{0,40}"
+            r"\b(settings|channels|lspservers|outputstyles)\b",
+            clause,
+        )
+        or re.search(
             r"\bexecut\w*\b[^.]{0,40}\b(settings|channels"
             r"|lspservers|outputstyles)\b",
-            low,
-        ):
-            problems.append(
-                "the zcode brief has ZCode executing a "
-                "registered plugin field, which the register "
-                "but do not execute rule forbids"
-            )
-            return problems
-        if "description" in low:
-            for match in re.finditer(r"(\d+)\s*characters", low):
-                if int(match.group(1)) != 1024:
-                    problems.append(
-                        "the zcode brief states a plugin "
-                        "description cap of %s characters, "
-                        "above the pinned cap of 1024"
-                        % match.group(1)
-                    )
-                    return problems
-    return problems
+            clause,
+        )
+        or re.search(
+            r"\b(settings|channels|lspservers|outputstyles)\b"
+            r"[^.]{0,60}\b(are|is|were|was|gets?)\s+"
+            r"(?:\w+ly\s+)?(execut\w*|run|ran)\b"
+            r"[^.]{0,40}\bzcode\b",
+            clause,
+        )
+    ):
+        return (
+            "the zcode brief has ZCode executing a "
+            "registered plugin field, which the register "
+            "but do not execute rule forbids"
+        )
+    if "description" in clause and not re.search(
+        r"\b(different|another|other)\s+host\b|\bits own\b",
+        clause,
+    ):
+        for figure in _description_figures(clause):
+            if int(figure) != 1024:
+                return (
+                    "the zcode brief states a plugin "
+                    "description cap of %s characters, "
+                    "above the pinned cap of 1024" % figure
+                )
+    return None
 
 
 def decision_problems(root=None):

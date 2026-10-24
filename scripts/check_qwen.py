@@ -266,7 +266,7 @@ FIGURE_ADVERBS = (
 # A noun alone is ordinary roster prose, so the noun branch
 # of the figure check also needs a scope word from
 # FIGURE_SCOPE in the same sentence.
-FIGURE_AGENTS = "reviewers?|workers?|bots?"
+FIGURE_AGENTS = "reviewers?|workers?|bots?|agents?"
 
 # Scope words that turn a generic agent count into a
 # figure claim. Large and practice cover the G-01 scope
@@ -338,11 +338,15 @@ WINDOW = "[^.]{0,120}"
 # A bounded window let one long adverbial spread push the
 # simultaneity word 149 characters from its number inside
 # a single sentence, which is a filler length escape and
-# not a wording variant of a covered family. The wrapper
-# and activation families keep the bounded window above,
+# not a wording variant of a covered family. The figure
+# family therefore reads its sentence with no character
+# bound between the number and the simultaneity word,
+# and the gate review repair binds the number to a
+# generic agent noun so a number counting something else
+# in the same long sentence stays out. The wrapper and
+# activation families keep the bounded window above,
 # because their tokens state separate claims that a long
 # sentence can hold apart.
-FIGURE_SPAN = ".*"
 
 FIGURE_NUMBER = "([2-9]|1[0-9]|2[0-9])"
 
@@ -401,30 +405,49 @@ def sentence_units(text):
     return units
 
 
+def _bound_figure(sentence):
+    """Whether a figure number binds to a generic agent noun.
+
+    A number counts as a figure only when a generic agent
+    noun stands within the bounded window of it, in either
+    direction. A number bound to another noun, source
+    pages or routes or files, states no agent figure,
+    however near a simultaneity word it sits.
+    """
+    for match in re.finditer(
+        r"\b" + FIGURE_NUMBER + r"\b", sentence
+    ):
+        start = max(0, match.start() - 120)
+        end = match.end() + 120
+        if re.search(
+            r"\b(" + FIGURE_AGENTS + r")\b", sentence[start:end]
+        ):
+            return True
+    return False
+
+
 def figure_problem(sentence):
-    """Whether a sentence states a single Qwen figure."""
-    if re.search(
-        r"\b" + FIGURE_NUMBER + r"\b" + FIGURE_SPAN + r"\b("
-        + FIGURE_ADVERBS + r")\b", sentence
-    ):
-        return True
-    if re.search(
-        r"\b(" + FIGURE_ADVERBS + r")\b" + FIGURE_SPAN + r"\b"
-        + FIGURE_NUMBER + r"\b", sentence
-    ):
-        return True
-    if not re.search(
-        r"\b(" + FIGURE_SCOPE + r")\b", sentence
-    ):
+    """Whether a sentence states a single Qwen figure.
+
+    Gate review repair. The sentence scope span from
+    R36-E1-01 fired on any number in a sentence with a
+    simultaneity word, including a true sentence whose
+    number counted source pages 251 characters from the
+    word together. The figure now has to bind to a
+    generic agent noun first, and the simultaneity word
+    or the scope word in the same sentence does the
+    rest, so the long adverbial spread in the E1 plant
+    still fires on its reviewer count while a page count
+    in a record sentence passes.
+    """
+    if not _bound_figure(sentence):
         return False
     if re.search(
-        r"\b" + FIGURE_NUMBER + r"\b" + FIGURE_SPAN + r"\b("
-        + FIGURE_AGENTS + r")\b", sentence
+        r"\b(" + FIGURE_ADVERBS + r")\b", sentence
     ):
         return True
     return bool(re.search(
-        r"\b(" + FIGURE_AGENTS + r")\b" + FIGURE_SPAN + r"\b"
-        + FIGURE_NUMBER + r"\b", sentence
+        r"\b(" + FIGURE_SCOPE + r")\b", sentence
     ))
 
 
@@ -551,6 +574,28 @@ def negative_problems(text):
             problems.append("publication plant: " + line[:120])
         if re.search(r"vs code marketplace[^.]{0,40}\b(publication|publish)\b", line):
             problems.append("publication plant: " + line[:120])
+    # Gate review repair. The figure family also reads
+    # the pairs of prose sentences that stand next to each
+    # other, because the review split the agent count and
+    # the simultaneity word across a sentence boundary in
+    # both orders and each half passed alone. Table rows
+    # and headings and code lines stay out of the pairs,
+    # as they stay out of the sentence units themselves.
+    units = sentence_units(normalise(text))
+    for first, second in zip(units, units[1:]):
+        if first.startswith(("|", "#", "`")) or second.startswith(
+            ("|", "#", "`")
+        ):
+            continue
+        joined = first + " " + second
+        if guarded(joined):
+            continue
+        if (
+            figure_problem(joined)
+            and not figure_problem(first)
+            and not figure_problem(second)
+        ):
+            problems.append("figure plant: " + joined[:120])
     return problems
 
 

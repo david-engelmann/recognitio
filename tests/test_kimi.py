@@ -1380,6 +1380,65 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_review_swapped_limit_forms_fail(self):
+        # Gate review repair. The first swap branch bound a
+        # figure to a scope through a short limit phrase
+        # list in the digit kilobyte form only, so the
+        # review restated the swap with other verbs, with a
+        # spelled figure, and in bytes and KiB, and each
+        # passed. The binding now reads the scope word
+        # nearest the figure in any of those forms.
+        cases = (
+            ("Each systemPrompt field in Kimi has a limit "
+             "of 64 KB of content.", "per field limit of 64"),
+            ("Each systemPrompt field in Kimi allows a "
+             "maximum of 64 KB of content.",
+             "per field limit of 64"),
+            ("Each systemPrompt field in Kimi may hold up "
+             "to sixty four KB of content.",
+             "per field limit of 64"),
+            ("Each systemPrompt field in Kimi may hold up "
+             "to 65536 bytes of content.",
+             "per field limit of 64"),
+            ("Each systemPrompt field in Kimi may hold up "
+             "to 64 KiB of content.", "per field limit of 64"),
+            ("The per field systemPrompt limit in Kimi is "
+             "64 KB.", "per field limit of 64"),
+            ("The total systemPrompt limit in Kimi may hold "
+             "up to 32 KB of content.", "total limit of 32"),
+            ("Kimi holds 32 KB in total across every "
+             "systemPrompt field.", "total limit of 32"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_gate_review_bare_name_response_fails(self):
+        # Gate review repair. Bare name acceptance stated
+        # with a response verb before the bare name passed,
+        # because the response verb stood on the other side
+        # of the name from every branch that read it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nPlugin skills in Kimi respond to "
+                "a bare name without the qualified name.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("accepts a bare name" in p
+                    for p in problems),
+                problems,
+            )
 
 if __name__ == "__main__":
     unittest.main()

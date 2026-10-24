@@ -1002,6 +1002,20 @@ def qualified_problems(root=None):
                 verb = re.search(r"\binvok\w*\b", segment)
                 if not _neg_before(segment, verb.start()):
                     hit = True
+            # Gate review repair. Bare name acceptance
+            # stated with a response verb before the bare
+            # name, plugin skills responding to a bare name,
+            # states the same acceptance with the verb on
+            # the other side of the name.
+            respond_match = re.search(
+                r"\b(respond\w*|answer\w*)\b[^.]{0,30}"
+                r"\bbare (skill )?names?\b",
+                segment,
+            )
+            if respond_match and not _neg_before(
+                segment, respond_match.start()
+            ):
+                hit = True
             has_bare = bool(bare.search(segment))
             for match in acceptance.finditer(segment):
                 if has_bare and not _neg_before(
@@ -1116,6 +1130,142 @@ def workdir_problems(root=None):
     return problems
 
 
+_WORD_ONES = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13,
+    "fourteen": 14, "fifteen": 15, "sixteen": 16,
+    "seventeen": 17, "eighteen": 18, "nineteen": 19,
+}
+
+_WORD_TENS = {
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+    "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}
+
+
+def _word_number_before(clause, index):
+    """The spelled number ending just before index.
+
+    Returns the value and the start of the number phrase,
+    or None. A tens word with a ones word after it reads
+    as the two together, so sixty four reads as 64.
+    """
+    tokens = clause[:index].split()
+    if not tokens:
+        return None
+    last = tokens[-1]
+    if last in _WORD_TENS:
+        start = index - len(last)
+        return _WORD_TENS[last], start
+    if last in _WORD_ONES:
+        start = index - len(last)
+        if len(tokens) > 1 and tokens[-2] in _WORD_TENS:
+            start = index - len(last) - len(tokens[-2]) - 1
+            return _WORD_TENS[tokens[-2]] + _WORD_ONES[last], start
+        return _WORD_ONES[last], start
+    return None
+
+
+def _clause_figures(clause):
+    """Every size figure in a clause as a KB value.
+
+    Each entry is the value in KB, the start, and the end.
+    Byte figures count only as whole kilobytes, since the
+    census below judges the rest. Spelled figures count
+    the same as digit figures.
+    """
+    figures = []
+    covered = []
+    for match in re.finditer(
+        r"(?<![\w-])(\d+)\s*(?:kb|kib)\b", clause
+    ):
+        figures.append(
+            (int(match.group(1)), match.start(), match.end())
+        )
+        covered.append((match.start(), match.end()))
+    for match in re.finditer(
+        r"(?<![\w-])(\d[\d,]*)\s*bytes\b", clause
+    ):
+        value = int(match.group(1).replace(",", ""))
+        if value % 1024 == 0:
+            figures.append(
+                (value // 1024, match.start(), match.end())
+            )
+            covered.append((match.start(), match.end()))
+    for match in re.finditer(r"\b(?:kb|kib)\b", clause):
+        if any(
+            start <= match.start() < end for start, end in covered
+        ):
+            continue
+        spelled = _word_number_before(clause, match.start())
+        if spelled is not None:
+            value, start = spelled
+            figures.append((value, start, match.end()))
+    return figures
+
+
+def _swap_problem(clause):
+    """Whether a clause swaps the per field and total figures.
+
+    Figures bind to scope words by closeness, closest
+    pairs first, and each scope word binds one figure. A
+    figure bound to the field scope must be 32 and a
+    figure bound to the total scope must be 64.
+    """
+    if not re.search(
+        r"systemprompt|prompt|field|limit|total|budget", clause
+    ):
+        return None
+    figures = _clause_figures(clause)
+    if not figures:
+        return None
+    markers = []
+    for match in re.finditer(r"\bfields?\b", clause):
+        markers.append(("field", match.start(), match.end()))
+    for match in re.finditer(
+        r"\b(total|overall|combined|aggregate|budget)\b", clause
+    ):
+        markers.append(("total", match.start(), match.end()))
+    if not markers:
+        return None
+    pairs = []
+    for fi, (value, fstart, fend) in enumerate(figures):
+        for mi, (scope, mstart, mend) in enumerate(markers):
+            gap = max(mstart - fend, fstart - mend, 0)
+            if gap <= 100:
+                pairs.append((gap, fi, mi))
+    pairs.sort()
+    bound_figures = set()
+    bound_markers = set()
+    bindings = {}
+    for gap, fi, mi in pairs:
+        if fi in bound_figures or mi in bound_markers:
+            continue
+        bound_figures.add(fi)
+        bound_markers.add(mi)
+        bindings[fi] = markers[mi][0]
+    for fi, (value, fstart, fend) in enumerate(figures):
+        scope = bindings.get(fi)
+        if scope is None:
+            continue
+        if _neg_before(clause, fstart, 15):
+            continue
+        if scope == "field" and value != 32:
+            return (
+                "a kimi rule states a per field limit of "
+                "%s KB, which swaps the pinned 32KB per "
+                "field figure for the 64KB total figure" % value
+            )
+        if scope == "total" and value != 64:
+            return (
+                "a kimi rule states a total limit of %s "
+                "KB, which swaps the pinned 64KB total "
+                "figure for the 32KB per field figure" % value
+            )
+    return None
+
+
 def limits_problems(root=None):
     """R28-RT-05. No sentence may inflate the size limits.
 
@@ -1133,56 +1283,29 @@ def limits_problems(root=None):
     if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
-    # R36-RT-02. The per field figure and the total figure
-    # swapped state the same inflation with both figures
-    # inside the allowed pair, so the figure census below
-    # passes them. A figure bound to the field scope by a
-    # limit phrase must be the 32 figure, and a figure
-    # bound to the total scope must be the 64 figure. The
-    # derivation note clause that states the 32 per field
-    # limit and the 64 prompt build budget in one breath
-    # binds no limit phrase to its 64 figure, so it passes.
+    # R36-RT-02, repaired at the gate review. The per field
+    # figure and the total figure swapped state the same
+    # inflation with both figures inside the allowed pair,
+    # so the figure census below passes them. The first
+    # repair bound a figure to a scope through a short list
+    # of limit phrases in the digit kilobyte form only, and
+    # the gate review restated the swap with other verbs,
+    # with spelled figures, and in bytes and KiB, and each
+    # restatement passed. The binding now reads scope
+    # itself. Every size figure in a limit clause, in
+    # digits or in words, in KB or KiB or bytes, binds to
+    # the nearest scope word in the clause, field words to
+    # the per field scope and total words to the total
+    # scope, closest pairs first so one scope word binds
+    # one figure. A figure bound to the field scope must
+    # be the 32 figure and a figure bound to the total
+    # scope must be the 64 figure. The derivation note
+    # clause that states the 32 per field limit and the 64
+    # prompt build budget in one breath binds its 32 to
+    # the field word beside it and its 64 to the budget
+    # word beside it, so it passes.
     for clause in clauses:
-        swap = None
-        for match in re.finditer(
-            r"field\b[^.]{0,80}?(?:limited to|may hold up to"
-            r"|holds? up to|hold up to|capped at|at most)"
-            r"\s*(\d+)\s*kb\b",
-            clause,
-        ):
-            if int(match.group(1)) != 32 and not _neg_before(
-                clause, match.start(), 15
-            ):
-                swap = (
-                    "a kimi rule states a per field limit of "
-                    "%s KB, which swaps the pinned 32KB per "
-                    "field figure for the 64KB total figure"
-                    % match.group(1)
-                )
-        for match in re.finditer(
-            r"(\d+)\s*kb\s+per\s+field\b", clause
-        ):
-            if int(match.group(1)) != 32 and not _neg_before(
-                clause, match.start(), 15
-            ):
-                swap = (
-                    "a kimi rule states a per field limit of "
-                    "%s KB, which swaps the pinned 32KB per "
-                    "field figure for the 64KB total figure"
-                    % match.group(1)
-                )
-        for match in re.finditer(
-            r"(\d+)\s*kb\s+total\b", clause
-        ):
-            if int(match.group(1)) != 64 and not _neg_before(
-                clause, match.start(), 15
-            ):
-                swap = (
-                    "a kimi rule states a total limit of %s "
-                    "KB, which swaps the pinned 64KB total "
-                    "figure for the 32KB per field figure"
-                    % match.group(1)
-                )
+        swap = _swap_problem(clause)
         if swap is not None:
             problems.append(swap)
             break

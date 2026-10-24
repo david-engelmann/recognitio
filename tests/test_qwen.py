@@ -186,6 +186,46 @@ class TestCheckQwen(unittest.TestCase):
         for probe in probes:
             self.assertEqual(self.mod.negative_problems(probe), [], probe)
 
+    def test_gate_review_split_figure_plants_fail(self):
+        # Gate review repair. The figure family read one
+        # sentence at a time, so the review split the agent
+        # count and the simultaneity word across a sentence
+        # boundary in both orders and each half passed. The
+        # family now reads the pairs of prose sentences
+        # that stand next to each other beside the singles.
+        for plant in (
+            "Qwen runs 16 agents. They work together on a "
+            "large review.",
+            "Together, they check the whole review. Qwen "
+            "runs 16 agents on it.",
+        ):
+            problems = self.mod.negative_problems(plant)
+            self.assertTrue(
+                any("figure plant" in p for p in problems),
+                (plant, problems),
+            )
+
+    def test_gate_review_unbound_figure_sentence_passes(self):
+        # Gate review repair. The sentence scope span fired
+        # on any number in a sentence with a simultaneity
+        # word, including a true record sentence whose
+        # number counted source pages far from the word
+        # together. A figure now has to bind to a generic
+        # agent noun before the sentence can state one.
+        problems = self.mod.negative_problems(
+            "Qwen lists 4 source pages in the basis and "
+            "scope table at the head of this brief, and each "
+            "page was read on its own date and is cited for "
+            "a different claim in a different section of the "
+            "record that follows, and the basis table and "
+            "the scope table are presented together in that "
+            "record."
+        )
+        self.assertFalse(
+            any("figure plant" in p for p in problems),
+            problems,
+        )
+
     def test_passive_beaten_fails_and_active_beats_passes(self):
         # S2. Only the passive beaten form states losing, so
         # the active beats form that states the shipped

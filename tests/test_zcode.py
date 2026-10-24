@@ -265,6 +265,58 @@ class TestCheckZcode(unittest.TestCase):
                     (plant, problems),
                 )
 
+    def test_gate_review_execution_and_cap_restated_plants_fail(self):
+        # Gate review repair. The sentence level guard let
+        # a first clause guard phrase exempt a second
+        # clause execution claim, the patterns read one
+        # word order and one verb stem, and the cap branch
+        # read the digit characters form only, so the
+        # review restated each claim outside those shapes.
+        cases = (
+            ("Until ZCode executes them, settings stay "
+             "registered, and in practice ZCode executes "
+             "the settings declared in a plugin manifest "
+             "at startup.", "executing a registered"),
+            ("The settings declared in a plugin manifest "
+             "are executed by ZCode on startup.",
+             "executing a registered"),
+            ("ZCode runs the settings declared in a plugin "
+             "manifest.", "executing a registered"),
+            ("A plugin description on ZCode has a 2048 "
+             "character limit.", "description cap of 2048"),
+            ("A plugin description on ZCode runs at most "
+             "two thousand and forty eight characters.",
+             "description cap of 2048"),
+            ("A plugin description on ZCode runs at most "
+             "2048 chars.", "description cap of 2048"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_gate_review_other_host_cap_sentence_passes(self):
+        # Gate review repair. The first cap branch read
+        # every character figure in a sentence holding the
+        # word description, so a true sentence stating the
+        # ZCode cap beside a different host figure failed.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nThe ZCode plugin description cap "
+                "is 1024 characters, and a different host "
+                "allows 2048 characters for its own "
+                "description field.\n",
+            )
+            self.assertEqual(self.problems(root), [])
 
 if __name__ == "__main__":
     unittest.main()

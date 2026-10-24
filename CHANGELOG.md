@@ -513,7 +513,13 @@ This unreleased work carries version 1.3.0.
   the Gemini Code Assist on GitHub split status, and the
   README install guidance states that copies do not
   inherit upstream fixes. The accepted round 34 single
-  synonym residual stands unchanged.
+  synonym residual stands unchanged. The three review
+  gate on this pass then restated each new branch in the
+  forms just outside its first shape, and a repair commit
+  widened the branches to read scope binding, sentence
+  pairs, clause level guards, and figure binding in
+  place of the first narrow forms, with the false
+  positives the widening first carried guarded out.
 
 ### Fixed
 

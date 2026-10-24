@@ -735,36 +735,48 @@ def brief_negative_problems(root=None):
     problems = []
     for sentence in sentences:
         low = sentence.lower()
-        cap = re.search(r"(\d+)\s+repositories\b", low)
-        if cap and re.search(
-            r"\b(up to|supports?|supported|cap|limit|maximum"
-            r"|at most)\b",
+        # R36 gate repair. The cap branch binds a figure to
+        # the word repositories at any short distance, in
+        # digits or in the spelled hundred forms, with no
+        # bounding verb required and no two figure
+        # exemption, because a sentence naming both figures
+        # still cites cap figures and the conflict note is
+        # the only thing that makes a citation honest. The
+        # sentence that names both figures with the conflict
+        # named beside them passes on the conflict word.
+        cap = re.search(
+            r"\b(\d+|three hundred|five hundred)\b"
+            r"[^.]{0,40}\brepositories\b",
             low,
-        ):
-            figures = set(re.findall(r"\b(300|500)\b", low))
-            if "conflict" not in low and len(figures) < 2:
-                problems.append(
-                    "the cursor brief states a repository cap "
-                    "figure of %s with no R35-C-01 conflict "
-                    "note beside it" % cap.group(1)
-                )
-                return problems
+        ) or re.search(
+            r"\brepositories\b[^.]{0,40}"
+            r"\b(\d+|three hundred|five hundred)\b",
+            low,
+        )
+        if cap and "conflict" not in low:
+            problems.append(
+                "the cursor brief states a repository cap "
+                "figure of %s with no R35-C-01 conflict "
+                "note beside it" % cap.group(1)
+            )
+            return problems
         if (
             "bugbot.yaml" in low
             and (
                 re.search(
-                    r"\beffort\b[^.]{0,50}\b(pin\w*|set|configur\w*)\b",
+                    r"\beffort\b[^.]{0,120}"
+                    r"\b(pin\w*|set|configur\w*|control\w*)\b",
                     low,
                 )
                 or re.search(
-                    r"\b(pin\w*|set|configur\w*)\b[^.]{0,30}"
-                    r"\beffort\b",
+                    r"\b(pin\w*|set|configur\w*|control\w*)\b"
+                    r"[^.]{0,120}\beffort\b",
                     low,
                 )
             )
             and not re.search(
                 r"\b(claims|secondary|no such|inventing"
-                r"|not|never)\b",
+                r"|not|never|cannot)\b",
                 low,
             )
         ):
@@ -774,7 +786,11 @@ def brief_negative_problems(root=None):
                 "pin forbids"
             )
             return problems
-        block = re.search(r"\bblocks?\b", low)
+        block = re.search(
+            r"\b(blocks?|blocked|stops?|stopped|halts?"
+            r"|prevent\w*)\b",
+            low,
+        )
         if block and "neutral" in low and not re.search(
             r"\b(does not|do not|not|never|no)\b[^.]{0,30}$",
             low[:block.start()],

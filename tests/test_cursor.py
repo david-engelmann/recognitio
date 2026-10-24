@@ -467,6 +467,60 @@ class TestCheckCursor(unittest.TestCase):
             )
             self.assertEqual(self.problems(root), [])
 
+    def test_gate_review_cursor_restated_plants_fail(self):
+        # Gate review repair. The first cap branch needed a
+        # bounding verb and exempted a sentence naming both
+        # figures, the effort branch read a 50 character
+        # window and three pin verbs, and the neutral branch
+        # read one verb form, so the review restated every
+        # plant just outside those shapes and each passed.
+        cases = (
+            ("A cloud agent environment has 500 "
+             "repositories.", "cap figure of 500"),
+            ("Cloud agent environments get 500 repositories "
+             "each.", "cap figure of 500"),
+            ("A cloud agent environment supports up to five "
+             "hundred repositories.",
+             "cap figure of five hundred"),
+            ("A cloud agent environment supports up to 500 "
+             "repositories, while another page says 300 "
+             "repositories.", "cap figure of 500"),
+            ("The bugbot.yaml file controls Bugbot effort "
+             "for this repository.", "pins Bugbot effort"),
+            ("Bugbot effort for this repository, across all "
+             "reviews and all teams in the organization, can "
+             "be pinned in bugbot.yaml.",
+             "pins Bugbot effort"),
+            ("A neutral Bugbot conclusion stops merges on "
+             "findings.", "neutral Bugbot conclusion"),
+            ("A neutral Bugbot conclusion blocked merges on "
+             "findings.", "neutral Bugbot conclusion"),
+        )
+        for plant, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (plant, problems),
+                )
+
+    def test_gate_review_cursor_cannot_control_passes(self):
+        # Gate review repair. The effort guard read the
+        # words not and never, so the same true sentence
+        # with cannot in place of never failed the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nEffort cannot be pinned in "
+                "bugbot.yaml, because effort is a dashboard "
+                "setting only.\n",
+            )
+            self.assertEqual(self.problems(root), [])
 
 if __name__ == "__main__":
     unittest.main()

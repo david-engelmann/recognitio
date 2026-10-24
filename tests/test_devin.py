@@ -565,6 +565,56 @@ class TestCheckDevin(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_review_degree_adverb_chain_plants_fail(self):
+        # Gate review repair. The modifier chain read
+        # articles, conjunctions, and suffix shaped words,
+        # so a chain carrying the plain degree adverbs very
+        # or quite broke the chain at any length and the
+        # membership claim passed.
+        cases = (
+            "Dismissed findings are part of the very "
+            "comprehensive resolved total.",
+            "Dismissed findings are part of the quite "
+            "comprehensive resolved total.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any("counts dismissed findings" in p
+                        for p in problems),
+                    (plant, problems),
+                )
+
+    def test_gate_review_chain_true_sentences_pass(self):
+        # Gate review repair. The first chain form also
+        # fired on the plain negation of the plant shape
+        # and on an attributive resolved findings review,
+        # neither of which claims membership in the
+        # resolved total.
+        cases = (
+            "Dismissed findings are not part of the "
+            "comprehensive and carefully audited resolved "
+            "total.",
+            "Dismissed findings are listed as part of the "
+            "comprehensive and carefully audited resolved "
+            "findings review, which explains why they stay "
+            "separate from the count.",
+        )
+        for plant in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertFalse(
+                    any("counts dismissed findings" in p
+                        for p in problems),
+                    (plant, problems),
+                )
 
 if __name__ == "__main__":
     unittest.main()
