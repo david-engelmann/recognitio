@@ -199,6 +199,9 @@ Derives from the primary Devin API release notes at
 docs.devin.ai/api-reference/release-notes, read in the
 round 30 research sweep, which date the session schedules
 deprecation to September 10 with no end date published.
+The same page states the September 24 2026 POST 403 for
+migrated organizations in its v3 API Deprecations entry
+on the schedules endpoints.
 
 ### R11. The coordinator surfaces
 
@@ -336,7 +339,9 @@ record that AI Scan stays advisory only.
 
 Explicit Copilot feature choices are recorded rather
 than relying on a default set during the October 22
-through October 26 rollout window. A packet workflow
+through October 26 rollout window. The Copilot model policy
+API is the governance surface for those choices, generally
+available since October 19 2026. A packet workflow
 that runs during or after that window records its
 Copilot feature choices explicitly, because an
 unconfigured setting in that window takes the global

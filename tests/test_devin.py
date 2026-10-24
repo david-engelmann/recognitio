@@ -279,6 +279,89 @@ class TestCheckDevin(unittest.TestCase):
                 problems,
             )
 
+    def test_added_contradictions_fail(self):
+        # R32-RT-01. The gate carried no semantic negative, so
+        # an appended rule that counted dismissed findings
+        # toward the resolved total, merged a blocked pull
+        # request without a bypass surface, and dropped SARIF
+        # passed while every pin stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root,
+                text + "\n\nFindings dismissed by a reviewer now "
+                "count toward the resolved total. Devin Review "
+                "merges a blocked pull request without any "
+                "bypass surface. Export is CSV only with SARIF "
+                "dropped.\n",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("counts dismissed findings" in p
+                    for p in problems),
+                problems,
+            )
+            self.assertTrue(
+                any("without a bypass surface" in p
+                    for p in problems),
+                problems,
+            )
+            self.assertTrue(
+                any("exports CSV only" in p for p in problems),
+                problems,
+            )
+
+    def test_an_in_rule_resolved_contradiction_fails(self):
+        # R32-RT-01. The same dismissed count contradiction
+        # inserted inside the R2 rule block, directly after
+        # its pinned sentence, also passed while every pin
+        # stayed in place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "Findings dismissed by a reviewer and duplicates "
+                "no longer count",
+                "Findings dismissed by a reviewer and duplicates "
+                "no longer count. Findings dismissed by a "
+                "reviewer also count toward the resolved total",
+            )
+            self.assertTrue(
+                any("counts dismissed findings" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_replacement_contradictions_fail(self):
+        # R32-RT-01. Each contradiction in replacement form,
+        # where the pinned sentence itself is rewritten to
+        # state the opposite, must fail the semantic check
+        # as well as the pin check.
+        cases = (
+            ("count a finding as resolved only when it was "
+             "fixed in code",
+             "findings dismissed by a reviewer also count "
+             "toward the resolved total",
+             "counts dismissed findings"),
+            ("can merge a blocked pull request directly from "
+             "Devin Review",
+             "merges a blocked pull request without any "
+             "bypass surface",
+             "without a bypass surface"),
+            ("export as SARIF 2.1.0",
+             "export as CSV only",
+             "exports CSV only"),
+        )
+        for old, new, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(root, old, new)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (old, problems),
+                )
+
     def test_a_decision_record_without_decision_4_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

@@ -326,18 +326,28 @@ posture the plan already required stands unchanged. The data
 upload controversy means the trust text must be explicit that
 the skill is local git only and exfiltrates nothing.
 
-## 13. Build 18, the Trae skill build, condition lifted
+## 13. Build 18, the Trae skill build, condition suspended
 
 Recorded on 2026-10-23 in round 16 under the retrospective
 correction convention. The round 15 plan proposed this change
-and the round 16 fix lane records it. The round 15 research
-primary confirmed Agent Skills support in Trae CLI and IDE,
-so the condition lifts and the build proceeds as documented.
-Global skills live at `~/.traecli/skills`, project skills at
-`.traecli/skills/`, IDE skills at `.trae/skills/` and
-`~/.traecn/skills`, with `SKILL.md` carrying name and
-description frontmatter, plus auto skills from
-`.agents/skills`.
+and the round 16 fix lane records it.
+
+Round 32 retraction, recorded on 2026-10-24. The primary
+confirmed sentence in the round 15 paragraph below is
+retracted, and the lifted condition in the former heading
+is withdrawn. The paragraph below stands only as the round
+15 historical record. It is superseded for Build 18 purposes
+by the round 31 note and the round 32 deferral note below,
+and the paths it carries are not to be used as a build
+target.
+
+The round 15 research primary confirmed Agent Skills support
+in Trae CLI and IDE, so the condition lifts and the build
+proceeds as documented. Global skills live at
+`~/.traecli/skills`, project skills at `.traecli/skills/`,
+IDE skills at `.trae/skills/` and `~/.traecn/skills`, with
+`SKILL.md` carrying name and description frontmatter, plus
+auto skills from `.agents/skills`.
 
 Round 31 note, recorded on 2026-10-24. The round 30 check
 found no primary Trae skill surface in any lane, so the
@@ -348,6 +358,36 @@ round 32 establishes the surface from Trae primary docs,
 and the merger is never cited as evidence of a Trae skill
 or plugin surface. No Trae brief, gate script, or manifest
 lands in round 31.
+
+Round 32 deferral, recorded on 2026-10-24. The round 32
+primary check found no Trae skill or plugin surface. The
+trae-agent repo at https://github.com/bytedance/trae-agent
+states Releases 0 and Tags 0, and its README names no skill
+surface and no plugin surface. Primary docs searches
+returned no Trae vendor skill specification. Build 18 is
+DEFERRED rather than built, and the deferral is revisited
+only after a future primary Trae docs page defines a
+targetable surface. No Trae brief, gate script, or manifest
+lands in round 32. The opening paragraph above is superseded
+for Build 18 purposes by the round 31 note and this
+deferral, and the carried paths are not to be used as a
+build target. The secondary pages that must never lift the
+surface from UNVERIFIED are the skills.sh Trae marketplace
+page at https://www.skills.sh/agent/trae, the agentgid
+aggregator page at https://agentgid.com/agents/trae/, and
+user repos with .trae/skills layouts. A secondary article
+about VS Code extension compatibility is about extensions,
+not skills, and it must never lift the surface either. The
+Trae and TraeWork merger is never cited as evidence of a
+Trae skill or plugin surface. The TraeWork shutdown date
+of October 23 has passed, so any future Build 18 brief
+must recheck each Trae link on unified TRAE primary docs
+and must flag any link that still points to a TraeWork
+location as retired. The .traecli and .traecn paths in the
+opening paragraph are marked as round 15 carries with
+UNVERIFIED status, since no source found in round 32 names
+them. The .trae/skills and .agents/skills members stay
+only as carried, unproven paths.
 
 ## 14. Build 5, the plugin reviewer persona as the main thread
 
@@ -970,7 +1010,9 @@ procedure. Each stack layer and the integrated whole are
 verified separately. An AI Scan pass is signal and never a
 merge gate. Explicit Copilot feature choices are recorded
 rather than relying on a default set during the October 22
-through October 26 rollout window. The Fusion score claim
+through October 26 rollout window. The Copilot model policy
+API is the governance surface for those choices, generally
+available since October 19 2026. The Fusion score claim
 carries the chart caveat and the higher Sonnet 5.5 figure
 from the same chart, never as a top score claim. The brief
 qualifies every Devin Dynamic Workflows mention with Devin,
@@ -978,7 +1020,7 @@ so the Build 6 Claude Code fan out surface is never
 confused with Devin Dynamic Workflows. Decision 4 binds
 this build like every other build.
 
-## Round 31 note. Graphite CLI changelog pin
+### Round 31 note on the Graphite CLI changelog pin
 
 Recorded on 2026-10-24 in round 31. This note is the home
 for the future Graphite material, and no Graphite brief,

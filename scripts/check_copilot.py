@@ -285,6 +285,11 @@ def trust_problems(root=None):
         r"\bmay be followed\b",
         r"\bcan be followed\b",
         r"\bshould be followed\b",
+        # R32-RT-02. Trust stated as credible or endorsed
+        # states the same trust without the reliable and
+        # trustworthy words.
+        r"\bcredible\b",
+        r"\bendorse\w*\b",
     )
     for sentence in _sentences(section):
         if "head branch" not in sentence:
@@ -414,6 +419,13 @@ def approval_problems(root=None):
         r"\bissued\b",
         r"\bclears\b",
         r"\bis fine\b",
+        # R32-RT-02. An approval that goes through or
+        # greenlights a red packet, or that is valid on a
+        # red packet, permits the same firing in other
+        # words.
+        r"\bgoes through\b",
+        r"\bgreenlight\w*\b",
+        r"\bis valid\b",
     )
     for sentence in _sentences(section):
         if "approval" not in sentence:

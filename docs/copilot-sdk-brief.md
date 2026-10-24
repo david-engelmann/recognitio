@@ -269,6 +269,12 @@ Gemini 4 Argon entry.
 The head branch change record stays current as of the
 July 17 2026 primary entry. The November 16 2026
 retirement wave shows no movement as of October 24 2026.
+Round 32 note, recorded on 2026-10-24. Re-check the
+November 16 Copilot model retirements and the Teams
+legacy retirement after November 16 2026 against the
+primary entries, and re-read the October 22 through
+October 26 global default window after October 26 2026,
+when that window ends.
 The Lite ensemble figures stay vendor reported. The usage
 metrics stay client telemetry that undercounts. The
 October 19 2026 deprecation coverage never names code

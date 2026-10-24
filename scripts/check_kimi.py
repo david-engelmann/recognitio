@@ -799,6 +799,26 @@ def collision_problems(root=None):
                 "forbids"
             )
             break
+        # R32-RT-04. Precedence stated as a loser, where the
+        # agent file agent is not the one that runs in a
+        # collision, states the same plugin win without any
+        # winning verb, because only the plugin agent is
+        # left to run.
+        if re.search(
+            r"\bis not the one that (runs|executes)\b", clause
+        ) and (
+            "collision" in clause
+            or re.search(
+                r"\b(agent-file|agent file|user|project|extra)\b",
+                clause,
+            )
+        ):
+            problems.append(
+                "a kimi rule lets the plugin provided agent win "
+                "a name collision, which the precedence rule "
+                "forbids"
+            )
+            break
         # R31-RT-02. A plugin win stated as a default or as
         # an agent file loss states the same ordering claim
         # without any winning verb. A plugin agent that is
@@ -932,9 +952,18 @@ def qualified_problems(root=None):
             # name being fine, states the same acceptance
             # without the bare name noun.
             if re.search(
-                r"\banswer\w*\b.{0,30}\b(short|just|bare) "
+                r"\banswer\w*\b.{0,30}\b(short|just|bare|plain) "
                 r"(name|names)\b",
                 segment,
+            ):
+                hit = True
+            # R32-RT-04. Bare name acceptance stated as a
+            # plain name answered to states the same
+            # acceptance without the bare name noun.
+            if re.search(
+                r"\bplain names?\b", segment
+            ) and re.search(
+                r"\b(answer\w*|respond\w*)\b", segment
             ):
                 hit = True
             if re.search(

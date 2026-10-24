@@ -299,6 +299,94 @@ def naming_problems(root=None):
     return problems
 
 
+def semantic_problems(root=None):
+    """R32-RT-01. No sentence may contradict the resolved count,
+    the bypass surface, or the SARIF export shape.
+
+    The pins prove the correct sentences are stated, but an
+    added sentence or an in place rewrite passes while the
+    pins stay in place, because no check reads the
+    contradicting sentence. This check reads every sentence
+    in the whole brief, inside and outside the rules
+    section, so an appended rule contradicts just as loudly
+    as an in rule rewrite. Sentences that state the correct
+    posture with a negation, such as dismissed findings no
+    longer counting, the bypass path never assumed absent,
+    or CSV alone never named as the export shape, are
+    skipped.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "devin-playbook-brief.md")
+    if raw is None:
+        return ["docs/devin-playbook-brief.md is missing"]
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(
+            r"(?<=[.!?])\s+", re.sub(r"\s+", " ", raw)
+        )
+        if sentence.strip()
+    ]
+    problems = []
+    seen = set()
+    for sentence in sentences:
+        low = sentence.lower()
+        negated = bool(
+            re.search(r"\b(no longer|never)\b", low)
+            or re.search(r"\bnot\b.{0,20}\bcount\b", low)
+        )
+        if "resolved" not in seen and not negated and (
+            re.search(r"\bdismissed\b.{0,50}\bcount\b", low)
+            or re.search(
+                r"\bresolved\b.{0,30}\bincludes?\b.{0,30}"
+                r"\bdismissed\b",
+                low,
+            )
+        ):
+            problems.append(
+                "a devin rule counts dismissed findings toward "
+                "the resolved total, which the code fixed only "
+                "resolved count forbids"
+            )
+            seen.add("resolved")
+        if "bypass" not in seen and (
+            re.search(r"without (any )?bypass", low)
+            or re.search(r"\bno bypass\b", low)
+            or (
+                "assume" not in low
+                and re.search(
+                    r"\bbypass (surface|path)\b.{0,20}\babsent\b",
+                    low,
+                )
+            )
+            or re.search(
+                r"\bbypass\b.{0,20}\b(not needed|not required"
+                r"|unnecessary)\b",
+                low,
+            )
+        ):
+            problems.append(
+                "a devin rule merges a blocked pull request "
+                "without a bypass surface, which the merge past "
+                "bypass surface forbids"
+            )
+            seen.add("bypass")
+        if "sarif" not in seen and (
+            re.search(r"\bcsv only\b", low)
+            or (not negated and re.search(r"\bcsv alone\b", low))
+            or re.search(
+                r"\bsarif\b.{0,30}\b(dropped|removed|absent)\b",
+                low,
+            )
+            or re.search(r"without sarif", low)
+        ):
+            problems.append(
+                "a devin rule exports CSV only, which the SARIF "
+                "2.1.0 export beside CSV forbids"
+            )
+            seen.add("sarif")
+    return problems
+
+
 def decision_problems(root=None):
     """Problems with the Build 17 decision record."""
     root = ROOT if root is None else root
@@ -327,6 +415,7 @@ def devin_problems(root=None):
     problems.extend(brief_problems(root))
     problems.extend(rules_problems(root))
     problems.extend(naming_problems(root))
+    problems.extend(semantic_problems(root))
     problems.extend(decision_problems(root))
     return problems
 
