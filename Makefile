@@ -16,6 +16,7 @@ check:
 	$(PYTHON) scripts/check_persona.py
 	$(PYTHON) scripts/check_fanout.py
 	$(PYTHON) scripts/check_mod.py
+	$(PYTHON) scripts/check_package.py
 	$(PYTHON) scripts/smoke_extract.py
 
 test: check

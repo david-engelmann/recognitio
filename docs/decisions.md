@@ -447,3 +447,82 @@ deterministically in the repo gate.
 Skill tightness holds. The mod, its tests, and the brief
 live outside the canonical skill text, and the
 description protocol is untouched.
+
+## 17. Build 8, the Agent Plugins 1.0.0 portable package
+
+Recorded on 2026-10-23 in round 19. The package at
+`agent-plugins-package/` carries only the portable core, the
+manifest at `agent-plugins-package/plugin.json` and the skills
+tree at `agent-plugins-package/skills/`, against the Agent
+Plugins Specification v1.0.0 the round 19 spec lane read on
+primary.
+
+The manifest schema is closed. Section 5 permits exactly the ten
+top level fields `$schema`, `name`, `version`, `description`,
+`author`, `homepage`, `repository`, `license`, `keywords` and
+`extensions`, with the canonical `$schema` value
+`https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`.
+The repo native manifest keys `agents`, `settings`,
+`outputStyles` and `skills` are unknown top level fields under
+that schema, and a conformant client must ignore them without
+assigning them semantics, so reusing them would silently drop
+the persona, the session agent setting, the forced output style
+and the hook wiring. The portable manifest carries none of them
+at the top level, and the gate fails any top level field outside
+the permitted set. That is the inversion guard the spec lane
+named, the portable package that silently drops the native
+enforcement, closed before it could land.
+
+The Claude Code native shapes ride as per platform extensions
+beside the portable core under the section 8 mechanism. Build 8
+uses the repo root representation for the shape files and the
+extension manifest data representation to declare them. The
+shapes do not move into the package. The agent persona at
+`agents/reviewer.md`, the output style at
+`output-styles/packet.md`, the mod hooks at `hooks/hooks.json`
+and `hooks/register.js`, the headless runbook at
+`docs/headless-review.md` with `scripts/check_headless.py`, and
+the fan out workflow at `workflows/review-fanout.md` with
+`workflows/findings.schema.json` stay where the home platform
+install expects them, and the portable manifest declares each
+one under the `com.anthropic.claude-code` reverse domain
+namespace, with the native install path named at
+`.claude-plugin/plugin.json` and
+`.claude-plugin/marketplace.json`. The gate resolves every
+declared path in the repo. The mod hooks cannot ride in the
+portable core at all, because version 1.0 defines exactly two
+component types, skills and MCP servers, so the extension
+mechanism is the only honest ride for them.
+
+Recognitio ships no MCP servers, so the package omits
+`mcp.json`, which section 6 permits. The gate pins the omission,
+so a later edit cannot quietly add a server the trust text never
+approved.
+
+The package skill at `agent-plugins-package/skills/recognitio/`
+is a second spelling of the canonical skill at
+`.agents/skills/recognitio/` by construction, because section 6
+fixes skill discovery at `skills/` with one immediate child
+directory per skill. The canonical is the only spelling that
+ever changes, and the gate pins the package copy byte identical
+to the canonical on every run, file by file across the whole
+skill tree.
+
+The package does not install natively in Claude Code on current
+evidence. No primary source puts Claude Code among the
+implementing hosts, and the brief at
+`docs/agent-plugins-brief.md` states the negative plainly with
+the gate pinning the sentence. The brief keeps the two
+governances distinct. The Agentic AI Foundation governs the
+Agent Skills standard, and the Agent Plugins project is governed
+separately under its own Technical Charter. The 70 plus platform
+integrations are Agent Skills integrations, not Agent Plugins
+implementing hosts.
+
+Decision 4 binds the build. The package is a packaging format
+with no execution or enforcement semantics, and enforcement
+stays on the shipped scripts and the per platform extension.
+
+Skill tightness holds. The package, its gate script at
+`scripts/check_package.py`, and the brief live outside the
+canonical skill text, and the description protocol is untouched.

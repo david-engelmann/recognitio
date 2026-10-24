@@ -256,6 +256,21 @@ This unreleased work carries version 1.3.0.
   the second layer fail open as a stated limit, and the
   repo gate pins the mod contract in `scripts/check_mod.py`.
   Decision 16 records the build.
+- Build 8, the Agent Plugins 1.0.0 portable package. The package
+  at `agent-plugins-package/` carries the closed schema manifest
+  and the skills tree as the portable core, with the Claude Code
+  native shapes riding beside it at the repo root as per platform
+  extensions declared under the reverse domain namespace the spec
+  section 8 defines. The gate pins the ten field manifest schema
+  in `scripts/check_package.py`, so a native manifest key can
+  never slip into the portable manifest and be silently ignored,
+  pins the package skill byte identical to the canonical skill,
+  pins the `mcp.json` omission, and pins the brief sentence that
+  the package does not install natively in Claude Code on current
+  evidence. The brief at `docs/agent-plugins-brief.md` records
+  the section 8 mechanism per shape, the single source rule for
+  the package skill, and the two governances kept distinct.
+  Decision 17 records the build.
 
 ### Fixed
 

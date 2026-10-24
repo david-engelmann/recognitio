@@ -154,15 +154,29 @@ def discover_comment_files(root=None):
 def discover_manifest_files(root=None):
     """Plugin manifests whose description fields are public prose.
 
-    The two paths are fixed surfaces of the repo, so both are
-    returned even when one is absent, and the caller reports the
-    missing file instead of passing a scan that never ran.
+    Manifests are found by rule rather than listed by hand. Every
+    plugin.json and every marketplace.json under the tree is a
+    manifest surface, discovered through the shared exclusion
+    rule, so a new manifest joins the fence by construction the
+    way a new Markdown file does. The two Claude Code manifests
+    are additionally returned when absent, so a deleted manifest
+    is reported as missing by the caller instead of passing a
+    scan that never ran.
     """
     root = ROOT if root is None else root
-    return [
+    found = []
+    for pattern in ("plugin.json", "marketplace.json"):
+        for path in sorted(root.rglob(pattern)):
+            if is_fence_excluded(root, path):
+                continue
+            found.append(path)
+    for path in (
         root / ".claude-plugin" / "plugin.json",
         root / ".claude-plugin" / "marketplace.json",
-    ]
+    ):
+        if path not in found:
+            found.append(path)
+    return sorted(set(found))
 
 
 PROSE_FILES = discover_prose_files()

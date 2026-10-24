@@ -34,7 +34,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_evals.py`, the persona pin check at
 `scripts/check_persona.py`, the fan-out run record validator at
 `scripts/check_fanout.py`, the mod contract check at
-`scripts/check_mod.py`, and an end to end extractor smoke that must
+`scripts/check_mod.py`, the portable package check at
+`scripts/check_package.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
 findings schema, the proof packet manifest, and the primary
@@ -111,6 +112,14 @@ not a gate.
   `*.test.ts` host side tests. The mod is a home platform
   extension beside the portable core, not a change to the
   canonical skill text.
+- `agent-plugins-package/` holds the Build 8 portable package,
+  the closed schema manifest at
+  `agent-plugins-package/plugin.json` and the skills tree at
+  `agent-plugins-package/skills/`, with the Claude Code native
+  shapes riding beside it at the repo root as per platform
+  extensions declared in the manifest. The package skill is a
+  byte identical copy of the canonical skill, pinned by the
+  gate, and the package carries no `mcp.json`.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 
@@ -284,5 +293,10 @@ one reviewer per file group and an adversarial second pass, and
 closed the round 17 findings. The round 18 pass then landed
 Build 7, the Claude Code mod with in process hooks gating the
 reviewer fan out at spawn time with a `.catch` fail closed
-handler, and closed the round 18 findings. No release has
+handler, and closed the round 18 findings. The round 19 pass then
+landed Build 8, the Agent Plugins 1.0.0 portable package with
+the closed schema manifest, the byte pinned package skill, the
+omitted `mcp.json`, and the native shapes riding beside the
+portable core as per platform extensions, and closed the round
+19 findings. No release has
 been tagged yet.

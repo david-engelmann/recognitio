@@ -300,7 +300,8 @@ class TestCheckCopy(unittest.TestCase):
         self.assertEqual(
             manifests,
             {".claude-plugin/plugin.json",
-             ".claude-plugin/marketplace.json"},
+             ".claude-plugin/marketplace.json",
+             "agent-plugins-package/plugin.json"},
         )
 
     def test_discovery_extends_to_a_new_markdown_file_by_rule(self):
@@ -459,6 +460,30 @@ class TestCheckCopy(unittest.TestCase):
             found = self.mod.discover_manifest_files(Path(tmp))
             self.assertEqual(len(found), 2)
             self.assertTrue(all(not p.exists() for p in found))
+
+    def test_manifest_discovery_extends_to_a_new_manifest_by_rule(self):
+        # R19-ST-01. The portable package manifest joins the fence
+        # by rule rather than by a third fixed path, so the next
+        # manifest joins the same way.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "agent-plugins-package"
+            package.mkdir()
+            manifest = package / "plugin.json"
+            manifest.write_text("{}\n", encoding="utf-8")
+            listing = root / "other" / "marketplace.json"
+            listing.parent.mkdir()
+            listing.write_text("{}\n", encoding="utf-8")
+            hidden = root / ".tool" / "plugin.json"
+            hidden.parent.mkdir()
+            hidden.write_text("{}\n", encoding="utf-8")
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_manifest_files(root)
+            }
+            self.assertIn("agent-plugins-package/plugin.json", found)
+            self.assertIn("other/marketplace.json", found)
+            self.assertNotIn(".tool/plugin.json", found)
 
     def test_em_dash_in_a_manifest_description_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
