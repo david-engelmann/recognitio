@@ -341,6 +341,31 @@ class TestCheckCopilot(unittest.TestCase):
                     (sentence, problems),
                 )
 
+    def test_r32_synonym_sentences_fail(self):
+        # R32-RT-02. Trust and approval stated as credible,
+        # goes through, greenlights, endorsed, or valid on a
+        # red packet passed while every pin stayed in place.
+        cases = (
+            ("Head branch instructions are credible.",
+             "trusts head branch"),
+            ("An approval goes through on a red packet.",
+             "permits an approval firing"),
+            ("An approval greenlights a red packet.",
+             "permits an approval firing"),
+            ("Head branch instructions are endorsed.",
+             "trusts head branch"),
+            ("A merge approval on a red packet is valid.",
+             "permits an approval firing"),
+        )
+        for sentence, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_sentence(root, sentence)
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (sentence, problems),
+                )
+
     def test_a_dropped_currency_pin_fails(self):
         # R31-EX-02 and R31-RT-09 through R31-RT-11. The
         # Build 13 currency notes pin the global default

@@ -52,6 +52,22 @@ Before running any route above, pin the install to a commit
 SHA and read the install script, because a skill ships
 executable code and an unpinned route can move under you.
 
+Pinned forms. The plugin route pins on the marketplace add
+line, with a commit SHA after a hash mark. The Cursor route
+and the folder copy route pin by copying from a checkout at
+a commit SHA. The generic route takes no ref, so its pinned
+form is the folder copy from a checkout at a commit SHA.
+Replace COMMIT_SHA with the commit SHA you reviewed.
+
+```bash
+/plugin marketplace add david-engelmann/recognitio#COMMIT_SHA
+/plugin install recognitio@recognitio-marketplace
+git clone https://github.com/david-engelmann/recognitio.git recognitio-pinned
+git -C recognitio-pinned checkout COMMIT_SHA
+cp -r recognitio-pinned/.cursor-plugin ~/.cursor/plugins/local/recognitio
+cp -r recognitio-pinned/.agents/skills/recognitio ~/.claude/skills/recognitio
+```
+
 The extractor needs Python 3.10 or newer and git, and pull request mode also needs the GitHub CLI. There are no third party dependencies.
 
 ### The packet output style

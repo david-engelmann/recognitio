@@ -808,6 +808,33 @@ class TestCheckKimi(unittest.TestCase):
         )
         return self.problems(root)
 
+    def test_r32_synonym_replacements_fail(self):
+        # R32-RT-04. Precedence stated as a loser and bare
+        # name acceptance stated as a plain name both passed
+        # by the round 31 R6 replacement method, replacing
+        # the sentence that calls the events observation
+        # points.
+        cases = (
+            ("In a collision, the agent-file agent is not "
+             "the one that runs.",
+             "plugin provided agent win"),
+            ("Plugin skills answer to their plain name.",
+             "bare name"),
+        )
+        for sentence, needle in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root,
+                    "The primaries describe the events as "
+                    "observation points.",
+                    sentence,
+                )
+                self.assertTrue(
+                    any(needle in p for p in problems),
+                    (sentence, problems),
+                )
+
     def test_an_auto_discovery_denial_fails(self):
         # R29-RT-06 and R29-ST-01. The agents pin proves the
         # auto discovery sentence exists, but a sentence

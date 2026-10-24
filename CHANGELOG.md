@@ -439,7 +439,26 @@ This unreleased work carries version 1.3.0.
   and the internal verify exit 4 scope, decision 13 is
   annotated with the UNVERIFIED Trae skill surface, and a
   round 31 note homes the corrected Graphite CLI changelog
-  pin.
+  pin. The Codex brief gains the CLI 0.164.0 promotion,
+  with the ten preset slots scoped as TUI slots only and no
+  skill format claim for presets. The fan-out runbook gains
+  the limitation note that it carries no flipped task eval
+  and no repeated run comparison.
+- The round 32 pass rewrites decision 13 to a single
+  suspended status and defers Build 18 by dated decision,
+  because the round 32 primary check found no Trae skill
+  or plugin surface. The round 15 entry line about the
+  Build 18 condition lifting on primary confirmed Trae
+  support is superseded by the round 31 annotation and the
+  round 32 deferral, and the old entry stands as history.
+  The Devin gate gains semantic negatives for the resolved
+  count, the bypass surface, and the SARIF export shape.
+  The Copilot and Kimi gates gain negatives for fresh
+  trust, approval, precedence, and bare name phrasings.
+  The README prints pinned install forms beside the
+  unpinned routes, and the docs gain the model policy API
+  naming, the POST 403 derivation locator, the November 16
+  re-check diary note, and the layout map completions.
 
 ### Fixed
 

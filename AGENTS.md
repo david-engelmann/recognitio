@@ -111,6 +111,10 @@ not a gate.
   key of the plugin manifest and named as the session agent
   under the manifest `settings` key. The directory holds
   exactly the declared file, pinned by the gate.
+- `docs/reviewer-persona.md` holds the Build 5 persona doc
+  with its host rules and persona bounds in full.
+- `docs/headless-review.md` holds the headless review
+  runbook with its invocation shape and findings schema.
 - `output-styles/` holds the packet output style at
   `output-styles/packet.md`, the Build 3 output style that
   shapes how a packet reads to the review skill downstream.
@@ -173,8 +177,8 @@ not a gate.
   directory copy under `.cursor-plugin/skills/recognitio/`, byte
   identical to the canonical skill and pinned real by the gate,
   because the host skips a symlink that points outside the local
-  plugin folder. One rule file lives under
-  `.cursor-plugin/rules/`. The plugin ships no agents, no
+  plugin folder. One rule file lives at
+  `.cursor-plugin/rules/recognitio.mdc`. The plugin ships no agents, no
   commands, no MCP servers, and no hooks.
 - `.cursor/` holds the Bugbot rules at `.cursor/BUGBOT.md` with
   the effort level and gate pins, and the repo config at
@@ -456,4 +460,8 @@ derivation noted brief and gate script, hardened the Build
 synonyms, folded the Build 13, Build 10, and Build 11
 currency corrections, narrowed the decision 25 any phrasing
 wording to the phrasing families the gate tests, and closed
-the round 31 findings.
+the round 31 findings. The round 32 pass then rewrote
+decision 13 to a single suspended status with a dated Build
+18 deferral, hardened the Devin, Copilot, and Kimi gates
+against fresh synonym plants, and closed the round 32
+findings.
