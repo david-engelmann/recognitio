@@ -590,6 +590,70 @@ class TestCheckQwen(unittest.TestCase):
         )
         self.assertEqual(problems, [])
 
+    def test_gate_round38_figure_split_across_paragraphs_fails(self):
+        # R38G-RT-03. The count and the simultaneity word
+        # split across a paragraph break stand in no
+        # paragraph window, and the claim scope reading
+        # over consecutive prose paragraphs must catch
+        # the figure claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. The "
+            "packet lists each file beside its diff. The "
+            "roster records each file in the change. The "
+            "summary lists each file in the packet. The "
+            "index names each file in the review.\n\n"
+            "They work together on the review."
+        )
+        self.assertTrue(problems)
+
+    def test_gate_round38_decoy_member_does_not_shelter_window(self):
+        # R38G-RT-05. A simultaneity member headed by an
+        # explicit subject other than the figure agents
+        # heads its own claim and does not join, and it
+        # no longer exempts the whole window either, so a
+        # decoy member standing between the figure and a
+        # member that does join shelters nothing, in the
+        # unnumbered and the numbered decoy forms alike.
+        plants = (
+            "Qwen runs 16 agents for this change. The "
+            "editors work together on the packet format. "
+            "The agents work together on the review.",
+            "Qwen runs 16 agents for this change. The "
+            "two editors work together on the packet "
+            "format. The agents work together on the "
+            "review.",
+            "Qwen runs 16 agents for this change. The "
+            "editors work together on the packet format. "
+            "They work together on the review.",
+        )
+        for plant in plants:
+            problems = self.mod.negative_problems(plant)
+            self.assertTrue(problems, plant)
+
+    def test_gate_round38_figure_guard_with_appendage_fails(self):
+        # R38G-RT-09. A basis appendage joined by the
+        # word with and no comma is a clause edge, so
+        # its guard phrase stands outside the figure
+        # clause and does not exempt the claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents together on this review "
+            "with the roster narrative recording the "
+            "count."
+        )
+        self.assertTrue(problems)
+
+    def test_gate_round38_guard_paragraph_shelters_nothing(self):
+        # R38G-RT-03 control. A guard phrase standing in
+        # a neighbouring paragraph before a figure claim
+        # shelters nothing, because the guard stays
+        # scoped to the clause of the sentence that
+        # carries the figure, and the claim must fail.
+        problems = self.mod.negative_problems(
+            "The roster narrative records the count.\n\n"
+            "Qwen runs 16 agents together on this review."
+        )
+        self.assertTrue(problems)
+
     def test_round38_side_shape_record_pins_hold(self):
         # R38-EX-01 and R38-EX-02. Dropping any of the
         # rescoped side shape or mirror sentences from the

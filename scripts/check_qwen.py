@@ -405,6 +405,18 @@ def sentence_unit_groups(text):
     or code line forms a group of its own, so those units
     never join a neighbouring paragraph into a claim.
     """
+    return [group for group, _barrier in _unit_groups(text)]
+
+
+def _unit_groups(text):
+    """The sentence unit groups, each tagged as a barrier.
+
+    A prose paragraph group is no barrier. A table row,
+    a heading, and a code line each form a group of their
+    own and stand as barriers, the structural breaks the
+    brief format itself marks between one claim unit and
+    the next.
+    """
     groups = []
     buffer = []
     in_code = False
@@ -422,7 +434,7 @@ def sentence_unit_groups(text):
             if sentence.strip()
         ]
         if group:
-            groups.append(group)
+            groups.append((group, False))
 
     for raw in text.splitlines():
         line = raw.strip()
@@ -435,14 +447,43 @@ def sentence_unit_groups(text):
             continue
         if in_code:
             flush()
-            groups.append([line])
+            groups.append(([line], True))
             continue
         if line.startswith("|") or line.startswith("#"):
             flush()
-            groups.append([line])
+            groups.append(([line], True))
             continue
         buffer.append(line)
     flush()
+    return groups
+
+
+def sentence_unit_scope_groups(text):
+    """The prose sentence units grouped at claim scope.
+
+    R38G-RT-03. A paragraph break alone does not end a
+    figure claim in this brief, because consecutive prose
+    paragraphs under one structural unit state claims
+    across their break. The claim scope therefore runs
+    over consecutive prose paragraph groups in order and
+    stops at a barrier group, a table row or a heading or
+    a code line, so a figure in one structural unit never
+    joins a simultaneity word in the next. The figure
+    guard stays scoped to the clause of the sentence that
+    carries the figure, so a guard phrase standing in a
+    neighbouring paragraph still shelters nothing.
+    """
+    groups = []
+    current = []
+    for group, barrier in _unit_groups(text):
+        if barrier:
+            if current:
+                groups.append(current)
+                current = []
+            continue
+        current = current + group
+    if current:
+        groups.append(current)
     return groups
 
 
@@ -581,9 +622,14 @@ def _figure_guarded(sentence):
     # appended with while or when or because or since or
     # whereas or although and no comma stands outside the
     # figure clause the same way.
+    # R38G-RT-09. A basis appendage joined by the word
+    # with and no comma is a clause edge of the same kind,
+    # an appendage joint rather than a subordinator, so a
+    # guard phrase standing inside that appendage stands
+    # outside the figure clause too.
     markers = (
         ",", ";", " as ", " while ", " when ", " because ",
-        " since ", " whereas ", " although ",
+        " since ", " whereas ", " although ", " with ",
     )
     clause_start = 0
     for marker in markers:
@@ -708,7 +754,7 @@ def negative_problems(text):
     # guarded in the figure's own clause, so a basis label
     # on a neighbouring sentence or in a contrast clause
     # no longer shelters an unguarded figure.
-    groups = sentence_unit_groups(normalise(text))
+    groups = sentence_unit_scope_groups(normalise(text))
 
     def window_problem(window):
         joined = " ".join(window)
@@ -732,6 +778,17 @@ def negative_problems(text):
             span = _bound_figure_span(member)
             if span is not None:
                 bound_values.add(member[span[0]:span[1]])
+        # R38G-RT-05. The exemption is judged per member,
+        # not per window. A member that heads its own claim
+        # does not join the window's count, and it no
+        # longer exempts the whole window either, because
+        # the gate review stood such a member as a decoy
+        # between the figure sentence and a pronoun member
+        # that does join, and the window stated the claim
+        # in full while the exemption sheltered it. The
+        # window fires only where at least one simultaneity
+        # or scope member actually joins the count.
+        joined_claim = False
         for member in window:
             word = re.search(
                 r"\b(" + FIGURE_ADVERBS + r"|" + FIGURE_SCOPE
@@ -747,7 +804,7 @@ def negative_problems(text):
                 )
             }
             if own and not own <= bound_values:
-                return False
+                continue
             # R38-RT-15. A simultaneity or scope member
             # whose subject is an explicit noun phrase
             # other than the figure's agents heads its own
@@ -761,16 +818,20 @@ def negative_problems(text):
             if re.match(
                 r"\s*(they|it|these|those)\b", head
             ):
+                joined_claim = True
                 continue
             if "qwen" in head:
+                joined_claim = True
                 continue
             if re.search(
                 r"\b(" + FIGURE_AGENTS + r")\b", head
             ):
+                joined_claim = True
                 continue
-            if re.search(r"[a-z]", head):
-                return False
-        return True
+            if not re.search(r"[a-z]", head):
+                joined_claim = True
+                continue
+        return joined_claim
 
     # R37F-RT-15. Windows ran to four neighbouring
     # sentences, because the fix review split the count
@@ -782,10 +843,13 @@ def negative_problems(text):
     # neighbouring window inside a paragraph group and
     # never across a paragraph break, a table row, a
     # heading, or a code line.
+    # R38G-RT-03. The gate review split them across a
+    # paragraph break, so the reading now runs at claim
+    # scope, over every neighbouring window inside a scope
+    # group of consecutive prose paragraphs, and still
+    # never across a table row, a heading, or a code line.
     for group in groups:
         if len(group) < 2:
-            continue
-        if group[0].startswith(("|", "#", "`")):
             continue
         for size in range(2, len(group) + 1):
             for index in range(len(group) - size + 1):
