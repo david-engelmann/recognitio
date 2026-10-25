@@ -69,6 +69,24 @@ confirm of every component in Customize. The local simulation of
 the documented rule in this round's gate is the evidence that
 stands in until that run happens.
 
+Round 38 note, recorded on 2026-10-24. Cursor plugin
+load behaviour stays UNVERIFIED. A bounded API attempt
+in round 38 built a Bearer credential for the Cloud
+Agents API identity read and received no HTTP response
+while an egress approval for api.cursor.com sat
+pending, so the attempt produced no observation of
+loading. The real client run remains owed under the
+protocol above. Duplicate skill behaviour stays
+UNVERIFIED as well, because the cloud agent surface
+cannot speak to desktop skill resolution. The standing
+guidance remains that two separate copies of the same
+skill are never shipped. The practical next step is a
+parent level trigger of the egress approval for
+api.cursor.com, then a rerun of the helper identity
+read exactly as built, and only a successful identity
+read opens one list read and then at most one short
+read only cloud agent run with PR creation off.
+
 ## The variable contract
 
 Cursor does not expand the standard's `${PLUGIN_ROOT}` and
