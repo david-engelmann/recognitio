@@ -797,6 +797,55 @@ class TestCheckCursor(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_round38_neutral_split_across_paragraphs_fails(self):
+        # R38G-RT-04. The neutral claim split across a
+        # paragraph break inside one block stands in no
+        # paragraph window, and the claim scope reading
+        # must catch it.
+        plant = (
+            "Bugbot findings default to a neutral "
+            "conclusion. The packet lists each finding "
+            "beside its diff.\n\n"
+            "That conclusion blocks merges in this "
+            "repository."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "neutral Bugbot conclusion blocking" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_gate_round38_cap_split_across_paragraphs_fails(self):
+        # R38G-RT-04. The cap figure and the repositories
+        # it counts split across a paragraph break inside
+        # one block state one cap claim, and the claim
+        # scope pair reading must catch it.
+        plant = (
+            "A cloud agent environment supports up to 500 "
+            "in this workspace.\n\n"
+            "Those are repositories counted across every "
+            "team in the organisation."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "repository cap figure of 500" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_round38_cap_split_across_two_sentences_fails(self):
         # R38-RT-07. The cap figure in one sentence and the
         # repositories it counts named in the next, carried

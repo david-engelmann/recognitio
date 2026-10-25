@@ -737,9 +737,19 @@ def brief_negative_problems(root=None):
     # group the sentences by the blank line breaks the
     # brief format itself marks, instead of stopping at a
     # fixed pair count the next split steps past.
+    # R38G-RT-04. The gate review split both claims across
+    # a paragraph break inside one block, so the readings
+    # now group at claim scope, the headed block, every
+    # paragraph under one heading read as one group of
+    # sentences in order, and a heading starts a new group.
+    # The neutral guard stays scoped to the stretch before
+    # its own blocking verb and the cap reading keeps its
+    # deictic binding, so a guard or a figure in a
+    # neighbouring paragraph joins only through the claim
+    # halves themselves.
     groups = []
-    for block in re.split(r"\n\s*\n", body):
-        flat = re.sub(r"\s+", " ", block)
+    for chunk in re.split(r"(?m)^#{1,6} .*$", raw):
+        flat = re.sub(r"\s+", " ", chunk)
         group = [
             sentence.strip()
             for sentence in re.split(r"(?<=[.!?])\s+", flat)
@@ -899,7 +909,10 @@ def brief_negative_problems(root=None):
     # with a deictic word carrying the figure forward,
     # those are repositories counted. That pair reads as
     # one claim, judged by the same cap binding and the
-    # same conflict note rule as a single sentence.
+    # same conflict note rule as a single sentence. The
+    # pair reading runs over the claim scope groups, so
+    # the two halves may stand in neighbouring paragraphs
+    # of one block.
     for group in groups:
         for index, first in enumerate(group):
             for second in group[index + 1:]:
@@ -923,7 +936,10 @@ def brief_negative_problems(root=None):
     # neighbouring window inside a paragraph, not only
     # pairs, because the round 38 review split the claim
     # across three sentences with a filler between the
-    # halves and no pair held both halves.
+    # halves and no pair held both halves. The windows
+    # now run inside the claim scope groups, so a split
+    # across a paragraph break inside one block is read
+    # the same way.
     units = []
     for group in groups:
         for start in range(len(group)):
