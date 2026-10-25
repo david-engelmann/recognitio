@@ -732,6 +732,21 @@ def brief_negative_problems(root=None):
         for sentence in re.split(r"(?<=[.!?])\s+", text)
         if sentence.strip()
     ]
+    # R38-RT-05 and R38-RT-07. A claim in this brief lives
+    # inside one paragraph, so the cross sentence readings
+    # group the sentences by the blank line breaks the
+    # brief format itself marks, instead of stopping at a
+    # fixed pair count the next split steps past.
+    groups = []
+    for block in re.split(r"\n\s*\n", body):
+        flat = re.sub(r"\s+", " ", block)
+        group = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", flat)
+            if sentence.strip()
+        ]
+        if group:
+            groups.append(group)
     problems = []
     # R37-RT-06. The cap and effort branches now read the
     # whole sentence with no measured reach, because the
@@ -878,9 +893,42 @@ def brief_negative_problems(root=None):
                     "pin forbids"
                 )
                 return problems
-    units = list(sentences)
-    for first, second in zip(sentences, sentences[1:]):
-        units.append(first + " " + second)
+    # R38-RT-07. A cap claim can state its figure in one
+    # sentence and name repositories as what the figure
+    # counts in the next, where the second sentence opens
+    # with a deictic word carrying the figure forward,
+    # those are repositories counted. That pair reads as
+    # one claim, judged by the same cap binding and the
+    # same conflict note rule as a single sentence.
+    for group in groups:
+        for index, first in enumerate(group):
+            for second in group[index + 1:]:
+                low_second = second.lower()
+                if not re.match(
+                    r"(those|these|that|they|it)\b", low_second
+                ):
+                    continue
+                if "repositories" not in low_second:
+                    continue
+                joined = first + " " + second
+                cap = cap_figure(joined.lower())
+                if cap and "conflict" not in joined.lower():
+                    problems.append(
+                        "the cursor brief states a repository cap "
+                        "figure of %s with no R35-C-01 conflict "
+                        "note beside it" % cap
+                    )
+                    return problems
+    # R38-RT-05. The neutral reading runs over every
+    # neighbouring window inside a paragraph, not only
+    # pairs, because the round 38 review split the claim
+    # across three sentences with a filler between the
+    # halves and no pair held both halves.
+    units = []
+    for group in groups:
+        for start in range(len(group)):
+            for end in range(start + 1, len(group) + 1):
+                units.append(" ".join(group[start:end]))
     for unit in units:
         low = unit.lower()
         block = re.search(
@@ -898,9 +946,13 @@ def brief_negative_problems(root=None):
         # because a comma splice joins the verbs the same
         # way and a negation before the comma modifies the
         # earlier verb alone.
+        # R38-RT-06. The stretch also stops at a semicolon,
+        # because a semicolon joins the verbs the same way
+        # and a negation before it modifies the earlier
+        # verb alone.
         if block and "neutral" in low and not re.search(
             r"\b(does not|do not|not|never|no)\b"
-            r"(?:(?!\band\b)[^.,]){0,30}$",
+            r"(?:(?!\band\b)[^.,;]){0,30}$",
             low[:block.start()],
         ):
             problems.append(
