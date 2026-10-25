@@ -496,5 +496,39 @@ whole brief, caught the Kimi figure swap and the ZCode
 execution and cap restatements, added the Cursor and
 CodeRabbit brief negatives, gave the Qwen figure family
 sentence scope and the Devin membership branch a
-modifier chain form, folded the remaining plan round 35
-brief corrections, and closed the round 36 findings.
+modifier chain form, folded the plan round 35 brief
+corrections its lanes had verified, and closed the
+round 36 findings, with five items standing outside
+that fold in the qualified form the round 37 fix
+report records, the hook ordering citation at
+v2.1.299, the SWE-Skills-Bench preprint citation rule,
+the Devin pricing eligibility limits, the Build 10
+steering check as a check result, and the Build 13
+completion wording held until after the October 26
+check, none of which any tree text records as folded.
+The round 37 pass then hardened the landed build
+gates against the round 37 audit findings with no new
+build, widened the Copilot trust and approval readings
+to triples of neighbouring sentences with each
+negation guard scoped to the claim it guards and the
+authority passes reading the same windows, read the
+Kimi swap binding and the bare name segments whole,
+bound the Cursor figures by their own count noun and
+the CodeRabbit linked readings at unit scope over
+sentence pairs and then triples, judged the ZCode
+execution claim with its guarded clauses removed and
+its description figures against their own clause, gave
+the Qwen figure family windows that grew across the
+pass to five sentences with the figure guard scoped
+to the figure own clause, and gave the Devin
+membership branch its whole claim stretch guard with
+an aggregate noun tail. The pass also recorded the
+round 37 full bundle conversion attempt in the Qwen
+brief with its three named differences, the skill
+line rewrite at 15231 bytes against 15233, the dropped
+author and license fields, and the installer mirror
+trailing newline at 355 bytes against 356, under gate
+pins, and landed the five repairs and the filed
+confirmation repair the three review gates ordered.
+The accepted round 34 single synonym residual stands
+unchanged.
