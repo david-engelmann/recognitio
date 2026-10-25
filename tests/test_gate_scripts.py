@@ -2457,6 +2457,7 @@ class TestCheckEvals(unittest.TestCase):
         shutil.copytree(ROOT / "evals", root / "evals")
         shutil.copytree(ROOT / "tests", root / "tests")
         shutil.copytree(ROOT / "scripts", root / "scripts")
+        shutil.copy2(ROOT / "README.md", root / "README.md")
         skill_scripts = (
             root / ".agents" / "skills" / "recognitio" / "scripts"
         )
@@ -2469,6 +2470,31 @@ class TestCheckEvals(unittest.TestCase):
 
     def test_the_real_eval_artefacts_pass(self):
         self.assertEqual(self.mod.all_problems(ROOT), [])
+
+    def test_a_readme_eval_claim_without_the_caveat_fails(self):
+        # Visual round 1. The README paired eval claim
+        # must carry the construction caveat the results
+        # file states, so a claim restored without it
+        # fails the eval gate.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = root / "README.md"
+            text = target.read_text(encoding="utf-8")
+            broken = text.replace(
+                "A defect in an unchanged file is "
+                "unreachable by a raw diff pass by "
+                "construction, because the pass holds no "
+                "content from any unchanged file. ",
+                "",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            target.write_text(broken, encoding="utf-8")
+            problems = self.mod.readme_eval_claim_problems(root)
+            self.assertTrue(
+                any("construction caveat" in p for p in problems),
+                problems,
+            )
 
     def test_a_transcript_edit_fails_naming_its_file(self):
         with RetryingTemporaryDirectory() as tmp:

@@ -1136,3 +1136,19 @@ This unreleased work carries version 1.3.0.
   the desktop client alone and marketplace
   installation and Bugbot behaviour on a real pull
   request still open.
+- The README no longer states that the Cursor plugin
+  is distributed through the Cursor Marketplace. It
+  states that the plugin ships in this repo as a
+  plugin package and that no Cursor Marketplace
+  listing exists or has been submitted, with the
+  local load as the route. The Install section no
+  longer carries the copyable scoped npm test form
+  for a package that does not exist, whose
+  conditional draft form stays in the Qwen brief,
+  and the paired eval claim now carries the
+  construction caveat that a defect in an unchanged
+  file is unreachable by a raw diff pass by
+  construction. The Cursor gate and the Qwen gate
+  and the eval gate now pin the corrected wording,
+  and the Cursor gate refuses the stale marketplace
+  distribution claim outright.

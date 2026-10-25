@@ -576,4 +576,16 @@ that evidence, and repinned the Cursor gate on the
 settled claims, with invocation precedence on the
 desktop client, marketplace installation, and Bugbot
 behaviour on a real pull request still open.
+The visual round 1 pass on 2026-10-25 then corrected
+the README honesty trio with no new build, stating that
+the Cursor plugin ships in this repo as a plugin package
+with no Cursor Marketplace listing existing or submitted
+and the local load as the route, removing the copyable
+scoped npm test form from the Qwen Code install section
+while its conditional draft form stays in the Qwen
+brief, and adding the construction caveat to the paired
+eval claim, with the Cursor gate and the Qwen gate and
+the eval gate repinned on the corrected wording and the
+Cursor gate refusing the stale marketplace distribution
+claim outright.
 

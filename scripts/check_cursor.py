@@ -18,7 +18,10 @@ fall back silently, and the brief to keep the stated pins, the
 verbatim primary quotes, and the desktop run record that
 discharged the client run the brief once carried as owed. A
 later edit that drops any of them fails the gate instead of
-drifting in silence.
+drifting in silence. The gate also pins the README Cursor
+passage to the shipped package position, because no Cursor
+Marketplace listing exists or has been submitted, and it
+refuses the stale marketplace distribution wording outright.
 """
 
 import json
@@ -289,6 +292,33 @@ STALE_PRECEDENCE = (
     "Invocation precedence stays open",
     "with no precedence field in the Customize data",
     "a sign-in the run did not perform",
+)
+
+# README Cursor passage fragments the gate pins. The plugin
+# ships in this repo as a plugin package and no Cursor
+# Marketplace listing exists or has been submitted, so the
+# README states that position and the local load route.
+README_PINNED = (
+    ("the plugin package position",
+     "The plugin ships in this repo as a plugin package"),
+    ("the no listing position",
+     "No Cursor Marketplace listing exists or has been "
+     "submitted"),
+    ("the local load route position",
+     "so the local load route below is the route"),
+    ("the local load test",
+     "For a local load test, copy the folder into the "
+     "local plugin folder"),
+)
+
+# README wording the gate refuses outright. The positive
+# pins prove the corrected sentences are stated, but a
+# restored stale sentence would pass beside them.
+README_STALE = (
+    "distributed through the manually reviewed Cursor "
+    "Marketplace",
+    "distributed through the Cursor Marketplace",
+    "reviewed updates auto deploy",
 )
 
 DECISION_HEADING = "## 19. Build 10"
@@ -1100,6 +1130,29 @@ def brief_negative_problems(root=None):
     return problems
 
 
+def readme_problems(root=None):
+    """Problems with the README Cursor passage."""
+    root = ROOT if root is None else root
+    raw = read_text(root / "README.md")
+    if raw is None:
+        return ["README.md is missing"]
+    text = re.sub(r"\s+", " ", raw)
+    problems = []
+    for label, fragment in README_PINNED:
+        if fragment not in text:
+            problems.append(
+                "README.md does not state %s" % label
+            )
+    for fragment in README_STALE:
+        if fragment in text:
+            problems.append(
+                "README.md states the stale Cursor "
+                "Marketplace distribution claim %r"
+                % fragment
+            )
+    return problems
+
+
 def decision_problems(root=None):
     """Problems with the Build 10 decision record."""
     root = ROOT if root is None else root
@@ -1130,6 +1183,7 @@ def cursor_problems(root=None):
     problems.extend(bugbot_yaml_problems(root))
     problems.extend(brief_problems(root))
     problems.extend(brief_negative_problems(root))
+    problems.extend(readme_problems(root))
     problems.extend(decision_problems(root))
     return problems
 

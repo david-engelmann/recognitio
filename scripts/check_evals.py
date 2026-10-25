@@ -309,6 +309,41 @@ def results_problems(root):
     return problems
 
 
+def readme_eval_claim_problems(root):
+    """Check the README paired eval claim carries its caveat.
+
+    The results file states the construction limit plainly.
+    A raw pass holds no content from any unchanged file, so
+    an unchanged file defect is unreachable by construction
+    in a raw condition. The README headline claim must carry
+    that caveat beside the numbers it reports, so the claim
+    cannot stand without its basis.
+    """
+    path = root / "README.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ["the README cannot be read for the eval claim"]
+    flat = re.sub(r"\s+", " ", text)
+    problems = []
+    if "packet pass found 8 of 8" not in flat:
+        problems.append(
+            "the README holds no paired eval claim matching "
+            "the recorded results"
+        )
+    if "unreachable by a raw diff pass by construction" not in flat:
+        problems.append(
+            "the README paired eval claim carries no "
+            "construction caveat"
+        )
+    if "holds no content from any unchanged file" not in flat:
+        problems.append(
+            "the README paired eval claim states no basis "
+            "for its construction caveat"
+        )
+    return problems
+
+
 def task06_planted_rule(task_dir):
     """Parse the task-06 planted grading rule into checkable parts.
 
@@ -1389,6 +1424,7 @@ def all_problems(root):
     problems = []
     problems.extend(checksum_problems(root))
     problems.extend(results_problems(root))
+    problems.extend(readme_eval_claim_problems(root))
     problems.extend(task06_problems(root))
     for task_name in ("task-01", "task-02", "task-03", "task-04", "task-05"):
         problems.extend(task_anchor_problems(root, task_name))
@@ -1470,7 +1506,8 @@ def main(argv=None):
         "anchor and every corpus name stands in the suite and the "
         "corpus coverage record matches the index and the corpus "
         "scope sentence names the highest round section the index "
-        "carries"
+        "carries and the README paired eval claim carries "
+        "the construction caveat the results file states"
     )
     return 0
 

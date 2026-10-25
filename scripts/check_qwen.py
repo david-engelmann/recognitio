@@ -976,8 +976,17 @@ def qwen_problems(root):
         section = readme_qwen_section(readme)
         if section is None:
             problems.append("the README Qwen section is missing")
-        elif "COMMIT_SHA" not in section or "unpinned test form" not in section:
+        elif "COMMIT_SHA" not in section:
             problems.append("the README Qwen section lacks its pinned form")
+        elif (
+            "@scope/my-extension" in section
+            or "unpinned test form" in section
+            or "scoped npm route is untested" in section
+        ):
+            problems.append(
+                "the README Qwen section carries the scoped npm "
+                "test form that belongs in the brief only"
+            )
     for path in root.rglob("qwen-extension.json"):
         if "scratch" not in str(path):
             problems.append("a Qwen listing file ships: " + str(path))

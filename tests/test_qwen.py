@@ -160,6 +160,35 @@ class TestCheckQwen(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def test_the_readme_scoped_npm_form_fails(self):
+        # Visual round 1. The copyable scoped npm test
+        # form belongs in this brief only, so restoring
+        # it in the README Qwen section fails the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "README.md"
+            text = path.read_text(encoding="utf-8")
+            plant = (
+                "The scoped npm form below is an unpinned "
+                "test form in shape only.\n\n"
+                "```bash\n"
+                "qwen extensions install "
+                "@scope/my-extension@1.2.0\n"
+                "```\n\n"
+            )
+            broken = text.replace(
+                "Before running any route above",
+                plant + "Before running any route above",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("scoped npm test form" in p for p in problems),
+                problems,
+            )
+
     def test_every_plant_fails(self):
         for plant in PLANTS:
             problems = self.mod.negative_problems(plant)

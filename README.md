@@ -10,7 +10,7 @@ Recognitio serves the pull request review workflow. It is the step before the re
 
 ![A 3,233 line diff floods an agent session in this repository, the recognitio skill distills it into a verified packet, and the model reviews the packet and returns the meat only](docs/images/recognitio-demo-chat.gif)
 
-In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. The full record lives in [the paired eval results](evals/RESULTS.md).
+In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. The full record lives in [the paired eval results](evals/RESULTS.md).
 
 ## What it does
 
@@ -123,7 +123,7 @@ The plugin route comes first. Register this repo as a marketplace in Claude Code
 /plugin install recognitio@recognitio-marketplace
 ```
 
-The Cursor plugin route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The plugin is distributed through the manually reviewed Cursor Marketplace, and reviewed updates auto deploy to clients pinned at the commit SHA. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
+The Cursor plugin route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
 
 ```bash
 cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio
@@ -160,14 +160,6 @@ SHA you reviewed, as the commands above show.
 Replace COMMIT_SHA with the commit SHA you reviewed.
 The marketplace source add stays a conditional draft
 form in the brief only.
-
-The scoped npm form below is an unpinned test form in
-shape only. No scoped recognitio package is published
-in this round and the scoped npm route is untested.
-
-```bash
-qwen extensions install @scope/my-extension@1.2.0
-```
 
 Before running any route above, pin the install to a commit
 SHA and read the install script, because a skill ships

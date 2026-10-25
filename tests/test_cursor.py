@@ -50,6 +50,7 @@ class TestCheckCursor(unittest.TestCase):
             ".cursor/BUGBOT.md",
             ".cursor/config/bugbot.yaml",
             ".claude-plugin/plugin.json",
+            "README.md",
         ):
             source = ROOT / rel
             target = root / rel
@@ -89,6 +90,12 @@ class TestCheckCursor(unittest.TestCase):
         self.write_brief(root, broken)
         return self.problems(root)
 
+    def read_readme(self, root):
+        return (root / "README.md").read_text(encoding="utf-8")
+
+    def write_readme(self, root, text):
+        (root / "README.md").write_text(text, encoding="utf-8")
+
     def read_manifest(self, root):
         return json.loads(
             (root / ".cursor-plugin" / "plugin.json").read_text(
@@ -108,6 +115,52 @@ class TestCheckCursor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
+
+    def test_a_dropped_readme_package_position_fails(self):
+        # Visual round 1. No Cursor Marketplace listing
+        # exists or has been submitted, so a README that
+        # drops the shipped package position fails the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_readme(root)
+            broken = text.replace(
+                "The plugin ships in this repo as a plugin "
+                "package.",
+                "The plugin ships somehow.",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_readme(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("plugin package position" in p for p in problems),
+                problems,
+            )
+
+    def test_the_stale_readme_marketplace_claim_fails(self):
+        # Visual round 1. The marketplace distribution
+        # sentence the README once carried is refused
+        # outright, so it cannot return beside the
+        # corrected sentences.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_readme(root)
+            plant = (
+                "The plugin is distributed through the "
+                "manually reviewed Cursor Marketplace, and "
+                "reviewed updates auto deploy to clients "
+                "pinned at the commit SHA."
+            )
+            self.write_readme(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "stale Cursor Marketplace distribution claim"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
 
     def test_a_symlinked_skill_copy_fails(self):
         # R22-RT-01. The host skips a symlink that points at a
