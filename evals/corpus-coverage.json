@@ -341,6 +341,35 @@
       "test_spelled_sarif_versions_fail",
       "test_verb_plus_membership_long_filler_fails"
     ],
+    "Round 35": [],
+    "Round 36": [
+      "test_a_swapped_per_field_limit_fails",
+      "test_cap_figure_and_bugbot_control_plants_fail",
+      "test_execution_and_cap_plants_fail",
+      "test_gate_review_degree_adverb_chain_plants_fail",
+      "test_gate_review_execution_and_cap_restated_plants_fail",
+      "test_gate_review_linked_source_true_sentences_pass",
+      "test_gate_review_negated_and_attributed_trust_passes",
+      "test_gate_review_split_and_paraphrase_plants_fail",
+      "test_gate_review_split_figure_plants_fail",
+      "test_gate_review_swapped_limit_forms_fail",
+      "test_gate_review_unbound_figure_sentence_passes",
+      "test_linked_source_plants_fail",
+      "test_modifier_chain_membership_plants_fail",
+      "test_trust_core_plants_after_the_rules_section_fail"
+    ],
+    "Round 37": [
+      "test_a_stale_readme_badge_is_a_problem",
+      "test_main_fails_on_a_stale_readme_badge",
+      "test_round37_approval_split_across_three_sentences_fails",
+      "test_round37_confirm2_figure_guard_as_clause_fails",
+      "test_round37_confirm_figure_split_across_five_fails",
+      "test_round37_fidelity_record_pins_hold",
+      "test_round37_fixreview_platform_split_across_three_fails",
+      "test_round37_full_conversion_byte_fidelity_claim_fails",
+      "test_round37_neutral_conclusion_split_across_sentences_fails",
+      "test_round37_trust_split_across_three_sentences_fails"
+    ],
     "Round 4": [
       "test_a_colon_inside_a_flow_mapping_value_still_flags",
       "test_a_colon_inside_a_list_item_flow_mapping_still_flags",
