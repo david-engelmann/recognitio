@@ -238,9 +238,37 @@ def _sentences(section):
     a period would otherwise merge with the next sentence
     and carry its negation into it.
     """
-    body = re.sub(r"(?m)^#{1,6} .*$", "", section)
-    text = re.sub(r"\s+", " ", body).lower()
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    return [
+        sentence
+        for group in _sentence_groups(section)
+        for sentence in group
+    ]
+
+
+def _sentence_groups(section):
+    """The text as groups of lowercased sentences.
+
+    R38-RT-02. A claim in these briefs lives inside one
+    paragraph, and a paragraph is the claim scope the
+    brief format itself marks with blank lines. The
+    groups keep that scope, so a scan can read a whole
+    paragraph as one claim stretch instead of stopping
+    at a fixed sentence count that the next split simply
+    steps past. Headings are labels, not claims, so they
+    are stripped before splitting, as in _sentences.
+    """
+    groups = []
+    for block in re.split(r"\n\s*\n", section):
+        body = re.sub(r"(?m)^#{1,6} .*$", "", block)
+        text = re.sub(r"\s+", " ", body).lower()
+        group = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+", text)
+            if s.strip()
+        ]
+        if group:
+            groups.append(group)
+    return groups
 
 
 def _post_negated(sentence, match):
@@ -259,9 +287,14 @@ def _post_negated(sentence, match):
     zero red packets among them, so they guard the match
     the same way.
     """
+    # R38-RT-03. An adverb standing between the preposition
+    # and the quantifier modifies the quantifier phrase and
+    # does not break it, trusted by absolutely no reviewer
+    # among them, so adverb tokens may stand in that slot.
     return bool(
         re.search(
-            r"\b(?:by|on|for|to)\s+(?:no|nobody|none|nothing"
+            r"\b(?:by|on|for|to)\s+(?:[a-z]+ly\s+){0,2}"
+            r"(?:no|nobody|none|nothing"
             r"|zero|not a single|not one)\b",
             sentence[match.end():match.end() + 45],
         )
@@ -271,9 +304,8 @@ def _post_negated(sentence, match):
 def _windows(sentences):
     """Neighbouring sentence windows as lists of parts.
 
-    The scans read singles, pairs, and triples. The
-    parts stay separate so a guard can be scoped to the
-    sentences that carry the claim under judgement.
+    Kept for a flat sentence list. The scans use
+    _group_windows, which reads at paragraph scope.
     """
     windows = [[part] for part in sentences]
     windows += [
@@ -286,6 +318,26 @@ def _windows(sentences):
             sentences, sentences[1:], sentences[2:]
         )
     ]
+    return windows
+
+
+def _group_windows(groups):
+    """Every neighbouring window inside each paragraph group.
+
+    R38-RT-02. The window bound is the paragraph itself,
+    not a sentence count, because each fixed count in
+    rounds 36 and 37 was met by a split one sentence
+    further out. The parts stay separate so a guard can
+    be scoped to the sentences that carry the claim
+    under judgement, and no window crosses a paragraph
+    break, so two claims stated in two paragraphs never
+    join into a claim neither states.
+    """
+    windows = []
+    for group in groups:
+        for start in range(len(group)):
+            for end in range(start + 1, len(group) + 1):
+                windows.append(group[start:end])
     return windows
 
 
@@ -397,9 +449,6 @@ def trust_problems(root=None):
     # a source claim and rejects it in the same breath is
     # attribution, not a rule, and is skipped.
     sentences = _sentences(raw)
-    units = list(sentences)
-    for first, second in zip(sentences, sentences[1:]):
-        units.append(first + " " + second)
     # R37-RT-02. The pattern passes read triples of
     # neighbouring sentences, because the round 37 review
     # split the trust and approval claims across three
@@ -407,10 +456,22 @@ def trust_problems(root=None):
     # and no sentence and no pair held both halves.
     # R37F-RT-01. The merge authority passes read triples
     # too, because the fix review split an authority claim
-    # the same way. The guards inside every pass are
-    # scoped by _guard_prefix, so a negation in a filler
-    # sentence guards nothing.
-    windows = _windows(sentences)
+    # the same way.
+    # R38-RT-02 and R38-ST-02. The passes now read at
+    # paragraph scope through _group_windows, because the
+    # round 38 review split the same claims across four
+    # sentences, one past the triple bound. The guards in
+    # the trust pass and in the merge authority phrase
+    # and valid branches are scoped by _guard_prefix with
+    # a claim pattern, so a negation guards a match only
+    # from a sentence that carries the subject and the
+    # claim predicate, or from the match sentence itself
+    # before the match. A negation in a filler sentence
+    # that carries neither guards nothing in those
+    # branches. The decide branch calls the same helper
+    # scoped to the subject sentences, with no claim
+    # pattern.
+    windows = _group_windows(_sentence_groups(raw))
     for parts in windows:
         sentence = " ".join(parts)
         if "head branch" not in sentence:
@@ -480,26 +541,67 @@ def trust_problems(root=None):
         # than stating a rule, so it is skipped too.
         if "derives from" in sentence:
             continue
-        if "merge authority" in sentence and not re.search(
-            r"\b(no|never)\b.{0,30}merge authority", sentence
+        # R38-ST-02. Each authority or validity occurrence is
+        # judged in its own sentence, through the same scoped
+        # guard the trust pass uses. An occurrence in a
+        # sentence that carries neither the head branch
+        # subject nor a pronoun carrying it states a
+        # different fact, as the base branch rule sentence
+        # does, and is not judged here. A negation guards
+        # only from a subject sentence that also states the
+        # claim predicate, or from the occurrence sentence
+        # itself before the occurrence, so a filler sentence
+        # negation between the halves guards nothing.
+        authority_claim = re.compile(
+            r"\bmerge authority\b|\bmerge approval\b"
+        )
+        for authority in re.finditer(
+            r"\bmerge authority\b", sentence
         ):
-            problems.append(
-                "a copilot rule grants head branch content merge "
-                "authority, which the base branch authority rule "
-                "forbids"
+            _gi, _gl = _match_home(parts, authority.start())
+            home = parts[_gi]
+            if "head branch" not in home and not re.match(
+                r"(they|it|these|those)\b", home
+            ):
+                continue
+            guard, _index = _guard_prefix(
+                parts,
+                authority.start(),
+                "head branch",
+                claim=authority_claim,
             )
-            return problems
-        if (
-            "merge" in sentence
-            and re.search(r"\bvalid\b", sentence)
-            and not re.search(r"\b(no|not|never)\b.{0,30}\bvalid\b", sentence)
-        ):
-            problems.append(
-                "a copilot rule grants head branch content merge "
-                "authority, which the base branch authority rule "
-                "forbids"
-            )
-            return problems
+            if not re.search(
+                r"\b(no|not|never)\b|n't", guard
+            ):
+                problems.append(
+                    "a copilot rule grants head branch content merge "
+                    "authority, which the base branch authority rule "
+                    "forbids"
+                )
+                return problems
+        if "merge" in sentence:
+            for valid in re.finditer(r"\bvalid\b", sentence):
+                _gi, _gl = _match_home(parts, valid.start())
+                home = parts[_gi]
+                if "head branch" not in home and not re.match(
+                    r"(they|it|these|those)\b", home
+                ):
+                    continue
+                guard, _index = _guard_prefix(
+                    parts,
+                    valid.start(),
+                    "head branch",
+                    claim=re.compile(r"\bvalid\b|\bmerge\b"),
+                )
+                if not re.search(
+                    r"\b(no|not|never)\b|n't", guard
+                ):
+                    problems.append(
+                        "a copilot rule grants head branch content "
+                        "merge authority, which the base branch "
+                        "authority rule forbids"
+                    )
+                    return problems
         # Gate review repair. Merge authority stated as
         # head branch CODEOWNERS and rulesets deciding
         # whether a merge proceeds grants the same
@@ -645,7 +747,7 @@ def approval_problems(root=None):
     claim = re.compile(
         "|".join("(?:%s)" % item for item in patterns)
     )
-    for parts in _windows(_sentences(raw)):
+    for parts in _group_windows(_sentence_groups(raw)):
         sentence = " ".join(parts)
         if "approval" not in sentence and "approved" not in sentence:
             continue
