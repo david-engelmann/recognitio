@@ -216,6 +216,7 @@ The packet discipline travels. Each adaptation below restates it in the surface 
 | ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace |
 | Devin | A playbook and coordinator build, written as derivation noted rules in `docs/devin-playbook-brief.md` |
 | Qwen | A conditional draft, with the brief at `docs/qwen-code-brief.md` and the install route in the Install section above |
+| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and the PreToolUse hook wiring at `.antigravity/hooks.json` carrying the deny and force_ask and auto_approve mapping, with the native shapes as a second extensions namespace beside the portable core |
 
 A Trae adaptation ships nothing. The round 32 check found no Trae skill or plugin surface in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
 
