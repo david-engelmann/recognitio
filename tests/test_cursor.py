@@ -826,7 +826,10 @@ class TestCheckCursor(unittest.TestCase):
         # of the settled desktop sentences fails the gate,
         # so the brief cannot drift back to carrying the
         # desktop questions as open once the real client
-        # run answered them.
+        # run answered them. The precedence fragment that
+        # stood here moved to the CLI precedence pins,
+        # because the CLI run settled that question on its
+        # surface later the same day.
         fragments = (
             "The duplicate skill residual is settled at the "
             "level of desktop registration",
@@ -842,8 +845,6 @@ class TestCheckCursor(unittest.TestCase):
             "the Customize backing records held two "
             "recognitio skill entries side by side",
             "the desktop deduped neither entry",
-            "both copies register with no precedence field "
-            "in the Customize data",
             "Marketplace installation from a listing and "
             "Bugbot behaviour on a real pull request stay "
             "UNVERIFIED",
@@ -889,6 +890,72 @@ class TestCheckCursor(unittest.TestCase):
                     any("stale" in p for p in problems),
                     (plant, problems),
                 )
+
+    def test_cli_precedence_pins_hold(self):
+        # CLI precedence run of 2026-10-25. Dropping any
+        # of the settled precedence sentences fails the
+        # gate, so the brief cannot drift back to carrying
+        # invocation precedence as open on every surface
+        # once the live CLI sessions answered it.
+        fragments = (
+            "Invocation precedence is settled on the agent "
+            "CLI surface",
+            "stays open on the desktop client alone",
+            "two in the shipped state and two in the "
+            "duplicate state",
+            "a distinct marker line appended to each copy "
+            "of the skill",
+            "installed at .cursor/plugins/local/recognitio "
+            "in the session home",
+            "each session invoked the workspace copy at "
+            "the .claude/skills/recognitio/SKILL.md "
+            "spelling",
+            "registered as a second entry and was never "
+            "invoked",
+            "each session invoked the added copy at "
+            ".cursor/skills/recognitio/SKILL.md",
+            "took the workspace seat outright while the "
+            ".claude spelling entry left the catalog",
+            "The repo root plugin tree at .cursor-plugin "
+            "appeared as an entry in no session",
+            "no signed-in desktop session could be landed "
+            "on this box",
+            "login-session poll never received a completed "
+            "sign-in across the original run and the "
+            "repaired relaunch",
+            "the evidence stands in the desktop "
+            "precedence report and the sign-in repair "
+            "report",
+        )
+        for fragment in fragments:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, fragment, "the record omits this"
+                )
+                self.assertTrue(problems, fragment)
+
+    def test_the_superseded_precedence_sentence_fails(self):
+        # CLI precedence run of 2026-10-25. The open
+        # precedence sentence the run superseded fails the
+        # gate when planted back, because the positive
+        # pins alone would let a restored stale sentence
+        # ride beside them.
+        plant = (
+            "Invocation precedence stays open, because both "
+            "copies register with no precedence field in "
+            "the Customize data and a live agent session "
+            "requires a sign-in the run did not perform."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("stale" in p for p in problems),
+                (plant, problems),
+            )
 
     def test_gate_round38_neutral_split_across_paragraphs_fails(self):
         # R38G-RT-04. The neutral claim split across a

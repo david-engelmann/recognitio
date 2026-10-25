@@ -453,7 +453,12 @@ packaging rules (R22-RT-07 and R22-RT-08) and the half
 primary pin and canvases sentence (R22-EX-01 and
 R22-EX-02) stand as brief and decision record prose in
 the same change, and this section records them without
-a pinning test of their own.
+a pinning test of their own. A precedence run on the
+agent CLI surface on 2026-10-25 later settled
+invocation precedence on that surface in the shipped
+state and in the duplicate state, and the question
+stays open on the desktop client alone, and the
+record of the run stands in the Cursor brief.
 
 ## Round 23 incidents
 

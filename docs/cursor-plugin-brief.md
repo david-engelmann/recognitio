@@ -122,10 +122,34 @@ unchanged and a project entry pointing at the
 .claude/skills spelling of the canonical skill, and
 the repo root plugin tree copy under .cursor-plugin
 registered in neither state. Invocation precedence
-stays open, because both copies register with no
-precedence field in the Customize data and a live
-agent session requires a sign-in the run did not
-perform. Each CLI session listed
+is settled on the agent CLI surface and stays open
+on the desktop client alone. Four live sessions ran
+on 2026-10-25 against a scratch clone, two in the
+shipped state and two in the duplicate state, with a
+distinct marker line appended to each copy of the
+skill so the copies could be told apart, and with
+the plugin copy in play installed at
+.cursor/plugins/local/recognitio in the session
+home. In the shipped state each session invoked the
+workspace copy at the
+.claude/skills/recognitio/SKILL.md spelling, the
+canonical skill served through the shipped symlink,
+while the installed plugin copy registered as a
+second entry and was never invoked. In the duplicate
+state each session invoked the added copy at
+.cursor/skills/recognitio/SKILL.md, which took the
+workspace seat outright while the .claude spelling
+entry left the catalog, and the installed plugin
+copy registered again and was never invoked. The
+repo root plugin tree at .cursor-plugin appeared as
+an entry in no session. On the desktop client a live
+agent session requires a sign-in, and no signed-in
+desktop session could be landed on this box. The
+app's login-session poll never received a completed
+sign-in across the original run and the repaired
+relaunch, and the evidence stands in the desktop
+precedence report and the sign-in repair report,
+both recorded on 2026-10-25. Each CLI session listed
 recognitio as exactly one skill entry. In the shipped
 tree the entry pointed at the .claude/skills spelling
 of the canonical skill. With a byte identical copy

@@ -567,4 +567,13 @@ UNVERIFIED, corrected the Cursor brief and decision
 repinned the Cursor gate on the settled claims, with
 invocation precedence, marketplace installation, and
 Bugbot behaviour on a real pull request still open.
+A second post program correction on 2026-10-25 then
+recorded the agent CLI precedence run that settled
+invocation precedence on that surface in the shipped
+state and the duplicate state, corrected the Cursor
+brief and decision 19 and the round 22 corpus note to
+that evidence, and repinned the Cursor gate on the
+settled claims, with invocation precedence on the
+desktop client, marketplace installation, and Bugbot
+behaviour on a real pull request still open.
 

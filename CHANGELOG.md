@@ -1123,3 +1123,16 @@ This unreleased work carries version 1.3.0.
   now record that evidence, with invocation precedence,
   marketplace installation, and Bugbot behaviour on a
   real pull request still open.
+- The Cursor brief no longer carries invocation
+  precedence as open on every surface. A live session
+  run on the agent CLI surface on 2026-10-25 settled
+  precedence on that surface, invoking the workspace
+  copy in the shipped state and the added copy under
+  .cursor/skills in the duplicate state, with the
+  installed plugin copy registered and never invoked
+  in either state, and the brief, decision 19, the
+  eval corpus round 22 note, and the Cursor gate pins
+  now record that evidence, with precedence open on
+  the desktop client alone and marketplace
+  installation and Bugbot behaviour on a real pull
+  request still open.

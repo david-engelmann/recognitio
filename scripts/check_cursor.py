@@ -223,9 +223,44 @@ PINNED = (
      "skill entries side by side"),
     ("the desktop duplicate no dedupe",
      "the desktop deduped neither entry"),
-    ("the invocation precedence open",
-     "both copies register with no precedence field in "
-     "the Customize data"),
+    ("the invocation precedence settled on the CLI surface",
+     "Invocation precedence is settled on the agent CLI "
+     "surface"),
+    ("the precedence open on the desktop client alone",
+     "stays open on the desktop client alone"),
+    ("the CLI precedence session states",
+     "two in the shipped state and two in the duplicate "
+     "state"),
+    ("the CLI precedence copy markers",
+     "a distinct marker line appended to each copy of "
+     "the skill"),
+    ("the installed plugin copy in the CLI precedence home",
+     "installed at .cursor/plugins/local/recognitio in "
+     "the session home"),
+    ("the shipped state workspace invocation",
+     "each session invoked the workspace copy at the "
+     ".claude/skills/recognitio/SKILL.md spelling"),
+    ("the plugin copy second entry never invoked",
+     "registered as a second entry and was never invoked"),
+    ("the duplicate state added copy invocation",
+     "each session invoked the added copy at "
+     ".cursor/skills/recognitio/SKILL.md"),
+    ("the duplicate seat taken outright",
+     "took the workspace seat outright while the .claude "
+     "spelling entry left the catalog"),
+    ("the plugin tree no entry in the CLI precedence run",
+     "The repo root plugin tree at .cursor-plugin "
+     "appeared as an entry in no session"),
+    ("the desktop sign in landing failure",
+     "no signed-in desktop session could be landed on "
+     "this box"),
+    ("the desktop poll received no completed sign in",
+     "login-session poll never received a completed "
+     "sign-in across the original run and the repaired "
+     "relaunch"),
+    ("the precedence evidence record",
+     "the evidence stands in the desktop precedence "
+     "report and the sign-in repair report"),
     ("the marketplace and Bugbot items unverified",
      "Marketplace installation from a listing and Bugbot "
      "behaviour on a real pull request stay UNVERIFIED"),
@@ -243,6 +278,17 @@ STALE = (
     "load behaviour in the desktop client stays UNVERIFIED",
     "stays UNVERIFIED for the desktop client",
     "duplicate skill residual stays UNVERIFIED",
+)
+
+# Brief fragments the agent CLI precedence run of
+# 2026-10-25 superseded. The run settled invocation
+# precedence on that surface, so the open wording it
+# replaced fails the gate even beside the settled
+# sentences.
+STALE_PRECEDENCE = (
+    "Invocation precedence stays open",
+    "with no precedence field in the Customize data",
+    "a sign-in the run did not perform",
 )
 
 DECISION_HEADING = "## 19. Build 10"
@@ -761,6 +807,14 @@ def brief_problems(root=None):
                 "docs/cursor-plugin-brief.md states the stale "
                 "pre desktop run claim %r, which the desktop "
                 "verification run of 2026-10-25 superseded"
+                % fragment
+            )
+    for fragment in STALE_PRECEDENCE:
+        if fragment in text:
+            problems.append(
+                "docs/cursor-plugin-brief.md states the stale "
+                "open precedence claim %r, which the agent CLI "
+                "precedence run of 2026-10-25 superseded"
                 % fragment
             )
     return problems

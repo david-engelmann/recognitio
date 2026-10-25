@@ -700,6 +700,17 @@ precedence, marketplace installation, and Bugbot behaviour
 on a real pull request stay open, for the reasons the brief
 states.
 
+A second correcting note recorded on 2026-10-25. The
+statements above that invocation precedence stays open
+stand narrowed by the agent CLI precedence run recorded
+in the brief on the same date. Live sessions on that
+surface settled invocation precedence in the shipped
+state and in the duplicate state, and precedence stays
+open on the desktop client alone, where no signed-in
+session could be landed on this box. Marketplace
+installation and Bugbot behaviour on a real pull request
+stay open as recorded above.
+
 ## 20. Build 11, the CodeRabbit guidelines build
 
 Recorded on 2026-10-24 in round 23. The brief at
