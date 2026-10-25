@@ -754,5 +754,55 @@ class TestCheckDevin(unittest.TestCase):
             )
 
 
+    def test_round38_longer_aggregate_tail_fails(self):
+        # R38-RT-16. A longer aggregate run pushes the
+        # word of past the wider tail reach, and the tail
+        # now reads the whole remainder of the sentence.
+        plant = (
+            "Dismissed findings are part of the "
+            "comprehensive audited resolved comprehensive "
+            "grand total pool of findings."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round38_plain_and_article_subject_reset_fails(self):
+        # R38-RT-17. A plain and clause opening on the
+        # article led subject restatement, and the
+        # dismissed findings are, is the same reset, so
+        # the first assertion negation does not guard the
+        # membership the second asserts.
+        plant = (
+            "Dismissed findings are not in the audit "
+            "trail sample and the dismissed findings are "
+            "part of the comprehensive audited resolved "
+            "total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

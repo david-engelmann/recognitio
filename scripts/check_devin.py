@@ -561,10 +561,47 @@ def semantic_problems(root=None):
                 # dismissed findings restated, is the same
                 # reset in noun form.
                 r"|\band\s+(?:they|it|we|he|she|these|those"
-                r"|are|is|was|were|dismissed)\b",
+                r"|are|is|was|were|dismissed)\b"
+                # R38-RT-17. A plain and clause opening on
+                # an article led subject restatement, and
+                # the dismissed findings are, is the same
+                # reset with the article standing before the
+                # noun subject.
+                r"|\band\s+(?:the|a|an)\s+"
+                r"(?:\w+\s+){0,3}?\w+\s+"
+                r"(?:is|are|was|were|has|have|had|does|do"
+                r"|did|can|could|will|would|shall|should"
+                r"|may|might|must)\b",
                 low[:chain_match.start()],
             ):
                 stretch_start = max(stretch_start, reset.end())
+            # R38-RT-16. The tail after resolved reads the
+            # whole remainder of the sentence, not a
+            # character reach, because a longer aggregate
+            # run pushed the word of past the wider reach
+            # the confirmation repair set. An aggregate noun
+            # anywhere in the remainder heads the membership
+            # object, and an of phrase heads it when the
+            # words standing between resolved and of are a
+            # pure modifier run, the same chain words the
+            # gap itself allows, however long that run is.
+            # An attributive resolved findings remainder
+            # starts its own claim unit at its verb, so its
+            # modifier run stops before of and it stays out.
+            tail = low[chain_match.end():]
+            # The aggregate noun is read inside the noun
+            # phrase that follows resolved, which runs
+            # until the first word that starts a new claim
+            # unit. A count named in a later clause, the
+            # findings review that stays separate from the
+            # count, stands outside that phrase and does
+            # not head the membership object.
+            noun_phrase = re.match(
+                r"^\s*(?:"
+                + MODIFIER_WORD
+                + r"[\s,]*)+",
+                tail,
+            )
             membership_modifier_chain = bool(
                 not re.search(
                     r"\b(not|never)\b|n't",
@@ -572,32 +609,16 @@ def semantic_problems(root=None):
                 )
                 and (
                     re.search(
-                        # R37F-RT-18. An aggregate noun
-                        # heading an of phrase, the resolved
-                        # pool of findings, heads the same
-                        # membership object as a listed tail
-                        # word, while an attributive
-                        # resolved findings review takes no
-                        # of phrase and stays out.
-                        r"\s+(total|count|tally|number)\b"
-                        r"|[.,;:]",
-                        low[
-                            chain_match.end():
-                            chain_match.end() + 12
-                        ],
+                        r"\b(total|count|tally|number|pool"
+                        r"|set|group|sum)\b",
+                        noun_phrase.group(0) if noun_phrase else "",
                     )
-                    # Confirmation repair. The of phrase
-                    # tail reads on its own wider reach,
-                    # because a second aggregate word,
-                    # resolved grand pool of findings,
-                    # pushes the of past the shared window
-                    # while heading the same object.
+                    or re.match(r"\s*[.,;:]", tail)
                     or re.search(
-                        r"\s+[a-z]+(?:\s+[a-z]+)?\s+of\b",
-                        low[
-                            chain_match.end():
-                            chain_match.end() + 24
-                        ],
+                        r"^\s+(?:"
+                        + MODIFIER_WORD
+                        + r"\s+)+of\b",
+                        tail,
                     )
                 )
             )
