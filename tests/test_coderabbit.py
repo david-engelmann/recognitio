@@ -886,6 +886,54 @@ class TestCheckCoderabbit(unittest.TestCase):
             problems = self.problems(root)
             self.assertTrue(problems, problems)
 
+    def test_gate_round38_platform_across_paragraphs_fails(self):
+        # R38G-RT-02. The platform claim split across a
+        # paragraph break inside one block stands in no
+        # paragraph window, and the claim scope reading
+        # must catch it.
+        plant = (
+            "Deep Scan linked source runs in the scan "
+            "trigger flow. The packet lists each repository "
+            "beside its diff. The summary records that "
+            "reading in full. The roster lists each file "
+            "in the change beside its diff.\n\n"
+            "It also runs on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
+    def test_gate_round38_prefix_reset_on_a_possessive_subject(self):
+        # R38G-RT-06. A comma and clause opening on a
+        # possessive led subject restatement, our summary,
+        # is the same reset as the article led form, so
+        # the first clause negation does not guard the
+        # offer in the second.
+        plant = (
+            "Linked source is not a separate product in "
+            "the scan trigger flow, and our summary is "
+            "available on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
     def test_round38_prefix_reset_on_an_unlisted_noun_subject(self):
         # R38-RT-09. A comma and clause opening on a noun
         # subject the earlier reset list never named, the

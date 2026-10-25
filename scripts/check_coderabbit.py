@@ -267,11 +267,19 @@ def guidelines_problems(root=None):
 # closed by a finite verb, the summary is available. A
 # joint with no subject restated, and runs on, opens no
 # new clause and is no reset.
+# R38G-RT-06. A possessive led subject restatement, our
+# summary is available, opens a clause the same way, so
+# it joins the reset forms in the same determiner led
+# shape.
 CLAUSE_RESET = (
     r";|\bbut\b|\bhowever\b|\byet\b"
     r"|,\s+and\s+(?:it|they|we|he|she|these|those"
     r"|linked source|deep scan)\b"
     r"|,\s+and\s+(?:the|a|an|this|that)\s+"
+    r"(?:\w+\s+){0,3}?\w+\s+"
+    r"(?:is|are|was|were|has|have|had|does|do|did"
+    r"|can|could|will|would|shall|should|may|might|must)\b"
+    r"|,\s+and\s+(?:our|their|its|his|her|my|your)\s+"
     r"(?:\w+\s+){0,3}?\w+\s+"
     r"(?:is|are|was|were|has|have|had|does|do|did"
     r"|can|could|will|would|shall|should|may|might|must)\b"
@@ -340,7 +348,6 @@ def linked_problems(root=None):
     raw = read_text(root / "docs" / "coderabbit-review-brief.md")
     if raw is None:
         return ["docs/coderabbit-review-brief.md is missing"]
-    body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
     # R37F-RT-11. Triples joined the reading, because the
     # fix review split both linked claims across three
     # sentences with a filler between the halves, and the
@@ -353,9 +360,18 @@ def linked_problems(root=None):
     # format itself marks with blank lines, so every
     # neighbouring window inside a paragraph is read and
     # no window crosses a paragraph break.
+    # R38G-RT-02. The gate review split the same claims
+    # across a paragraph break inside one block, so the
+    # reading now runs at claim scope, the headed block,
+    # every paragraph under one heading read as one group
+    # of sentences in order, and a heading starts a new
+    # group. The guards stay scoped to the claim stretch
+    # of their own sentence, so a guard phrase or a
+    # negation in a neighbouring paragraph reaches no
+    # further than its own claim.
     windows = []
-    for block in re.split(r"\n\s*\n", body):
-        flat = re.sub(r"\s+", " ", block)
+    for chunk in re.split(r"(?m)^#{1,6} .*$", raw):
+        flat = re.sub(r"\s+", " ", chunk)
         group = [
             sentence.strip()
             for sentence in re.split(r"(?<=[.!?])\s+", flat)
