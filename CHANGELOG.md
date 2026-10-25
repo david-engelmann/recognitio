@@ -598,6 +598,33 @@ This unreleased work carries version 1.3.0.
   terminal rendering closes the See it on a real change
   section, and the single rendering they replace is gone.
 
+- The round 38 pass consolidates the landed build gates
+  with no new build. Every brief reading that stopped at
+  a fixed neighbouring window now reads at claim scope,
+  the Copilot trust and approval readings and the
+  CodeRabbit linked readings over every neighbouring
+  window inside a paragraph, the Cursor neutral and cap
+  readings joining deictic continuations in the same
+  paragraph, and the Qwen figure windows over every
+  neighbouring window inside a paragraph. The Copilot
+  authority branches judge each occurrence in its own
+  sentence, the Kimi bare name segment breaks at the yet
+  joint, the ZCode execution reading keeps the text
+  between guard phrases under judgement, and the Devin
+  chain tail reads the whole remainder of its sentence
+  with article led subject restatements resetting its
+  claim stretch. The copy fence now covers the
+  Antigravity and ZCode plugin manifests. The Qwen brief
+  scopes its side shape sentence to the installs it
+  describes and restates the installer mirror once as a
+  mirror of the input manifest, decision 26 gains a
+  dated correcting note, the README adaptations table
+  gains the Antigravity row, the Cursor brief carries
+  the round 38 attempt note with its load behaviour
+  still UNVERIFIED, and the eval corpus index catches
+  up through round 34. The accepted round 34 single
+  synonym residual stands unchanged.
+
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
