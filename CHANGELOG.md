@@ -597,7 +597,6 @@ This unreleased work carries version 1.3.0.
   recorded run. The chat rendering leads the page and the raw
   terminal rendering closes the See it on a real change
   section, and the single rendering they replace is gone.
-
 - The round 38 pass consolidates the landed build gates
   with no new build. Every brief reading that stopped at
   a fixed neighbouring window now reads at claim scope,
@@ -622,8 +621,13 @@ This unreleased work carries version 1.3.0.
   gains the Antigravity row, the Cursor brief carries
   the round 38 attempt note with its load behaviour
   still UNVERIFIED, and the eval corpus index catches
-  up through round 34. The accepted round 34 single
-  synonym residual stands unchanged.
+  up through round 34. The round also records the
+  round 36 E1 fixture correction, that the four
+  fixtures P008 and P009 and P012 and P013 have exited
+  1 since the round 36 landing rather than standing at
+  their recorded exit 0, with the correction note
+  appended to the fixtures record. The accepted round
+  34 single synonym residual stands unchanged.
 
 ### Fixed
 
