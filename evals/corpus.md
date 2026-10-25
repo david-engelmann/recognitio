@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 34, with each round
+found, from the first cycle through round 37, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -696,6 +696,62 @@ not closed, and the escapes in it are single synonym
 variants of families the gates already cover. R34-EX-01,
 the scoped shape guard carried from round 32, landed
 as a guard with no violation found in the set.
+
+## Round 35 incidents
+
+Round 35 was a research and plan refinement round and
+raised no code incidents of its own. Its plan handed
+the pre close rounds and the final fix round shape to
+rounds 36 through 39, and the findings those rounds
+raised stand in their own sections below. This section
+stands so the head of this index can say that each
+round has its own section and a reader can tell that
+round 35 was checked rather than skipped.
+
+## Round 36 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Copilot trust plants split and paraphrased past the brief gate (R36 audit family) | `test_gate_review_split_and_paraphrase_plants_fail` and `test_gate_review_negated_and_attributed_trust_passes` and `test_trust_core_plants_after_the_rules_section_fail` in tests/test_copilot.py |
+| A swapped Kimi per field limit passed the Kimi plugin gate | `test_a_swapped_per_field_limit_fails` and `test_gate_review_swapped_limit_forms_fail` in tests/test_kimi.py |
+| ZCode execution and cap restatements passed the ZCode brief gate | `test_execution_and_cap_plants_fail` and `test_gate_review_execution_and_cap_restated_plants_fail` in tests/test_zcode.py |
+| Cursor cap figures and Bugbot control plants passed the Cursor brief gate | `test_cap_figure_and_bugbot_control_plants_fail` in tests/test_cursor.py |
+| CodeRabbit linked source restatements passed the CodeRabbit brief gate | `test_linked_source_plants_fail` and `test_gate_review_linked_source_true_sentences_pass` in tests/test_coderabbit.py |
+| Qwen figure plants split from their simultaneity sentence passed the Qwen brief gate | `test_gate_review_split_figure_plants_fail` and `test_gate_review_unbound_figure_sentence_passes` in tests/test_qwen.py |
+| Devin membership plants with a modifier chain passed the Devin brief gate | `test_modifier_chain_membership_plants_fail` and `test_gate_review_degree_adverb_chain_plants_fail` in tests/test_devin.py |
+
+The round 36 pass widened the landed build gates with
+no new build and folded the plan round 35 brief
+corrections its lanes had verified. Five items stood
+outside that fold in the qualified form the round 37
+fix report records and no tree text records any of the
+five as folded. The accepted round 34 single synonym
+residual stands unchanged.
+
+## Round 37 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Copilot trust and approval claims split across three sentences passed the Copilot brief gate | `test_round37_trust_split_across_three_sentences_fails` and `test_round37_approval_split_across_three_sentences_fails` in tests/test_copilot.py |
+| A Qwen figure split across five sentences from its simultaneity sentence passed the Qwen brief gate | `test_round37_confirm_figure_split_across_five_fails` and `test_round37_confirm2_figure_guard_as_clause_fails` in tests/test_qwen.py |
+| The round 37 conversion record in the Qwen brief stood without pins of its own | `test_round37_fidelity_record_pins_hold` and `test_round37_full_conversion_byte_fidelity_claim_fails` in tests/test_qwen.py |
+| A Cursor neutral conclusion split across sentences passed the Cursor brief gate | `test_round37_neutral_conclusion_split_across_sentences_fails` in tests/test_cursor.py |
+| CodeRabbit platform claims split across three sentences passed the CodeRabbit brief gate | `test_round37_fixreview_platform_split_across_three_fails` in tests/test_coderabbit.py |
+| A stale README version badge passed the version coherence gate | `test_a_stale_readme_badge_is_a_problem` and `test_main_fails_on_a_stale_readme_badge` in the gate script suite |
+
+The round 37 pass widened the Copilot readings to
+triples of neighbouring sentences, bound the Cursor
+figures by their own count noun and the CodeRabbit
+linked readings at unit scope over sentence pairs and
+then triples, judged the ZCode figures against their
+own clause, gave the Qwen figure family windows that
+grew across the pass to five sentences with the figure
+guard scoped to the figure own clause, and gave the
+Devin membership branch its whole claim stretch guard.
+The pass also recorded the round 37 full bundle
+conversion attempt in the Qwen brief with its three
+named differences under gate pins. The accepted round
+34 single synonym residual stands unchanged.
 
 ## Disclosure incidents with no test of their own
 
