@@ -519,8 +519,8 @@ than skipped.
 
 The per sentence axis claim overstatement carried from
 round 24 (R26-SP-01) closed in this round as brief
-prose in the Antigravity brief, and no test pins the
-axis wording by name. The en dash scan gap (R26-ST-01)
+prose in the CodeRabbit brief and in decision 20, and
+no test pins the axis wording by name. The en dash scan gap (R26-ST-01)
 closed as a scan change in the copy gate, and the fence
 tests in the gate script suite cover the dash family
 without a dedicated en dash test name. The October 26
