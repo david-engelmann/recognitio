@@ -1,7 +1,7 @@
 # Eval corpus from real failures
 
 This index encodes the incidents the audit program actually
-found, from the first cycle through round 24, with each round
+found, from the first cycle through round 34, with each round
 in its own section below, and maps each one to the
 regression test or fixture that now covers it. A test name in this file was checked against the suite in the same
 change that wrote the line. When a fix lands without a test, the
@@ -496,6 +496,206 @@ claim (R24-SP-01) has no recorded closure in the round 24
 fix report, so it stands here as an open record item. The
 Build 13 citation upgrades handed forward to round 26
 stand outside this section.
+
+## Round 25 incidents
+
+Round 25 was a research and plan refinement round and
+raised no code incidents of its own. Its plan handed
+the Build 13, Build 14, Build 15, and Build 16 builds
+and the gate hardening rounds to rounds 26 through 29,
+and the findings those rounds raised stand in their
+own sections below. This section stands so the head of
+this index can say that each round has its own section
+and a reader can tell that round 25 was checked rather
+than skipped.
+
+## Round 26 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A trusted head branch sentence passed the Copilot brief gate (R26-RT-01) | `test_a_trusted_head_branch_sentence_fails` and `test_a_reliable_head_branch_sentence_fails` and `test_a_head_branch_merge_authority_grant_fails` in tests/test_copilot.py |
+| A named review model passed the Copilot brief gate (R26-RT-02) | `test_a_named_review_model_fails` in tests/test_copilot.py |
+| A permitted approval on a red packet passed the Copilot brief gate (R26-RT-03) | `test_a_permitted_approval_on_a_red_packet_fails` and `test_a_reworded_approval_permission_fails` and `test_a_negated_approval_permission_passes` in tests/test_copilot.py |
+
+The per sentence axis claim overstatement carried from
+round 24 (R26-SP-01) closed in this round as brief
+prose in the Antigravity brief, and no test pins the
+axis wording by name. The en dash scan gap (R26-ST-01)
+closed as a scan change in the copy gate, and the fence
+tests in the gate script suite cover the dash family
+without a dedicated en dash test name. The October 26
+Copilot global default recheck was carried forward as
+a watch item and stands outside this section.
+
+## Round 27 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A hook event without a blocking check and a notification only sentence passed the Kimi plugin gate (R27-RT-01) | `test_each_hook_event_carries_a_blocking_check` and `test_a_notification_only_sentence_fails` in tests/test_kimi.py |
+| A plugin wins collision sentence passed the Kimi plugin gate (R27-RT-02) | `test_the_user_agent_wins_the_collision_fixture` and `test_a_plugin_wins_sentence_fails` in tests/test_kimi.py |
+| A bare name sentence passed the Kimi plugin gate (R27-RT-03) | `test_a_bare_name_sentence_fails` and `test_a_bare_name_works_sentence_fails` in tests/test_kimi.py |
+| A server start directory sentence passed the Kimi plugin gate (R27-RT-04) | `test_a_server_start_directory_sentence_fails` and `test_a_server_start_directory_noun_sentence_fails` in tests/test_kimi.py |
+| An inflated size limit passed the Kimi plugin gate (R27-RT-05) | `test_an_inflated_limit_fails` and `test_an_inflated_limit_added_sentence_fails` in tests/test_kimi.py |
+| A dropped print mode persona passed the Kimi plugin gate (R27-RT-06) | `test_a_dropped_persona_fails` and `test_a_persona_free_ci_sentence_fails` in tests/test_kimi.py |
+
+The round 27 fix report on file is reconstructed by
+the owner from the pushed commit record, and this
+section carries that caveat with it. The spec and
+standards items (R27-SP-01, R27-SP-02, R27-ST-01, and
+R27-ST-02) closed inside the same build landing, and
+the derivation note and dropped pin tests in
+tests/test_kimi.py stand behind them without a one to
+one name mapping in the reconstructed report.
+
+## Round 28 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A hook blocking rewording passed the Kimi plugin gate (R28-RT-01) | `test_a_replacement_hook_rewording_fails` and `test_a_failed_check_proceeds_sentence_fails` and `test_an_advisory_failure_sentence_fails` in tests/test_kimi.py |
+| A collision precedence rewording passed the Kimi plugin gate (R28-RT-02) | `test_a_replacement_collision_rewording_fails` and `test_a_resolves_to_plugin_sentence_fails` and `test_a_plugin_precedence_sentence_fails` in tests/test_kimi.py |
+| A qualified names rewording passed the Kimi plugin gate (R28-RT-03) | `test_a_replacement_qualified_rewording_fails` in tests/test_kimi.py |
+| A server start directory rewording passed the Kimi plugin gate (R28-RT-04) | `test_a_replacement_workdir_rewording_fails` in tests/test_kimi.py |
+| Five pinned claims stood with no negative of their own (R28-RT-05) | `test_a_swapped_fixture_pair_fails` and `test_dropped_secondary_sentences_fail` and `test_a_missing_numbering_note_fails` and `test_a_honoured_fields_sentence_fails` and `test_an_immediate_source_edit_sentence_fails` and `test_a_per_project_scope_sentence_fails` in tests/test_kimi.py |
+| Derivation escapes and bare citation derivation notes passed the Kimi plugin gate (R28-RT-06 and R28-RT-07) | `test_an_unnumbered_rule_heading_fails` and `test_a_bare_paragraph_rule_fails` and `test_a_late_rule_section_fails` and `test_a_bare_kimi_citation_fails` and `test_a_bare_decision_citation_fails` in tests/test_kimi.py |
+| A gutted decision record passed the Kimi plugin gate (R28-RT-09) | `test_a_gutted_decision_record_fails` in tests/test_kimi.py |
+| Fixture contents stood unchecked and the live probe could fail open (R28-RT-10 and R28-RT-11) | `test_a_hostile_fixture_fails` and `test_an_always_blocking_fixture_fails_the_pass_probe` in tests/test_kimi.py |
+
+The extractor flagging of the Kimi plugin surfaces
+(R28-RT-08) stands in the extractor suite. Four
+unpinned brief sentences (R28-RT-12) and the decision
+21 gap (R28-RT-13) closed inside the same pin set the
+rows above cite, with the unknown fields sentence of
+R28-RT-12 shared with R28-SP-01. The external items
+closed as brief corrections from primary pages, and
+R28-EX-04 stands as an honest partial, with the
+sandboxing half pinned primary in this round and the
+Agent Framework stable half corroborated rather than
+primary verified until round 29 closed it from the
+vendor devblog.
+
+## Round 29 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Semantic negative groups stood missing across the Kimi plugin gate (R29-RT-06) | `test_a_no_form_autodiscovery_denial_fails` and `test_an_any_override_drop_fails` and `test_a_dropped_trust_workspace_pin_fails` and `test_a_dropped_unversioned_layout_pin_fails` and `test_a_noun_free_event_denial_fails` and `test_a_swapped_per_field_limit_fails` and `test_a_bare_name_subject_invocation_fails` in tests/test_kimi.py |
+| A dropped version bump rule, a dropped register but not execute sentence, and a dropped description cap passed the ZCode plugin gate | `test_a_dropped_version_bump_sentence_fails` and `test_a_dropped_register_not_execute_sentence_fails` and `test_a_dropped_description_cap_fails` and `test_an_over_cap_description_fails` in tests/test_zcode.py |
+| ZCode execution and cap restatements passed the ZCode plugin gate | `test_execution_and_cap_plants_fail` and `test_gate_review_execution_and_cap_restated_plants_fail` and `test_gate_review_other_host_cap_sentence_passes` in tests/test_zcode.py |
+| Copilot trust and approval claims stood guarded by their rule position rather than their meaning | `test_trust_core_plants_after_the_rules_section_fail` and `test_gate_review_split_and_paraphrase_plants_fail` and `test_gate_review_negated_and_attributed_trust_passes` in tests/test_copilot.py |
+| The live hook probe stood outside the gate function | `test_kimi_problems_includes_the_live_probe` and `test_a_live_all_events_fixture_fails_the_probe` in tests/test_kimi.py |
+
+The remaining round 29 red team items closed across
+the Kimi, ZCode, and Copilot gate hardening in this
+round, including the kimi.plugin.json basename
+flagging in all three extractor copies, and they stand
+behind the negative groups the rows above cite without
+a one to one name mapping in the fix report. The Build
+15 omission from the round 28 report (R29-SP-01)
+closed as decision 26, the dated deferral of Build 15
+to round 33, and the round 33 section below records
+its landing. The standards and external items closed
+as pins and brief corrections in the same landing.
+
+## Round 30 incidents
+
+Round 30 was a research round and raised no code
+incidents of its own. Its research record handed the
+Build 13, Build 10, and Build 11 currency corrections
+to round 31, and the findings that round raised stand
+in their own section below. This section stands so the
+head of this index can say that each round has its own
+section and a reader can tell that round 30 was
+checked rather than skipped.
+
+## Round 31 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| A dropped Devin pin passed the Devin brief gate across the build surface | `test_a_dropped_bitbucket_host_fails` and `test_a_dropped_resolved_count_fails` and `test_a_dropped_sarif_pin_fails` and `test_a_dropped_v3beta1_continuation_fails` and `test_a_dropped_schedules_separation_fails` and `test_a_dropped_oncall_adjacent_fails` and `test_a_dropped_trigger_default_fails` and `test_a_dropped_stack_rule_fails` and `test_a_dropped_ai_scan_limit_fails` and `test_a_dropped_fusion_caveat_fails` in tests/test_devin.py |
+| A bare Dynamic Workflows mention and a Build 6 figure about Devin passed the Devin brief gate | `test_a_bare_dynamic_workflows_mention_fails` and `test_a_build_6_figure_about_devin_fails` in tests/test_devin.py |
+| A SARIF version swap and resolved count rewordings passed the Devin brief gate | `test_a_sarif_version_swap_fails` and `test_resolved_rewordings_fail` in tests/test_devin.py |
+| Replacement rewordings of the Kimi claims passed the Kimi plugin gate | `test_a_replacement_hook_rewording_fails` and `test_a_replacement_collision_rewording_fails` and `test_a_replacement_qualified_rewording_fails` and `test_a_replacement_workdir_rewording_fails` and `test_a_replacement_secondary_rewording_fails` in tests/test_kimi.py |
+| Synonym trust and approval sentences passed the Copilot brief gate | `test_a_synonym_trust_sentence_fails` and `test_a_synonym_approval_sentence_fails` in tests/test_copilot.py |
+
+Two red team items closed as stated limitations
+rather than new artifacts. R31-RT-12 stands as the
+record that no version is invented where the primary
+pages name none, and R31-RT-14 stands as the record
+that no flipped task eval is claimed. The Build 13,
+Build 10, and Build 11 currency corrections from the
+round 30 record folded in this round as brief prose,
+and the decision 25 phrasing wording narrowed to the
+phrasing families the gate tests. The external items
+closed as brief corrections from primary pages in the
+same landing.
+
+## Round 32 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Devin contradictions in added, in rule, and replacement form passed the Devin brief gate (R32-RT-01) | `test_added_contradictions_fail` and `test_an_in_rule_resolved_contradiction_fails` and `test_replacement_contradictions_fail` in tests/test_devin.py |
+| Copilot trust and approval stated with fresh synonyms passed the Copilot brief gate (R32-RT-02) | `test_r32_synonym_sentences_fail` in tests/test_copilot.py |
+| Kimi precedence and bare name synonyms passed the Kimi plugin gate (R32-RT-04) | `test_r32_synonym_replacements_fail` in tests/test_kimi.py |
+
+Decision 13 stands rewritten in this round to a
+single condition suspended status with the dated Build
+18 deferral, and no test pins the decision wording by
+name. R32-EX-05 was carried forward as a guard rather
+than closed by a tree change, and the round 34 section
+below records its guard landing. R32-SP-05 closed by
+locator rather than by dropping the sentence. No
+finding in this round was declined on substance.
+
+## Round 33 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| Qwen figure claims stood without their basis and scope (R33-RT-01, R33-RT-04, and R33-RT-08) | `test_every_plant_fails` and `test_the_number_normalisation_fires` and `test_a_dropped_figure_pin_fails` and `test_gate_review_split_figure_plants_fail` and `test_gate_review_unbound_figure_sentence_passes` in tests/test_qwen.py |
+| The wrapper exits and the internal verify exit stood merged (R33-RT-02) | `test_a_dropped_wrapper_exit_fails` and `test_a_dropped_internal_verify_pin_fails` and `test_a_merged_exit_table_fails` in tests/test_qwen.py |
+| A dropped activation, cancellation, precedence, or listing pin passed the Qwen brief gate (R33-RT-05 and R33-RT-06) | `test_a_dropped_not_activated_pin_fails` and `test_a_dropped_cancellation_pin_fails` and `test_a_dropped_precedence_pin_fails` and `test_a_dropped_no_listing_pin_fails` in tests/test_qwen.py |
+| A dropped runtime unverified pin and a dropped derivation note passed the Qwen brief gate | `test_a_dropped_runtime_unverified_pin_fails` and `test_a_dropped_derivation_note_fails` and `test_a_dropped_r4_qoder_path_fails` and `test_a_dropped_qoder_activation_unverified_fails` in tests/test_qwen.py |
+| A publication promise passed the Qwen brief gate | `test_a_publication_promise_fails` and `test_the_three_naming_cases` in tests/test_qwen.py |
+
+The 12 against 16 figure conflict was not resolved to
+a single figure in this round. The brief carries the
+basis and scope table, and the gate forbids a bare
+figure of either kind. Conversion fidelity holds for
+the skill tree only, runtime invocation stays
+UNVERIFIED, and the scoped npm route stays UNTESTED,
+and those three records stand as open residuals beside
+their pins. R33-SP-06 was carried forward as program
+record and R33-EX-06 was carried forward as
+UNVERIFIED. R33-RT-11 and R33-RT-12 closed by non
+action, and the rechecks they name were carried
+forward on their dates.
+
+## Round 34 incidents
+
+| Incident | Covered by |
+| --- | --- |
+| The corpus index stood behind the rounds it indexes | `test_a_renamed_cited_test_fails_the_corpus_check` and `test_a_corpus_name_that_never_existed_fails` and `test_a_dropped_corpus_row_fails_the_coverage_floor` and `test_a_dropped_corpus_citation_fails_the_coverage_floor` and `test_scope_cap_names_the_highest_round_section` in the gate script suite |
+| Devin membership plants escaped through long filler between the verb and resolved | `test_verb_plus_membership_long_filler_fails` and `test_modifier_chain_membership_plants_fail` and `test_gate_review_degree_adverb_chain_plants_fail` and `test_gate_review_chain_true_sentences_pass` in tests/test_devin.py |
+| Spelled SARIF versions passed the Devin brief gate | `test_spelled_sarif_versions_fail` in tests/test_devin.py |
+
+The round then ran four repair layers over its own
+gate. The G layer made the Qwen figure negative order
+independent and sentence scoped with adverb
+normalisation, and gave the wrapper, activation, and
+alias negatives their missing synonyms and reversed
+orders. The R layer normalised hyphens before matching
+and bounded the Qwen reading. The Y layer and the B3
+item tied the Devin membership phrases to resolved
+within a measured bound, and one spec item in that
+layer was a real regression, the beat pattern flagging
+the true shipped precedence sentence in its active
+form, repaired by restricting the pattern to the
+passive form. The W and S layer closed the remaining
+shapes of the same seams, and three confirmation lanes
+approved the final delta. The single synonym residual
+class stands accepted at the end of this round and is
+not closed, and the escapes in it are single synonym
+variants of families the gates already cover. R34-EX-01,
+the scoped shape guard carried from round 32, landed
+as a guard with no violation found in the set.
 
 ## Disclosure incidents with no test of their own
 
