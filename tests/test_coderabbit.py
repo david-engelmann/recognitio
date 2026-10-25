@@ -843,5 +843,71 @@ class TestCheckCoderabbit(unittest.TestCase):
             )
 
 
+    def test_round38_platform_across_five_sentences_fails(self):
+        # R38-RT-08. The platform claim split across five
+        # sentences with three fillers between the halves
+        # stands in no window of four, and the paragraph
+        # scope reading must catch it.
+        plant = (
+            "Deep Scan linked source runs in the scan "
+            "trigger flow. The packet lists each repository "
+            "beside its diff. The summary records that "
+            "reading in full. The roster lists each file "
+            "in the change beside its diff. It also runs "
+            "on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
+    def test_round38_cap_across_five_sentences_fails(self):
+        # R38-RT-08. The linked figure claim split across
+        # five sentences must fail the same way.
+        plant = (
+            "A Deep Scan can read linked repositories "
+            "across a workspace. The packet lists each "
+            "repository beside its diff. The summary "
+            "records that reading in full. The roster lists "
+            "each file in the change beside its diff. The "
+            "cap for that reading is 50 on any plan."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(problems, problems)
+
+    def test_round38_prefix_reset_on_an_unlisted_noun_subject(self):
+        # R38-RT-09. A comma and clause opening on a noun
+        # subject the earlier reset list never named, the
+        # summary, is the same reset, so the first clause
+        # negation does not guard the offer in the second.
+        plant = (
+            "Linked source is not a separate product in "
+            "the scan trigger flow, and the summary is "
+            "available on self hosted GitLab."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "promises Deep Scan linked source" in p
+                    for p in problems
+                ), problems
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

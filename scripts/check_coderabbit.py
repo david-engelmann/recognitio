@@ -259,6 +259,25 @@ def guidelines_problems(root=None):
     return problems
 
 
+# R38-RT-09. A comma and clause, or a plain and clause,
+# that opens with an explicit subject is a reset, whatever
+# noun the subject names. The subject forms are the
+# pronoun and claim noun forms the earlier repairs named,
+# and the article led form, a determiner and a noun phrase
+# closed by a finite verb, the summary is available. A
+# joint with no subject restated, and runs on, opens no
+# new clause and is no reset.
+CLAUSE_RESET = (
+    r";|\bbut\b|\bhowever\b|\byet\b"
+    r"|,\s+and\s+(?:it|they|we|he|she|these|those"
+    r"|linked source|deep scan)\b"
+    r"|,\s+and\s+(?:the|a|an|this|that)\s+"
+    r"(?:\w+\s+){0,3}?\w+\s+"
+    r"(?:is|are|was|were|has|have|had|does|do|did"
+    r"|can|could|will|would|shall|should|may|might|must)\b"
+)
+
+
 def _prefix_negated(low, start):
     """R37-RT-08. Whether a negation guards a match from
     before it in the same claim stretch.
@@ -282,12 +301,7 @@ def _prefix_negated(low, start):
     """
     prefix = low[:start]
     cut = 0
-    for reset in re.finditer(
-        r";|\bbut\b|\bhowever\b|\byet\b"
-        r"|,\s+and\s+(?:it|they|we|he|she|these|those"
-        r"|linked source|deep scan)\b",
-        prefix,
-    ):
+    for reset in re.finditer(CLAUSE_RESET, prefix):
         cut = max(cut, reset.end())
     return bool(
         re.search(
@@ -333,34 +347,29 @@ def linked_problems(root=None):
         for sentence in re.split(r"(?<=[.!?])\s+", text)
         if sentence.strip()
     ]
-    windows = [[part] for part in sentences]
-    windows += [
-        [first, second]
-        for first, second in zip(sentences, sentences[1:])
-    ]
-    # R37F-RT-11. Triples join the reading, because the
+    # R37F-RT-11. Triples joined the reading, because the
     # fix review split both linked claims across three
-    # sentences with a filler between the halves.
-    windows += [
-        [first, second, third]
-        for first, second, third in zip(
-            sentences, sentences[1:], sentences[2:]
-        )
-    ]
-    # Confirmation repair. Four sentence windows join
-    # too, because the confirmation pass split the
-    # platform claim across four sentences with two
-    # fillers between the halves, one unit past the
-    # triple reading.
-    windows += [
-        [first, second, third, fourth]
-        for first, second, third, fourth in zip(
-            sentences,
-            sentences[1:],
-            sentences[2:],
-            sentences[3:],
-        )
-    ]
+    # sentences with a filler between the halves, and the
+    # confirmation repair widened the reading to four.
+    # R38-RT-08. The round 38 review split the same claims
+    # across five sentences, one past the four sentence
+    # bound again, so the reading now runs at paragraph
+    # scope. A claim in this brief lives inside one
+    # paragraph, and the paragraph is the scope the brief
+    # format itself marks with blank lines, so every
+    # neighbouring window inside a paragraph is read and
+    # no window crosses a paragraph break.
+    windows = []
+    for block in re.split(r"\n\s*\n", body):
+        flat = re.sub(r"\s+", " ", block)
+        group = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", flat)
+            if sentence.strip()
+        ]
+        for start in range(len(group)):
+            for end in range(start + 1, len(group) + 1):
+                windows.append(group[start:end])
     problems = []
     for parts in windows:
         sentence = " ".join(parts)
@@ -564,21 +573,11 @@ def linked_problems(root=None):
                 local_end = platform.end() - home_start
                 pre = home[:local_start]
                 cut = 0
-                for reset in re.finditer(
-                    r";|\bbut\b|\bhowever\b|\byet\b"
-                    r"|,\s+and\s+(?:it|they|we|he|she|these"
-                    r"|those|linked source|deep scan)\b",
-                    pre,
-                ):
+                for reset in re.finditer(CLAUSE_RESET, pre):
                     cut = max(cut, reset.end())
                 post = home[local_end:]
                 stop = len(post)
-                first_reset = re.search(
-                    r";|\bbut\b|\bhowever\b|\byet\b"
-                    r"|,\s+and\s+(?:it|they|we|he|she|these"
-                    r"|those|linked source|deep scan)\b",
-                    post,
-                )
+                first_reset = re.search(CLAUSE_RESET, post)
                 if first_reset is not None:
                     stop = first_reset.start()
                 if re.search(
