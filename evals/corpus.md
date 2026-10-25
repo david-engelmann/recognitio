@@ -444,8 +444,11 @@ names no pinning test for those entries by name.
 
 The review latency risk (R22-RT-06) stays carried as an
 unbounded risk in the brief and decision record, and the
-real client run noted in the R22-RT-01 row stays owed
-because no Cursor client runs on this box. The caps and
+real client run noted in the R22-RT-01 row stayed owed
+at this round because no Cursor client had then run on
+this box. A desktop verification run on 2026-10-25 later
+discharged that run on this box, and the record of the
+run stands in the Cursor brief. The caps and
 packaging rules (R22-RT-07 and R22-RT-08) and the half
 primary pin and canvases sentence (R22-EX-01 and
 R22-EX-02) stand as brief and decision record prose in

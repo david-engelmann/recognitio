@@ -557,5 +557,14 @@ under gate pins with desktop load behaviour still
 UNVERIFIED. The round also recorded the round 36 E1
 fixture correction for fixtures P008 and P009 and
 P012 and P013. The accepted round 34 single synonym
-residual stands unchanged.
+residual stands unchanged. A post program correction
+on 2026-10-25 then recorded the desktop verification
+run that ran the official Cursor desktop client on
+this box and settled the desktop load and duplicate
+registration questions the round 38 note carried as
+UNVERIFIED, corrected the Cursor brief and decision
+19 and the round 22 corpus note to that evidence, and
+repinned the Cursor gate on the settled claims, with
+invocation precedence, marketplace installation, and
+Bugbot behaviour on a real pull request still open.
 

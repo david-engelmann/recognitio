@@ -41,9 +41,14 @@ under `rules/`. It ships no agents, no commands, no MCP servers,
 and no hooks. The reviewer persona stays a Claude Code plugin
 agent, so the Cursor plugin carries no second persona. The plugin
 carries no `mcp.json`, mirroring the portable package's
-documented omission. The duplicate skill residual stays
-UNVERIFIED at primary, and the standing guidance is unchanged.
-Never ship two separate copies of the same skill.
+documented omission. The duplicate skill residual is
+settled at the level of desktop registration by the
+desktop run recorded in this brief, because the client
+registers two copies of the skill side by side and
+dedupes neither, and the residual stays open at the
+level of invocation precedence, and the standing
+guidance is unchanged. Never ship two separate copies
+of the same skill.
 
 ## The real directory copy
 
@@ -62,12 +67,16 @@ symlink habit carried into the plugin folder would ship a hollow
 plugin that loads nothing, silently.
 
 The honest limitation is recorded here and in the decision
-record. This box has no Cursor client, so the real client run is
-owed. The protocol is a real directory copy at
+record. The real client run has now happened on this box.
+On 2026-10-25 the official Cursor desktop build 3.27.12
+for Linux ran here under a virtual display, with no
+account signed in and no credential entered into the
+application. The protocol is a real directory copy at
 `~/.cursor/plugins/local/recognitio`, a window reload, and a
-confirm of every component in Customize. The local simulation of
-the documented rule in this round's gate is the evidence that
-stands in until that run happens.
+confirm of every component in Customize. The desktop
+evidence from that run stands in the place of the local
+simulation of the documented rule in this round's gate for
+load behaviour.
 
 Round 38 note, recorded on 2026-10-24. An earlier
 bounded API attempt in this round built a Bearer
@@ -78,21 +87,45 @@ produced no observation of loading. A bounded Cursor
 agent CLI attempt in the same round then answered in
 full, and the rest of this note records that attempt.
 
-Cursor plugin load behaviour in the desktop client
-stays UNVERIFIED. A bounded Cursor agent CLI attempt
-in round 38 reached the agent host surface in three
+The desktop run recorded in the desktop verification
+note after this note settled Cursor plugin load
+behaviour in the desktop client. The client plugins
+log recorded the recognitio plugin loaded with zero
+failures five times in the first launch as reload
+cycles ran and four more times in the second launch
+after a full quit and restart, and every recorded
+load happened before any sign-in. A bounded Cursor
+agent CLI attempt in round 38 reached the agent host
+surface in three
 sessions against a clone of this repo and no session
 included a recognitio plugin manifest, so a plugin
 tree at a repo root did not present as an installed
-plugin on that surface. The real desktop client run
-remains owed under the protocol in this brief,
-including the local plugin folder copy, the window
-reload, and the confirm of every component in
-Customize.
+plugin on that surface. The protocol in this brief
+stands discharged by the desktop run at the level of
+the local plugin folder copy and the window reload,
+and its confirm of every component stands discharged
+at the level of the Customize backing records, which
+list a skill entry and a rule entry pointing at the
+local plugin copies.
 
 Duplicate skill behaviour on the Cursor agent CLI
-surface was observed in round 38 and stays UNVERIFIED
-for the desktop client. Each CLI session listed
+surface was observed in round 38, and the desktop run
+settled the registration half of the question for the
+desktop client. In the duplicate state the Customize
+backing records held two recognitio skill entries side
+by side, one at project scope pointing at the workspace
+copy under .cursor/skills and one at plugin scope
+pointing at the local plugin copy, and the desktop
+deduped neither entry. In the pristine shipped state
+the records held two entries again, the plugin entry
+unchanged and a project entry pointing at the
+.claude/skills spelling of the canonical skill, and
+the repo root plugin tree copy under .cursor-plugin
+registered in neither state. Invocation precedence
+stays open, because both copies register with no
+precedence field in the Customize data and a live
+agent session requires a sign-in the run did not
+perform. Each CLI session listed
 recognitio as exactly one skill entry. In the shipped
 tree the entry pointed at the .claude/skills spelling
 of the canonical skill. With a byte identical copy
@@ -114,6 +147,31 @@ observation speaks to the CLI surface only and
 changes nothing the brief states about Bugbot, which
 reads its own surfaces on a pull request and was not
 exercised here.
+
+Desktop verification note, recorded on 2026-10-25.
+The run behind the settled sentences in this section
+used the official Cursor desktop build 3.27.12 for
+Linux, extracted from the vendor AppImage and run
+under a virtual display on this box, with its home
+and user data redirected into a scratch area. No
+account was signed in, no account was created, and
+no credential of any kind was entered into the
+application. Two workspace states ran in two
+launches, a clone carrying an added byte identical
+copy of the skill under .cursor/skills and a
+pristine clone in the shipped state, and the
+evidence came from the app session logs, the
+workspace storage snapshot that backs the Customize
+page, and screenshots of the virtual display. The
+rendered Customize page stays unobserved, because on
+a fresh profile the application presents one window
+whose only actions are log in and sign up, and
+closing that window ends the application, so no
+rendered Customize page is reachable without a
+sign-in. Marketplace installation from a listing and
+Bugbot behaviour on a real pull request stay
+UNVERIFIED, because no listing submission and no
+pull request took place in this run.
 
 ## The variable contract
 

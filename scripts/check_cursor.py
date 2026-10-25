@@ -15,9 +15,10 @@ symlinks that point outside the local plugin folder, every
 Bugbot rule to carry a checkable derivation note, the shipped
 bugbot.yaml to hold only documented fields because unknown fields
 fall back silently, and the brief to keep the stated pins, the
-verbatim primary quotes, and the honest limitation that the real
-client run is still owed. A later edit that drops any of them
-fails the gate instead of drifting in silence.
+verbatim primary quotes, and the desktop run record that
+discharged the client run the brief once carried as owed. A
+later edit that drops any of them fails the gate instead of
+drifting in silence.
 """
 
 import json
@@ -161,8 +162,6 @@ PINNED = (
      "never declare `${CURSOR_PLUGIN_ROOT}` there"),
     ("the mcp omission",
      "The plugin carries no `mcp.json`"),
-    ("the owed client run",
-     "the real client run is owed"),
     ("the canvases mention",
      "Hex Canvas and Atlassian Canvas"),
     ("the duplicate skill guidance",
@@ -185,16 +184,11 @@ PINNED = (
      "not the only CodeRabbit in Cursor path"),
     ("the decision 4 statement",
      "Decision 4 binds this build like every other build"),
-    ("the desktop load behaviour UNVERIFIED",
-     "Cursor plugin load behaviour in the desktop client "
-     "stays UNVERIFIED"),
     ("the CLI attempt manifest absence",
      "no session included a recognitio plugin manifest"),
     ("the plugin tree not an installed plugin on the CLI surface",
      "a plugin tree at a repo root did not present as an "
      "installed plugin on that surface"),
-    ("the desktop duplicate behaviour UNVERIFIED",
-     "stays UNVERIFIED for the desktop client"),
     ("the shipped tree skill entry spelling",
      "the entry pointed at the .claude/skills spelling "
      "of the canonical skill"),
@@ -209,6 +203,46 @@ PINNED = (
     ("the CLI rule surface observation",
      "no session named the plugin rule file or BUGBOT.md "
      "as in effect on that surface"),
+    ("the duplicate residual settled at registration",
+     "The duplicate skill residual is settled at the "
+     "level of desktop registration"),
+    ("the desktop run build",
+     "the official Cursor desktop build 3.27.12 for "
+     "Linux ran here under a virtual display"),
+    ("the desktop plugin load record",
+     "recorded the recognitio plugin loaded with zero "
+     "failures five times in the first launch"),
+    ("the desktop load before sign in",
+     "every recorded load happened before any sign-in"),
+    ("the Customize backing records confirm",
+     "the Customize backing records, which list a skill "
+     "entry and a rule entry pointing at the local "
+     "plugin copies"),
+    ("the desktop duplicate registration",
+     "the Customize backing records held two recognitio "
+     "skill entries side by side"),
+    ("the desktop duplicate no dedupe",
+     "the desktop deduped neither entry"),
+    ("the invocation precedence open",
+     "both copies register with no precedence field in "
+     "the Customize data"),
+    ("the marketplace and Bugbot items unverified",
+     "Marketplace installation from a listing and Bugbot "
+     "behaviour on a real pull request stay UNVERIFIED"),
+)
+
+# Brief fragments the desktop verification run of 2026-10-25
+# superseded. The positive pins prove the corrected sentences
+# are stated, but a restored stale sentence would pass beside
+# them, so the gate also refuses the old wordings outright.
+STALE = (
+    "no Cursor client",
+    "the real client run is owed",
+    "desktop client run remains owed",
+    "stands in until that run happens",
+    "load behaviour in the desktop client stays UNVERIFIED",
+    "stays UNVERIFIED for the desktop client",
+    "duplicate skill residual stays UNVERIFIED",
 )
 
 DECISION_HEADING = "## 19. Build 10"
@@ -720,6 +754,14 @@ def brief_problems(root=None):
         if fragment not in text:
             problems.append(
                 "docs/cursor-plugin-brief.md does not state %s" % label
+            )
+    for fragment in STALE:
+        if fragment in text:
+            problems.append(
+                "docs/cursor-plugin-brief.md states the stale "
+                "pre desktop run claim %r, which the desktop "
+                "verification run of 2026-10-25 superseded"
+                % fragment
             )
     return problems
 

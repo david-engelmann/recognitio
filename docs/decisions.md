@@ -653,11 +653,14 @@ agent, so the Cursor plugin carries no second persona. The
 plugin copy is real files because Cursor skips a symlink that
 points to a plugin repository elsewhere on disk, and the gate
 verifies the copy is a real directory and byte identical to the
-canonical skill. This box has no Cursor client, so the real
-client run is owed and recorded as the honest limitation. The
-duplicate skill residual stays UNVERIFIED at primary, and the
-standing guidance is unchanged. Never ship two separate copies
-of the same skill.
+canonical skill. A desktop verification run on 2026-10-25
+discharged the real client run this record carried as owed,
+and its evidence is recorded in the brief. The duplicate
+skill residual is settled at the level of desktop
+registration by that run and stays open at the level of
+invocation precedence, and the standing guidance is
+unchanged. Never ship two separate copies of the same
+skill.
 
 The Bugbot surface pins the round 22 findings. Effort level is a
 Teams dashboard setting billed from prepaid credit, and no
@@ -683,6 +686,19 @@ scripts.
 Skill tightness holds. The brief, its gate script at
 `scripts/check_cursor.py`, and its tests live outside the
 canonical skill text, and the description protocol is untouched.
+
+A correcting note recorded on 2026-10-25. The limitation
+paragraph above replaces the statement this decision
+recorded at round 22, which held that this box had no Cursor
+client and the real client run was owed. The official Cursor
+desktop build 3.27.12 for Linux ran on this box under a
+virtual display and loaded the plugin with zero failures
+across reload cycles and a full restart, every load before
+any sign-in, and the Customize backing records registered
+two copies of the skill with no dedupe. Invocation
+precedence, marketplace installation, and Bugbot behaviour
+on a real pull request stay open, for the reasons the brief
+states.
 
 ## 20. Build 11, the CodeRabbit guidelines build
 

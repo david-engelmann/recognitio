@@ -1114,3 +1114,12 @@ This unreleased work carries version 1.3.0.
   no primary source on record, so the record treats it as
   unknown, with hard fail documented only on Anthropic's own
   distribution paths.
+- The Cursor brief no longer carries the desktop client
+  run as owed. A desktop verification run on 2026-10-25
+  ran the official Cursor desktop build 3.27.12 on this
+  box and settled the desktop load and duplicate
+  registration questions, and the brief, decision 19, the
+  eval corpus round 22 note, and the Cursor gate pins
+  now record that evidence, with invocation precedence,
+  marketplace installation, and Bugbot behaviour on a
+  real pull request still open.

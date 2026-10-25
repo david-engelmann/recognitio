@@ -821,6 +821,75 @@ class TestCheckCursor(unittest.TestCase):
                 )
                 self.assertTrue(problems, fragment)
 
+    def test_desktop_verification_pins_hold(self):
+        # Desktop verification of 2026-10-25. Dropping any
+        # of the settled desktop sentences fails the gate,
+        # so the brief cannot drift back to carrying the
+        # desktop questions as open once the real client
+        # run answered them.
+        fragments = (
+            "The duplicate skill residual is settled at the "
+            "level of desktop registration",
+            "the official Cursor desktop build 3.27.12 for "
+            "Linux ran here under a virtual display",
+            "recorded the recognitio plugin loaded with zero "
+            "failures five times in the first launch",
+            "every recorded load happened before any "
+            "sign-in",
+            "the Customize backing records, which list a "
+            "skill entry and a rule entry pointing at the "
+            "local plugin copies",
+            "the Customize backing records held two "
+            "recognitio skill entries side by side",
+            "the desktop deduped neither entry",
+            "both copies register with no precedence field "
+            "in the Customize data",
+            "Marketplace installation from a listing and "
+            "Bugbot behaviour on a real pull request stay "
+            "UNVERIFIED",
+        )
+        for fragment in fragments:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, fragment, "the record omits this"
+                )
+                self.assertTrue(problems, fragment)
+
+    def test_the_superseded_desktop_sentences_fail(self):
+        # Desktop verification of 2026-10-25. Each pre run
+        # sentence the desktop evidence falsified or
+        # discharged fails the gate when planted back,
+        # because the positive pins alone would let a
+        # restored stale sentence ride beside them.
+        plants = (
+            "This box has no Cursor client, so the real "
+            "client run is owed.",
+            "The local simulation of the documented rule in "
+            "this round's gate is the evidence that stands "
+            "in until that run happens.",
+            "Cursor plugin load behaviour in the desktop "
+            "client stays UNVERIFIED.",
+            "Duplicate skill behaviour on the Cursor agent "
+            "CLI surface was observed in round 38 and stays "
+            "UNVERIFIED for the desktop client.",
+            "The duplicate skill residual stays UNVERIFIED "
+            "at primary, and the standing guidance is "
+            "unchanged.",
+            "The real desktop client run remains owed under "
+            "the protocol in this brief.",
+        )
+        for plant in plants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                self.write_brief(root, text + "\n\n" + plant + "\n")
+                problems = self.problems(root)
+                self.assertTrue(
+                    any("stale" in p for p in problems),
+                    (plant, problems),
+                )
+
     def test_gate_round38_neutral_split_across_paragraphs_fails(self):
         # R38G-RT-04. The neutral claim split across a
         # paragraph break inside one block stands in no
