@@ -928,6 +928,23 @@ def qualified_problems(root=None):
     )
     for sentence in _sentences(raw):
         segments = _clauses(sentence)
+        # R38-RT-04. Two clauses joined by the word yet with
+        # no comma are two clauses, the same joint the plain
+        # and form makes, so the bare name reading cuts the
+        # segment there too. The adverb form not yet is no
+        # joint, so a segment ending in the word not keeps
+        # its yet.
+        split_segments = []
+        for segment in segments:
+            pieces = re.split(r",\s*yet\s+|\s+yet\s+", segment)
+            merged = [pieces[0]]
+            for piece in pieces[1:]:
+                if merged[-1].rstrip().endswith(" not"):
+                    merged[-1] = merged[-1] + " yet " + piece
+                else:
+                    merged.append(piece)
+            split_segments.extend(merged)
+        segments = split_segments
         earlier_bare = False
         hit = False
         for segment in segments:
@@ -1029,7 +1046,8 @@ def qualified_problems(root=None):
                 # clauses and a negation in the first does
                 # not reach the invocation in the second.
                 for joint in re.finditer(
-                    r",\s+(?:and|but)\s+|\s+and\s+", prefix
+                    r",\s+(?:and|but|yet)\s+|\s+(?:and|yet)\s+",
+                    prefix,
                 ):
                     boundary = joint.end()
                 if not _neg_before(

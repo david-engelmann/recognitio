@@ -1607,6 +1607,27 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
+    def test_round38_bare_name_yet_joint_fails(self):
+        # R38-RT-04. Two clauses joined by the word yet
+        # with no comma are two clauses, so a negation in
+        # the first clause does not guard the invocation
+        # the second clause asserts.
+        plant = (
+            "The bare name is never documented yet a bare "
+            "name still invokes a plugin skill in Kimi."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "accepts a bare name" in p for p in problems
+                ),
+                problems,
+            )
+
     def test_round37_confirm_total_of_field_content_fails(self):
         # R37C-RT-03. A total word right after the figure
         # whose own of phrase names field content measures
