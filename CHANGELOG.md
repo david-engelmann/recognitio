@@ -551,9 +551,9 @@ This unreleased work carries version 1.3.0.
   judges the sentence with its guarded clauses removed,
   and its description figures are read from the whole
   sentence against their own clause. The Qwen figure
-  family reads windows of three sentences, and a guard
-  word exempts only the sentences that carry the bound
-  figure. The Devin modifier chain now reads any word
+  family reads windows of three sentences, and a window
+  is exempt only when every sentence in it that carries
+  a bound figure is guarded in the figure own clause. The Devin modifier chain now reads any word
   that starts no new claim unit, and its negation guard
   reads the whole claim stretch. The Qwen brief records
   the round 37 full bundle conversion attempt with its
@@ -568,9 +568,11 @@ This unreleased work carries version 1.3.0.
   repair pass widened the Copilot authority and
   CodeRabbit linked readings to triples and the Qwen
   figure windows to four sentences, scoped each negation
-  and guard phrase to the claim it guards, and bound
-  each figure by its own clause, its own count noun, and
-  its own scope word. A confirmation pass over the repair
+  and guard phrase to the claim it guards, bound the
+  Qwen figures by their own clause, judged the ZCode
+  figures in their own clause, bound the Cursor figures
+  by their own count noun, and bound the Kimi figures
+  by their own scope word. A confirmation pass over the repair
   then widened the Qwen figure windows to five sentences
   and closed the remaining fresh shapes of the same
   seams.
@@ -602,10 +604,10 @@ This unreleased work carries version 1.3.0.
   a fixed neighbouring window now reads at claim scope,
   the Copilot trust and approval readings and the
   CodeRabbit linked readings over every neighbouring
-  window inside a paragraph, the Cursor neutral and cap
-  readings joining deictic continuations in the same
-  paragraph, and the Qwen figure windows over every
-  neighbouring window inside a paragraph. The Copilot
+  window inside a headed block, the Cursor neutral and
+  cap readings joining deictic continuations inside the
+  same headed block, and the Qwen figure windows at
+  claim scope over consecutive prose paragraph groups. The Copilot
   authority branches judge each occurrence in its own
   sentence, the Kimi bare name segment breaks at the yet
   joint, the ZCode execution reading keeps the text
@@ -628,6 +630,27 @@ This unreleased work carries version 1.3.0.
   their recorded exit 0, with the correction note
   appended to the fixtures record. The accepted round
   34 single synonym residual stands unchanged.
+- The round 39 pass closes the record gaps the pre close
+  audits filed with no new build. The eval corpus index
+  catches up through round 37 with the round 35 section
+  standing in its research round form, this file states
+  the round 38 gate scope in its final headed block and
+  claim scope form, the AGENTS chronicle gains its round
+  38 entry, and two predecessor framings in the Kimi
+  limits docstring and the round 37 bullet above stand
+  restated in the form the gates run. The packet stamp
+  now reads the manifest tier receipt against the packet
+  bodies and the manifest file records against the
+  change tier entries, so a thin packet cannot wear a
+  full tier receipt and a dropped changed file entry
+  fails the stamp, and the gate suite now pins the
+  recorded executable modes of the gate scripts and the
+  extractor and the recorded mode of the skill symlink.
+  The heading and barrier and sentence scope seams the
+  round 39 red team filed stand frozen as closing
+  residuals with their reasons in the round 39 fix
+  report, and the accepted round 34 single synonym
+  residual stands unchanged.
 
 ### Fixed
 
