@@ -110,6 +110,8 @@ A diff alone is not what a reviewer reads. A reviewer reads the change inside it
 
 Recognitio takes the other path. Extraction runs against the local clone, where there is no file count cap and the full history is present. The result is counted twice by separate git invocations, and the packet is only called verified when both counts agree.
 
+The claims behind these choices stand written down in [Principles](docs/principles.md), each one beside the failure that produced it.
+
 ## Install
 
 Take one install route only. Installing through two routes installs the skill twice.

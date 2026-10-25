@@ -651,6 +651,10 @@ This unreleased work carries version 1.3.0.
   residuals with their reasons in the round 39 fix
   report, and the accepted round 34 single synonym
   residual stands unchanged.
+- A principles page at docs/principles.md states what a
+  review packet owes its reader as claims, each one beside
+  the failure in this project record that produced it, and
+  the README links it from the Why section.
 
 ### Fixed
 
