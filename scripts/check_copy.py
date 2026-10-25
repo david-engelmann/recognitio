@@ -51,11 +51,15 @@ ROOT = Path(__file__).resolve().parents[1]
 # the authored Bugbot rules and repo config, and the
 # .cursor-plugin directory holds the authored plugin README, the
 # rule file, and the manifests, so both join the fence. The
-# plugin's skill copy subtree stays out by the rule below,
-# because its own gate script pins it byte identical to the
-# canonical skill the fence already scans.
+# .antigravity directory holds the authored Antigravity plugin
+# manifest and hook wiring, and the .zcode-plugin directory
+# holds the authored ZCode plugin manifest, so both join the
+# fence as well. The plugin's skill copy subtree stays out by
+# the rule below, because its own gate script pins it byte
+# identical to the canonical skill the fence already scans.
 _PUBLIC_DOT_DIRS = (".github", ".agents", ".claude", ".claude-plugin",
-                    ".cursor", ".cursor-plugin")
+                    ".cursor", ".cursor-plugin", ".antigravity",
+                    ".zcode-plugin")
 
 
 def is_fence_excluded(root, path):

@@ -303,6 +303,8 @@ class TestCheckCopy(unittest.TestCase):
              ".claude-plugin/marketplace.json",
              ".cursor-plugin/plugin.json",
              ".cursor-plugin/marketplace.json",
+             ".antigravity/plugin.json",
+             ".zcode-plugin/plugin.json",
              "agent-plugins-package/plugin.json"},
         )
 
@@ -557,6 +559,70 @@ class TestCheckCopy(unittest.TestCase):
             manifest = self.write_tmp(
                 root,
                 ".cursor-plugin/plugin.json",
+                '{"name": "x", "description": "Does a thing %s '
+                'in plain words."}\n' % EM_DASH,
+            )
+            found = self.mod.discover_manifest_files(root)
+            self.assertIn(manifest, found)
+            original = (
+                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                self.mod.MANIFEST_FILES,
+            )
+            self.mod.PROSE_FILES = []
+            self.mod.COMMENT_FILES = []
+            self.mod.MANIFEST_FILES = [manifest]
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main()
+            finally:
+                (
+                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                    self.mod.MANIFEST_FILES,
+                ) = original
+            self.assertEqual(code, 1)
+
+    def test_em_dash_in_antigravity_plugin_manifest_is_caught(self):
+        # R38-ST-01. The Antigravity plugin manifest
+        # description is public prose, so an em dash in it
+        # fails the gate. The manifest joins the fence
+        # through the public directory list the shared
+        # exclusion rule reads.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self.write_tmp(
+                root,
+                ".antigravity/plugin.json",
+                '{"name": "x", "description": "Does a thing %s '
+                'in plain words."}\n' % EM_DASH,
+            )
+            found = self.mod.discover_manifest_files(root)
+            self.assertIn(manifest, found)
+            original = (
+                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                self.mod.MANIFEST_FILES,
+            )
+            self.mod.PROSE_FILES = []
+            self.mod.COMMENT_FILES = []
+            self.mod.MANIFEST_FILES = [manifest]
+            try:
+                with redirect_stderr(io.StringIO()):
+                    code = self.mod.main()
+            finally:
+                (
+                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
+                    self.mod.MANIFEST_FILES,
+                ) = original
+            self.assertEqual(code, 1)
+
+    def test_em_dash_in_zcode_plugin_manifest_is_caught(self):
+        # R38-ST-01. The ZCode plugin manifest description
+        # is public prose of the same kind, so an em dash
+        # in it fails the gate the same way.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self.write_tmp(
+                root,
+                ".zcode-plugin/plugin.json",
                 '{"name": "x", "description": "Does a thing %s '
                 'in plain words."}\n' % EM_DASH,
             )
