@@ -11,7 +11,13 @@ however green it once was. The check also reads the packet against
 the section headings the manifest records, and a manifest that
 records none cannot be checked against its packet at all, so a
 thin packet cannot wear a full packet's manifest and a manifest
-without the record is not evidence either.
+without the record is not evidence either. The check also reads
+the tier receipt the manifest carries against the packet, so a
+tier the manifest records as included cannot stand in the packet
+as a not selected placeholder, and it reads the change tier
+entries against the file records the manifest carries, so a
+changed file the manifest receipts cannot be missing from the
+packet that wears the manifest.
 
 Exits nonzero and lists every problem when the packet cannot be used.
 """
@@ -140,6 +146,137 @@ def section_problems(packet_text, recorded):
     return problems
 
 
+TIER_HEADINGS = {
+    "T2": "## T2 Companions",
+    "T3": "## T3 History",
+}
+
+PLACEHOLDER_LINES = (
+    "Not selected for this run. The change in T1 is complete.",
+    "Dropped under the token budget. The change in T1 is complete.",
+)
+
+
+def section_body(packet_text, heading):
+    """Return the lines under one section heading, outside fences.
+
+    The body runs from the heading line to the next level two
+    heading outside a fence, or to the end of the packet. A
+    heading inside a fence is quoted text and opens nothing.
+    """
+    lines = packet_text.splitlines()
+    outside = outside_fence(lines)
+    start = None
+    for index, line in enumerate(lines):
+        if outside[index] and line == heading:
+            start = index + 1
+            break
+    if start is None:
+        return None
+    body = []
+    for position in range(start, len(lines)):
+        if outside[position] and lines[position].startswith("## "):
+            break
+        body.append(lines[position])
+    return body
+
+
+def tier_problems(packet_text, tiers):
+    """Check the manifest tier receipt against the packet bodies.
+
+    A tier the manifest records as included must carry real
+    content in its packet section. A section whose whole body
+    is the not selected or dropped placeholder is the thin
+    packet shape, whatever the manifest receipt claims, so a
+    thin packet cannot wear a full packet manifest even when
+    both packets record the same section headings.
+    """
+    problems = []
+    if not isinstance(tiers, dict):
+        return ["the manifest records its tiers in a shape that "
+                "cannot be checked"]
+    for tier, heading in TIER_HEADINGS.items():
+        info = tiers.get(tier)
+        if not isinstance(info, dict):
+            continue
+        if info.get("included") is not True:
+            continue
+        body = section_body(packet_text, heading)
+        if body is None:
+            continue
+        text = "\n".join(body).strip()
+        if text in PLACEHOLDER_LINES:
+            problems.append(
+                "the manifest records %s as included but the packet "
+                "carries only the placeholder for a tier that was "
+                "not gathered" % tier
+            )
+    return problems
+
+
+def display_path(path):
+    """Render a manifest path the way the extractor prints it.
+
+    The extractor escapes control characters and backslashes in
+    a path before printing it as a packet heading, so the check
+    applies the same escaping before comparing a manifest file
+    record against the change tier headings.
+    """
+    out = []
+    for char in str(path):
+        if char == "\\":
+            out.append("\\\\")
+        elif char == "\n":
+            out.append("\\n")
+        elif char == "\r":
+            out.append("\\r")
+        elif char == "\t":
+            out.append("\\t")
+        elif ord(char) < 32 or ord(char) == 127:
+            out.append("\\x%02x" % ord(char))
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def file_problems(packet_text, files):
+    """Check every manifest file record stands in the change tier.
+
+    The extractor prints one level three heading per changed
+    file inside the change tier. A packet that drops a changed
+    file entry in full no longer shows the change the manifest
+    receipts, and the stamp must fail even though every section
+    heading still stands.
+    """
+    problems = []
+    if not isinstance(files, list):
+        return ["the manifest records its files in a shape that "
+                "cannot be checked"]
+    body = section_body(packet_text, "## T1 The change")
+    if body is None:
+        return problems
+    lines = packet_text.splitlines()
+    outside = outside_fence(lines)
+    headings = set()
+    in_t1 = False
+    for index, line in enumerate(lines):
+        if outside[index] and line.startswith("## "):
+            in_t1 = line == "## T1 The change"
+            continue
+        if in_t1 and outside[index] and line.startswith("### "):
+            headings.add(line[4:])
+    for entry in files:
+        if not isinstance(entry, dict) or "path" not in entry:
+            problems.append("a manifest file record carries no path")
+            continue
+        if display_path(entry["path"]) not in headings:
+            problems.append(
+                "the manifest receipts a changed file the packet "
+                "change tier does not hold: %s" % entry["path"]
+            )
+    return problems
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="check_packet.py",
@@ -216,6 +353,14 @@ def main(argv=None):
                     problems.extend(
                         section_problems(packet_text, manifest["sections"])
                     )
+                    if "tiers" in manifest:
+                        problems.extend(
+                            tier_problems(packet_text, manifest["tiers"])
+                        )
+                    if "files" in manifest:
+                        problems.extend(
+                            file_problems(packet_text, manifest["files"])
+                        )
 
     if problems:
         for problem in problems:
