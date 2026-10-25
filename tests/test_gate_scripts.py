@@ -1770,6 +1770,35 @@ class TestCanonicalSkillLayout(unittest.TestCase):
             os.path.samefile(home.resolve(), canonical.resolve())
         )
 
+    def test_the_tree_records_every_gate_script_as_executable(self):
+        # The full gate invokes every script through the Python
+        # interpreter, so a script that lost its executable bit
+        # in the tree would pass the gate and ship in a tag
+        # archive without the bit. The recorded modes are read
+        # from the git index, where a mode drift is visible.
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "ls-files", "-s"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            self.skipTest("no git index stands over this tree")
+        modes = {}
+        for line in result.stdout.splitlines():
+            meta, _, path = line.partition("\t")
+            modes[path] = meta.split(" ", 1)[0]
+        scripts = [
+            path for path in modes
+            if path.startswith("scripts/") and path.endswith(".py")
+        ]
+        self.assertTrue(scripts)
+        for path in scripts:
+            self.assertEqual(modes[path], "100755", path)
+        self.assertEqual(
+            modes[".agents/skills/recognitio/scripts/extract.py"],
+            "100755",
+        )
+        self.assertEqual(modes[".claude/skills/recognitio"], "120000")
+
     def test_a_symlink_home_spelling_passes_the_layout(self):
         # T1, T4. The symlink shape the build ships.
         with RetryingTemporaryDirectory() as tmp:
@@ -2208,6 +2237,81 @@ class TestCheckPacket(unittest.TestCase):
             "## T2 Companions\n\nNot selected for this run.\n",
         )
         self.assertEqual(self.run_check(out), 1)
+
+    def write_receipt_packet(self, name, packet_text, tiers=None,
+                             files=None):
+        out = Path(self.tmp.name) / name
+        out.mkdir()
+        (out / "packet.md").write_text(packet_text, encoding="utf-8")
+        manifest = {
+            "verified": True,
+            "head": self.head,
+            "sections": [
+                "## T0 Triage", "## T1 The change",
+                "## T2 Companions", "## T3 History",
+            ],
+        }
+        if tiers is not None:
+            manifest["tiers"] = tiers
+        if files is not None:
+            manifest["files"] = files
+        (out / "manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        return out
+
+    FULL_TIERS = {
+        "T0": {"state": "included", "included": True},
+        "T1": {"state": "included", "included": True},
+        "T2": {"state": "included", "included": True},
+        "T3": {"state": "included", "included": True},
+    }
+
+    def test_a_thin_packet_wearing_a_full_tier_receipt_fails(self):
+        out = self.write_receipt_packet(
+            "thinreceipt",
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
+            "## T2 Companions\n\n"
+            "Not selected for this run. The change in T1 is complete.\n\n"
+            "## T3 History\n\nThe history.\n",
+            tiers=self.FULL_TIERS,
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_an_included_tier_with_real_content_passes(self):
+        out = self.write_receipt_packet(
+            "fullreceipt",
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
+            "## T2 Companions\n\nThe companions.\n\n"
+            "## T3 History\n\nThe history.\n",
+            tiers=self.FULL_TIERS,
+        )
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_a_manifest_file_missing_from_the_change_tier_fails(self):
+        out = self.write_receipt_packet(
+            "droppedfile",
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
+            "## T2 Companions\n\nThe companions.\n\n"
+            "## T3 History\n\nThe history.\n",
+            files=[{"path": "a.py"}, {"path": "b.py"}],
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_manifest_files_present_in_the_change_tier_pass(self):
+        out = self.write_receipt_packet(
+            "wholefiles",
+            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
+            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
+            "### b.py\n\nThe other diff.\n\n"
+            "## T2 Companions\n\nThe companions.\n\n"
+            "## T3 History\n\nThe history.\n",
+            files=[{"path": "a.py"}, {"path": "b.py"}],
+        )
+        self.assertEqual(self.run_check(out), 0)
 
     def test_a_recorded_section_with_no_content_fails(self):
         out = self.write_sections_packet(
@@ -2967,13 +3071,13 @@ class TestCheckEvals(unittest.TestCase):
             root = self.copy_fixture(tmp)
             target = root / "evals" / "corpus.md"
             text = target.read_text(encoding="utf-8")
-            stale = text.replace("through round 34", "through round 11", 1)
+            stale = text.replace("through round 37", "through round 11", 1)
             self.assertNotEqual(stale, text)
             target.write_text(stale, encoding="utf-8")
             problems = self.mod.corpus_scope_problems(root)
             self.assertEqual(len(problems), 1)
             self.assertIn("round 11", problems[0])
-            self.assertIn("round 34", problems[0])
+            self.assertIn("round 37", problems[0])
 
     def test_a_section_past_the_scope_cap_fails_the_scope_check(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -2981,13 +3085,13 @@ class TestCheckEvals(unittest.TestCase):
             target = root / "evals" / "corpus.md"
             text = target.read_text(encoding="utf-8")
             target.write_text(
-                text + "\n## Round 35 incidents\n\nNothing yet.\n",
+                text + "\n## Round 38 incidents\n\nNothing yet.\n",
                 encoding="utf-8",
             )
             problems = self.mod.corpus_scope_problems(root)
             self.assertEqual(len(problems), 1)
-            self.assertIn("round 34", problems[0])
-            self.assertIn("round 35", problems[0])
+            self.assertIn("round 37", problems[0])
+            self.assertIn("round 38", problems[0])
 
     def test_a_skipped_round_fails_the_scope_check(self):
         with RetryingTemporaryDirectory() as tmp:
