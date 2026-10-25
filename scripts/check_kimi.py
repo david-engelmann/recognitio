@@ -1408,10 +1408,11 @@ def _swap_problem(sentence):
 
 
 def limits_problems(root=None):
-    """R28-RT-05. No sentence may inflate the size limits.
+    """R28-RT-05. No sentence may state a size limit outside
+    the pinned pair.
 
     The pin fragments prove the 32KB and 64KB figures are
-    stated, but an added sentence stating a larger limit
+    stated, but an added sentence stating a different limit
     passes while the pins stay in place. Any kilobyte figure
     other than 32 or 64, and any megabyte figure at all, is
     a limit outside the pinned pair. A swapped figure, the
