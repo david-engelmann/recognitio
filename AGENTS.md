@@ -530,5 +530,32 @@ author and license fields, and the installer mirror
 trailing newline at 355 bytes against 356, under gate
 pins, and landed the five repairs and the filed
 confirmation repair the three review gates ordered.
-The accepted round 34 single synonym residual stands
-unchanged.
+The round 38 pass then consolidated the landed build
+gates with no new build, widening the brief readings
+that stopped at a fixed neighbouring window to claim
+scope in their final form, the Copilot trust and
+approval readings and the CodeRabbit linked readings
+and the Cursor neutral and cap readings at headed
+block claim scope and the Qwen figure windows at claim
+scope over consecutive prose paragraph groups, with
+the Copilot authority branches judging each occurrence
+in its own sentence, the Kimi bare name segment
+breaking at the yet joint, the ZCode execution reading
+keeping the text between guard phrases under judgement,
+and the Devin chain tail reading the whole remainder
+of its sentence with article led and possessive led
+subject restatements resetting its claim stretch. The
+pass also added the Antigravity row to the README
+adaptations table, caught the eval corpus index up
+through round 34, rescoped the Qwen brief side shape
+passage to what the installs show with the installer
+mirror restated as a mirror of the input manifest and
+a dated round 38 note added to decision 26, and
+recorded the Cursor attempt in the Cursor brief, the
+blocked raw API attempt and the agent CLI attempt
+under gate pins with desktop load behaviour still
+UNVERIFIED. The round also recorded the round 36 E1
+fixture correction for fixtures P008 and P009 and
+P012 and P013. The accepted round 34 single synonym
+residual stands unchanged.
+
