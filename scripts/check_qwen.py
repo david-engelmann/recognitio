@@ -382,7 +382,22 @@ def sentence_units(text):
     a terminator followed by whitespace, so a multi
     sentence line does not leak tokens across sentences.
     """
-    units = []
+    return [
+        unit for group in sentence_unit_groups(text) for unit in group
+    ]
+
+
+def sentence_unit_groups(text):
+    """The sentence units grouped by their paragraph.
+
+    R38-RT-13. The blank line flush in the unit split is
+    the paragraph scope the brief format itself marks, so
+    the groups keep it. A prose paragraph forms one group
+    with every sentence in it, and a table row, heading,
+    or code line forms a group of its own, so those units
+    never join a neighbouring paragraph into a claim.
+    """
+    groups = []
     buffer = []
     in_code = False
 
@@ -391,9 +406,15 @@ def sentence_units(text):
             return
         joined = " ".join(buffer)
         buffer.clear()
-        for sentence in re.split(r"(?<=[.!?])\s+", joined.strip()):
-            if sentence.strip():
-                units.append(sentence.strip())
+        group = [
+            sentence.strip()
+            for sentence in re.split(
+                r"(?<=[.!?])\s+", joined.strip()
+            )
+            if sentence.strip()
+        ]
+        if group:
+            groups.append(group)
 
     for raw in text.splitlines():
         line = raw.strip()
@@ -406,15 +427,15 @@ def sentence_units(text):
             continue
         if in_code:
             flush()
-            units.append(line)
+            groups.append([line])
             continue
         if line.startswith("|") or line.startswith("#"):
             flush()
-            units.append(line)
+            groups.append([line])
             continue
         buffer.append(line)
     flush()
-    return units
+    return groups
 
 
 def _bound_figure_span(sentence):
@@ -547,23 +568,27 @@ def _figure_guarded(sentence):
     # no comma states the same subordinate basis the
     # comma form states, and its guard phrase stands
     # outside the clause that holds the figure.
-    as_before = sentence.rfind(" as ", 0, start)
-    clause_start = max(
-        sentence.rfind(",", 0, start),
-        sentence.rfind(";", 0, start),
-        as_before + 3 if as_before != -1 else -1,
-    ) + 1
-    as_after = sentence.find(" as ", start)
-    ends = [
-        index
-        for index in (
-            sentence.find(",", start),
-            sentence.find(";", start),
-            as_after,
-        )
-        if index != -1
-    ]
-    clause_end = min(ends) if ends else len(sentence)
+    # R38-RT-14. The subordinate joints are clause edges
+    # as a class, not the as form alone, so a basis clause
+    # appended with while or when or because or since or
+    # whereas or although and no comma stands outside the
+    # figure clause the same way.
+    markers = (
+        ",", ";", " as ", " while ", " when ", " because ",
+        " since ", " whereas ", " although ",
+    )
+    clause_start = 0
+    for marker in markers:
+        index = sentence.rfind(marker, 0, start)
+        if index != -1:
+            clause_start = max(
+                clause_start, index + len(marker)
+            )
+    clause_end = len(sentence)
+    for marker in markers:
+        index = sentence.find(marker, start)
+        if index != -1:
+            clause_end = min(clause_end, index)
     return guarded(sentence[clause_start:clause_end])
 
 
@@ -667,7 +692,7 @@ def negative_problems(text):
     # guarded in the figure's own clause, so a basis label
     # on a neighbouring sentence or in a contrast clause
     # no longer shelters an unguarded figure.
-    units = sentence_units(normalise(text))
+    groups = sentence_unit_groups(normalise(text))
 
     def window_problem(window):
         joined = " ".join(window)
@@ -692,11 +717,12 @@ def negative_problems(text):
             if span is not None:
                 bound_values.add(member[span[0]:span[1]])
         for member in window:
-            if not re.search(
+            word = re.search(
                 r"\b(" + FIGURE_ADVERBS + r"|" + FIGURE_SCOPE
                 + r")\b",
                 member,
-            ):
+            )
+            if not word:
                 continue
             own = {
                 match.group(0)
@@ -706,37 +732,63 @@ def negative_problems(text):
             }
             if own and not own <= bound_values:
                 return False
-        return True
-
-    prose = [
-        not unit.startswith(("|", "#", "`")) for unit in units
-    ]
-    # R37F-RT-15. Windows run to four neighbouring
-    # sentences, because the fix review split the count
-    # and the simultaneity word three sentences apart.
-    # R37C-RT-01. The confirmation review split them one
-    # sentence further again, so the windows run to five.
-    # Each widening moves the seam one unit out and the
-    # next audit re-tests it, which is the recorded
-    # cadence of this family.
-    for size in (2, 3, 4, 5):
-        for index in range(len(units) - size + 1):
-            window = units[index:index + size]
-            if not all(prose[index:index + size]):
-                continue
-            if not window_problem(window):
-                continue
-            if any(figure_problem(member) for member in window):
-                continue
-            if any(
-                window_problem(window[start:start + sub])
-                for sub in range(2, size)
-                for start in range(size - sub + 1)
+            # R38-RT-15. A simultaneity or scope member
+            # whose subject is an explicit noun phrase
+            # other than the figure's agents heads its own
+            # claim whether or not it carries a number, the
+            # editors working together on the packet
+            # format. Only a member whose subject is a
+            # pronoun carrying the figure's subject
+            # forward, or the agent noun itself, or Qwen,
+            # joins the window's count into one claim.
+            head = member[:word.start()]
+            if re.match(
+                r"\s*(they|it|these|those)\b", head
             ):
                 continue
-            problems.append(
-                "figure plant: " + " ".join(window)[:120]
-            )
+            if "qwen" in head:
+                continue
+            if re.search(
+                r"\b(" + FIGURE_AGENTS + r")\b", head
+            ):
+                continue
+            if re.search(r"[a-z]", head):
+                return False
+        return True
+
+    # R37F-RT-15. Windows ran to four neighbouring
+    # sentences, because the fix review split the count
+    # and the simultaneity word three sentences apart, and
+    # the confirmation repair widened them to five.
+    # R38-RT-13. The round 38 review split them one
+    # sentence further again, across six sentences, so the
+    # reading now runs at paragraph scope, over every
+    # neighbouring window inside a paragraph group and
+    # never across a paragraph break, a table row, a
+    # heading, or a code line.
+    for group in groups:
+        if len(group) < 2:
+            continue
+        if group[0].startswith(("|", "#", "`")):
+            continue
+        for size in range(2, len(group) + 1):
+            for index in range(len(group) - size + 1):
+                window = group[index:index + size]
+                if not window_problem(window):
+                    continue
+                if any(
+                    figure_problem(member) for member in window
+                ):
+                    continue
+                if any(
+                    window_problem(window[start:start + sub])
+                    for sub in range(2, size)
+                    for start in range(size - sub + 1)
+                ):
+                    continue
+                problems.append(
+                    "figure plant: " + " ".join(window)[:120]
+                )
     return problems
 
 

@@ -549,3 +549,43 @@ class TestCheckQwen(unittest.TestCase):
             "as the roster narrative records."
         )
         self.assertTrue(problems)
+
+    def test_round38_figure_split_across_six_sentences_fails(self):
+        # R38-RT-13. The count and the simultaneity word
+        # stand five sentences apart with four fillers
+        # between them, and the paragraph scope reading
+        # must catch the figure claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents for this change. The "
+            "packet lists each file beside its diff. The "
+            "roster records each file in the change. The "
+            "summary lists each file in the packet. The "
+            "index names each file in the review. They "
+            "work together on the review."
+        )
+        self.assertTrue(problems)
+
+    def test_round38_figure_guard_while_clause_fails(self):
+        # R38-RT-14. A basis clause appended with while
+        # and no comma stands outside the clause that
+        # holds the figure, so its guard phrase does not
+        # exempt the claim.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents together on this review "
+            "while the roster narrative records the count."
+        )
+        self.assertTrue(problems)
+
+    def test_round38_window_with_unnumbered_other_subject_passes(self):
+        # R38-RT-15. A simultaneity sentence whose subject
+        # is an explicit noun phrase other than the
+        # figure agents heads its own claim even with no
+        # number of its own, so the window joins no figure
+        # claim and must pass.
+        problems = self.mod.negative_problems(
+            "The roster lists 16 agents for this change. "
+            "The packet lists each file beside its diff. "
+            "The editors work together on the packet "
+            "format."
+        )
+        self.assertEqual(problems, [])
