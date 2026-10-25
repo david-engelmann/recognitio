@@ -185,6 +185,30 @@ PINNED = (
      "not the only CodeRabbit in Cursor path"),
     ("the decision 4 statement",
      "Decision 4 binds this build like every other build"),
+    ("the desktop load behaviour UNVERIFIED",
+     "Cursor plugin load behaviour in the desktop client "
+     "stays UNVERIFIED"),
+    ("the CLI attempt manifest absence",
+     "no session included a recognitio plugin manifest"),
+    ("the plugin tree not an installed plugin on the CLI surface",
+     "a plugin tree at a repo root did not present as an "
+     "installed plugin on that surface"),
+    ("the desktop duplicate behaviour UNVERIFIED",
+     "stays UNVERIFIED for the desktop client"),
+    ("the shipped tree skill entry spelling",
+     "the entry pointed at the .claude/skills spelling "
+     "of the canonical skill"),
+    ("the duplicate resolution on the CLI surface",
+     "both repeat sessions resolved the entry to that "
+     "copy"),
+    ("the plugin tree copy never a skill entry",
+     "the plugin tree copy never appeared as a skill "
+     "entry in any session"),
+    ("the skill count instability",
+     "no claim in this note rests on a skill count"),
+    ("the CLI rule surface observation",
+     "no session named the plugin rule file or BUGBOT.md "
+     "as in effect on that surface"),
 )
 
 DECISION_HEADING = "## 19. Build 10"

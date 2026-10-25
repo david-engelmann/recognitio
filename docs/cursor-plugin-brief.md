@@ -69,23 +69,51 @@ confirm of every component in Customize. The local simulation of
 the documented rule in this round's gate is the evidence that
 stands in until that run happens.
 
-Round 38 note, recorded on 2026-10-24. Cursor plugin
-load behaviour stays UNVERIFIED. A bounded API attempt
-in round 38 built a Bearer credential for the Cloud
-Agents API identity read and received no HTTP response
-while an egress approval for api.cursor.com sat
-pending, so the attempt produced no observation of
-loading. The real client run remains owed under the
-protocol above. Duplicate skill behaviour stays
-UNVERIFIED as well, because the cloud agent surface
-cannot speak to desktop skill resolution. The standing
-guidance remains that two separate copies of the same
-skill are never shipped. The practical next step is a
-parent level trigger of the egress approval for
-api.cursor.com, then a rerun of the helper identity
-read exactly as built, and only a successful identity
-read opens one list read and then at most one short
-read only cloud agent run with PR creation off.
+Round 38 note, recorded on 2026-10-24. An earlier
+bounded API attempt in this round built a Bearer
+credential for the Cloud Agents API identity read and
+received no HTTP response while an egress approval
+for api.cursor.com sat pending, so that attempt
+produced no observation of loading. A bounded Cursor
+agent CLI attempt in the same round then answered in
+full, and the rest of this note records that attempt.
+
+Cursor plugin load behaviour in the desktop client
+stays UNVERIFIED. A bounded Cursor agent CLI attempt
+in round 38 reached the agent host surface in three
+sessions against a clone of this repo and no session
+included a recognitio plugin manifest, so a plugin
+tree at a repo root did not present as an installed
+plugin on that surface. The real desktop client run
+remains owed under the protocol in this brief,
+including the local plugin folder copy, the window
+reload, and the confirm of every component in
+Customize.
+
+Duplicate skill behaviour on the Cursor agent CLI
+surface was observed in round 38 and stays UNVERIFIED
+for the desktop client. Each CLI session listed
+recognitio as exactly one skill entry. In the shipped
+tree the entry pointed at the .claude/skills spelling
+of the canonical skill. With a byte identical copy
+added under .cursor/skills in a scratch clone, both
+repeat sessions resolved the entry to that copy and
+listed no second recognitio entry, and the plugin
+tree copy never appeared as a skill entry in any
+session. The sessions disagreed on the total number
+of skills they listed, so no claim in this note rests
+on a skill count. The standing guidance remains that
+two separate copies of the same skill are never
+shipped.
+
+The CLI sessions named the repo AGENTS.md and
+CLAUDE.md and the home AGENTS.md as the rule files in
+effect, and no session named the plugin rule file or
+BUGBOT.md as in effect on that surface. That
+observation speaks to the CLI surface only and
+changes nothing the brief states about Bugbot, which
+reads its own surfaces on a pull request and was not
+exercised here.
 
 ## The variable contract
 

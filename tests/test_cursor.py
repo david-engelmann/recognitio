@@ -797,6 +797,30 @@ class TestCheckCursor(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_round38_cli_attempt_note_pins_hold(self):
+        # Round 38 CLI attempt note. Dropping any of the
+        # amended note sentences fails the gate, so the
+        # CLI surface record cannot quietly soften back
+        # into the blocked API attempt wording or grow a
+        # desktop claim the attempt never observed.
+        fragments = (
+            "no session included a recognitio plugin manifest",
+            "the entry pointed at the .claude/skills spelling "
+            "of the canonical skill",
+            "the plugin tree copy never appeared as a skill "
+            "entry in any session",
+            "no claim in this note rests on a skill count",
+            "no session named the plugin rule file or "
+            "BUGBOT.md as in effect on that surface",
+        )
+        for fragment in fragments:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, fragment, "the record omits this"
+                )
+                self.assertTrue(problems, fragment)
+
     def test_gate_round38_neutral_split_across_paragraphs_fails(self):
         # R38G-RT-04. The neutral claim split across a
         # paragraph break inside one block stands in no
