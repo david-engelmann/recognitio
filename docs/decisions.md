@@ -987,6 +987,24 @@ records the third so a reader checking the table
 against the note finds every label named. No figure
 changes and no other note text changes.
 
+Round 38 note, recorded on 2026-10-24. The round 37
+full bundle conversion attempt qualifies the round 33
+fidelity sentence above. Skill file byte fidelity
+does not hold for a Qoder install of the current
+canonical skill text, because the installed SKILL.md
+differs in exactly one line, the rules folder rewrite
+at 15231 bytes against 15233, with the extractor
+untouched. The converted manifest drops the author
+and license fields the input manifest carried, and
+the installer mirror of the input manifest loses only
+its trailing newline at 355 bytes against 356. File
+carriage beyond the skill tree is now tested, and the
+full bundle install preserved the side shape files
+byte for byte, with no activation of them shown.
+Runtime invocation stays UNVERIFIED, and the scoped
+npm route stays UNTESTED. The round 33 note text
+stands as the historical record it is.
+
 ## 27. Build 16, the ZCode plugin build
 
 Recorded on 2026-10-24 in round 29. Recognitio ships on ZCode

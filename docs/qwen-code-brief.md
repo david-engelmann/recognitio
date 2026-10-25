@@ -342,12 +342,17 @@ current canonical skill text, and this brief claims
 byte fidelity for the round 33 skill tree installs
 only.
 
-Side shapes do not ride in. The installed bundles
-contain only the skill tree. They do not contain the
-reviewer persona, the hooks, the output style, or the
-fanout workflow. A converted bundle described as
-carrying any of those shapes would promise behaviour
-the tested installs do not show.
+Side shape files ride in as files in the round 37
+full bundle install. The round 33 installs carried
+the skill tree only because their inputs held nothing
+else. The round 37 full bundle install preserved the
+side shape files byte for byte, the reviewer persona,
+the hooks, the output style, and the fanout workflow
+among them. No activation of the preserved shapes
+inside a Qwen session is shown, and the extensions
+list for that install names the skill and the agent
+only, so file carriage is the whole of what the
+record proves for those shapes.
 
 Runtime invocation stays UNVERIFIED. No authenticated
 Qwen session was run in the round 33 test, so no
@@ -360,15 +365,18 @@ shape conformance is noted only, because the package
 carries plugin.json at its root as the primary page
 requires.
 
-The Qoder install also added a hidden
-`.claude-plugin/plugin.json` artifact carrying the
-same name, version, and description as the converted
-manifest, beside the retained Qoder manifest and the
-created qwen-extension.json. That artifact is an
-installer mirror of the converted manifest. It carries
-no extra fields and no skill content, and it is not
-a second skill. A top level listing hides it, so any
-future conversion diff must include hidden files.
+The Qoder installs also added a hidden
+`.claude-plugin/plugin.json` artifact, beside the
+retained Qoder manifest and the created
+qwen-extension.json. That artifact is an installer
+mirror of the input manifest. Its fields are the
+fields the input carried, three in the round 33
+input, being name and version and description, and
+five in the round 37 input, the same three beside an
+author object and license. It carries no skill
+content, and it is not a second skill. A top level
+listing hides it, so any future conversion diff must
+include hidden files.
 
 Derives from the round 33 conversion test recorded in
 this brief and from the primary Qwen extension

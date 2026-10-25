@@ -149,8 +149,16 @@ PINNED = (
      "recorded originSource as Qoder"),
     ("the AgentPlugins originSource",
      "recorded originSource as AgentPlugins"),
-    ("the side shapes not carried",
-     "Side shapes do not ride in"),
+    ("the side shape files carried in the round 37 install",
+     "Side shape files ride in as files in the round 37"),
+    ("the round 33 skill tree only scope",
+     "The round 33 installs carried the skill tree only"),
+    ("the side shape activation limit",
+     "No activation of the preserved shapes inside a Qwen session is shown"),
+    ("the installer mirror of the input manifest",
+     "an installer mirror of the input manifest"),
+    ("the installer mirror field sets",
+     "three in the round 33 input"),
     ("the runtime UNVERIFIED",
      "Runtime invocation stays UNVERIFIED"),
     ("the scoped npm UNTESTED",
@@ -665,6 +673,14 @@ def negative_problems(text):
             r"\b(full|entire|whole)\b", line
         ):
             problems.append("conversion fidelity plant: " + line[:120])
+        # R38-EX-01. The unscoped denial that side shapes
+        # do not ride in contradicts the round 37 full
+        # bundle install recorded in the same section, so
+        # its return in any form the repair removed fails.
+        if re.search(r"side shapes do not ride in", line) or re.search(
+            r"installed bundles contain only the skill tree", line
+        ):
+            problems.append("conversion plant: " + line[:120])
         if re.search(r"\bproven to run\b", line):
             problems.append("conversion plant: " + line[:120])
         if re.search(r"\bfull packet workflow in qwen\b", line) and "not" not in line:

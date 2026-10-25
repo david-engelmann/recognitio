@@ -589,3 +589,38 @@ class TestCheckQwen(unittest.TestCase):
             "format."
         )
         self.assertEqual(problems, [])
+
+    def test_round38_side_shape_record_pins_hold(self):
+        # R38-EX-01 and R38-EX-02. Dropping any of the
+        # rescoped side shape or mirror sentences from the
+        # brief fails the gate, so the conversion account
+        # cannot quietly return to its unscoped form.
+        fragments = (
+            "Side shape files ride in as files in the "
+            "round 37",
+            "The round 33 installs carried the skill tree "
+            "only",
+            "No activation of the preserved shapes inside "
+            "a Qwen session is shown",
+            "an installer mirror of the input manifest",
+            "three in the round 33 input",
+        )
+        for fragment in fragments:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.break_brief(
+                    root, fragment, "the record omits this"
+                )
+                self.assertTrue(problems, fragment)
+
+    def test_round38_unscoped_side_shape_denial_fails(self):
+        # R38-EX-01. The old unscoped denial states the
+        # opposite of the round 37 full bundle record, so
+        # the negative reading rejects it on its own.
+        for plant in (
+            "Side shapes do not ride in.",
+            "The installed bundles contain only the skill "
+            "tree.",
+        ):
+            problems = self.mod.negative_problems(plant)
+            self.assertTrue(problems, plant)
