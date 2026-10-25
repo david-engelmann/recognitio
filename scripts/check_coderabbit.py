@@ -341,12 +341,6 @@ def linked_problems(root=None):
     if raw is None:
         return ["docs/coderabbit-review-brief.md is missing"]
     body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
-    text = re.sub(r"\s+", " ", body)
-    sentences = [
-        sentence.strip()
-        for sentence in re.split(r"(?<=[.!?])\s+", text)
-        if sentence.strip()
-    ]
     # R37F-RT-11. Triples joined the reading, because the
     # fix review split both linked claims across three
     # sentences with a filler between the halves, and the

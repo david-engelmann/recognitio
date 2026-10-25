@@ -301,26 +301,6 @@ def _post_negated(sentence, match):
     )
 
 
-def _windows(sentences):
-    """Neighbouring sentence windows as lists of parts.
-
-    Kept for a flat sentence list. The scans use
-    _group_windows, which reads at paragraph scope.
-    """
-    windows = [[part] for part in sentences]
-    windows += [
-        [first, second]
-        for first, second in zip(sentences, sentences[1:])
-    ]
-    windows += [
-        [first, second, third]
-        for first, second, third in zip(
-            sentences, sentences[1:], sentences[2:]
-        )
-    ]
-    return windows
-
-
 def _group_windows(groups):
     """Every neighbouring window inside each paragraph group.
 
@@ -448,7 +428,6 @@ def trust_problems(root=None):
     # posture and is skipped, and a sentence that reports
     # a source claim and rejects it in the same breath is
     # attribution, not a rule, and is skipped.
-    sentences = _sentences(raw)
     # R37-RT-02. The pattern passes read triples of
     # neighbouring sentences, because the round 37 review
     # split the trust and approval claims across three
