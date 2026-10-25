@@ -777,6 +777,57 @@ class TestCheckDevin(unittest.TestCase):
                 problems,
             )
 
+    def test_gate_round38_plain_and_possessive_subject_reset_fails(self):
+        # R38G-RT-07. A plain and clause opening on a
+        # possessive led subject restatement, and our
+        # dismissed findings are, is the same reset, so
+        # the first assertion negation does not guard the
+        # membership the second asserts.
+        plant = (
+            "Dismissed findings are not in the audit "
+            "trail sample and our dismissed findings are "
+            "part of the comprehensive audited resolved "
+            "total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_gate_round38_membership_split_across_sentences_fails(self):
+        # R38G-RT-08. A membership claim that states
+        # membership in one sentence and names that pool
+        # as the resolved total in the next states the
+        # forbidden count in no single sentence, and the
+        # paragraph pair reading must catch it.
+        plant = (
+            "Dismissed findings are part of the "
+            "comprehensive audited pool. That pool is "
+            "the resolved total."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "counts dismissed findings toward the "
+                    "resolved total" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_round38_plain_and_article_subject_reset_fails(self):
         # R38-RT-17. A plain and clause opening on the
         # article led subject restatement, and the

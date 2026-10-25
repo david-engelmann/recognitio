@@ -571,6 +571,17 @@ def semantic_problems(root=None):
                 r"(?:\w+\s+){0,3}?\w+\s+"
                 r"(?:is|are|was|were|has|have|had|does|do"
                 r"|did|can|could|will|would|shall|should"
+                r"|may|might|must)\b"
+                # R38G-RT-07. A plain and clause opening on
+                # a possessive led subject restatement, and
+                # our dismissed findings are, is the same
+                # reset with the possessive determiner
+                # standing before the noun subject.
+                r"|\band\s+(?:our|their|its|his|her|my"
+                r"|your)\s+"
+                r"(?:\w+\s+){0,3}?\w+\s+"
+                r"(?:is|are|was|were|has|have|had|does|do"
+                r"|did|can|could|will|would|shall|should"
                 r"|may|might|must)\b",
                 low[:chain_match.start()],
             ):
@@ -706,6 +717,66 @@ def semantic_problems(root=None):
             if spelled_sarif_problem(low):
                 problems.append(SARIF_PROBLEM)
                 seen.add("sarif")
+    # R38G-RT-08. A membership claim can state membership
+    # in one sentence and name that pool as the resolved
+    # total in the next, and no single sentence reading
+    # holds both halves. The chain family therefore also
+    # reads sentence pairs inside a paragraph, the claim
+    # scope the brief format marks there. The first
+    # sentence must state dismissed membership, unnegated,
+    # in a named aggregate pool, and a later sentence of
+    # the same paragraph must name that same pool as the
+    # resolved total, so two statements about two
+    # different pools never join and a correct definition
+    # sentence in either half keeps the pair out.
+    if "resolved" not in seen:
+        body = re.sub(r"(?m)^#{1,6} .*$", "", raw)
+        for block in re.split(r"\n\s*\n", body):
+            flat = re.sub(r"\s+", " ", block).lower()
+            parts = [
+                part.strip()
+                for part in re.split(r"(?<=[.!?])\s+", flat)
+                if part.strip()
+            ]
+            for index, first in enumerate(parts):
+                if "dismissed" not in first:
+                    continue
+                member = re.search(
+                    r"\b(" + MEMBERSHIP_PHRASES + r")\b"
+                    r".{0,80}?\b(pool|set|group|total|tally"
+                    r"|count|number|sum)\b",
+                    first,
+                )
+                if not member:
+                    continue
+                if re.search(
+                    r"\b(not|never)\b|n't", first[:member.end()]
+                ):
+                    continue
+                pool = member.group(2)
+                for second in parts[index + 1:]:
+                    if re.search(
+                        r"\b(excluded|only when|fixed in code"
+                        r"|code fixed only)\b",
+                        first + " " + second,
+                    ):
+                        continue
+                    if re.search(
+                        r"\b(that|this|the)\s+" + pool
+                        + r"\b[^.]*\bresolved\b",
+                        second,
+                    ) or re.search(
+                        r"\bresolved\b[^.]*\b(that|this|the)"
+                        r"\s+" + pool + r"\b",
+                        second,
+                    ):
+                        problems.append(RESOLVED_PROBLEM)
+                        seen.add("resolved")
+                        break
+                if "resolved" in seen:
+                    break
+            if "resolved" in seen:
+                break
     return problems
 
 
