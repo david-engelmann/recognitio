@@ -312,23 +312,20 @@ def negative_problems(root=None):
         # settings it declares and does not execute the
         # borrowed ones, is a claim the guard does not
         # govern either.
+        # R38-RT-10. A guard phrase removes only its own
+        # words, and every other word of the clause stays
+        # under judgement, including the text standing
+        # between two guard phrases. The earlier cut kept
+        # only the text before the first guard phrase and
+        # after the last one, so an execution claim placed
+        # between two guard phrases was dropped with the
+        # governed text and never judged.
         judged_parts = []
         for text, offset in spans:
-            marks = []
+            judged_text = text
             for guard in _CLAUSE_GUARDS:
-                pos = text.find(guard)
-                while pos >= 0:
-                    marks.append((pos, pos + len(guard)))
-                    pos = text.find(guard, pos + 1)
-            if marks:
-                judged_parts.append(
-                    text[:min(start for start, end in marks)]
-                )
-                judged_parts.append(
-                    text[max(end for start, end in marks):]
-                )
-            else:
-                judged_parts.append(text)
+                judged_text = judged_text.replace(guard, " ")
+            judged_parts.append(judged_text)
         judged = " ".join(judged_parts)
         problem = _execution_problem(judged)
         if problem is not None:
@@ -410,14 +407,19 @@ def _description_figures(sentence):
     # with the limit measured in characters, states the
     # same separated figure, so a few plain words may
     # stand between the comma and the qualifier.
-    # Confirmation repair. The filler allowance is a
-    # measured bound at twelve plain words. The
-    # confirmation plant states nine, with the limit for
-    # every plugin in the workspace measured, and the
-    # qualifier anchor stays the discipline past it.
+    # Confirmation repair. The filler allowance was a
+    # measured bound at twelve plain words.
+    # R38-RT-12. Fourteen plain words defeated that bound
+    # the same way nine defeated the six word allowance
+    # before it, so the reading no longer counts filler
+    # words at all. The qualifier phrase itself, a
+    # qualifier verb with in characters, is what binds
+    # the figure, and the stretch between the comma and
+    # the qualifier may hold any words of the same clause,
+    # stopping only at a semicolon or the sentence end.
     for match in re.finditer(
         r"(?<![\d.])(\d+)(?![\d.])\s*,\s*"
-        r"(?:\w+\s+){0,12}?"
+        r"[^.;]*?"
         r"(?:measured|counted|expressed|given|stated)"
         r"\s+in\s+(?:characters?|chars)\b",
         sentence,
@@ -547,10 +549,16 @@ def _description_problem(sentence, spans):
             # deictic naming of the cap or the limit, so
             # uses that limit binds the same way inherits
             # that cap does.
+            # R38-RT-11. The reference forms include the
+            # same figure naming, uses the same figure,
+            # beside the same cap and same limit forms, and
+            # the binding verbs include the use and follow
+            # and apply forms beside inherit and adopt.
             if re.search(
-                r"\bzcode\b[^.]*(\b(inherit\w*|adopt\w*)\b"
-                r"|\b(that|this)\s+(cap|limit)\b"
-                r"|\bsame\s+(cap|limit)\b)",
+                r"\bzcode\b[^.]*(\b(inherit\w*|adopt\w*"
+                r"|us\w+|follow\w*|appl\w*)\b"
+                r"|\b(that|this)\s+(cap|limit|figure)\b"
+                r"|\bsame\s+(cap|limit|figure|number)\b)",
                 sentence,
             ):
                 pass

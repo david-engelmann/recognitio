@@ -554,5 +554,72 @@ class TestCheckZcode(unittest.TestCase):
             )
 
 
+    def test_round38_execution_between_two_guards_fails(self):
+        # R38-RT-10. An execution claim standing between
+        # two guard phrases in one clause stays under
+        # judgement, because a guard phrase now removes
+        # only its own words.
+        plant = (
+            "ZCode does not execute the settings it "
+            "borrows and executes the settings it declares "
+            "and does not execute the settings it lends."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("execute" in p for p in problems), problems
+            )
+
+    def test_round38_inheritance_same_figure_fails(self):
+        # R38-RT-11. The binding stated with the verb uses
+        # and the reference the same figure binds the
+        # different host figure to ZCode the same way
+        # inherits that cap does.
+        plant = (
+            "A plugin description on a different host is "
+            "capped at 2048 characters, and ZCode uses the "
+            "same figure for its plugin descriptions."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "cap of 2048 characters" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_round38_separated_filler_fourteen_fails(self):
+        # R38-RT-12. Fourteen plain words of filler before
+        # the qualifier verb state the same separated
+        # figure, because the reading no longer counts
+        # filler words.
+        plant = (
+            "On ZCode, a plugin description is capped at "
+            "2048, with the limit for every single plugin "
+            "in the whole workspace and every project "
+            "measured in characters for every plugin."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "cap of 2048 characters" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
