@@ -301,17 +301,43 @@ def _post_negated(sentence, match):
     )
 
 
-def _group_windows(groups):
-    """Every neighbouring window inside each paragraph group.
+def _claim_groups(section):
+    """The text as claim scope groups of lowercased sentences.
 
-    R38-RT-02. The window bound is the paragraph itself,
+    R38G-RT-01. A paragraph break alone does not end a
+    claim in this brief, because one headed block states
+    one claim across its paragraphs and the brief format
+    marks the block with its heading. The claim scope is
+    therefore the headed block, every paragraph under one
+    heading read as one group of sentences in order, and
+    a heading starts a new group, so claims stated in two
+    blocks never join into a claim neither states. The
+    guards stay scoped to the sentences that carry the
+    claim, so a negation standing in a neighbouring
+    paragraph guards nothing unless its own sentence
+    carries the subject and the claim predicate.
+    """
+    groups = []
+    for chunk in re.split(r"(?m)^#{1,6} .*$", section):
+        group = [
+            sentence
+            for paragraph in _sentence_groups(chunk)
+            for sentence in paragraph
+        ]
+        if group:
+            groups.append(group)
+    return groups
+
+
+def _group_windows(groups):
+    """Every neighbouring window inside each claim scope group.
+
+    R38-RT-02. The window bound is the claim scope itself,
     not a sentence count, because each fixed count in
     rounds 36 and 37 was met by a split one sentence
     further out. The parts stay separate so a guard can
     be scoped to the sentences that carry the claim
-    under judgement, and no window crosses a paragraph
-    break, so two claims stated in two paragraphs never
-    join into a claim neither states.
+    under judgement.
     """
     windows = []
     for group in groups:
@@ -450,7 +476,12 @@ def trust_problems(root=None):
     # branches. The decide branch calls the same helper
     # scoped to the subject sentences, with no claim
     # pattern.
-    windows = _group_windows(_sentence_groups(raw))
+    # R38G-RT-01. The gate review split the same claims
+    # across a paragraph break inside one block, so the
+    # passes now read at claim scope through _claim_groups,
+    # the headed block, with the guards unchanged in their
+    # scoping.
+    windows = _group_windows(_claim_groups(raw))
     for parts in windows:
         sentence = " ".join(parts)
         if "head branch" not in sentence:
@@ -609,7 +640,7 @@ def trust_problems(root=None):
             )
             return problems
     if re.search(r"(?<!no )carries base branch merge authority",
-                 re.sub(r"\s+", " ", raw)):
+                 " ".join(_sentences(raw))):
         problems.append(
             "a copilot rule grants head branch content merge "
             "authority, which the base branch authority rule "
@@ -726,7 +757,7 @@ def approval_problems(root=None):
     claim = re.compile(
         "|".join("(?:%s)" % item for item in patterns)
     )
-    for parts in _group_windows(_sentence_groups(raw)):
+    for parts in _group_windows(_claim_groups(raw)):
         sentence = " ".join(parts)
         if "approval" not in sentence and "approved" not in sentence:
             continue
@@ -751,7 +782,7 @@ def approval_problems(root=None):
                 "rule forbids"
             )
             return problems
-    text = re.sub(r"\s+", " ", raw)
+    text = " ".join(_sentences(raw))
     if re.search(
         r"(?<!never )(?<!not )fires on an? (?:red|unverified) "
         r"packet",
