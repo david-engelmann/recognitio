@@ -1152,3 +1152,14 @@ This unreleased work carries version 1.3.0.
   and the eval gate now pin the corrected wording,
   and the Cursor gate refuses the stale marketplace
   distribution claim outright.
+- The plugin README under `.cursor-plugin` no longer
+  states that the Cursor plugin is distributed
+  through the Cursor Marketplace. It states that
+  the plugin ships in this repo as a plugin package
+  and that no Cursor Marketplace listing exists or
+  has been submitted, with the local load as the
+  route. This correction is the addendum to the
+  visual round 1 README correction. The Cursor gate
+  now pins the corrected wording in that file and
+  refuses the stale marketplace distribution
+  wording there as well as in the root README.

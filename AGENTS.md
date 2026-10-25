@@ -589,3 +589,11 @@ the eval gate repinned on the corrected wording and the
 Cursor gate refusing the stale marketplace distribution
 claim outright.
 
+The visual round 1 addendum on 2026-10-25 then
+corrected the plugin README under .cursor-plugin to
+the same position, removing the marketplace
+distribution wording from its Installing section
+and keeping the local load instructions and command
+unchanged, with the Cursor gate repinned to pin the
+corrected wording in that file and refuse the stale
+marketplace distribution wording there.

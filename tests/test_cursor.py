@@ -51,6 +51,7 @@ class TestCheckCursor(unittest.TestCase):
             ".cursor/config/bugbot.yaml",
             ".claude-plugin/plugin.json",
             "README.md",
+            ".cursor-plugin/README.md",
         ):
             source = ROOT / rel
             target = root / rel
@@ -95,6 +96,16 @@ class TestCheckCursor(unittest.TestCase):
 
     def write_readme(self, root, text):
         (root / "README.md").write_text(text, encoding="utf-8")
+
+    def read_plugin_readme(self, root):
+        return (root / ".cursor-plugin" / "README.md").read_text(
+            encoding="utf-8"
+        )
+
+    def write_plugin_readme(self, root, text):
+        (root / ".cursor-plugin" / "README.md").write_text(
+            text, encoding="utf-8"
+        )
 
     def read_manifest(self, root):
         return json.loads(
@@ -157,6 +168,90 @@ class TestCheckCursor(unittest.TestCase):
                 any(
                     "stale Cursor Marketplace distribution claim"
                     in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_dropped_plugin_readme_package_position_fails(self):
+        # Visual round 1 addendum. No Cursor Marketplace
+        # listing exists or has been submitted, so a plugin
+        # README that drops the shipped package position
+        # fails the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_plugin_readme(root)
+            broken = text.replace(
+                "The plugin ships in this repo as a plugin "
+                "package.",
+                "The plugin ships somehow.",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_plugin_readme(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    ".cursor-plugin/README.md" in p
+                    and "plugin package position" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_dropped_plugin_readme_no_listing_position_fails(self):
+        # Visual round 1 addendum. A plugin README that
+        # drops the no listing position fails the gate, so
+        # the correction cannot soften in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_plugin_readme(root)
+            broken = text.replace(
+                "No Cursor\nMarketplace listing exists or "
+                "has been submitted",
+                "A Cursor\nMarketplace listing may exist",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            self.write_plugin_readme(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    ".cursor-plugin/README.md" in p
+                    and "no listing position" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_stale_plugin_readme_marketplace_claim_fails(self):
+        # Visual round 1 addendum. The marketplace
+        # distribution passage the plugin README once
+        # carried is refused outright, so it cannot return
+        # beside the corrected sentences.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_plugin_readme(root)
+            plant = (
+                "The plugin is distributed through the "
+                "manually reviewed Cursor Marketplace. Every "
+                "plugin is manually reviewed before it is "
+                "listed, and all plugins must be open source. "
+                "Reviewed updates auto deploy to clients "
+                "pinned at the commit SHA, with no user "
+                "version pinning. A running Cloud Agent keeps "
+                "the plugin versions it started with, so "
+                "start a new agent to pick up an update."
+            )
+            self.write_plugin_readme(
+                root, text + "\n\n" + plant + "\n"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    ".cursor-plugin/README.md" in p
+                    and "stale Cursor Marketplace distribution "
+                    "claim" in p
                     for p in problems
                 ),
                 problems,

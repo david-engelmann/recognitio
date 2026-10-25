@@ -19,12 +19,9 @@ server to declare.
 
 ## Installing
 
-The plugin is distributed through the manually reviewed Cursor
-Marketplace. Every plugin is manually reviewed before it is
-listed, and all plugins must be open source. Reviewed updates
-auto deploy to clients pinned at the commit SHA, with no user
-version pinning. A running Cloud Agent keeps the plugin versions
-it started with, so start a new agent to pick up an update.
+The plugin ships in this repo as a plugin package. No Cursor
+Marketplace listing exists or has been submitted for it, so the
+local load route below is the route.
 
 For a local load test, copy this folder into the local plugin
 folder and reload the window, then confirm every component in
