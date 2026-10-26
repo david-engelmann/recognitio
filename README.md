@@ -18,7 +18,7 @@ One recorded run in full. A session in the Cursor agent uses the recognitio skil
 
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-cursor-agent-verified-crop.png">
-  <img alt="A Cursor agent session using recognitio on a 28 file change, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792" height="608">
+  <img alt="A Cursor agent session using recognitio on a 28 file change, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792">
 </picture>
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. On the defects inside the diff itself the two passes tied at 4 of 4 each. The full record lives in [the paired eval results](evals/RESULTS.md).
@@ -103,21 +103,40 @@ Extraction runs on the local clone and assembles the packet in four tiers, and a
 
 ```mermaid
 flowchart TB
-    subgraph one [ ]
+    subgraph one [" "]
         direction LR
         A([Pull request or commit range]) --> B[Extract from the local clone]
     end
-    subgraph two [ ]
+    subgraph two [" "]
         direction LR
         C[Assemble the packet in four tiers] --> D{Recount the change}
     end
-    subgraph three [ ]
+    subgraph three [" "]
         direction LR
         E([Verified packet]) --> G[The review reads the packet]
     end
     B --> C
     D -->|Counts agree| E
     D -->|Counts disagree| F[The run fails and no packet stands]
+```
+
+```mermaid
+flowchart TB
+    subgraph uno
+        direction LR
+        A2([Pull request or commit range]) --> B2[Extract from the local clone]
+    end
+    subgraph dos
+        direction LR
+        C2[Assemble the packet in four tiers] --> D2{Recount the change}
+    end
+    subgraph tres
+        direction LR
+        E2([Verified packet]) --> G2[The review reads the packet]
+    end
+    B2 --> C2
+    D2 -->|Counts agree| E2
+    D2 -->|Counts disagree| F2[The run fails and no packet stands]
 ```
 
 The four tiers are T0 Triage, T1 The change, T2 Companions and T3 History. T2 gathers call sites and definitions of the changed names, the imports of each changed file, and the test files that mention the changed modules. The definition patterns the companion search uses cover five languages, Python and Rust and Go and JavaScript and TypeScript, and a definition written in a language outside those five will not be found.
