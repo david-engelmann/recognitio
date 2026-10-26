@@ -707,6 +707,20 @@ This unreleased work carries version 1.3.0.
   The Antigravity row of the adaptations table is
   halved, and the asset gate pins the ring, the crop
   geometry and the still hashes.
+
+- The docs set given its structural layer in visual round 7.
+  A documentation index now stands at `docs/README.md`,
+  grouping all fifteen documents by type with a relative
+  link, a short description and a status word for each one.
+  Every document opens with a back link to the index and
+  every brief opens with a summary above its existing text
+  and closes with a navigation block. The principles page
+  is rewrapped with no word changed and three paragraph
+  breaks where its subject changes. The headless runbook
+  states the session limit in its limits section. Inside a
+  provider session the packet is never rendered for the
+  person watching the session, and that sentence now stands
+  in the runbook where a reader of its limits meets it.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

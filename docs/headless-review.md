@@ -1,3 +1,5 @@
+[Back to the documentation index](README.md)
+
 # The headless review shape
 
 This doc defines the unattended review shape the repo gates.
@@ -131,3 +133,6 @@ authoritative one, because that is the list the docs name.
 Decision 4 still binds this shape. The headless run consumes
 the packet as a reviewer, and nothing it judges replaces a
 check the shipped scripts run.
+
+Inside a provider session the packet is never rendered for
+the person watching the session.

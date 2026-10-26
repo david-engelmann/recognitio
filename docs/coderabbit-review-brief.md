@@ -1,4 +1,17 @@
+[Back to the documentation index](README.md)
+
 # The Build 11 CodeRabbit guidelines build
+
+## Summary
+
+Build 11 writes the packet discipline as review guidelines
+that pair with the packet in the review fix cycle and never
+replace it, and every guideline carries a note naming the skill
+section, the primary citation or the binding decision behind
+it. The guidelines ship in this repo in the CodeRabbit config
+at the repo root, with this brief as their derivation noted
+record. The contract lives in the guidelines section below,
+and the gate at scripts/check_coderabbit.py pins it.
 
 This document is the brief for Build 11, the CodeRabbit
 guidelines build. It exploits the Code Guidelines entry reading
@@ -255,3 +268,9 @@ its tests live outside the canonical skill text under `docs/`,
 `scripts/`, and `tests/`. The skill description is untouched, so
 the description protocol does not fire. The deliverable remains
 the skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

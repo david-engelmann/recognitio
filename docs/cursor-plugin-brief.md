@@ -1,4 +1,16 @@
+[Back to the documentation index](README.md)
+
 # The Build 10 Cursor plugin
+
+## Summary
+
+Build 10 carries recognitio into Cursor as a plugin that holds
+the skill as a real directory copy beside one rule file, with
+the Bugbot rules and their repo config riding beside the
+plugin. The build ships in this repo as the plugin tree under
+.cursor-plugin and the Bugbot rules under .cursor. The
+contract lives in the review rules section below, and the gate
+at scripts/check_cursor.py pins it.
 
 This document is the brief for Build 10, the Cursor plugin. It
 exploits the Cursor Plugin manifest at `.cursor-plugin/plugin.json`
@@ -438,3 +450,9 @@ tests live outside the canonical skill text under `docs/`,
 `scripts/`, and `tests/`. The skill description is untouched, so
 the description protocol does not fire. The deliverable remains
 the skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

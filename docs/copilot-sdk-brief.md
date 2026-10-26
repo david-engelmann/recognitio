@@ -1,4 +1,17 @@
+[Back to the documentation index](README.md)
+
 # The Build 13 Copilot SDK agent build
+
+## Summary
+
+Build 13 builds a Copilot SDK agent as a review advisory layer
+beside the canonical packet, and every rule in it carries a
+note naming the skill section or the primary citation it
+reports. What ships in this repo is that derivation noted rule
+set in this brief, and the guidance advises while enforcement
+stays on the shipped scripts. The contract lives in the SDK
+rules section below, and the gate at scripts/check_copilot.py
+pins it.
 
 This document is the brief for Build 13, the Copilot SDK agent
 build. It exploits the Copilot code review surface as a review
@@ -287,3 +300,9 @@ and its tests live outside the canonical skill text under
 `docs/`, `scripts/`, and `tests/`. The skill description
 is untouched, so the description protocol does not fire.
 The deliverable remains the skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

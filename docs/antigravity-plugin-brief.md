@@ -1,4 +1,16 @@
+[Back to the documentation index](README.md)
+
 # The Build 12 Antigravity plugin alteration
+
+## Summary
+
+Build 12 alters the plugin for Antigravity as a second
+extensions namespace beside the portable core, with its
+manifest and its hook wiring standing under .antigravity in
+this repo. What ships here is that plugin tree and the second
+namespace entry in the portable manifest. The contract lives
+in the harness contract section below, and the gate at
+scripts/check_antigravity.py pins it.
 
 This document is the brief for Build 12, the Antigravity plugin
 alteration. It records the Antigravity plugin format with
@@ -220,3 +232,9 @@ so the description protocol does not fire. The canonical skill
 frontmatter holds exactly four keys, name, description, context,
 and background, and the brief claims nothing else about it.
 The deliverable remains the skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

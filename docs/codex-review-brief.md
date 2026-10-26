@@ -1,4 +1,16 @@
+[Back to the documentation index](README.md)
+
 # The Build 9 Codex review rules package
+
+## Summary
+
+Build 9 writes the packet discipline as review rules for Codex,
+and every rule carries a note naming the canonical skill
+section, the gate or the primary source it derives from. What
+ships in this repo is that derivation noted rule set in this
+brief, and the rules advise while enforcement stays on the
+shipped scripts. The contract lives in the review rules section
+below, and the gate at scripts/check_codex.py pins it.
 
 This document is the brief for Build 9, the Codex review rules
 package. It exploits OpenAI's custom code review rules surface,
@@ -378,3 +390,9 @@ tests live outside the canonical skill text under `docs/`,
 `scripts/`, and `tests/`. The skill description is untouched, so
 the description protocol does not fire. The deliverable remains
 the skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

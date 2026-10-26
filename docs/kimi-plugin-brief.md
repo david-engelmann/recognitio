@@ -1,4 +1,16 @@
+[Back to the documentation index](README.md)
+
 # The Build 14 Kimi managed plugin
+
+## Summary
+
+Build 14 carries recognitio into Kimi as a managed plugin, and
+every rule in this brief carries a note naming the skill
+section or the primary citation it reports. What ships in this
+repo is that derivation noted rule set in this brief, pinned
+by its gate, while enforcement stays on the shipped scripts.
+The contract lives in the Kimi rules section below, and the
+gate at scripts/check_kimi.py pins it.
 
 This document is the brief for Build 14, the Kimi managed plugin.
 It exploits the Kimi plugin surface as a review advisory layer
@@ -198,3 +210,7 @@ tests live outside the canonical skill text under `docs/`,
 `scripts/`, and `tests/`. The skill description is untouched, so
 the description protocol does not fire. The deliverable remains
 the skill.
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

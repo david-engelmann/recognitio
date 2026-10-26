@@ -1,4 +1,18 @@
+[Back to the documentation index](README.md)
+
 # The Build 17 Devin playbook and coordinator build
+
+## Summary
+
+Build 17 writes the packet discipline for Devin as a playbook
+and coordinator rule set, and every rule carries a note naming
+the primary Devin citation it reports or the binding decision
+it follows. What ships in this repo is that derivation noted
+rule set in this brief, and the guidance advises while
+enforcement stays on the shipped scripts. The contract lives
+in the Devin rules section below, and the gate at
+scripts/check_devin.py pins it, with the build recorded as
+decision 28 in the decision record.
 
 This document is the brief for Build 17, the Devin playbook and
 coordinator build. It exploits the Devin Review surface as a
@@ -392,3 +406,9 @@ the description protocol does not fire. The deliverable remains
 the skill. No Devin surface in this brief enters the canonical
 skill text, because every Devin mechanic above is Devin
 hosting behavior, not portable core procedure.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

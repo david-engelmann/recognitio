@@ -665,3 +665,18 @@ diamond and no theme pin, and halved the
 Antigravity cell of the adaptations table, with the
 demo asset gate grown to pin the ring, the crop
 geometry and clean band, and the still hashes.
+
+The visual round 7 pass on 2026-10-26 then gave the
+docs set its structural layer with no new build, landing
+a documentation index at `docs/README.md` that groups
+all fifteen documents by type with a relative link and
+a short description and a status word for each one, a
+back link to the index as the first line of every
+document, a summary opening above the existing text of
+every brief and a closing navigation block at its foot,
+and a rewrapped principles page whose word stream is
+unchanged apart from three paragraph breaks where its
+subject changes, and stated the provider session limit
+in the limits section of the headless runbook, with a
+gate test pinning the index and the navigation in the
+gate script suite.

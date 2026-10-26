@@ -1,4 +1,17 @@
+[Back to the documentation index](README.md)
+
 # The Build 8 portable package, Agent Plugins 1.0.0
+
+## Summary
+
+Build 8 packages the portable core on its own as a skills tree
+under a single manifest, with no MCP file in the package and the
+Claude Code native shapes left where they stand at the repo
+root. The package ships in this repo under
+agent-plugins-package, and the skill it carries is a byte
+identical copy of the canonical skill. The contract lives in
+the closed manifest section below, and the gate at
+scripts/check_package.py pins the package shape.
 
 This document is the brief for the Build 8 portable package. The
 package lives at `agent-plugins-package/` and carries only the
@@ -129,3 +142,10 @@ canonical skill text under `agent-plugins-package/`, `scripts/`
 and `docs/`. The skill description is untouched, so the
 description protocol does not fire. The deliverable remains the
 skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)
+- [The headless review shape](headless-review.md)

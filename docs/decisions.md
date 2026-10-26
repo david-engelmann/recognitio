@@ -1,3 +1,5 @@
+[Back to the documentation index](README.md)
+
 # Decisions
 
 Design decisions that depart from the research sketch the skill was

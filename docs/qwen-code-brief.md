@@ -1,4 +1,17 @@
+[Back to the documentation index](README.md)
+
 # The Build 15 Qwen Code marketplace presence brief
+
+## Summary
+
+Build 15 prepares a Qwen Code marketplace presence and stops
+at a conditional draft, because the publication decision stays
+with David and nothing in this build presents the presence as
+published. No listing file ships in this repo and no listing
+version exists for the version check to check, so the repo
+version stands where it stood. The contract lives in the Qwen
+rules section below, and the gate at scripts/check_qwen.py
+pins the brief in that conditional state.
 
 This document is the brief for Build 15, the Qwen Code
 marketplace presence. It is a conditional draft. The
@@ -455,3 +468,9 @@ primary releases read supports one here.
 Derives from binding decision 26, from binding
 decision 13 in its suspended state, and from the
 round 33 audit record.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

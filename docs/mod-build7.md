@@ -1,4 +1,17 @@
+[Back to the documentation index](README.md)
+
 # The Build 7 mod, in process hooks for the review fan out
+
+## Summary
+
+Build 7 adds an in process hook on the home platform that reads
+the packet manifest when a reviewer spawn is about to start and
+lets the spawn through only when the manifest reads verified.
+The mod ships in this repo as the hooks module and its host side
+tests under hooks, beside the portable core and outside the
+canonical skill text. The contract lives in the sections below,
+and the gate at scripts/check_mod.py pins the module list, the
+spawn hook and its fail closed deny handler.
 
 This document is the brief for the Build 7 Claude Code mod.
 The mod lives under `hooks/` beside the portable core, not
@@ -118,3 +131,9 @@ canonical skill text under `hooks/` and `docs/`. The
 skill description is untouched, so the description
 protocol does not fire. The deliverable remains the
 skill.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)

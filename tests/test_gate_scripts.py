@@ -2032,6 +2032,84 @@ def _png_pixels(path):
     return width, height, rows
 
 
+class TestDocsIndex(unittest.TestCase):
+    """The visual round 7 docs index and navigation pins.
+
+    The docs index at `docs/README.md` lists every document
+    in the docs set exactly once with a relative link that
+    resolves, every document opens with a back link to the
+    index, and every brief closes with the navigation block
+    after its final section, so the set cannot quietly return
+    to a pile of unlinked pages.
+    """
+
+    DOCS = (
+        "agent-plugins-brief.md",
+        "antigravity-plugin-brief.md",
+        "coderabbit-review-brief.md",
+        "codex-review-brief.md",
+        "copilot-sdk-brief.md",
+        "cursor-plugin-brief.md",
+        "decisions.md",
+        "devin-playbook-brief.md",
+        "headless-review.md",
+        "kimi-plugin-brief.md",
+        "mod-build7.md",
+        "principles.md",
+        "qwen-code-brief.md",
+        "reviewer-persona.md",
+        "zcode-plugin-brief.md",
+    )
+    BRIEFS = (
+        "agent-plugins-brief.md",
+        "antigravity-plugin-brief.md",
+        "coderabbit-review-brief.md",
+        "codex-review-brief.md",
+        "copilot-sdk-brief.md",
+        "cursor-plugin-brief.md",
+        "devin-playbook-brief.md",
+        "kimi-plugin-brief.md",
+        "mod-build7.md",
+        "qwen-code-brief.md",
+        "zcode-plugin-brief.md",
+    )
+    BACK_LINK = "[Back to the documentation index](README.md)"
+    NAV_BLOCK = (
+        "- [Documentation index](README.md)\n"
+        "- [Decisions](decisions.md)\n"
+        "- [Principles](principles.md)"
+    )
+
+    def test_the_index_lists_every_document_once_and_links_resolve(self):
+        index = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+        targets = re.findall(r"\]\(([^)]+\.md)\)", index)
+        self.assertEqual(sorted(targets), sorted(self.DOCS))
+        for target in targets:
+            self.assertTrue((ROOT / "docs" / target).is_file(), target)
+
+    def test_every_document_opens_with_the_back_link(self):
+        for name in self.DOCS:
+            text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+            self.assertEqual(text.splitlines()[0], self.BACK_LINK, name)
+
+    def test_every_brief_closes_with_the_navigation_block(self):
+        for name in self.BRIEFS:
+            text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+            self.assertIn(self.NAV_BLOCK, text, name)
+            # The Qwen brief carries no Skill tightness section,
+            # so its rules heading is the anchor there instead.
+            anchor = (
+                "## The Qwen rules"
+                if name == "qwen-code-brief.md"
+                else "## Skill tightness"
+            )
+            self.assertGreater(
+                text.index(self.NAV_BLOCK),
+                text.index(anchor),
+                name,
+            )
+
+
 class TestDemoAssets(unittest.TestCase):
     """The visual round 3 demo asset gate, grown in round 6.
 

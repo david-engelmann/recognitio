@@ -1,4 +1,16 @@
+[Back to the documentation index](README.md)
+
 # The ZCode plugin build
+
+## Summary
+
+Build 16 carries recognitio into ZCode as a native plugin
+whose manifest stands at .zcode-plugin/plugin.json in this
+repo. That manifest ships here, and no ZCode client is
+available on this box, so this build documents its contract
+and never enforces it on a live client. The contract lives in
+the ZCode rules section below, and the gate at
+scripts/check_zcode.py pins it.
 
 Recognitio ships on ZCode as a native plugin with its manifest
 at `.zcode-plugin/plugin.json`. ZCode distributes plugins
@@ -111,3 +123,9 @@ like every other build.
 The ZCode plugin adds no skill text. The canonical skill at
 `.agents/skills/recognitio/SKILL.md` is unchanged by this
 build, and no ZCode rule restates a packet workflow step.
+
+## Navigation
+
+- [Documentation index](README.md)
+- [Decisions](decisions.md)
+- [Principles](principles.md)
