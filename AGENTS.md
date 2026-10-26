@@ -620,3 +620,15 @@ the adaptations table brief references became
 clickable relative links, with the description
 pins and the storefront pins in the gate tests
 moved in the same change.
+
+The visual round 3 pass on 2026-10-25 then
+rebuilt the demo assets with no new build, landing
+the rebuilt hero recording from the same recorded
+session through the builder and capture record now
+shipped under docs/images, deleting the terminal
+loop in favour of a stills gallery from the same
+run with a hero poster still and its detail crop,
+and growing the demo asset gate in the gate tests
+over the hero dimensions and byte budget, the frame
+zero content, the verdict rest frame, the stills
+and the README image references.

@@ -1849,6 +1849,194 @@ class TestReadmeStorefront(unittest.TestCase):
         )
 
 
+def _gif_lzw_decode(data, min_code_size):
+    """Decode one GIF LZW stream with the standard library only."""
+    out = bytearray()
+    clear = 1 << min_code_size
+    eoi = clear + 1
+    code_size = min_code_size + 1
+    table = None
+
+    def reset():
+        return {i: bytes([i]) for i in range(clear)}
+
+    table = reset()
+    next_code = eoi + 1
+    bitpos = 0
+    prev = None
+
+    def read_code():
+        nonlocal bitpos
+        byte_i = bitpos // 8
+        shift = bitpos % 8
+        chunk = int.from_bytes(data[byte_i:byte_i + 4].ljust(4, b"\x00"), "little")
+        code = (chunk >> shift) & ((1 << code_size) - 1)
+        bitpos += code_size
+        return code
+
+    while True:
+        code = read_code()
+        if code == clear:
+            table = reset()
+            code_size = min_code_size + 1
+            next_code = eoi + 1
+            prev = None
+            continue
+        if code == eoi:
+            break
+        if prev is None:
+            entry = table[code]
+            out += entry
+            prev = entry
+            continue
+        if code in table:
+            entry = table[code]
+        else:
+            entry = prev + prev[:1]
+        out += entry
+        table[next_code] = prev + entry[:1]
+        next_code += 1
+        if next_code == (1 << code_size) and code_size < 12:
+            code_size += 1
+        prev = entry
+    return bytes(out)
+
+
+def _gif_frames(path):
+    """Return (width, height, palette, frames, delays_ms).
+
+    Each frame is its raw palette index bytes at its own
+    descriptor size, decoded with the standard library only.
+    """
+    raw = path.read_bytes()
+    assert raw[:6] in (b"GIF89a", b"GIF87a"), "not a GIF file"
+    width = int.from_bytes(raw[6:8], "little")
+    height = int.from_bytes(raw[8:10], "little")
+    packed = raw[10]
+    pos = 13
+    palette = []
+    if packed & 0x80:
+        count = 2 ** ((packed & 0x07) + 1)
+        for i in range(count):
+            palette.append(tuple(raw[13 + 3 * i:16 + 3 * i]))
+        pos += 3 * count
+    frames = []
+    delays = []
+    delay = 0
+    while pos < len(raw):
+        marker = raw[pos]
+        if marker == 0x3B:
+            break
+        if marker == 0x21:
+            label = raw[pos + 1]
+            if label == 0xF9:
+                delay = int.from_bytes(raw[pos + 4:pos + 6], "little") * 10
+                pos += 8
+            else:
+                pos += 2
+                while raw[pos]:
+                    pos += raw[pos] + 1
+                pos += 1
+        elif marker == 0x2C:
+            fw = int.from_bytes(raw[pos + 5:pos + 7], "little")
+            fh = int.from_bytes(raw[pos + 7:pos + 9], "little")
+            fpacked = raw[pos + 9]
+            pos += 10
+            if fpacked & 0x80:
+                pos += 3 * (2 ** ((fpacked & 0x07) + 1))
+            min_code = raw[pos]
+            pos += 1
+            chunks = bytearray()
+            while raw[pos]:
+                chunks += raw[pos + 1:pos + 1 + raw[pos]]
+                pos += raw[pos] + 1
+            pos += 1
+            frames.append(_gif_lzw_decode(bytes(chunks), min_code))
+            delays.append(delay)
+            delay = 0
+        else:
+            raise AssertionError("unexpected GIF block %r" % marker)
+    return width, height, palette, frames, delays
+
+
+def _bright_fraction(indices, palette):
+    if not indices:
+        return 0.0
+    bright = 0
+    for idx in indices:
+        r, g, b = palette[idx]
+        if r + g + b > 90:
+            bright += 1
+    return bright / len(indices)
+
+
+class TestDemoAssets(unittest.TestCase):
+    """The visual round 3 demo asset gate.
+
+    The hero GIF is pinned on dimensions, a byte budget, a
+    frame zero content threshold, a clean verdict rest frame
+    and a total duration window. The stills must exist as
+    real PNG frames and every image the README names must
+    exist at its named path.
+    """
+
+    IMAGES = ROOT / "docs" / "images"
+    HERO = IMAGES / "recognitio-demo-chat.gif"
+    STILLS = (
+        "recognitio-demo-poster.png",
+        "recognitio-demo-poster-detail.png",
+        "recognitio-demo-still-diff.png",
+        "recognitio-demo-still-verified.png",
+        "recognitio-demo-still-verdict.png",
+    )
+    BYTE_BUDGET = 750000
+
+    def test_the_hero_dimensions_and_byte_budget_are_pinned(self):
+        width, height, _pal, _frames, _delays = _gif_frames(self.HERO)
+        self.assertEqual((width, height), (796, 624))
+        self.assertLessEqual(self.HERO.stat().st_size, self.BYTE_BUDGET)
+
+    def test_frame_zero_carries_content(self):
+        _w, _h, palette, frames, _delays = _gif_frames(self.HERO)
+        self.assertGreater(_bright_fraction(frames[0], palette), 0.05)
+
+    def test_the_verdict_rest_frame_is_present_and_clean(self):
+        width, _h, palette, frames, delays = _gif_frames(self.HERO)
+        self.assertGreaterEqual(len(frames), 30)
+        total_ms = sum(delays)
+        self.assertGreaterEqual(total_ms, 10000)
+        self.assertLessEqual(total_ms, 20000)
+        last = frames[-1]
+        self.assertGreater(_bright_fraction(last, palette), 0.05)
+        # No text band may sit partly under the header bar in
+        # the resting frame. Rows 49 to 59 sit just below the
+        # header separator at row 48, so a glyph band clipped
+        # by the bar would leave bright pixels there.
+        for row in range(49, 60):
+            band = last[row * width:(row + 1) * width]
+            bright = sum(
+                1 for idx in band if sum(palette[idx]) > 90
+            )
+            self.assertLess(bright, 20, "clipped band at row %d" % row)
+
+    def test_the_stills_exist_as_png_frames(self):
+        for name in self.STILLS:
+            path = self.IMAGES / name
+            self.assertTrue(path.is_file(), name)
+            self.assertEqual(path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n", name)
+            self.assertGreater(path.stat().st_size, 5000, name)
+
+    def test_every_readme_image_reference_resolves(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
+        self.assertIn("docs/images/recognitio-demo-chat.gif", refs)
+        for name in self.STILLS:
+            self.assertIn("docs/images/" + name, refs)
+        for ref in refs:
+            self.assertTrue((ROOT / ref).is_file(), ref)
+        self.assertNotIn("recognitio-demo-terminal", readme)
+
+
 class TestCanonicalSkillLayout(unittest.TestCase):
     """Build 2, the canonical skill at .agents/skills/recognitio.
 

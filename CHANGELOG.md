@@ -656,6 +656,19 @@ This unreleased work carries version 1.3.0.
   the failure in this project record that produced it, and
   the README links it from the Why section.
 
+- The demo assets rebuilt in visual round 3. The hero
+  recording is rebuilt from the same recorded session
+  through the builder now shipped in the repo at
+  docs/images/build_demo.py with its capture record
+  beside it, opening on a loaded frame instead of a
+  black canvas, holding its verdict clear of the
+  header bar, and running 14.48 seconds at 694336
+  bytes. The terminal recording leaves the page as a
+  loop and returns as three stills from the same run
+  beside a hero poster still and its detail crop, and
+  a new asset gate pins the hero dimensions and byte
+  budget, the frame zero content, the verdict rest
+  frame, the stills and every README image reference.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

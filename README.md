@@ -8,7 +8,17 @@ Pulls the relevant changes from a pull request or a commit range, with the conte
 
 [![CI](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+Watch one recorded run in full. A 3,233 line diff enters, the skill builds the verified packet, and the model reviews that packet.
+
 ![A recorded run in a chat session. A large diff enters the session, the recognitio skill builds a verified packet from it, and the model reviews the packet.](docs/images/recognitio-demo-chat.gif)
+
+One recorded run. A 3,233 line diff goes in and the build ends with the packet marked verified.
+
+![A still from the same recorded run. The finished tool card shows six steps complete and the packet marked verified, with the diff and the ask above it.](docs/images/recognitio-demo-poster.png)
+
+The same frame at detail size. The card header carries the verified marker and the packet line.
+
+![A detail crop of the same frame. The tool card header shows the verified marker beside the packet line reporting 28 files and verified.](docs/images/recognitio-demo-poster-detail.png)
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. The full record lives in [the paired eval results](evals/RESULTS.md).
 
@@ -86,9 +96,19 @@ Completeness check passed. A separate recount of files, statuses, old paths, hun
 
 Both excerpts are trimmed for length, and the fence lines inside the packet itself are dropped so the excerpts can sit inside the fences of this file. The full packet for this commit runs 579 lines, and the commands that produce one for any change are in the Usage section below.
 
-The demo at the top of this page is one recorded run, and the same run plays below in the raw terminal without the chat framing.
+The same run without the chat framing. These frames come from the raw terminal recording of the run at the top of this page, and nothing in them is a second run or a redrawn output.
 
-![The same 3,233 line diff in a raw terminal window, the recognitio skill distills it into a verified packet, and the model reviews the packet and returns the meat only](docs/images/recognitio-demo-terminal.gif)
+![A still from the raw terminal recording. The settled tail of the 3,233 line diff at rest.](docs/images/recognitio-demo-still-diff.png)
+
+The problem at full scale. One range across 28 files and 3,233 lines of raw diff.
+
+![A still from the raw terminal recording. A terminal search shows the verified flag in the packet manifest.](docs/images/recognitio-demo-still-verified.png)
+
+The check in plain text. A terminal search finds the verified flag in the packet manifest.
+
+![A still from the raw terminal recording. The review at rest, ending on the approve verdict.](docs/images/recognitio-demo-still-verdict.png)
+
+The payoff at rest. The model reviews the packet and the run ends on a plain approve.
 
 ## How it works
 
