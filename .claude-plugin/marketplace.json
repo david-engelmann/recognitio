@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "description": "The marketplace listing for the recognitio skill.",
+    "description": "Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.",
     "version": "1.3.0"
   },
   "name": "recognitio-marketplace",
@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "description": "Assembles a pull request or a commit range from a local clone into one verified review packet, so a review starts from evidence instead of a bare diff.",
+      "description": "Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.",
       "name": "recognitio",
       "source": "./",
       "strict": true,

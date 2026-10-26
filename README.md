@@ -1,16 +1,18 @@
 # Recognitio
 
-[![CI](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+**A review starts from evidence instead of a bare diff.**
 
-Recognitio is an agent skill that pulls the relevant changes out of a pull request or a commit range and assembles them into a verified review packet. The packet holds the change plus the context a careful human reviewer would go and find, and it proves that nothing was left behind.
+Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.
 
-Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
+[What it does](#what-it-does) · [See it on a real change](#see-it-on-a-real-change) · [How it works](#how-it-works) · [Why](#why) · [Install](#install) · [Platform adaptations](#platform-adaptations) · [Usage](#usage) · [The tier model](#the-tier-model) · [The completeness guarantee](#the-completeness-guarantee) · [Trust and limits](#trust-and-limits) · [The name](#the-name)
 
-![A 3,233 line diff floods an agent session in this repository, the recognitio skill distills it into a verified packet, and the model reviews the packet and returns the meat only](docs/images/recognitio-demo-chat.gif)
+[![CI](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+![A recorded run in a chat session. A large diff enters the session, the recognitio skill builds a verified packet from it, and the model reviews the packet.](docs/images/recognitio-demo-chat.gif)
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. The full record lives in [the paired eval results](evals/RESULTS.md).
+
+New here. Start with the [Install](#install) section below and take the plugin route first.
 
 ## What it does
 
@@ -110,6 +112,8 @@ A diff alone is not what a reviewer reads. A reviewer reads the change inside it
 
 Recognitio takes the other path. Extraction runs against the local clone, where there is no file count cap and the full history is present. The result is counted twice by separate git invocations, and the packet is only called verified when both counts agree.
 
+Recognitio serves the pull request review workflow. It is the step before the review itself, run when a reviewer must judge a change they did not write and needs the whole change on the page first.
+
 The claims behind these choices stand written down in [Principles](docs/principles.md), each one beside the failure that produced it.
 
 ## Install
@@ -144,9 +148,9 @@ cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 ### Qwen Code
 
 The Qwen Code route is a conditional draft. The brief
-at docs/qwen-code-brief.md states the full Qwen
-contract, and the conditional publication decision
-stays with David. No Qwen listing file ships in this
+at [the Qwen Code brief](docs/qwen-code-brief.md) states
+the full Qwen contract, and the conditional publication
+decision stays with David. No Qwen listing file ships in this
 round.
 
 ```bash
@@ -193,7 +197,7 @@ The plugin ships an output style that shapes the review packet as the tiered sec
 
 ### The reviewer persona
 
-The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use. A user's own `agent` setting overrides the plugin default, which is host behavior and not a defect. The brief at `docs/reviewer-persona.md` states the host rules and the persona bounds in full.
+The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use. A user's own `agent` setting overrides the plugin default, which is host behavior and not a defect. The brief at [the reviewer persona brief](docs/reviewer-persona.md) states the host rules and the persona bounds in full.
 
 ## Platform adaptations
 
@@ -202,15 +206,15 @@ The packet discipline travels. Each adaptation below restates it in the surface 
 | Platform | What ships |
 | --- | --- |
 | Claude Code | The home platform plugin, carrying the canonical skill, the packet output style and the reviewer persona |
-| Codex | A review rules package, written as derivation noted rules in `docs/codex-review-brief.md` |
-| Cursor | A plugin under `.cursor-plugin/` with the skill as a real directory copy and one rule file, plus the Bugbot rules in `.cursor/` |
-| Copilot | A Copilot SDK agent build, written as derivation noted rules in `docs/copilot-sdk-brief.md` |
-| CodeRabbit | Review guidelines in `.coderabbit.yaml` at the repo root, with the derivation noted brief at `docs/coderabbit-review-brief.md` |
-| Kimi | A managed plugin build, written as derivation noted rules and the plugin contract in `docs/kimi-plugin-brief.md` |
-| ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace |
-| Devin | A playbook and coordinator build, written as derivation noted rules in `docs/devin-playbook-brief.md` |
-| Qwen | A conditional draft, with the brief at `docs/qwen-code-brief.md` and the install route in the Install section above |
-| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and the PreToolUse hook wiring at `.antigravity/hooks.json` carrying the deny and force_ask and auto_approve mapping, with the native shapes as a second extensions namespace beside the portable core |
+| Codex | A review rules package, written as derivation noted rules in [the Codex review brief](docs/codex-review-brief.md) |
+| Cursor | A plugin under `.cursor-plugin/` with the skill as a real directory copy and one rule file, plus the Bugbot rules in `.cursor/`, with the build recorded in [the Cursor plugin brief](docs/cursor-plugin-brief.md) |
+| Copilot | A Copilot SDK agent build, written as derivation noted rules in [the Copilot SDK brief](docs/copilot-sdk-brief.md) |
+| CodeRabbit | Review guidelines in `.coderabbit.yaml` at the repo root, with the derivation noted brief at [the CodeRabbit review brief](docs/coderabbit-review-brief.md) |
+| Kimi | A managed plugin build, written as derivation noted rules and the plugin contract in [the Kimi plugin brief](docs/kimi-plugin-brief.md) |
+| ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace, with [the ZCode plugin brief](docs/zcode-plugin-brief.md) as the brief for the build |
+| Devin | A playbook and coordinator build, written as derivation noted rules in [the Devin playbook brief](docs/devin-playbook-brief.md) |
+| Qwen | A conditional draft, with the brief at [the Qwen Code brief](docs/qwen-code-brief.md) and the install route in the Install section above |
+| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and the PreToolUse hook wiring at `.antigravity/hooks.json` carrying the deny and force_ask and auto_approve mapping, with the native shapes as a second extensions namespace beside the portable core, and the build recorded in [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
 
 A Trae adaptation ships nothing. The round 32 check found no Trae skill or plugin surface in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
 

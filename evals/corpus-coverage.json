@@ -359,8 +359,8 @@
       "test_trust_core_plants_after_the_rules_section_fail"
     ],
     "Round 37": [
-      "test_a_stale_readme_badge_is_a_problem",
-      "test_main_fails_on_a_stale_readme_badge",
+      "test_a_stale_marketplace_entry_is_a_problem",
+      "test_main_no_longer_reads_a_readme_version_badge",
       "test_round37_approval_split_across_three_sentences_fails",
       "test_round37_confirm2_figure_guard_as_clause_fails",
       "test_round37_confirm_figure_split_across_five_fails",

@@ -5,9 +5,9 @@ single source of agent guidance here, and CLAUDE.md points at it.
 
 ## What this is
 
-Recognitio is an agent skill that pulls the relevant changes out of
-a pull request or a commit range and assembles them into a verified
-review packet. The packet is called the pericope. The canonical
+Pulls the relevant changes from a pull request or a commit range,
+with the context a reviewer needs, into one verified review packet.
+The packet is called the pericope. The canonical
 skill lives in `.agents/skills/recognitio/` and its extractor is
 the script at `.agents/skills/recognitio/scripts/extract.py`. A
 symlink at `.claude/skills/recognitio` points at the canonical
@@ -597,3 +597,26 @@ and keeping the local load instructions and command
 unchanged, with the Cursor gate repinned to pin the
 corrected wording in that file and refuse the stale
 marketplace distribution wording there.
+
+The visual round 2 pass on 2026-10-25 then
+rebuilt the README first screen as the storefront
+with no new build, placing the headline under the
+title, the one canonical description under the
+headline, a one line navigation row, the CI and
+license badges alone in the badge row, the hero
+recording with a shortened alt text, the paired
+eval proof directly under it with its link and its
+construction caveat whole, and a one line install
+pointer closing the screen, and moving the serving
+paragraph down to the Why section rather than
+deleting it. Every display description slot now
+carries the canonical sentence, with the skill
+frontmatter description standing as the named
+exception because its trigger text is functional
+and no local trigger runner exists. The static
+version badge left the README and the version gate
+repinned to the manifests and the changelog, and
+the adaptations table brief references became
+clickable relative links, with the description
+pins and the storefront pins in the gate tests
+moved in the same change.

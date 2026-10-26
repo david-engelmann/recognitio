@@ -745,7 +745,7 @@ residual stands unchanged.
 | The round 37 conversion record in the Qwen brief stood without pins of its own | `test_round37_fidelity_record_pins_hold` and `test_round37_full_conversion_byte_fidelity_claim_fails` in tests/test_qwen.py |
 | A Cursor neutral conclusion split across sentences passed the Cursor brief gate | `test_round37_neutral_conclusion_split_across_sentences_fails` in tests/test_cursor.py |
 | CodeRabbit platform claims split across three sentences passed the CodeRabbit brief gate | `test_round37_fixreview_platform_split_across_three_fails` in tests/test_coderabbit.py |
-| A stale README version badge passed the version coherence gate | `test_a_stale_readme_badge_is_a_problem` and `test_main_fails_on_a_stale_readme_badge` in the gate script suite |
+| A stale README version badge passed the version coherence gate | `test_a_stale_marketplace_entry_is_a_problem` and `test_main_no_longer_reads_a_readme_version_badge` in the gate script suite |
 
 The round 37 pass widened the Copilot readings to
 triples of neighbouring sentences, bound the Cursor

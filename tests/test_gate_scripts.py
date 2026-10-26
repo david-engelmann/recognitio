@@ -1084,26 +1084,16 @@ class TestCheckVersion(unittest.TestCase):
             self.mod.plugin_version('{"version": "1.3.0"}'), "1.3.0"
         )
 
-    def test_the_readme_badge_version_is_read(self):
-        badge = (
-            "[![Version](https://img.shields.io/badge/"
-            "version-1.3.0-blue.svg)](CHANGELOG.md)"
-        )
-        self.assertEqual(self.mod.readme_badge_version(badge), "1.3.0")
-        self.assertIsNone(
-            self.mod.readme_badge_version("a README with no badge")
-        )
-
-    def test_a_stale_readme_badge_is_a_problem(self):
+    def test_a_stale_marketplace_entry_is_a_problem(self):
         problems = self.mod.coherence_problems({
             "plugin.json": "1.3.0",
             "EXTRACTOR_VERSION": "1.3.0",
-            "README.md version badge": "1.2.0",
+            "marketplace.json entry 1": "1.2.0",
         })
         self.assertTrue(any("disagree" in p for p in problems), problems)
         problems = self.mod.coherence_problems({
             "plugin.json": "1.3.0",
-            "README.md version badge": None,
+            "marketplace.json entry 1": None,
         })
         self.assertTrue(any("no version" in p for p in problems), problems)
 
@@ -1230,10 +1220,7 @@ class TestCheckVersion(unittest.TestCase):
     def run_main_on_texts(self, plugin_text, marketplace_text,
                           changelog_text, readme_text=None):
         if readme_text is None:
-            readme_text = (
-                "[![Version](https://img.shields.io/badge/"
-                "version-1.3.0-blue.svg)](CHANGELOG.md)\n"
-            )
+            readme_text = "# Recognitio\n"
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
@@ -1251,13 +1238,11 @@ class TestCheckVersion(unittest.TestCase):
             original = (
                 self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
                 self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
-                self.mod.README_MD,
             )
             self.mod.PLUGIN_JSON = plugin
             self.mod.MARKETPLACE_JSON = market
             self.mod.EXTRACT_PY = extract
             self.mod.CHANGELOG_MD = log
-            self.mod.README_MD = readme
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
@@ -1265,11 +1250,16 @@ class TestCheckVersion(unittest.TestCase):
                 (
                     self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
                     self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
-                    self.mod.README_MD,
                 ) = original
             return code, captured.getvalue()
 
-    def test_main_fails_on_a_stale_readme_badge(self):
+    def test_main_no_longer_reads_a_readme_version_badge(self):
+        # The README version badge retired in the visual round 2
+        # storefront rebuild, and the gate repinned to the
+        # manifests and the changelog. A README that still carried
+        # a stale badge, or no badge at all, is no longer a
+        # version surface, so both forms pass while the manifests
+        # and the changelog agree.
         plugin = '{"version": "1.3.0"}'
         market = (
             '{"metadata": {"version": "1.3.0"}, "plugins": '
@@ -1285,14 +1275,12 @@ class TestCheckVersion(unittest.TestCase):
         code, err = self.run_main_on_texts(
             plugin, market, log, readme_text=stale
         )
-        self.assertEqual(code, 1)
-        self.assertIn("README.md version badge", err)
+        self.assertEqual(code, 0, err)
         missing = "a README with no badge at all\n"
         code, err = self.run_main_on_texts(
             plugin, market, log, readme_text=missing
         )
-        self.assertEqual(code, 1)
-        self.assertIn("README.md version badge", err)
+        self.assertEqual(code, 0, err)
 
     def test_manifest_conflict_problems_names_the_broken_pair(self):
         plugin = '{"name": "x", "skills": ["./skills/x/"]}'
@@ -1621,17 +1609,20 @@ class TestPluginPackaging(unittest.TestCase):
 
 
 class TestDescriptionPins(unittest.TestCase):
-    """The three spellings of the skill description are pinned.
+    """The description spellings are pinned.
 
     The frontmatter description is the trigger identity the
     TRIGGER-RESULTS.md winner discipline protects. No description
-    change ships without a winning scored run. The manifest
-    descriptions are the listing blurbs. A copy bar clean rewrite
-    of any of the three spellings must fail the gate, so each
-    text is pinned here. A deliberate change updates the
-    spelling, this pin, the trigger record and the changelog in
-    the same change, and the change notes say the description
-    change is a spec change and why.
+    change ships without a winning scored run, so the frontmatter
+    stands as the named exception to the description unification.
+    Every display description carries the one canonical sentence
+    from the visual round 2 storefront rebuild, and each spelling
+    is pinned here so a copy bar clean rewrite of any of them
+    fails the gate. A deliberate change updates the spelling,
+    this pin and the changelog in the same change, and a change
+    to the frontmatter spelling also updates the trigger record
+    and says in the change notes that the change is a spec change
+    and why.
     """
 
     FRONTMATTER_DESCRIPTION = (
@@ -1646,9 +1637,16 @@ class TestDescriptionPins(unittest.TestCase):
         "findings."
     )
     MANIFEST_DESCRIPTION = (
-        "Assembles a pull request or a commit range from a local clone into one "
-        "verified review packet, so a review starts from evidence instead of a "
-        "bare diff."
+        "Pulls the relevant changes from a pull request or a commit range, "
+        "with the context a reviewer needs, into one verified review packet."
+    )
+    ANTIGRAVITY_DESCRIPTION = (
+        MANIFEST_DESCRIPTION
+        + " Antigravity native hook wiring serves the review run gate."
+    )
+    PACKAGE_DESCRIPTION = (
+        MANIFEST_DESCRIPTION
+        + " This is the portable Agent Plugins 1.0.0 packaging of the skill."
     )
 
     def setUp(self):
@@ -1677,6 +1675,24 @@ class TestDescriptionPins(unittest.TestCase):
         )
         return data["plugins"][0]["description"]
 
+    def json_description(self, *parts):
+        data = self.version_mod.strict_json_loads(
+            (ROOT.joinpath(*parts)).read_text(encoding="utf-8")
+        )
+        return data["description"]
+
+    def json_entry_description(self, *parts):
+        data = self.version_mod.strict_json_loads(
+            (ROOT.joinpath(*parts)).read_text(encoding="utf-8")
+        )
+        return data["plugins"][0]["description"]
+
+    def json_metadata_description(self, *parts):
+        data = self.version_mod.strict_json_loads(
+            (ROOT.joinpath(*parts)).read_text(encoding="utf-8")
+        )
+        return data["metadata"]["description"]
+
     def test_frontmatter_description_is_pinned(self):
         self.assertEqual(
             self.frontmatter_description(), self.FRONTMATTER_DESCRIPTION
@@ -1692,6 +1708,144 @@ class TestDescriptionPins(unittest.TestCase):
         self.assertEqual(
             self.marketplace_entry_description(),
             self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_marketplace_metadata_description_is_pinned(self):
+        self.assertEqual(
+            self.json_metadata_description(
+                ".claude-plugin", "marketplace.json"
+            ),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_cursor_manifest_description_is_pinned(self):
+        self.assertEqual(
+            self.json_description(".cursor-plugin", "plugin.json"),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_cursor_marketplace_entry_description_is_pinned(self):
+        self.assertEqual(
+            self.json_entry_description(
+                ".cursor-plugin", "marketplace.json"
+            ),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_cursor_marketplace_metadata_description_is_pinned(self):
+        self.assertEqual(
+            self.json_metadata_description(
+                ".cursor-plugin", "marketplace.json"
+            ),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_zcode_manifest_description_is_pinned(self):
+        self.assertEqual(
+            self.json_description(".zcode-plugin", "plugin.json"),
+            self.MANIFEST_DESCRIPTION,
+        )
+
+    def test_antigravity_manifest_description_is_pinned(self):
+        self.assertEqual(
+            self.json_description(".antigravity", "plugin.json"),
+            self.ANTIGRAVITY_DESCRIPTION,
+        )
+
+    def test_package_manifest_description_is_pinned(self):
+        self.assertEqual(
+            self.json_description("agent-plugins-package", "plugin.json"),
+            self.PACKAGE_DESCRIPTION,
+        )
+
+
+class TestReadmeStorefront(unittest.TestCase):
+    """The visual round 2 storefront elements are pinned.
+
+    The first screen carries the headline, the canonical
+    description, the navigation row, the CI and license badges,
+    the hero, the paired eval proof and the install pointer, in
+    that order. The static version badge retired from the README,
+    so its badge form must not return. The adaptations table
+    names each platform brief as a clickable relative link.
+    """
+
+    CANONICAL = (
+        "Pulls the relevant changes from a pull request or a commit "
+        "range, with the context a reviewer needs, into one verified "
+        "review packet."
+    )
+    HEADLINE = "**A review starts from evidence instead of a bare diff.**"
+    BRIEF_LINKS = (
+        "[the Codex review brief](docs/codex-review-brief.md)",
+        "[the Cursor plugin brief](docs/cursor-plugin-brief.md)",
+        "[the Copilot SDK brief](docs/copilot-sdk-brief.md)",
+        "[the CodeRabbit review brief](docs/coderabbit-review-brief.md)",
+        "[the Kimi plugin brief](docs/kimi-plugin-brief.md)",
+        "[the ZCode plugin brief](docs/zcode-plugin-brief.md)",
+        "[the Devin playbook brief](docs/devin-playbook-brief.md)",
+        "[the Qwen Code brief](docs/qwen-code-brief.md)",
+        "[the Antigravity plugin brief](docs/antigravity-plugin-brief.md)",
+    )
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.flat = " ".join(self.readme.split())
+
+    def test_the_first_screen_order_is_pinned(self):
+        markers = (
+            "# Recognitio",
+            self.HEADLINE,
+            self.CANONICAL,
+            "[What it does](#what-it-does)",
+            "[![CI]",
+            "docs/images/recognitio-demo-chat.gif",
+            "In the paired eval recorded in this repo",
+            "New here. Start with the [Install](#install) section",
+            "## What it does",
+        )
+        positions = []
+        for marker in markers:
+            self.assertIn(marker, self.flat)
+            positions.append(self.flat.index(marker))
+        self.assertEqual(positions, sorted(positions))
+
+    def test_the_version_badge_stays_out_of_the_readme(self):
+        self.assertNotIn("badge/version-", self.readme)
+        self.assertNotIn("[![Version]", self.readme)
+
+    def test_the_badge_row_is_ci_and_license_only(self):
+        badge_lines = [
+            line for line in self.readme.splitlines()
+            if line.startswith("[![")
+        ]
+        self.assertEqual(len(badge_lines), 1)
+        self.assertIn("[![CI]", badge_lines[0])
+        self.assertIn("[![License]", badge_lines[0])
+
+    def test_the_canonical_sentence_opens_agents_and_the_cursor_readme(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn(self.CANONICAL, " ".join(agents.split()))
+        cursor_readme = (
+            ROOT / ".cursor-plugin" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(self.CANONICAL, " ".join(cursor_readme.split()))
+
+    def test_the_adaptations_briefs_are_clickable_links(self):
+        for link in self.BRIEF_LINKS:
+            self.assertIn(link, self.readme)
+        self.assertNotIn("`docs/codex-review-brief.md`", self.readme)
+        self.assertNotIn("`docs/qwen-code-brief.md`", self.readme)
+
+    def test_the_serving_paragraph_lives_in_the_why_section(self):
+        why = self.readme.split("## Why", 1)[1].split("## Install", 1)[0]
+        self.assertIn(
+            "Recognitio serves the pull request review workflow.", why
+        )
+        first_screen = self.readme.split("## What it does", 1)[0]
+        self.assertNotIn(
+            "Recognitio serves the pull request review workflow.",
+            first_screen,
         )
 
 

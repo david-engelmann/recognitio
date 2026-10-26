@@ -1163,3 +1163,32 @@ This unreleased work carries version 1.3.0.
   now pins the corrected wording in that file and
   refuses the stale marketplace distribution
   wording there as well as in the root README.
+- The README first screen is rebuilt as the
+  storefront of the repo. The headline that a
+  review starts from evidence instead of a bare
+  diff now stands under the title, followed by the
+  one canonical description, a one line navigation
+  row linking the sections of the page, and a badge
+  row of the CI and license badges alone. The hero
+  recording carries a shortened alt text, the
+  paired eval proof stands directly under it with
+  its link and its construction caveat whole, and a
+  one line install pointer closes the screen. The
+  serving paragraph moved down to the Why section
+  rather than leaving the page. Every display
+  description in the repo now carries the canonical
+  sentence, in the README and AGENTS.md openings,
+  the plugin and marketplace manifests, the ZCode
+  and Antigravity and portable package manifests,
+  and the Cursor plugin README opening, while the
+  skill frontmatter description stands as the named
+  exception because its trigger sentences are the
+  text a held out trigger run rewarded and no local
+  trigger runner exists to retest a replacement.
+  The static version badge left the README, and the
+  version gate now proves coherence against the
+  manifests and this changelog alone. The brief
+  references in the adaptations table are now
+  clickable relative links, and the description
+  pins and the storefront pins in the gate tests
+  moved with the wording.

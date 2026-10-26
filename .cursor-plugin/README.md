@@ -1,5 +1,7 @@
 # The recognitio Cursor plugin
 
+Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.
+
 This is the Cursor plugin for recognitio. It ships the same skill
 the Claude Code plugin ships, as a real directory copy under
 `skills/recognitio/`, plus one rule file under `rules/` that
