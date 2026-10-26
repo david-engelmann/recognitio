@@ -1983,6 +1983,126 @@ class TestReadmeRebuild(unittest.TestCase):
             self.assertLessEqual(len(line), 80, line)
 
 
+class TestReadmePhoneWidth(unittest.TestCase):
+    """The WP1 phone width fixes are pinned.
+
+    The hero recording carries a max width picture source
+    for its phone crop, the worked example fences and the
+    shell command blocks keep every physical line inside
+    the phone visible width, the flow diagram runs wide,
+    the platform table carries no long inline code path,
+    and every README image alt sits inside the 125
+    character guideline with declared dimensions.
+    """
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    def fences(self, section_start, section_end=None):
+        part = self.readme.split(section_start, 1)[1]
+        if section_end:
+            part = part.split(section_end, 1)[0]
+        found = []
+        current = None
+        for line in part.splitlines():
+            if line.startswith("```"):
+                if current is None:
+                    current = []
+                else:
+                    found.append(current)
+                    current = None
+                continue
+            if current is not None:
+                current.append(line)
+        return found
+
+    def test_the_hero_picture_serves_the_phone_crop(self):
+        block = self.readme.split("<picture>", 2)[2].split(
+            "</picture>", 1
+        )[0]
+        self.assertIn(
+            '<source media="(max-width: 480px)" '
+            'srcset="docs/images/'
+            'recognitio-cursor-agent-verified-crop.png">',
+            block,
+        )
+        self.assertIn(
+            'src="docs/images/recognitio-cursor-agent-demo.gif" '
+            'width="792" height="608">',
+            block,
+        )
+
+    def test_every_readme_image_alt_and_dimensions(self):
+        alts = re.findall(r'alt="([^"]+)"', self.readme)
+        alts += re.findall(r"!\[([^\]]*)\]\(", self.readme)
+        self.assertTrue(alts)
+        for alt in alts:
+            self.assertLessEqual(len(alt), 125, alt)
+        for tag in re.findall(r"<img [^>]+>", self.readme):
+            self.assertIn('width="', tag)
+            self.assertIn('height="', tag)
+
+    def test_the_worked_example_lines_fit_phone_width(self):
+        for fence in self.fences(
+            "## See it on a real change", "## How it works"
+        ):
+            for line in fence:
+                self.assertLessEqual(len(line), 33, line)
+
+    def test_shell_command_lines_fit_phone_width(self):
+        # The plugin chat lines are the named residue. They
+        # are chat input rather than shell, they cannot take
+        # a backslash continuation, and they stand at their
+        # shortest true lengths of 50 and 49 characters in
+        # the first block and 61 and 49 in the pin block.
+        for start, end in (
+            ("## Install", "## Platform adaptations"),
+            ("## Usage", "## Going deeper"),
+        ):
+            for fence in self.fences(start, end):
+                for line in fence:
+                    if line.startswith("/plugin"):
+                        continue
+                    self.assertLessEqual(len(line), 33, line)
+
+    def test_usage_commands_join_back_to_the_exact_paths(self):
+        usage = self.readme.split("## Usage", 1)[1]
+        joined = usage.replace("\\\n", "")
+        self.assertEqual(
+            joined.count(
+                "python3 .agents/skills/recognitio/"
+                "scripts/extract.py"
+            ),
+            5,
+        )
+
+    def test_the_flow_diagram_runs_wide_with_its_nodes(self):
+        self.assertIn("flowchart LR", self.readme)
+        for label in (
+            "Pull request or commit range",
+            "Extract from the local clone",
+            "Assemble the packet in four tiers",
+            "Recount the change",
+            "Verified packet",
+            "The run fails and no packet stands",
+            "The review reads the packet",
+        ):
+            self.assertIn(label, self.readme)
+        self.assertIn("D -->|Counts agree|", self.readme)
+        self.assertIn("D -->|Counts disagree|", self.readme)
+
+    def test_the_platform_table_carries_no_long_code_path(self):
+        table = self.readme.split("## Platform adaptations", 1)[1]
+        self.assertNotIn("`.zcode-plugin/plugin.json`", table)
+        self.assertNotIn("`.antigravity/plugin.json`", table)
+        self.assertIn(
+            "in the .zcode-plugin directory as `plugin.json`", table
+        )
+        self.assertIn(
+            "in the .antigravity directory as `plugin.json`", table
+        )
+
+
 class TestReadmeRound9(unittest.TestCase):
     """The visual round 9 cold eyes fixes are pinned.
 
@@ -2164,10 +2284,15 @@ def _gif_lzw_decode(data, min_code_size):
 
 
 def _gif_frames(path):
-    """Return (width, height, palette, frames, delays_ms).
+    """Return (width, height, frames, delays_ms) for one GIF.
 
-    Each frame is its raw palette index bytes at its own
-    descriptor size, decoded with the standard library only.
+    Each frame is the composited full canvas as flat RGB
+    bytes after that frame is applied, decoded with the
+    standard library only. The WP1 encode carries local
+    palettes and a transparency index for unchanged pixels,
+    so compositing is the only honest read of a frame. The
+    palette argument the older form returned is gone, and
+    _bright_fraction reads the RGB bytes directly.
     """
     raw = path.read_bytes()
     assert raw[:6] in (b"GIF89a", b"GIF87a"), "not a GIF file"
@@ -2175,15 +2300,19 @@ def _gif_frames(path):
     height = int.from_bytes(raw[8:10], "little")
     packed = raw[10]
     pos = 13
-    palette = []
+    global_palette = []
     if packed & 0x80:
         count = 2 ** ((packed & 0x07) + 1)
         for i in range(count):
-            palette.append(tuple(raw[13 + 3 * i:16 + 3 * i]))
+            global_palette.append(
+                tuple(raw[13 + 3 * i:16 + 3 * i])
+            )
         pos += 3 * count
+    canvas = bytearray(width * height * 3)
     frames = []
     delays = []
     delay = 0
+    transparent = None
     while pos < len(raw):
         marker = raw[pos]
         if marker == 0x3B:
@@ -2191,7 +2320,13 @@ def _gif_frames(path):
         if marker == 0x21:
             label = raw[pos + 1]
             if label == 0xF9:
-                delay = int.from_bytes(raw[pos + 4:pos + 6], "little") * 10
+                delay = int.from_bytes(
+                    raw[pos + 4:pos + 6], "little"
+                ) * 10
+                if raw[pos + 3] & 0x01:
+                    transparent = raw[pos + 6]
+                else:
+                    transparent = None
                 pos += 8
             else:
                 pos += 2
@@ -2199,12 +2334,20 @@ def _gif_frames(path):
                     pos += raw[pos] + 1
                 pos += 1
         elif marker == 0x2C:
+            left = int.from_bytes(raw[pos + 1:pos + 3], "little")
+            top = int.from_bytes(raw[pos + 3:pos + 5], "little")
             fw = int.from_bytes(raw[pos + 5:pos + 7], "little")
             fh = int.from_bytes(raw[pos + 7:pos + 9], "little")
             fpacked = raw[pos + 9]
             pos += 10
+            palette = global_palette
             if fpacked & 0x80:
-                pos += 3 * (2 ** ((fpacked & 0x07) + 1))
+                count = 2 ** ((fpacked & 0x07) + 1)
+                palette = [
+                    tuple(raw[pos + 3 * i:pos + 3 * i + 3])
+                    for i in range(count)
+                ]
+                pos += 3 * count
             min_code = raw[pos]
             pos += 1
             chunks = bytearray()
@@ -2212,23 +2355,34 @@ def _gif_frames(path):
                 chunks += raw[pos + 1:pos + 1 + raw[pos]]
                 pos += raw[pos] + 1
             pos += 1
-            frames.append(_gif_lzw_decode(bytes(chunks), min_code))
+            indices = _gif_lzw_decode(bytes(chunks), min_code)
+            for y in range(fh):
+                for x in range(fw):
+                    idx = indices[y * fw + x]
+                    if idx == transparent or idx >= len(palette):
+                        continue
+                    r, g, b = palette[idx]
+                    off = ((top + y) * width + (left + x)) * 3
+                    canvas[off:off + 3] = bytes((r, g, b))
+            frames.append(bytes(canvas))
             delays.append(delay)
             delay = 0
+            transparent = None
         else:
             raise AssertionError("unexpected GIF block %r" % marker)
-    return width, height, palette, frames, delays
+    return width, height, frames, delays
 
 
-def _bright_fraction(indices, palette):
-    if not indices:
+def _bright_fraction(rgb_bytes):
+    """Share of pixels whose channel sum clears the floor."""
+    if not rgb_bytes:
         return 0.0
     bright = 0
-    for idx in indices:
-        r, g, b = palette[idx]
-        if r + g + b > 90:
+    pixels = len(rgb_bytes) // 3
+    for i in range(0, len(rgb_bytes), 3):
+        if rgb_bytes[i] + rgb_bytes[i + 1] + rgb_bytes[i + 2] > 90:
             bright += 1
-    return bright / len(indices)
+    return bright / pixels
 
 
 def _png_pixels(path):
@@ -2406,35 +2560,60 @@ class TestDemoAssets(unittest.TestCase):
         "89b417c3ec456e64f8706b5a788c64a2fc02224cf3dfc54edd7328"
         "f3fb3e65f5"
     )
-    # The byte budget is a deliberate ceiling for this asset
-    # class, set by the money shot landing and not a silent
-    # raise. A live terminal stream carries a full screen of
-    # new text on every scroll, the capture record weighs
-    # that cost in the open, and the shipped file still sits
-    # under the 1,822,894 byte terminal recording the README
-    # carried earlier in the program.
-    BYTE_BUDGET = 1400000
+    # The byte budget moved down for WP1 in the open. The
+    # work order set a 700,000 byte target for the captioned
+    # re-encode, and the shipped file weighs 646,314 bytes,
+    # so the budget now stands at that target rather than
+    # the 1,400,000 the first money shot landing set.
+    BYTE_BUDGET = 700000
 
     def test_the_hero_dimensions_and_byte_budget_are_pinned(self):
-        width, height, _pal, _frames, _delays = _gif_frames(self.HERO)
-        self.assertEqual((width, height), (792, 570))
+        width, height, _frames, _delays = _gif_frames(self.HERO)
+        self.assertEqual((width, height), (792, 608))
         self.assertLessEqual(self.HERO.stat().st_size, self.BYTE_BUDGET)
 
     def test_frame_zero_carries_content(self):
-        _w, _h, palette, frames, _delays = _gif_frames(self.HERO)
-        self.assertGreater(_bright_fraction(frames[0], palette), 0.05)
+        _w, _h, frames, _delays = _gif_frames(self.HERO)
+        self.assertGreater(_bright_fraction(frames[0]), 0.05)
 
     def test_the_verdict_rest_frame_is_present_and_clean(self):
-        _w, _h, palette, frames, delays = _gif_frames(self.HERO)
-        self.assertGreaterEqual(len(frames), 30)
-        total_ms = sum(delays)
-        # The window is re-derived from this take, which runs
-        # longer than the retired chat capture because the
-        # change under review is the full 28 file range.
-        self.assertGreaterEqual(total_ms, 20000)
-        self.assertLessEqual(total_ms, 35000)
+        _w, _h, frames, delays = _gif_frames(self.HERO)
+        # The WP1 re-encode pins, re-derived from the shipped
+        # file. It carries 28 frames over 26,700 ms in total,
+        # with the closing verdict frame held for 2,400 ms.
+        self.assertEqual(len(frames), 28)
+        self.assertEqual(sum(delays), 26700)
+        self.assertEqual(delays[-1], 2400)
         last = frames[-1]
-        self.assertGreater(_bright_fraction(last, palette), 0.05)
+        # The brightness floor is re-derived from this last
+        # frame, whose composited bright share measures
+        # 0.0926. The floor stands at 0.08, under that
+        # measure and well above a dark field.
+        self.assertGreater(_bright_fraction(last), 0.08)
+
+    def test_the_short_cut_geometry_and_timing_are_pinned(self):
+        path = self.IMAGES / "recognitio-cursor-agent-demo-short.gif"
+        self.assertTrue(path.is_file())
+        width, height, frames, delays = _gif_frames(path)
+        self.assertEqual((width, height), (792, 608))
+        self.assertEqual(len(frames), 20)
+        self.assertEqual(sum(delays), 8000)
+        self.assertEqual(path.stat().st_size, 337523)
+
+    def test_the_phone_crop_geometry_and_hash_are_pinned(self):
+        path = (
+            self.IMAGES
+            / "recognitio-cursor-agent-verified-crop.png"
+        )
+        self.assertTrue(path.is_file())
+        width, height, _rows = _png_pixels_any(path)
+        self.assertEqual((width, height), (400, 220))
+        found = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(
+            found,
+            "9e05d15206756e5039d41bcb32831b9487cbf7797c4ff"
+            "006cc7213907a15abbe",
+        )
 
     def test_the_poster_exists_as_a_png_frame(self):
         path = self.IMAGES / self.POSTER
@@ -2460,10 +2639,14 @@ class TestDemoAssets(unittest.TestCase):
         # asset name may return to the page.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
+        refs += re.findall(
+            r"(?:src|srcset)=\"(docs/images/[^\"]+)\"", readme
+        )
         self.assertEqual(
             refs,
             [
                 "docs/images/recognitio-cursor-agent-poster.png",
+                "docs/images/recognitio-cursor-agent-verified-crop.png",
                 "docs/images/recognitio-cursor-agent-demo.gif",
             ],
         )
@@ -2583,18 +2766,16 @@ class TestBrandAssets(unittest.TestCase):
         "recognitio-social-preview.png":
             "85c3155015b1cfe77ec8082f8a0d381be379fd543748e88fb72a2fcd09e69f3d",
     }
-    # The ceiling moved once, by the money shot landing
-    # after the visual program, and the move is recorded
-    # here rather than absorbed in silence. The retired
-    # chat capture weighed 690,157 bytes under the old
-    # ceiling of 699,943. The live Cursor agent recording
-    # that replaced it weighs 1,274,392 bytes, because a
-    # terminal stream repaints a full screen on every
-    # scroll, and David directed the re-record at that
-    # size after the first take weighed less and showed
-    # less. The new ceiling holds headroom over the exact
-    # ledger the test below pins.
-    PAGE_CEILING = 1300000
+    # The ceiling moved down for WP1, and the move is
+    # recorded here rather than absorbed in silence. The
+    # ledger under it is 3,556 for the dark wordmark plus
+    # 3,556 for the light wordmark plus 17,509 for the
+    # phone crop plus 646,314 for the captioned hero
+    # recording, which sums to 670,935. The old ceiling
+    # of 1,300,000 held the 1,274,392 byte first encode.
+    # The new ceiling of 700,000 is the work order hero
+    # target and holds 29,065 of headroom over the ledger.
+    PAGE_CEILING = 700000
 
     def test_the_brand_files_exist(self):
         for name in list(self.SHA256) + ["palette.json", "build_brand.py"]:
@@ -2653,11 +2834,15 @@ class TestBrandAssets(unittest.TestCase):
 
     def test_the_picture_element_form_is_pinned(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertEqual(readme.count("<picture>"), 1)
+        # Two picture elements stand in the README since
+        # WP1. The wordmark lockup checked here is the
+        # first, and the hero recording picture is the
+        # second, pinned in TestReadmePhoneWidth.
+        self.assertEqual(readme.count("<picture>"), 2)
         block = readme.split("<picture>", 1)[1].split("</picture>", 1)[0]
         dark = '<source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">'
         light = '<source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">'
-        fallback = '<img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300">'
+        fallback = '<img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300" height="72">'
         for fragment in (dark, light, fallback):
             self.assertIn(fragment, block)
         positions = [block.index(item) for item in (dark, light, fallback)]
@@ -2752,10 +2937,13 @@ class TestBrandAssets(unittest.TestCase):
     def test_the_readme_page_weight_sits_under_its_ceiling(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"!\[[^\]]*\]\((docs/[^)]+)\)", readme)
-        total = sum((ROOT / ref).stat().st_size for ref in refs)
-        total += (self.BRAND / "wordmark-light.svg").stat().st_size
+        refs += re.findall(
+            r"(?:src|srcset)=\"(docs/[^\"]+)\"", readme
+        )
+        unique = list(dict.fromkeys(refs))
+        total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 1277948)
+        self.assertEqual(total, 670935)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

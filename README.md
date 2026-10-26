@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">
-    <img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300">
+    <img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300" height="72">
   </picture>
 </p>
 
@@ -16,7 +16,10 @@ Pulls the relevant changes from a pull request or a commit range, with the conte
 
 One recorded run in full. A session in the Cursor agent uses the recognitio skill to review the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff, and its capture record stands at `docs/images/capture-record.md`. The recording is that session as it happened, cut for pace only, with idle spans shortened and no frame reordered or redrawn, and [one frame of it stands as a still](docs/images/recognitio-cursor-agent-poster.png) at the moment the packet check passes.
 
-![A recorded session in the Cursor agent. The agent uses the recognitio skill on a 28 file change, builds the verified packet, runs the packet check, reads the packet and ends on a verdict of Approve.](docs/images/recognitio-cursor-agent-demo.gif)
+<picture>
+  <source media="(max-width: 480px)" srcset="docs/images/recognitio-cursor-agent-verified-crop.png">
+  <img alt="A Cursor agent session using recognitio on a 28 file change, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792" height="608">
+</picture>
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. On the defects inside the diff itself the two passes tied at 4 of 4 each. The full record lives in [the paired eval results](evals/RESULTS.md).
 
@@ -34,24 +37,24 @@ New here. Start with the [Install](#install) section below and take the plugin r
 Commit `991ac6a` in this repo changed two gate scripts. The first hunk of the raw diff for `scripts/check_devin.py` shows a six line window around the edit, with three lines of context on each side.
 
 ```diff
-diff --git a/scripts/check_devin.py b/scripts/check_devin.py
+diff --git a/[...]check_devin.py
 index 0327324..522392d 100644
 --- a/scripts/check_devin.py
 +++ b/scripts/check_devin.py
-@@ -497,6 +497,15 @@ def semantic_problems(root=None):
-             r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
+@@ [...] semantic_problems
+             r"\b([...]resolved",
              low,
          ))
-+        # Modifier chain from R36-E1-02. A membership phrase
-+        # followed by a pure modifier chain and then
-+        # resolved states the same membership at any gap
-+        # length, so it fires beside the bounded form.
-+        membership_modifier_chain = bool(re.search(
-+            r"\b(" + MEMBERSHIP_PHRASES + r")\b"
-+            + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
++        # Modifier chain [...]
++        # followed by [...]
++        # resolved states [...]
++        # length, so it [...]
++        membership_mod[...]
++            r"\b(" + [...]
++            + [...]resolved\b",
 +            low,
 +        ))
-         # Verb plus membership from S4. A listed verb within
+         # Verb plus [...]
 ```
 
 The packet for the same commit shows the change inside its whole enclosing function. The function runs 163 lines at the base revision and 173 at the head, and the excerpt below is trimmed to the packet heading and the lines around the edit.
@@ -61,33 +64,33 @@ The packet for the same commit shows the change inside its whole enclosing funct
 
 Status: modified
 
-diff --git a/scripts/check_devin.py b/scripts/check_devin.py
+diff --git a/[...]check_devin.py
 index 0327324..522392d 100644
 --- a/scripts/check_devin.py
 +++ b/scripts/check_devin.py
-@@ -421,163 +421,173 @@ def naming_problems(root=None):
- def semantic_problems(root=None):
-[Elided. The body of the function up to the edit stands in the full packet]
-         membership_near_resolved = bool(re.search(
-             r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
+@@ [...] def naming_problems
+ def semantic_problems([...]):
+[Elided. Body up to the edit]
+         membership_near_[...]
+             r"\b([...]resolved",
              low,
          ))
-+        # Modifier chain from R36-E1-02. A membership phrase
-+        # followed by a pure modifier chain and then
-+        # resolved states the same membership at any gap
-+        # length, so it fires beside the bounded form.
-+        membership_modifier_chain = bool(re.search(
-+            r"\b(" + MEMBERSHIP_PHRASES + r")\b"
-+            + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
++        # Modifier chain [...]
++        # followed by [...]
++        # resolved states [...]
++        # length, so it [...]
++        membership_mod[...]
++            r"\b(" + [...]
++            + [...]resolved\b",
 +            low,
 +        ))
-         # Verb plus membership from S4. A listed verb within
-[Elided. The lines between this comment and the condition below stand in the full packet]
-                 verb_then_equivalence
-                 or membership_near_resolved
-+                or membership_modifier_chain
-                 or verb_then_membership_near_resolved
-[Elided. The rest of the function stands in the full packet]
+         # Verb plus [...]
+[Elided. Lines to the condition]
+                 verb_then_[...]
+                 or [...]resolved
++                or [...]_chain
+                 or verb_[...]
+[Elided. Rest of the function]
 ```
 
 The packet excerpt above is trimmed, chosen around the ten added lines, and the rest of the function is elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file. Both excerpts show the same edit inside semantic_problems, and the packet header names naming_problems because git labels a hunk with the nearest function line above its opening line, and this hunk opens on the def line of semantic_problems itself.
@@ -99,13 +102,10 @@ The same packet names the test files that mention the changed code, `tests/test_
 Extraction runs on the local clone and assembles the packet in four tiers, and a separate recount of the files, hunks and lines then decides whether the packet may call itself verified.
 
 ```mermaid
-flowchart TB
-    A([Pull request or commit range]) --> B[Extract from the local clone]
-    B --> C[Assemble the packet in four tiers]
-    C --> D{Recount the change}
-    D -->|Counts agree| E([Verified packet])
+flowchart LR
+    A([Pull request or commit range]) --> B[Extract from the local clone] --> C[Assemble the packet in four tiers] --> D{Recount the change}
+    D -->|Counts agree| E([Verified packet]) --> G[The review reads the packet]
     D -->|Counts disagree| F[The run fails and no packet stands]
-    E --> G[The review reads the packet]
 ```
 
 The four tiers are T0 Triage, T1 The change, T2 Companions and T3 History. T2 gathers call sites and definitions of the changed names, the imports of each changed file, and the test files that mention the changed modules. The definition patterns the companion search uses cover five languages, Python and Rust and Go and JavaScript and TypeScript, and a definition written in a language outside those five will not be found.
@@ -142,7 +142,9 @@ The plugin route comes first. Register this repo as a marketplace in Claude Code
 The Cursor route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg`, and the brand assets and their builder and palette record live under `docs/brand/`. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
 
 ```bash
-cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio
+cp -r .cursor-plugin \
+  ~/.cursor/plugins/local/\
+recognitio
 ```
 
 ### Any agent
@@ -150,7 +152,8 @@ cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio
 The generic route works with any agent that reads the skill format.
 
 ```bash
-npx skills add david-engelmann/recognitio
+npx skills add \
+  david-engelmann/recognitio
 ```
 
 ### Folder copy
@@ -158,7 +161,8 @@ npx skills add david-engelmann/recognitio
 Copy the skill folder into any skills directory your agent reads.
 
 ```bash
-cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
+cp -r .agents/skills/recognitio \
+  ~/.claude/skills/recognitio
 ```
 
 ### Qwen Code
@@ -166,9 +170,15 @@ cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 The Qwen Code route is a conditional draft. The brief at [the Qwen Code brief](docs/qwen-code-brief.md) states the full Qwen contract, and the conditional publication decision stays with the maintainer. No Qwen listing file ships.
 
 ```bash
-git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
-git -C recognitio-qwen checkout COMMIT_SHA
-qwen extensions install ./recognitio-qwen/agent-plugins-package
+git clone \
+  https://github.com/\
+david-engelmann/recognitio.git \
+  recognitio-qwen
+git -C recognitio-qwen \
+  checkout COMMIT_SHA
+qwen extensions install \
+  ./recognitio-qwen/\
+agent-plugins-package
 ```
 
 Pin the Qwen route before use by cloning at a commit SHA you reviewed, as the commands above show. Replace COMMIT_SHA with the commit SHA you reviewed. The marketplace source add stays a conditional draft form in the brief only.
@@ -184,10 +194,21 @@ The plugin route pins on the marketplace add line, with a commit SHA after a has
 ```bash
 /plugin marketplace add david-engelmann/recognitio#COMMIT_SHA
 /plugin install recognitio@recognitio-marketplace
-git clone https://github.com/david-engelmann/recognitio.git recognitio-pinned
-git -C recognitio-pinned checkout COMMIT_SHA
-cp -r recognitio-pinned/.cursor-plugin ~/.cursor/plugins/local/recognitio
-cp -r recognitio-pinned/.agents/skills/recognitio ~/.claude/skills/recognitio
+git clone \
+  https://github.com/\
+david-engelmann/recognitio.git \
+  recognitio-pinned
+git -C recognitio-pinned \
+  checkout COMMIT_SHA
+cp -r \
+  recognitio-pinned/\
+.cursor-plugin \
+  ~/.cursor/plugins/local/\
+recognitio
+cp -r \
+  recognitio-pinned/.agents/\
+skills/recognitio \
+  ~/.claude/skills/recognitio
 ```
 
 ### The packet output style
@@ -210,10 +231,10 @@ Each adaptation restates the packet discipline in the surface its platform reads
 | Copilot | A Copilot SDK agent build of derivation noted rules. [the Copilot SDK brief](docs/copilot-sdk-brief.md) |
 | CodeRabbit | Review guidelines in `.coderabbit.yaml`. [the CodeRabbit review brief](docs/coderabbit-review-brief.md) |
 | Kimi | A managed plugin build of derivation noted rules and the plugin contract. [the Kimi plugin brief](docs/kimi-plugin-brief.md) |
-| ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace. [the ZCode plugin brief](docs/zcode-plugin-brief.md) |
+| ZCode | A native plugin with its manifest in the .zcode-plugin directory as `plugin.json`, distributed through its in client plugin marketplace. [the ZCode plugin brief](docs/zcode-plugin-brief.md) |
 | Devin | A playbook and coordinator build of derivation noted rules. [the Devin playbook brief](docs/devin-playbook-brief.md) |
 | Qwen | A conditional draft with its route in the Install section. [the Qwen Code brief](docs/qwen-code-brief.md) |
-| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and its PreToolUse hook wiring. [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
+| Antigravity | A plugin alteration with its manifest in the .antigravity directory as `plugin.json` and its PreToolUse hook wiring. [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
 
 A Trae adaptation ships nothing. No Trae skill or plugin surface stands in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
 
@@ -222,32 +243,42 @@ A Trae adaptation ships nothing. No Trae skill or plugin surface stands in the p
 Extract a pull request by number. The GitHub CLI resolves the base and head, the extraction runs on local git objects, and both refs must already live in the local clone or the run stops and says to fetch them.
 
 ```bash
-python3 .agents/skills/recognitio/scripts/extract.py \
+python3 .agents/skills/\
+recognitio/scripts/extract.py \
   --pr 123 --out packet --repo .
 ```
 
 Extract a commit range, with merge base semantics under both spellings, so the packet shows what the head proposes rather than drift from the base branch.
 
 ```bash
-python3 .agents/skills/recognitio/scripts/extract.py \
-  --range main...feature --out packet --repo .
-python3 .agents/skills/recognitio/scripts/extract.py \
-  --range main..feature --out packet --repo .
+python3 .agents/skills/\
+recognitio/scripts/extract.py \
+  --range main...feature \
+  --out packet --repo .
+python3 .agents/skills/\
+recognitio/scripts/extract.py \
+  --range main..feature \
+  --out packet --repo .
 ```
 
 Extract a single commit against its parent.
 
 ```bash
-python3 .agents/skills/recognitio/scripts/extract.py \
-  --commit HEAD --out packet --repo .
+python3 .agents/skills/\
+recognitio/scripts/extract.py \
+  --commit HEAD \
+  --out packet --repo .
 ```
 
 Re-review after new commits land, with the since ref riding along with any mode. The packet gains a section with the new commits and a range diff against the previous series, and a findings file marks each prior finding addressed or unaddressed, one per line in the form `path:line: text`.
 
 ```bash
-python3 .agents/skills/recognitio/scripts/extract.py \
-  --range main...feature --since OLDHEAD \
-  --findings findings.txt --out packet --repo .
+python3 .agents/skills/\
+recognitio/scripts/extract.py \
+  --range main...feature \
+  --since OLDHEAD \
+  --findings findings.txt \
+  --out packet --repo .
 ```
 
 Two controls tune a run, a token budget that caps the packet size, counted as characters divided by four, and a tier selection that adds only the tiers a review needs, with triage and the change always in.
