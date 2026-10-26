@@ -37,21 +37,21 @@ New here. Start with the [Install](#install) section below and take the plugin r
 Commit `991ac6a` in this repo changed two gate scripts. The first hunk of the raw diff for `scripts/check_devin.py` shows a six line window around the edit, with three lines of context on each side.
 
 ```diff
-diff --git a/[...]check_devin.py
+diff --git a/[...]devin.py
 index 0327324..522392d 100644
 --- a/scripts/check_devin.py
 +++ b/scripts/check_devin.py
 @@ [...] semantic_problems
-             r"\b([...]resolved",
+             r"[...]resolved",
              low,
          ))
-+        # Modifier chain [...]
++        # Modifier chain[...]
 +        # followed by [...]
-+        # resolved states [...]
++        # resolved [...]
 +        # length, so it [...]
 +        membership_mod[...]
 +            r"\b(" + [...]
-+            + [...]resolved\b",
++            + [...]resolved",
 +            low,
 +        ))
          # Verb plus [...]
@@ -64,7 +64,7 @@ The packet for the same commit shows the change inside its whole enclosing funct
 
 Status: modified
 
-diff --git a/[...]check_devin.py
+diff --git a/[...]devin.py
 index 0327324..522392d 100644
 --- a/scripts/check_devin.py
 +++ b/scripts/check_devin.py
@@ -72,23 +72,23 @@ index 0327324..522392d 100644
  def semantic_problems([...]):
 [Elided. Body up to the edit]
          membership_near_[...]
-             r"\b([...]resolved",
+             r"[...]resolved",
              low,
          ))
-+        # Modifier chain [...]
++        # Modifier chain[...]
 +        # followed by [...]
-+        # resolved states [...]
++        # resolved [...]
 +        # length, so it [...]
 +        membership_mod[...]
 +            r"\b(" + [...]
-+            + [...]resolved\b",
++            + [...]resolved",
 +            low,
 +        ))
          # Verb plus [...]
-[Elided. Lines to the condition]
-                 verb_then_[...]
-                 or [...]resolved
-+                or [...]_chain
+[Elided. To the condition]
+                 verb_[...]
+                 or [...]
++                or [..]_chain
                  or verb_[...]
 [Elided. Rest of the function]
 ```
@@ -102,9 +102,21 @@ The same packet names the test files that mention the changed code, `tests/test_
 Extraction runs on the local clone and assembles the packet in four tiers, and a separate recount of the files, hunks and lines then decides whether the packet may call itself verified.
 
 ```mermaid
-flowchart LR
-    A([Pull request or commit range]) --> B[Extract from the local clone] --> C[Assemble the packet in four tiers] --> D{Recount the change}
-    D -->|Counts agree| E([Verified packet]) --> G[The review reads the packet]
+flowchart TB
+    subgraph one [ ]
+        direction LR
+        A([Pull request or commit range]) --> B[Extract from the local clone]
+    end
+    subgraph two [ ]
+        direction LR
+        C[Assemble the packet in four tiers] --> D{Recount the change}
+    end
+    subgraph three [ ]
+        direction LR
+        E([Verified packet]) --> G[The review reads the packet]
+    end
+    B --> C
+    D -->|Counts agree| E
     D -->|Counts disagree| F[The run fails and no packet stands]
 ```
 
@@ -161,7 +173,8 @@ npx skills add \
 Copy the skill folder into any skills directory your agent reads.
 
 ```bash
-cp -r .agents/skills/recognitio \
+cp -r .agents/skills/\
+recognitio \
   ~/.claude/skills/recognitio
 ```
 
@@ -172,7 +185,8 @@ The Qwen Code route is a conditional draft. The brief at [the Qwen Code brief](d
 ```bash
 git clone \
   https://github.com/\
-david-engelmann/recognitio.git \
+david-engelmann/\
+recognitio.git \
   recognitio-qwen
 git -C recognitio-qwen \
   checkout COMMIT_SHA
@@ -196,7 +210,8 @@ The plugin route pins on the marketplace add line, with a commit SHA after a has
 /plugin install recognitio@recognitio-marketplace
 git clone \
   https://github.com/\
-david-engelmann/recognitio.git \
+david-engelmann/\
+recognitio.git \
   recognitio-pinned
 git -C recognitio-pinned \
   checkout COMMIT_SHA
@@ -244,19 +259,23 @@ Extract a pull request by number. The GitHub CLI resolves the base and head, the
 
 ```bash
 python3 .agents/skills/\
-recognitio/scripts/extract.py \
-  --pr 123 --out packet --repo .
+recognitio/scripts/\
+extract.py \
+  --pr 123 \
+  --out packet --repo .
 ```
 
 Extract a commit range, with merge base semantics under both spellings, so the packet shows what the head proposes rather than drift from the base branch.
 
 ```bash
 python3 .agents/skills/\
-recognitio/scripts/extract.py \
+recognitio/scripts/\
+extract.py \
   --range main...feature \
   --out packet --repo .
 python3 .agents/skills/\
-recognitio/scripts/extract.py \
+recognitio/scripts/\
+extract.py \
   --range main..feature \
   --out packet --repo .
 ```
@@ -265,7 +284,8 @@ Extract a single commit against its parent.
 
 ```bash
 python3 .agents/skills/\
-recognitio/scripts/extract.py \
+recognitio/scripts/\
+extract.py \
   --commit HEAD \
   --out packet --repo .
 ```
@@ -274,7 +294,8 @@ Re-review after new commits land, with the since ref riding along with any mode.
 
 ```bash
 python3 .agents/skills/\
-recognitio/scripts/extract.py \
+recognitio/scripts/\
+extract.py \
   --range main...feature \
   --since OLDHEAD \
   --findings findings.txt \

@@ -2047,7 +2047,7 @@ class TestReadmePhoneWidth(unittest.TestCase):
             "## See it on a real change", "## How it works"
         ):
             for line in fence:
-                self.assertLessEqual(len(line), 33, line)
+                self.assertLessEqual(len(line), 30, line)
 
     def test_shell_command_lines_fit_phone_width(self):
         # The plugin chat lines are the named residue. They
@@ -2063,7 +2063,7 @@ class TestReadmePhoneWidth(unittest.TestCase):
                 for line in fence:
                     if line.startswith("/plugin"):
                         continue
-                    self.assertLessEqual(len(line), 33, line)
+                    self.assertLessEqual(len(line), 30, line)
 
     def test_usage_commands_join_back_to_the_exact_paths(self):
         usage = self.readme.split("## Usage", 1)[1]
@@ -2077,7 +2077,11 @@ class TestReadmePhoneWidth(unittest.TestCase):
         )
 
     def test_the_flow_diagram_runs_wide_with_its_nodes(self):
-        self.assertIn("flowchart LR", self.readme)
+        # The diagram pairs its nodes in left to right
+        # rows, the compact form the WP1 rendered pass
+        # settled on after the single wide row failed
+        # phone legibility on the live page.
+        self.assertEqual(self.readme.count("direction LR"), 3)
         for label in (
             "Pull request or commit range",
             "Extract from the local clone",
@@ -2607,12 +2611,12 @@ class TestDemoAssets(unittest.TestCase):
         )
         self.assertTrue(path.is_file())
         width, height, _rows = _png_pixels_any(path)
-        self.assertEqual((width, height), (400, 220))
+        self.assertEqual((width, height), (400, 307))
         found = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(
             found,
-            "9e05d15206756e5039d41bcb32831b9487cbf7797c4ff"
-            "006cc7213907a15abbe",
+            "dc267178f1240b240c81a69f90080ac026f85685f5f5d"
+            "9775b6c3ce5a58981b1",
         )
 
     def test_the_poster_exists_as_a_png_frame(self):
@@ -2769,12 +2773,12 @@ class TestBrandAssets(unittest.TestCase):
     # The ceiling moved down for WP1, and the move is
     # recorded here rather than absorbed in silence. The
     # ledger under it is 3,556 for the dark wordmark plus
-    # 3,556 for the light wordmark plus 17,509 for the
+    # 3,556 for the light wordmark plus 18,094 for the
     # phone crop plus 646,314 for the captioned hero
-    # recording, which sums to 670,935. The old ceiling
+    # recording, which sums to 671,520. The old ceiling
     # of 1,300,000 held the 1,274,392 byte first encode.
     # The new ceiling of 700,000 is the work order hero
-    # target and holds 29,065 of headroom over the ledger.
+    # target and holds 28,480 of headroom over the ledger.
     PAGE_CEILING = 700000
 
     def test_the_brand_files_exist(self):
@@ -2943,7 +2947,7 @@ class TestBrandAssets(unittest.TestCase):
         unique = list(dict.fromkeys(refs))
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 670935)
+        self.assertEqual(total, 671520)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):
@@ -3364,10 +3368,14 @@ class TestCanonicalSkillLayout(unittest.TestCase):
 
     def test_readme_install_route_names_the_canonical_source(self):
         # T10. The folder copy route installs from the canonical
-        # skill, not from the old location.
+        # skill, not from the old location. The WP1 phone wrap
+        # splits the source path over a backslash continuation,
+        # so the pin reads the command as the shell joins it,
+        # with the continuation removed.
         text = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("cp -r .agents/skills/recognitio", text)
-        self.assertNotIn("cp -r skills/recognitio", text)
+        joined = text.replace("\\\n", "")
+        self.assertIn("cp -r .agents/skills/recognitio", joined)
+        self.assertNotIn("cp -r skills/recognitio", joined)
 
 
 class TestCheckPacket(unittest.TestCase):
