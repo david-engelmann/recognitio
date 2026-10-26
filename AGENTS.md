@@ -710,3 +710,24 @@ a line holding one HTML tag and nothing else as
 markup, so the picture element attribute values are
 not judged as prose while prose sharing a line with
 a tag still is.
+
+The visual round 9 pass on 2026-10-26 then answered the
+cold eyes rehearsal with README wording only and no new
+build, placing a heads up at the top of the Install
+section that states the requirements and the two plugin
+session effects before any route, rewording the pin block
+to name the commands and files a route will run, naming
+the maintainer in the Qwen subsection and dropping its
+round language, naming the five
+languages the definition patterns cover in the tier model,
+adding the recorded run receipt to the demo lead in after
+an in lane recount confirmed 28 files and 3,233 lines,
+glossing the pericope at first use in the packet header
+own words, stating the tied 4 of 4 result beside the
+constructed eval headline, moving the hosted diff claim
+onto the research attribution the principles page uses
+after the current GitHub primary documentation stated
+the file cap in different mechanics and no patch omission
+in the sentence own terms, and clarifying the worked
+example two function names from a re-derived packet, with
+the storefront tests pinning every new sentence.

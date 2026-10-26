@@ -741,6 +741,22 @@ This unreleased work carries version 1.3.0.
   variants with the light SVG as its fallback, and a
   brand gate joins the check target with asset pins in
   the gate script suite.
+
+- The README cold eyes fixes in visual round 9. The
+  Install section opens with a heads up stating the
+  requirements and the two session effects of the plugin
+  route before any route command, and the pin block now
+  names the commands and files a route will run. The
+  Qwen subsection names the maintainer and carries no
+  round language. The tier model names the five
+  languages the definition patterns cover, the demo
+  lead in carries the receipt of its recorded run, the
+  pericope is glossed where the Usage section first
+  uses it, the eval paragraph states the tied result
+  beside the constructed one, the hosted diff claim in
+  the Why section carries the research attribution,
+  and the worked example states the true relationship
+  of its two function names.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

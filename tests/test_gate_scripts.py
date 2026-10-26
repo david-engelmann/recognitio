@@ -1884,6 +1884,120 @@ class TestReadmeStorefront(unittest.TestCase):
         )
 
 
+class TestReadmeRound9(unittest.TestCase):
+    """The visual round 9 cold eyes fixes are pinned.
+
+    The Install section opens with a heads up that states the
+    requirements and the two plugin session effects before any
+    route, the Qwen subsection names the maintainer and carries
+    no round language, the pin block names the commands and
+    files a route will run, the tier model names the five
+    languages the definition patterns cover, the demo lead in
+    carries its receipt, the pericope is glossed at first use,
+    the eval paragraph states the tied result beside the
+    constructed one, the hosted diff claim carries the research
+    attribution, and the worked example states the true
+    relationship of its two function names.
+    """
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.flat = " ".join(self.readme.split())
+
+    def test_the_qwen_subsection_names_the_maintainer(self):
+        self.assertIn(
+            "the conditional publication decision stays with "
+            "the maintainer",
+            self.flat,
+        )
+        self.assertIn("No Qwen listing file ships.", self.flat)
+        self.assertNotIn("stays with David", self.flat)
+        self.assertNotIn("ships in this round", self.flat)
+
+    def test_the_install_heads_up_states_requirements_and_effects(self):
+        for fragment in (
+            "Before any route, know what installing means.",
+            "Every route needs Python 3.10 or newer and git, "
+            "pull request mode also needs the GitHub CLI, and "
+            "there are no third party dependencies.",
+            "Its output style applies to every response in the "
+            "session while the plugin is enabled and overrides "
+            "the style chosen in your own settings",
+            "its reviewer persona runs as the session main thread",
+            "Pin the install to a commit SHA before running any "
+            "route, as the pin block below sets out.",
+        ):
+            self.assertIn(fragment, self.flat)
+        heads_up = self.flat.index("Before any route, know what")
+        self.assertLess(
+            self.flat.index("Take one install route only"), heads_up
+        )
+        self.assertLess(heads_up, self.flat.index("The plugin route comes first"))
+
+    def test_the_pin_block_names_what_the_route_will_run(self):
+        self.assertIn(
+            "read the commands and files the route will run", self.flat
+        )
+        self.assertNotIn("read the install script", self.flat)
+
+    def test_the_tier_model_names_the_five_languages(self):
+        self.assertIn(
+            "The definition patterns the companion search uses "
+            "cover five languages, Python and Rust and Go and "
+            "JavaScript and TypeScript, and a definition written "
+            "in a language outside those five will not be found.",
+            self.flat,
+        )
+
+    def test_the_demo_lead_in_carries_its_receipt(self):
+        first_screen = self.flat.split("## What it does", 1)[0]
+        self.assertIn(
+            "The run is the change from `365da81e` to `ecdda4c8` "
+            "in this repository, 28 files and 3,233 lines of "
+            "diff, and its capture record stands at "
+            "`docs/images/capture.json`.",
+            first_screen,
+        )
+
+    def test_the_pericope_is_glossed_at_first_use(self):
+        self.assertIn(
+            "The pericope is the packet itself, holding the "
+            "change and the context a reviewer needs to read it, "
+            "and nothing else.",
+            self.flat,
+        )
+
+    def test_the_eval_paragraph_states_the_tied_result(self):
+        self.assertIn(
+            "On the defects inside the diff itself the two "
+            "passes tied at 4 of 4 each.",
+            self.flat,
+        )
+
+    def test_the_hosted_claim_carries_the_research_attribution(self):
+        self.assertIn(
+            "The research this project grew out of found hosted "
+            "diffs capping the file counts they return and "
+            "dropping oversized patches entirely, with no flag "
+            "on either",
+            self.flat,
+        )
+        self.assertNotIn(
+            "Hosted diff endpoints cap their file counts", self.flat
+        )
+
+    def test_the_worked_example_states_the_function_relationship(self):
+        self.assertIn(
+            "Both excerpts show the same edit inside "
+            "semantic_problems, and the packet header names "
+            "naming_problems because git labels a hunk with the "
+            "nearest function line above its opening line, and "
+            "this hunk opens on the def line of "
+            "semantic_problems itself.",
+            self.flat,
+        )
+
+
 def _gif_lzw_decode(data, min_code_size):
     """Decode one GIF LZW stream with the standard library only."""
     out = bytearray()

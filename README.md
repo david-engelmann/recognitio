@@ -16,7 +16,7 @@ Pulls the relevant changes from a pull request or a commit range, with the conte
 
 [![CI passing](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Watch one recorded run in full. A 3,233 line diff enters, the skill builds the verified packet, and the model reviews that packet.
+Watch one recorded run in full. A 3,233 line diff enters, the skill builds the verified packet, and the model reviews that packet. The run is the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff, and its capture record stands at `docs/images/capture.json`.
 
 ![A recorded run in a chat session. A large diff enters the session, the recognitio skill builds a verified packet from it, and the model reviews the packet.](docs/images/recognitio-demo-chat.gif)
 
@@ -28,7 +28,7 @@ One recorded run. A 3,233 line diff goes in and the build ends with the packet m
 
 The same frame at detail size. The card header carries the verified marker and the packet line.
 
-In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. The full record lives in [the paired eval results](evals/RESULTS.md).
+In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. On the defects inside the diff itself the two passes tied at 4 of 4 each. The full record lives in [the paired eval results](evals/RESULTS.md).
 
 New here. Start with the [Install](#install) section below and take the plugin route first.
 
@@ -100,7 +100,7 @@ index 0327324..522392d 100644
 [Elided. The rest of the function stands in the full packet]
 ```
 
-The packet excerpt above is trimmed. It shows 19 of the 173 lines of the function at the head revision, chosen around the ten added lines, and the other 154 lines are elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file.
+The packet excerpt above is trimmed. It shows 19 of the 173 lines of the function at the head revision, chosen around the ten added lines, and the other 154 lines are elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file. Both excerpts show the same edit inside semantic_problems, and the packet header names naming_problems because git labels a hunk with the nearest function line above its opening line, and this hunk opens on the def line of semantic_problems itself.
 
 The same packet names the test files that mention the changed code and closes with its verification recount.
 
@@ -173,7 +173,7 @@ The tier model section below states what each tier holds, and the completeness g
 
 ## Why
 
-A diff alone is not what a reviewer reads. A reviewer reads the change inside its enclosing function, follows changed names to the places that call them, opens the tests that touch the changed module, and checks who shaped these lines in the past. Most tools hand the reviewer a fixed slice of lines and stay silent when the slice runs out. Hosted diff endpoints cap their file counts and drop oversized patches without a flag, so a large pull request can be reviewed in part while everyone believes it was reviewed in whole.
+A diff alone is not what a reviewer reads. A reviewer reads the change inside its enclosing function, follows changed names to the places that call them, opens the tests that touch the changed module, and checks who shaped these lines in the past. Most tools hand the reviewer a fixed slice of lines and stay silent when the slice runs out. The research this project grew out of found hosted diffs capping the file counts they return and dropping oversized patches entirely, with no flag on either, so a large pull request can be reviewed in part while everyone believes it was reviewed in whole.
 
 Recognitio takes the other path. Extraction runs against the local clone, where there is no file count cap and the full history is present. The result is counted twice by separate git invocations, and the packet is only called verified when both counts agree.
 
@@ -184,6 +184,8 @@ The claims behind these choices stand written down in [Principles](docs/principl
 ## Install
 
 Take one install route only. Installing through two routes installs the skill twice.
+
+Before any route, know what installing means. Every route needs Python 3.10 or newer and git, pull request mode also needs the GitHub CLI, and there are no third party dependencies. The plugin route changes the session it runs in. Its output style applies to every response in the session while the plugin is enabled and overrides the style chosen in your own settings, and its reviewer persona runs as the session main thread. Both effects are stated in full in their subsections below. Pin the install to a commit SHA before running any route, as the pin block below sets out.
 
 The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting. The plugin manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing and the marketplace entry carries no icon field.
 
@@ -215,8 +217,8 @@ cp -r .agents/skills/recognitio ~/.claude/skills/recognitio
 The Qwen Code route is a conditional draft. The brief
 at [the Qwen Code brief](docs/qwen-code-brief.md) states
 the full Qwen contract, and the conditional publication
-decision stays with David. No Qwen listing file ships in this
-round.
+decision stays with the maintainer. No Qwen listing file
+ships.
 
 ```bash
 git clone https://github.com/david-engelmann/recognitio.git recognitio-qwen
@@ -231,8 +233,9 @@ The marketplace source add stays a conditional draft
 form in the brief only.
 
 Before running any route above, pin the install to a commit
-SHA and read the install script, because a skill ships
-executable code and an unpinned route can move under you.
+SHA and read the commands and files the route will run,
+because a skill ships executable code and an unpinned route
+can move under you.
 
 A copied or installed skill does not inherit later upstream
 fixes. Receiving a fix means reinstalling or recopying from
@@ -322,7 +325,7 @@ Choose tiers directly when a review only needs part of the packet. Triage and th
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --tiers 0-1 --out packet --repo .
 ```
 
-A run that builds a packet writes two files into the output directory. The packet file is the reading document, and its title calls it the pericope for the change. The manifest file is the receipt, with the resolved refs, the command that produced it, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. The packet closes with the same check stated for its own reader, as a verification recount of the files and hunks and lines against the manifest. A run that fails, at argument checking or later, removes any earlier packet from the directory first and leaves a manifest whose verified flag is false, so a stale packet can never stand as the result of the latest run, as long as the run named an output directory.
+A run that builds a packet writes two files into the output directory. The packet file is the reading document, and its title calls it the pericope for the change. The pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The manifest file is the receipt, with the resolved refs, the command that produced it, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. The packet closes with the same check stated for its own reader, as a verification recount of the files and hunks and lines against the manifest. A run that fails, at argument checking or later, removes any earlier packet from the directory first and leaves a manifest whose verified flag is false, so a stale packet can never stand as the result of the latest run, as long as the run named an output directory.
 
 The script at `scripts/check_packet.py` validates a packet directory before a review is stamped on it. It confirms the manifest is verified, that the head it records is still the head of the repository under review, and that the sections the manifest records are present and filled in the packet.
 
@@ -332,7 +335,7 @@ The packet is built in four tiers and closes with a receipt. The packet reads in
 
 - T0 is triage, with the pull request title, body and spec references when the mode resolves them, the file list, the numstat summary, and the commit list for the range. A changed file whose name marks it as an instruction bearing file, such as an AGENTS.md or a SKILL.md at any depth, is flagged as an instruction file in that list, and its record in the manifest carries the same flag, so a reviewer can tell which changed files will steer the next agent that loads the tree.
 - T1 is the change, with per file diffs that carry whole enclosing function context instead of a fixed line radius.
-- T2 is the companions, with call sites of the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and test files that mention the changed modules. Companions come from deterministic search only, each one is capped, and the packet says when a cap was hit.
+- T2 is the companions, with call sites of the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and test files that mention the changed modules. Companions come from deterministic search only, each one is capped, and the packet says when a cap was hit. The definition patterns the companion search uses cover five languages, Python and Rust and Go and JavaScript and TypeScript, and a definition written in a language outside those five will not be found.
 - T3 is history, with a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. That lookup checks the three most changed files against the thirty most recent pull requests and shows at most five matches, and the packet states that window where it reports the results. When the CLI cannot name them, the tier says so.
 
 Some files stand in the change as named placeholders rather than diffs. A binary file is named with its byte count. A file detected as generated or as a lockfile is named with its detection reason, and detection works from a list of known lockfile names, known generated suffixes, and the do not edit marker in a file header. The header marker withholds a diff only when it already stood at the base revision. A marker that arrives in the change itself is flagged in the packet header and the change is shown in full, because a file cannot exempt itself with words it just wrote. Every placeholder keeps its lines and hunks counted in the manifest, and the packet header lists each one with its reason under the heading Files not shown in full. A text file that the tree marks binary through its attributes file is counted and shown as text instead, and the header names that too, under the heading Files shown in full, so no file that stands shown in full in the packet stands under a heading that says it was withheld. A file that changed from binary content to text in the change itself is counted and shown as text as well, its receipt names the transition as the real reason, and the manifest records the transition on the file record.
