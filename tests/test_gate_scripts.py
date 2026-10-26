@@ -1828,13 +1828,19 @@ class TestReadmeStorefront(unittest.TestCase):
         self.flat = " ".join(self.readme.split())
 
     def test_the_first_screen_order_is_pinned(self):
+        # The README rebuild after visual round 10. The hero
+        # is one lockup, the wordmark picture alone, and the
+        # heading that once repeated the wordmark under it
+        # stays out, so the first marker is the wordmark
+        # itself and the headline follows it.
+        self.assertNotIn("# Recognitio", self.readme)
         markers = (
-            "# Recognitio",
+            "docs/brand/wordmark-dark.svg",
             self.HEADLINE,
             self.CANONICAL,
             "[What it does](#what-it-does)",
             "[![CI passing]",
-            "docs/images/recognitio-demo-chat.gif",
+            "docs/images/recognitio-cursor-agent-demo.gif",
             "In the paired eval recorded in this repo",
             "New here. Start with the [Install](#install) section",
             "## What it does",
@@ -1882,6 +1888,99 @@ class TestReadmeStorefront(unittest.TestCase):
             "Recognitio serves the pull request review workflow.",
             first_screen,
         )
+
+
+class TestReadmeRebuild(unittest.TestCase):
+    """The README rebuild after the visual program is pinned.
+
+    The rebuild moved the tier model, the completeness
+    discipline and trust and limits behind a closing Going
+    deeper section, gave every install route its own
+    subheading, explained pinning in one place and wrapped
+    the Usage commands so every command line fits its
+    block. These pins hold that structure in place, in the
+    same way the storefront pins hold the first screen.
+    """
+
+    GOING_DEEPER_LINKS = (
+        "[The tier model](.agents/skills/recognitio/SKILL.md"
+        "#the-tier-model)",
+        "[The completeness discipline](.agents/skills/recognitio"
+        "/SKILL.md#completeness-discipline)",
+        "[Trust and limits](.agents/skills/recognitio/SKILL.md"
+        "#trust-and-limits)",
+        "[Principles](docs/principles.md)",
+    )
+    INSTALL_SUBHEADINGS = (
+        "### Claude Code plugin",
+        "### Cursor",
+        "### Any agent",
+        "### Folder copy",
+        "### Qwen Code",
+        "### Pinning the install",
+        "### The packet output style",
+        "### The reviewer persona",
+    )
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    def test_the_going_deeper_links_close_the_page(self):
+        for link in self.GOING_DEEPER_LINKS:
+            self.assertIn(link, self.readme)
+        headings = [
+            line for line in self.readme.splitlines()
+            if line.startswith("## ")
+        ]
+        self.assertEqual(headings[-1], "## Going deeper")
+
+    def test_each_install_route_carries_its_own_subheading(self):
+        install = self.readme.split("## Install", 1)[1].split(
+            "## Platform adaptations", 1
+        )[0]
+        positions = []
+        for heading in self.INSTALL_SUBHEADINGS:
+            self.assertIn(heading, install)
+            positions.append(install.index(heading))
+        self.assertEqual(positions, sorted(positions))
+
+    def test_pinning_is_explained_exactly_once(self):
+        self.assertEqual(
+            self.readme.count("### Pinning the install"), 1
+        )
+        self.assertEqual(
+            self.readme.count(
+                "Before running any route above, pin the install "
+                "to a commit SHA and read the commands and files "
+                "the route will run"
+            ),
+            1,
+        )
+        self.assertEqual(
+            self.readme.count(
+                "A copied or installed skill does not inherit "
+                "later upstream fixes."
+            ),
+            1,
+        )
+
+    def test_usage_command_lines_fit_their_blocks(self):
+        usage = self.readme.split("## Usage", 1)[1].split(
+            "## Going deeper", 1
+        )[0]
+        in_fence = False
+        command_lines = []
+        for line in usage.splitlines():
+            if line.startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                command_lines.append(line)
+        self.assertGreaterEqual(
+            sum("extract.py" in line for line in command_lines), 4
+        )
+        for line in command_lines:
+            self.assertLessEqual(len(line), 80, line)
 
 
 class TestReadmeRound9(unittest.TestCase):
@@ -1941,21 +2040,34 @@ class TestReadmeRound9(unittest.TestCase):
         self.assertNotIn("read the install script", self.flat)
 
     def test_the_tier_model_names_the_five_languages(self):
+        # The README rebuild after the visual program moved
+        # the tier model summary into How it works, so the
+        # sentence is pinned inside that section, not
+        # anywhere on the page.
+        how_it_works = self.readme.split("## How it works", 1)[1].split(
+            "## Why", 1
+        )[0]
         self.assertIn(
             "The definition patterns the companion search uses "
             "cover five languages, Python and Rust and Go and "
             "JavaScript and TypeScript, and a definition written "
             "in a language outside those five will not be found.",
-            self.flat,
+            " ".join(how_it_works.split()),
         )
 
     def test_the_demo_lead_in_carries_its_receipt(self):
+        # The money shot landing after the visual program.
+        # The recording changed from the retired chat capture
+        # to a live Cursor agent session over the same change,
+        # so the receipt sentence names the session and the
+        # new capture record in place of the old one.
         first_screen = self.flat.split("## What it does", 1)[0]
         self.assertIn(
-            "The run is the change from `365da81e` to `ecdda4c8` "
-            "in this repository, 28 files and 3,233 lines of "
-            "diff, and its capture record stands at "
-            "`docs/images/capture.json`.",
+            "A session in the Cursor agent uses the recognitio "
+            "skill to review the change from `365da81e` to "
+            "`ecdda4c8` in this repository, 28 files and 3,233 "
+            "lines of diff, and its capture record stands at "
+            "`docs/images/capture-record.md`.",
             first_screen,
         )
 
@@ -2258,54 +2370,54 @@ class TestDocsIndex(unittest.TestCase):
 
 
 class TestDemoAssets(unittest.TestCase):
-    """The visual round 3 demo asset gate, grown in round 6.
+    """The demo asset gate, rebuilt for the money shot landing.
 
-    The hero GIF is pinned on dimensions, a byte budget, a
-    frame zero content threshold, a clean verdict rest frame
-    and a total duration window. The stills must exist as
-    real PNG frames and every image the README names must
-    exist at its named path. Round 6 adds the border ring
-    every asset carries inside its canvas edge, the detail
-    crop geometry and clean band, and a hash pin on every
-    still, so a regeneration that moves any of them fails
-    until the pin is deliberately reset.
+    The visual round 3 gate pinned the chat capture and its
+    stills gallery, and round 6 grew it over the border ring
+    and the detail crop. The money shot landing after the
+    visual program retires that whole asset set, because the
+    pixel inspection condemned the stills as dark fields and
+    the crop as a cut off strip, and replaces it with one
+    recording of a live Cursor agent session over the same
+    change and one poster frame from it. The pins below hold
+    the new set. The ring pins retire with the assets they
+    described, because the recorded frames carry the terminal
+    ground to the canvas edge and no builder ring was applied
+    to this capture, and re-encoding a verified capture to
+    paint one on would alter the record the capture stands
+    as. The clipped band check retires for the same reason,
+    because the band geometry belonged to the retired chat
+    card header and this recording has no such header.
     """
 
     IMAGES = ROOT / "docs" / "images"
-    HERO = IMAGES / "recognitio-demo-chat.gif"
-    DETAIL = "recognitio-demo-poster-detail.png"
-    STILLS = (
+    HERO = IMAGES / "recognitio-cursor-agent-demo.gif"
+    POSTER = "recognitio-cursor-agent-poster.png"
+    RETIRED = (
+        "recognitio-demo-chat.gif",
         "recognitio-demo-poster.png",
         "recognitio-demo-poster-detail.png",
         "recognitio-demo-still-diff.png",
         "recognitio-demo-still-verified.png",
         "recognitio-demo-still-verdict.png",
     )
-    STILL_GEOMETRY = {
-        "recognitio-demo-poster.png": (796, 624),
-        "recognitio-demo-poster-detail.png": (360, 74),
-        "recognitio-demo-still-diff.png": (796, 450),
-        "recognitio-demo-still-verified.png": (796, 450),
-        "recognitio-demo-still-verdict.png": (796, 450),
-    }
-    STILL_SHA256 = {
-        "recognitio-demo-poster.png":
-            "0ec65fe4350909bc7142dfa9ae4c4c0076396157a9f23d1c21515093092251dd",
-        "recognitio-demo-poster-detail.png":
-            "9127188eb397cafa8b4476442380abc03c83a1c3b82e58ec80b6caa4b194f47a",
-        "recognitio-demo-still-diff.png":
-            "b24af369032244ed2a1b816198811f3b5f93cc0e9ca8e00f085b8e88247cdd94",
-        "recognitio-demo-still-verified.png":
-            "2a77161da8414be9067d2e149eac16838a3c2b938b2f0893566fa9c188bed247",
-        "recognitio-demo-still-verdict.png":
-            "fb7f5dd54cc749ceb7caa332400ef068ad77d255e51948cd1a8291e3ef774aac",
-    }
-    RING = (128, 135, 148)
-    BYTE_BUDGET = 750000
+    POSTER_GEOMETRY = (792, 570)
+    POSTER_SHA256 = (
+        "89b417c3ec456e64f8706b5a788c64a2fc02224cf3dfc54edd7328"
+        "f3fb3e65f5"
+    )
+    # The byte budget is a deliberate ceiling for this asset
+    # class, set by the money shot landing and not a silent
+    # raise. A live terminal stream carries a full screen of
+    # new text on every scroll, the capture record weighs
+    # that cost in the open, and the shipped file still sits
+    # under the 1,822,894 byte terminal recording the README
+    # carried earlier in the program.
+    BYTE_BUDGET = 1400000
 
     def test_the_hero_dimensions_and_byte_budget_are_pinned(self):
         width, height, _pal, _frames, _delays = _gif_frames(self.HERO)
-        self.assertEqual((width, height), (796, 624))
+        self.assertEqual((width, height), (792, 570))
         self.assertLessEqual(self.HERO.stat().st_size, self.BYTE_BUDGET)
 
     def test_frame_zero_carries_content(self):
@@ -2313,113 +2425,52 @@ class TestDemoAssets(unittest.TestCase):
         self.assertGreater(_bright_fraction(frames[0], palette), 0.05)
 
     def test_the_verdict_rest_frame_is_present_and_clean(self):
-        width, _h, palette, frames, delays = _gif_frames(self.HERO)
+        _w, _h, palette, frames, delays = _gif_frames(self.HERO)
         self.assertGreaterEqual(len(frames), 30)
         total_ms = sum(delays)
-        self.assertGreaterEqual(total_ms, 10000)
-        self.assertLessEqual(total_ms, 20000)
+        # The window is re-derived from this take, which runs
+        # longer than the retired chat capture because the
+        # change under review is the full 28 file range.
+        self.assertGreaterEqual(total_ms, 20000)
+        self.assertLessEqual(total_ms, 35000)
         last = frames[-1]
         self.assertGreater(_bright_fraction(last, palette), 0.05)
-        # No text band may sit partly under the header bar in
-        # the resting frame. Rows 49 to 59 sit just below the
-        # header separator at row 48, so a glyph band clipped
-        # by the bar would leave bright pixels there.
-        for row in range(49, 60):
-            band = last[row * width:(row + 1) * width]
-            bright = sum(
-                1 for idx in band if sum(palette[idx]) > 90
-            )
-            self.assertLess(bright, 20, "clipped band at row %d" % row)
 
-    def test_the_stills_exist_as_png_frames(self):
-        for name in self.STILLS:
-            path = self.IMAGES / name
-            self.assertTrue(path.is_file(), name)
-            self.assertEqual(path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n", name)
-            floor = 2000 if name == self.DETAIL else 5000
-            self.assertGreater(path.stat().st_size, floor, name)
+    def test_the_poster_exists_as_a_png_frame(self):
+        path = self.IMAGES / self.POSTER
+        self.assertTrue(path.is_file(), self.POSTER)
+        self.assertEqual(path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertGreater(path.stat().st_size, 5000)
 
-    def test_the_still_geometry_is_pinned(self):
-        for name, size in self.STILL_GEOMETRY.items():
-            width, height, _rows = _png_pixels(self.IMAGES / name)
-            self.assertEqual((width, height), size, name)
+    def test_the_poster_geometry_and_hash_are_pinned(self):
+        path = self.IMAGES / self.POSTER
+        width, height, _rows = _png_pixels(path)
+        self.assertEqual((width, height), self.POSTER_GEOMETRY)
+        found = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(found, self.POSTER_SHA256)
 
-    def test_the_still_hashes_are_pinned(self):
-        for name, digest in self.STILL_SHA256.items():
-            found = hashlib.sha256(
-                (self.IMAGES / name).read_bytes()
-            ).hexdigest()
-            self.assertEqual(found, digest, name)
-
-    def test_every_still_carries_the_border_ring(self):
-        # The ring is two pixels wide inside every canvas
-        # edge, in the one ring colour, so the asset keeps a
-        # visible edge on the GitHub dark canvas. A recapture
-        # or a rebuild that drops the ring fails here.
-        for name in self.STILLS:
-            width, height, rows = _png_pixels(self.IMAGES / name)
-            for row in rows[:2] + rows[-2:]:
-                self.assertTrue(
-                    all(pixel == self.RING for pixel in row), name
-                )
-            for row in rows:
-                self.assertTrue(
-                    all(pixel == self.RING for pixel in row[:2]), name
-                )
-                self.assertTrue(
-                    all(pixel == self.RING for pixel in row[-2:]), name
-                )
-
-    def test_the_hero_carries_the_border_ring(self):
-        # The GIF encoder stores later frames as partial
-        # updates over the first, so the ring is pinned on
-        # frame zero, the one full canvas frame the stream
-        # carries and the frame every later frame builds on.
-        width, height, palette, frames, _delays = _gif_frames(self.HERO)
-        self.assertIn(self.RING, palette)
-        ring_index = palette.index(self.RING)
-        for frame in (frames[0][:width * height],):
-            for row_number in (0, 1, height - 2, height - 1):
-                band = frame[row_number * width:(row_number + 1) * width]
-                self.assertTrue(
-                    all(idx == ring_index for idx in band),
-                    "hero frame row %d is not ring" % row_number,
-                )
-            for row_number in range(height):
-                band = frame[row_number * width:(row_number + 1) * width]
-                self.assertEqual(band[0], ring_index)
-                self.assertEqual(band[-1], ring_index)
-
-    def test_the_detail_crop_edges_slice_no_glyph_row(self):
-        # The crop opens on the blank band above the card, so
-        # the rows between the ring and the card header carry
-        # no glyph bright pixels at all, and the packet line
-        # band near the foot carries the full line of text.
-        # A crop edge moved onto a glyph row fails one side
-        # or the other of this check.
-        width, height, rows = _png_pixels(self.IMAGES / self.DETAIL)
-        self.assertEqual((width, height), (360, 74))
-        for row in rows[2:25]:
-            bright = sum(
-                1 for pixel in row[2:-2] if sum(pixel) > 300
-            )
-            self.assertEqual(bright, 0, "sliced glyph in the top band")
-        packet_bright = sum(
-            1
-            for row in rows[55:72]
-            for pixel in row[2:-2]
-            if sum(pixel) > 300
-        )
-        self.assertGreater(packet_bright, 200)
+    def test_the_retired_assets_stay_out_of_the_tree(self):
+        for name in self.RETIRED:
+            self.assertFalse((self.IMAGES / name).is_file(), name)
 
     def test_every_readme_image_reference_resolves(self):
+        # The page names the poster still as a link inside
+        # the demo lead in and embeds the recording itself,
+        # and every reference it carries resolves. No retired
+        # asset name may return to the page.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
-        self.assertIn("docs/images/recognitio-demo-chat.gif", refs)
-        for name in self.STILLS:
-            self.assertIn("docs/images/" + name, refs)
+        self.assertEqual(
+            refs,
+            [
+                "docs/images/recognitio-cursor-agent-poster.png",
+                "docs/images/recognitio-cursor-agent-demo.gif",
+            ],
+        )
         for ref in refs:
             self.assertTrue((ROOT / ref).is_file(), ref)
+        for name in self.RETIRED:
+            self.assertNotIn(name, readme)
         self.assertNotIn("recognitio-demo-terminal", readme)
 
 
@@ -2532,7 +2583,18 @@ class TestBrandAssets(unittest.TestCase):
         "recognitio-social-preview.png":
             "85c3155015b1cfe77ec8082f8a0d381be379fd543748e88fb72a2fcd09e69f3d",
     }
-    PAGE_CEILING = 882271
+    # The ceiling moved once, by the money shot landing
+    # after the visual program, and the move is recorded
+    # here rather than absorbed in silence. The retired
+    # chat capture weighed 690,157 bytes under the old
+    # ceiling of 699,943. The live Cursor agent recording
+    # that replaced it weighs 1,274,392 bytes, because a
+    # terminal stream repaints a full screen on every
+    # scroll, and David directed the re-record at that
+    # size after the first take weighed less and showed
+    # less. The new ceiling holds headroom over the exact
+    # ledger the test below pins.
+    PAGE_CEILING = 1300000
 
     def test_the_brand_files_exist(self):
         for name in list(self.SHA256) + ["palette.json", "build_brand.py"]:
@@ -2607,9 +2669,18 @@ class TestBrandAssets(unittest.TestCase):
         self.assertLess(
             readme.index(centred), readme.index("<picture>")
         )
+        # The README rebuild after visual round 10. The
+        # wordmark picture is the whole hero lockup and no
+        # heading repeats it, so the picture closes before
+        # the headline and the old heading stays out.
         self.assertLess(
-            readme.index("</picture>"), readme.index("# Recognitio")
+            readme.index("</picture>"),
+            readme.index(
+                "**A review starts from evidence instead "
+                "of a bare diff.**"
+            ),
         )
+        self.assertNotIn("# Recognitio", readme)
 
     def test_the_icon_safe_area_is_pinned(self):
         width, height, rows = _png_pixels_any(
@@ -2684,7 +2755,7 @@ class TestBrandAssets(unittest.TestCase):
         total = sum((ROOT / ref).stat().st_size for ref in refs)
         total += (self.BRAND / "wordmark-light.svg").stat().st_size
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 876041)
+        self.assertEqual(total, 1277948)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

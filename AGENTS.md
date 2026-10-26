@@ -320,8 +320,8 @@ this map instead.
 
 - Extractor behaviour changes update SKILL.md and CHANGELOG.md in
   the same change.
-- Tier or manifest changes also update the tier model section of
-  README.md in the same change.
+- Tier or manifest changes also update the tier summary in the
+  How it works section of README.md in the same change.
 - A change to the description field in SKILL.md is a spec change,
   and the change notes say so and say why.
 - Gate changes update this file and the CI workflow together.
@@ -731,3 +731,27 @@ the file cap in different mechanics and no patch omission
 in the sentence own terms, and clarifying the worked
 example two function names from a re-derived packet, with
 the storefront tests pinning every new sentence.
+
+The README rebuild after the visual program then cut
+the page from 4,334 words to 2,798 words, with the
+wordmark picture as the one hero lockup and no
+heading repeating it under the picture,
+one trimmed worked example, a subheading for every
+install route with pinning explained once, usage
+commands wrapped so every command fits its block,
+and a closing Going deeper section linking to the
+tier model, the completeness discipline and the
+trust and limits in the skill and to the principles
+page in place of their full text. The same landing
+replaced the demo assets outright, retiring the
+chat capture and its poster and terminal stills and
+detail crop from the page and the tree and standing
+a recording of a live Cursor agent session over the
+same change in the hero slot, with one frame of it
+linked as a still in the lead in and its capture
+record shipped beside the assets under docs/images.
+Every claim the page carried survives in compressed
+form, the storefront and demo and brand tests re-pin
+the moved pins, and the page weight ledger stands
+at 1,277,948 bytes under a ceiling of 1,300,000,
+raised once and on the record for the recording.

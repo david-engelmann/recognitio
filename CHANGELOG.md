@@ -757,6 +757,31 @@ This unreleased work carries version 1.3.0.
   the Why section carries the research attribution,
   and the worked example states the true relationship
   of its two function names.
+
+- The README rebuilt as a lean storefront after the
+  visual program. The wordmark picture stands as the
+  one hero lockup with no heading repeating it, the
+  chat capture and its poster and terminal stills and
+  detail crop retire from the page and the tree, and
+  a recording of a live Cursor agent session over the
+  same change stands as the one demo image, with one
+  frame of it linked as a still in the lead in and
+  its capture record shipped beside the assets, and
+  the page weight ceiling rises once on the record
+  to hold the recording. The worked
+  example keeps the raw hunk and one trimmed packet
+  excerpt, the Install section gives every route its
+  own subheading with pinning explained once, and the
+  Usage commands wrap so every command fits its block.
+  The tier model and the trust and limits text move
+  behind links to the skill and the principles page in
+  a closing Going deeper section, and the completeness
+  guarantee moves with them under its skill name of
+  the completeness discipline. Every claim the page
+  carried stands in
+  compressed form, and the storefront tests re-pin
+  the first screen order, the picture form, the image
+  references and the page weight.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

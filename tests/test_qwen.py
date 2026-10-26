@@ -164,6 +164,12 @@ class TestCheckQwen(unittest.TestCase):
         # Visual round 1. The copyable scoped npm test
         # form belongs in this brief only, so restoring
         # it in the README Qwen section fails the gate.
+        # The README rebuild after the visual program
+        # gave the pin block its own heading, which now
+        # bounds the Qwen section the gate reads, so the
+        # plant lands inside the section in front of its
+        # closing placeholder sentence instead of in
+        # front of the pin block.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             path = root / "README.md"
@@ -176,9 +182,13 @@ class TestCheckQwen(unittest.TestCase):
                 "@scope/my-extension@1.2.0\n"
                 "```\n\n"
             )
+            anchor = (
+                "Replace COMMIT_SHA with the commit SHA "
+                "you reviewed."
+            )
             broken = text.replace(
-                "Before running any route above",
-                plant + "Before running any route above",
+                anchor,
+                plant + anchor,
                 1,
             )
             self.assertNotEqual(broken, text)
