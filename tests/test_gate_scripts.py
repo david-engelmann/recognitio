@@ -230,6 +230,39 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertEqual(self.run_main_on([path]), 1)
 
+    def test_a_picture_tag_line_is_markup_not_prose(self):
+        # Visual round 8. The README wordmark stands in a
+        # picture element whose source lines carry a media
+        # attribute value with a colon inside it. A line
+        # holding one HTML tag and nothing else is markup
+        # so the attribute syntax is not judged as prose.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "<p align=\"center\">\n"
+                "  <picture>\n"
+                "    <source media=\"(prefers-color-scheme: dark)\" "
+                "srcset=\"docs/brand/wordmark-dark.svg\">\n"
+                "    <img alt=\"recognitio\" "
+                "src=\"docs/brand/wordmark-light.svg\" width=\"300\">\n"
+                "  </picture>\n"
+                "</p>\n"
+                "\n"
+                "Clean prose stands under the markup.\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_prose_beside_a_tag_on_one_line_still_fails(self):
+        # The tag line exemption is narrow. Prose sharing
+        # a line with a tag is still prose and a banned
+        # mark inside it still fails the bar.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "<p>Words in prose: with a colon beside a tag.</p>\n",
+            )
+            self.assertEqual(self.run_main_on([path]), 1)
+
     def test_a_markdown_link_with_clean_prose_passes(self):
         with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
@@ -2274,6 +2307,270 @@ class TestDemoAssets(unittest.TestCase):
         for ref in refs:
             self.assertTrue((ROOT / ref).is_file(), ref)
         self.assertNotIn("recognitio-demo-terminal", readme)
+
+
+def _png_pixels_any(path):
+    """Return width and height and RGB rows for one PNG file.
+
+    The decoder uses the standard library only and supports
+    the 8 bit RGB and RGBA forms the brand exports ship in
+    with no interlace and anything else fails here rather
+    than passing unexamined.
+    """
+    raw = path.read_bytes()
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG file"
+    width, height, depth, color = struct.unpack(">IIBB", raw[16:26])
+    assert depth == 8 and color in (2, 6) and raw[28] == 0, (
+        "unexpected PNG form"
+    )
+    channels = 3 if color == 2 else 4
+    idat = bytearray()
+    pos = 8
+    while pos < len(raw):
+        size = int.from_bytes(raw[pos:pos + 4], "big")
+        kind = raw[pos + 4:pos + 8]
+        if kind == b"IDAT":
+            idat += raw[pos + 8:pos + 8 + size]
+        pos += size + 12
+    data = zlib.decompress(bytes(idat))
+    stride = width * channels
+    rows = []
+    prev = bytearray(stride)
+    pos = 0
+    for _y in range(height):
+        filt = data[pos]
+        line = bytearray(data[pos + 1:pos + 1 + stride])
+        pos += stride + 1
+        for x in range(stride):
+            left = line[x - channels] if x >= channels else 0
+            up = prev[x]
+            corner = prev[x - channels] if x >= channels else 0
+            if filt == 1:
+                line[x] = (line[x] + left) & 0xFF
+            elif filt == 2:
+                line[x] = (line[x] + up) & 0xFF
+            elif filt == 3:
+                line[x] = (line[x] + (left + up) // 2) & 0xFF
+            elif filt == 4:
+                guess = left + up - corner
+                pick_a = abs(guess - left)
+                pick_b = abs(guess - up)
+                pick_c = abs(guess - corner)
+                if pick_a <= pick_b and pick_a <= pick_c:
+                    pred = left
+                elif pick_b <= pick_c:
+                    pred = up
+                else:
+                    pred = corner
+                line[x] = (line[x] + pred) & 0xFF
+            elif filt != 0:
+                raise AssertionError("unexpected PNG filter %r" % filt)
+        rows.append(
+            [tuple(line[i:i + 3]) for i in range(0, stride, channels)]
+        )
+        prev = line
+    return width, height, rows
+
+
+class TestBrandAssets(unittest.TestCase):
+    """The visual round 8 brand asset gate.
+
+    The brand masters and exports stand under geometry and
+    weight and hash pins and the README picture element and
+    its fallback alt stand under form pins and the page
+    weight ledger stands under its ceiling. The manifest
+    and palette pins live in scripts/check_brand.py and its
+    own test file drives that script against scratch trees.
+    """
+
+    BRAND = ROOT / "docs" / "brand"
+    GROUND = (19, 21, 27)
+    GEOMETRY = {
+        "recognitio-icon-512.png": (512, 512),
+        "recognitio-icon-256.png": (256, 256),
+        "recognitio-social-preview.png": (1280, 640),
+        "recognitio-wordmark-1600.png": (1600, 384),
+    }
+    BUDGETS = {
+        "recognitio-social-preview.png": 750000,
+        "wordmark-light.svg": 25000,
+        "wordmark-dark.svg": 25000,
+        "recognitio-wordmark-1600.png": 200000,
+        "recognitio-icon.svg": 25000,
+        "recognitio-icon-512.png": 100000,
+        "recognitio-icon-256.png": 50000,
+    }
+    SHA256 = {
+        "wordmark-light.svg":
+            "bc1a1e19e94380504ba3e541a7c877723bbf3aa1d8d30c2097262fba619f90df",
+        "wordmark-dark.svg":
+            "f237e5bc8358f75a453fc1e3b2147a502fe319e0f915e17eabc5c077fade3401",
+        "recognitio-icon.svg":
+            "5541cda96a1e985d1ee8b78670ce24fd879fa177743e74da36a22190d2850ddf",
+        "recognitio-social-preview.svg":
+            "5fc46199cc1e8c099f002950da2399de28214e08953ba08b38a6eca38db3419e",
+        "recognitio-wordmark-1600.png":
+            "1d786eff35455d9cea3f250519b18755be0a75e6a90aa5d03580043676bfb52c",
+        "recognitio-icon-512.png":
+            "76f8aa0c297165fd71a9d6a53df16f64c5bb3865a45cecd5878007a5da4a9111",
+        "recognitio-icon-256.png":
+            "e0fd6c02c638b50256b23ae7087950ebf3fcccc5c12442d83d78097784e33145",
+        "recognitio-social-preview.png":
+            "85c3155015b1cfe77ec8082f8a0d381be379fd543748e88fb72a2fcd09e69f3d",
+    }
+    PAGE_CEILING = 882271
+
+    def test_the_brand_files_exist(self):
+        for name in list(self.SHA256) + ["palette.json", "build_brand.py"]:
+            self.assertTrue((self.BRAND / name).is_file(), name)
+
+    def test_the_export_geometry_is_pinned(self):
+        for name, size in self.GEOMETRY.items():
+            width, height, _rows = _png_pixels_any(self.BRAND / name)
+            self.assertEqual((width, height), size, name)
+
+    def test_the_asset_weights_sit_under_their_budgets(self):
+        for name, budget in self.BUDGETS.items():
+            self.assertLessEqual(
+                (self.BRAND / name).stat().st_size, budget, name
+            )
+
+    def test_the_asset_hashes_are_pinned(self):
+        for name, digest in self.SHA256.items():
+            found = hashlib.sha256(
+                (self.BRAND / name).read_bytes()
+            ).hexdigest()
+            self.assertEqual(found, digest, name)
+
+    def test_no_master_carries_live_text_or_a_font_reference(self):
+        for name in (
+            "wordmark-light.svg",
+            "wordmark-dark.svg",
+            "recognitio-icon.svg",
+            "recognitio-social-preview.svg",
+        ):
+            text = (self.BRAND / name).read_text(encoding="utf-8")
+            self.assertNotIn("<text", text, name)
+            self.assertNotIn("font-family", text, name)
+            self.assertIn('aria-label="recognitio"', text, name)
+
+    def test_the_wordmark_variants_share_one_geometry(self):
+        def geometry(name):
+            text = (self.BRAND / name).read_text(encoding="utf-8")
+            return re.sub(r'(fill|stroke)="[^"]*"', r'\1=""', text)
+
+        self.assertEqual(
+            geometry("wordmark-light.svg"), geometry("wordmark-dark.svg")
+        )
+
+    def test_no_brand_asset_uses_a_green(self):
+        for name in self.SHA256:
+            if name.endswith(".svg"):
+                text = (self.BRAND / name).read_text(encoding="utf-8")
+                self.assertNotIn("#4AC76A", text, name)
+                self.assertNotIn("#3FB950", text, name)
+        palette = json.loads(
+            (self.BRAND / "palette.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(palette["reserved_verified_green"], "#4AC76A")
+        self.assertEqual(palette["accent"], "#D97757")
+
+    def test_the_picture_element_form_is_pinned(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertEqual(readme.count("<picture>"), 1)
+        block = readme.split("<picture>", 1)[1].split("</picture>", 1)[0]
+        dark = '<source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">'
+        light = '<source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">'
+        fallback = '<img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300">'
+        for fragment in (dark, light, fallback):
+            self.assertIn(fragment, block)
+        positions = [block.index(item) for item in (dark, light, fallback)]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(block.count("<img"), 1)
+        self.assertEqual(block.count("<source"), 2)
+        centred = '<p align="center">'
+        self.assertIn(centred, readme)
+        self.assertLess(
+            readme.index(centred), readme.index("<picture>")
+        )
+        self.assertLess(
+            readme.index("</picture>"), readme.index("# Recognitio")
+        )
+
+    def test_the_icon_safe_area_is_pinned(self):
+        width, height, rows = _png_pixels_any(
+            self.BRAND / "recognitio-icon-512.png"
+        )
+        self.assertEqual((width, height), (512, 512))
+        filled = [
+            (x, y)
+            for y, row in enumerate(rows)
+            for x, pixel in enumerate(row)
+            if pixel == (217, 119, 87)
+        ]
+        self.assertTrue(filled)
+        xs = [point[0] for point in filled]
+        ys = [point[1] for point in filled]
+        span_x = max(xs) - min(xs) + 1
+        span_y = max(ys) - min(ys) + 1
+        self.assertLessEqual(span_x, int(512 * 0.72) + 2)
+        self.assertLessEqual(span_y, int(512 * 0.72) + 2)
+        self.assertGreaterEqual(span_x, int(512 * 0.65))
+        self.assertGreaterEqual(span_y, int(512 * 0.65))
+
+    def test_the_social_preview_safe_area_and_ground_are_pinned(self):
+        width, height, rows = _png_pixels_any(
+            self.BRAND / "recognitio-social-preview.png"
+        )
+        self.assertEqual((width, height), (1280, 640))
+        for corner in (
+            rows[0][0], rows[0][-1], rows[-1][0], rows[-1][-1]
+        ):
+            self.assertEqual(corner, self.GROUND)
+        inset_x = int(width * 0.08)
+        inset_y = int(height * 0.12)
+        for row in rows[:inset_y] + rows[height - inset_y:]:
+            for pixel in row[:inset_x] + row[width - inset_x:]:
+                self.assertEqual(pixel, self.GROUND)
+        lockup = [
+            (x, y)
+            for y in range(140, 300)
+            for x in range(320, 960)
+            if rows[y][x] != self.GROUND
+        ]
+        self.assertTrue(lockup)
+        outside = [
+            (x, y)
+            for y in range(140, 300)
+            for x in list(range(0, 320)) + list(range(960, 1280))
+            if rows[y][x] != self.GROUND
+        ]
+        self.assertEqual(outside, [])
+
+    def test_the_icon_registers_at_the_floor_size(self):
+        _w, _h, rows = _png_pixels_any(
+            self.BRAND / "recognitio-icon-512.png"
+        )
+        block = 512 // 16
+        filled_cells = 0
+        for cell_y in range(16):
+            for cell_x in range(16):
+                coral = 0
+                for y in range(cell_y * block, (cell_y + 1) * block):
+                    for x in range(cell_x * block, (cell_x + 1) * block):
+                        if rows[y][x] == (217, 119, 87):
+                            coral += 1
+                if coral > (block * block) // 4:
+                    filled_cells += 1
+        self.assertGreaterEqual(filled_cells, 100)
+
+    def test_the_readme_page_weight_sits_under_its_ceiling(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        refs = re.findall(r"!\[[^\]]*\]\((docs/[^)]+)\)", readme)
+        total = sum((ROOT / ref).stat().st_size for ref in refs)
+        total += (self.BRAND / "wordmark-light.svg").stat().st_size
+        self.assertLessEqual(total, self.PAGE_CEILING)
+        self.assertEqual(total, 876041)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

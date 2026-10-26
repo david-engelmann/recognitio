@@ -721,6 +721,26 @@ This unreleased work carries version 1.3.0.
   provider session the packet is never rendered for the
   person watching the session, and that sentence now stands
   in the runbook where a reader of its limits meets it.
+
+- The brand assets in visual round 8. A wordmark in a
+  light and a dark variant and an icon and a social
+  preview now stand under `docs/brand/` beside a palette
+  record and a builder that outlines their lettering
+  from the Liberation Sans fonts into paths and renders
+  their PNG exports through CairoSVG, so no shipped SVG
+  holds live text and no viewer font can move the brand
+  name. The palette freezes one ground pair and one ink
+  pair and the coral accent, with the verified green
+  recorded as reserved and banned from every brand
+  asset. The Claude plugin manifest names the 512 pixel
+  icon and the Cursor plugin manifest and marketplace
+  entry name the icon master as their logo, while the
+  surfaces whose schemas document no image field gain
+  none. The README leads with a centred picture element
+  at a rendered width of 300 holding the two wordmark
+  variants with the light SVG as its fallback, and a
+  brand gate joins the check target with asset pins in
+  the gate script suite.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

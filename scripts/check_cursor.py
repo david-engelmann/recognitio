@@ -85,7 +85,7 @@ COMPONENT_KEYS = ("skills", "rules", "agents", "commands")
 # the gate instead of riding along unexamined.
 MANIFEST_KEYS = (
     "name", "version", "description", "license", "author",
-    "skills", "rules", "agents", "commands", "variables",
+    "skills", "rules", "agents", "commands", "variables", "logo",
 )
 
 # The only repo bugbot.yaml fields the primary docs name. An

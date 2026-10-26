@@ -45,6 +45,7 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_zcode.py`, the Devin playbook and coordinator
 build check at `scripts/check_devin.py`, the Qwen Code
 marketplace presence build check at `scripts/check_qwen.py`,
+the brand asset check at `scripts/check_brand.py`,
 the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
@@ -103,6 +104,13 @@ not a gate.
   the research sketch, with the reason for each one.
 - `docs/reviews/` holds review reports written from the template
   in `REVIEW.md`, with their findings disposition counts.
+- `docs/brand/` holds the brand assets, the palette record at
+  `docs/brand/palette.json` and the builder at
+  `docs/brand/build_brand.py` that outlines the wordmark and
+  social preview lettering from the Liberation Sans fonts and
+  renders the PNG exports through CairoSVG, pinned by the
+  gate at `scripts/check_brand.py` and by the asset pins in
+  the gate script suite.
 - `evals/` holds the paired eval tasks, the trigger set, the
   corpus index and their recorded results.
 - `.claude-plugin/` holds the plugin manifest at
@@ -680,3 +688,25 @@ subject changes, and stated the provider session limit
 in the limits section of the headless runbook, with a
 gate test pinning the index and the navigation in the
 gate script suite.
+
+The visual round 8 pass on 2026-10-26 then landed the
+brand assets with no new build, placing the wordmark
+masters and the icon master and the social preview
+master and their PNG exports under `docs/brand/` beside
+the palette record and the builder that outlines their
+lettering from the Liberation Sans fonts and renders
+the exports through CairoSVG. The Claude plugin
+manifest gained its icon field and the Cursor plugin
+manifest and marketplace entry gained the one logo
+value, with logo added to the closed key list of the
+Cursor checker as the one planned repin. The README
+gained a centred picture element above its title at a
+rendered width of 300 with the light SVG as its
+fallback, and a new brand gate at
+`scripts/check_brand.py` joined the Makefile check
+target with the asset pins in the gate script suite
+and its own test file. The copy fence learned to read
+a line holding one HTML tag and nothing else as
+markup, so the picture element attribute values are
+not judged as prose while prose sharing a line with
+a tag still is.

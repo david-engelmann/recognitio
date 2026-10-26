@@ -515,6 +515,33 @@ class TestCheckCursor(unittest.TestCase):
                 problems,
             )
 
+    def test_the_manifest_logo_key_is_accepted(self):
+        # Visual round 8. The brand logo field joins the
+        # closed manifest key list as its one planned repin
+        # so a scratch layout carrying the shipped logo
+        # value passes the Cursor gate whole.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            self.assertEqual(
+                data.get("logo"), "docs/brand/recognitio-icon.svg"
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_an_unknown_manifest_key_still_fails(self):
+        # The logo repin opens the list by one key only and
+        # an invented key beside the logo still fails.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["invented"] = "docs/brand/recognitio-icon.svg"
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("unknown keys" in p for p in problems),
+                problems,
+            )
+
     def test_a_dropped_security_review_pin_fails(self):
         # R31-EX-03. The Build 10 brief pins the Security
         # Review separation, scope, team rules, draft skip,

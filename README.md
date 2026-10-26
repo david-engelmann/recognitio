@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">
+    <img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300">
+  </picture>
+</p>
+
 # Recognitio
 
 **A review starts from evidence instead of a bare diff.**
@@ -177,14 +185,14 @@ The claims behind these choices stand written down in [Principles](docs/principl
 
 Take one install route only. Installing through two routes installs the skill twice.
 
-The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting.
+The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting. The plugin manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing and the marketplace entry carries no icon field.
 
 ```bash
 /plugin marketplace add david-engelmann/recognitio
 /plugin install recognitio@recognitio-marketplace
 ```
 
-The Cursor plugin route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
+The Cursor plugin route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg` and the brand assets and their builder and palette record live under `docs/brand/`. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
 
 ```bash
 cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio

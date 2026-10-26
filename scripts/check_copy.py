@@ -10,7 +10,12 @@ hits on a tree full of them.
 
 Code is exempt. Fenced code blocks and inline code spans are skipped,
 as are YAML frontmatter keys, link reference definitions and lines
-that hold nothing but a file path. A URL exempts only its own span of
+that hold nothing but a file path. A line that holds one HTML tag
+and nothing else is markup and is skipped in the same way, because
+an attribute value inside a tag is syntax and not a sentence, and
+the picture element the README carries for its wordmark stands in
+that class. Text standing beside a tag on the same line stays
+prose and is judged. A URL exempts only its own span of
 a line, never the whole line, so a banned mark hiding beside a link
 is still caught. The span ends at the link boundary, so punctuation
 sitting right after a link stays in the prose and is judged.
@@ -212,6 +217,7 @@ EN_DASH = "\u2013"
 FRONTMATTER_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*:(\s|$)")
 LINK_REFERENCE = re.compile(r"^\s*\[[^\]]+\]:")
 BARE_PATH = re.compile(r"^[\w.@~+-]+(/[\w.@~+-]+)+/?$")
+HTML_TAG_LINE = re.compile(r"^<[^>]*>$")
 INLINE_CODE = re.compile(r"`[^`]*`")
 URL_SPAN = re.compile(r"https?://\S+")
 YAML_BLOCK = re.compile(r":\s*[|>][+-]?\s*$")
@@ -452,6 +458,8 @@ def prose_lines(path):
         if LINK_REFERENCE.match(raw):
             continue
         if BARE_PATH.match(stripped):
+            continue
+        if HTML_TAG_LINE.match(stripped):
             continue
         yield number, clean(raw)
 
