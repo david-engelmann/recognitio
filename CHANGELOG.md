@@ -688,6 +688,25 @@ This unreleased work carries version 1.3.0.
   vocabulary for the review side, and the README worked
   example shows the real added lines of its function
   with its elisions marked and counted.
+
+- The demo assets and the README diagram rebuilt in
+  visual round 6. Every demo asset now carries a two
+  pixel border ring inside its canvas edge in a grey
+  that measures 5.24 to 1 against the GitHub dark
+  canvas and 3.61 to 1 against white, drawn by the
+  demo builder as chrome around the untouched session
+  pixels. The detail crop is recropped tight on the
+  card header at 360 pixels wide, magnifying the
+  frame 2.21 times where the old crop managed 1.11,
+  with its edges on blank bands and its caption
+  standing under it. The alt texts describe the
+  frames they name and the badge alts name the
+  passing state and MIT. The How it works diagram
+  draws the recount as a decision diamond with
+  rounded start and outcome shapes and no theme pin.
+  The Antigravity row of the adaptations table is
+  halved, and the asset gate pins the ring, the crop
+  geometry and the still hashes.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

@@ -108,6 +108,26 @@ def wrap_mono(text, cols):
     return out
 
 
+RING = (128, 135, 148)
+RING_W = 2
+
+
+def add_ring(img):
+    """Draw the border ring inside the canvas edge.
+
+    The ring is chrome added by this builder and not part of
+    the recorded session. It reuses the chat palette dim grey,
+    which measures 5.24 to 1 against the GitHub dark canvas at
+    13, 17, 23 and 3.61 to 1 against white, so every asset
+    carries its own edge on both page themes. The session
+    pixels inside the ring are untouched.
+    """
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, img.width - 1, img.height - 1],
+                outline=RING, width=RING_W)
+    return img
+
+
 def assemble(states, frames_dir, out_path, max_colors=160):
     """states: list of (PIL image, hold_ms). Writes the GIF and
     returns (frames, duration_s, bytes)."""
@@ -315,6 +335,7 @@ def a_compose(blocks, offset):
     d.line([0, HEADER_H, A_W, HEADER_H], fill=A_BORDER, width=1)
     d.rounded_rectangle([22, 15, 22 + 18, 15 + 18], 5, fill=A_ACCENT)
     d.text((50, 15), "recognitio", font=F_TITLE, fill=A_FG)
+    add_ring(img)
     return img, total
 
 
@@ -509,6 +530,7 @@ def b_draw(rows):
         else:
             d.text((x, y), text, font=F_B, fill=B_FG)
         y += B_LH
+    add_ring(img)
     return img
 
 
@@ -600,9 +622,18 @@ def main():
         # hold state in the sequence.
         poster = states[poster_idx][0]
         poster.save(OUTDIR / "recognitio-demo-poster.png", optimize=True)
-        # Narrow detail crop from that same frame, the card
-        # header band with the verified pill and packet lines.
-        poster.crop((10, 385, 730, 500)).save(
+        # Detail crop from that same frame, tight on the card
+        # header and the first packet line. The region runs
+        # from the blank gap before the 28 files figure to
+        # just past the card right edge, and from the blank
+        # band above the card to the blank band under the
+        # first packet line,
+        # so no glyph row is sliced at any edge. At 360 pixels
+        # wide against the 796 pixel frame it magnifies 2.21
+        # times, where the shipped 720 pixel crop managed 1.11.
+        detail = poster.crop((362, 408, 722, 482))
+        add_ring(detail)
+        detail.save(
             OUTDIR / "recognitio-demo-poster-detail.png", optimize=True)
         print("poster and detail crop written from the card frame")
     if which in ("all", "b"):

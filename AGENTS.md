@@ -652,3 +652,16 @@ and carries the fixed P1 and P2 and P3 severity
 vocabulary for the review side, and the README
 worked example shows the real added lines of its
 function with its elisions marked and counted.
+
+The visual round 6 pass on 2026-10-26 then gave
+every demo asset a measured border ring inside its
+canvas edge with no new build, recropped the detail
+crop tight on the card header at 2.21 times the
+frame magnification with its caption moved under
+it, rewrote the demo and badge alt texts to the
+frames and values they name, redrew the How it
+works diagram with the recount as a decision
+diamond and no theme pin, and halved the
+Antigravity cell of the adaptations table, with the
+demo asset gate grown to pin the ring, the crop
+geometry and clean band, and the still hashes.

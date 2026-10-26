@@ -6,7 +6,7 @@ Pulls the relevant changes from a pull request or a commit range, with the conte
 
 [What it does](#what-it-does) · [See it on a real change](#see-it-on-a-real-change) · [How it works](#how-it-works) · [Why](#why) · [Install](#install) · [Platform adaptations](#platform-adaptations) · [Usage](#usage) · [The tier model](#the-tier-model) · [The completeness guarantee](#the-completeness-guarantee) · [Trust and limits](#trust-and-limits) · [The name](#the-name)
 
-[![CI](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI passing](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Watch one recorded run in full. A 3,233 line diff enters, the skill builds the verified packet, and the model reviews that packet.
 
@@ -14,11 +14,11 @@ Watch one recorded run in full. A 3,233 line diff enters, the skill builds the v
 
 One recorded run. A 3,233 line diff goes in and the build ends with the packet marked verified.
 
-![A still from the same recorded run. The finished tool card shows six steps complete and the packet marked verified, with the diff and the ask above it.](docs/images/recognitio-demo-poster.png)
+![A still from the same recorded run. The finished tool card shows six lines ticked complete and the packet marked verified, with the diff and the ask above it.](docs/images/recognitio-demo-poster.png)
+
+![A detail crop of the same frame, enlarged so the card header can be read at small sizes. The crop shows the green verified marker in the card header and the packet line below it reporting 28 files.](docs/images/recognitio-demo-poster-detail.png)
 
 The same frame at detail size. The card header carries the verified marker and the packet line.
-
-![A detail crop of the same frame. The tool card header shows the verified marker beside the packet line reporting 28 files and verified.](docs/images/recognitio-demo-poster-detail.png)
 
 In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. The full record lives in [the paired eval results](evals/RESULTS.md).
 
@@ -135,15 +135,15 @@ The test files and recount excerpts above are trimmed for length too. The full p
 
 The same run without the chat framing. These frames come from the raw terminal recording of the run at the top of this page, and nothing in them is a second run or a redrawn output.
 
-![A still from the raw terminal recording. The settled tail of the 3,233 line diff at rest.](docs/images/recognitio-demo-still-diff.png)
+![A still from the raw terminal recording, filled with the green added lines at the tail of the 3,233 line diff.](docs/images/recognitio-demo-still-diff.png)
 
 The problem at full scale. One range across 28 files and 3,233 lines of raw diff.
 
-![A still from the raw terminal recording. A terminal search shows the verified flag in the packet manifest.](docs/images/recognitio-demo-still-verified.png)
+![A still from the raw terminal recording. Test file lines and recount lines fill the upper frame and a terminal search at the foot finds the verified flag set to true in the packet manifest.](docs/images/recognitio-demo-still-verified.png)
 
 The check in plain text. A terminal search finds the verified flag in the packet manifest.
 
-![A still from the raw terminal recording. The review at rest, ending on the approve verdict.](docs/images/recognitio-demo-still-verdict.png)
+![A still from the raw terminal recording. The closing page of the review fills the terminal and the final sentence ends on the single word approve.](docs/images/recognitio-demo-still-verdict.png)
 
 The payoff at rest. The model reviews the packet and the run ends on a plain approve.
 
@@ -153,10 +153,10 @@ Extraction runs on the local clone and assembles the packet in four tiers. A sep
 
 ```mermaid
 flowchart LR
-    A[Pull request or commit range] --> B[Extract from the local clone]
+    A([Pull request or commit range]) --> B[Extract from the local clone]
     B --> C[Assemble the packet in four tiers]
-    C --> D[Recount files, hunks and lines]
-    D -->|Counts agree| E[Verified packet]
+    C --> D{Recount the change}
+    D -->|Counts agree| E([Verified packet])
     D -->|Counts disagree| F[The run fails and no packet stands]
     E --> G[The review reads the packet]
 ```
@@ -271,7 +271,7 @@ The packet discipline travels. Each adaptation below restates it in the surface 
 | ZCode | A native plugin with its manifest at `.zcode-plugin/plugin.json`, distributed through its in client plugin marketplace, with [the ZCode plugin brief](docs/zcode-plugin-brief.md) as the brief for the build |
 | Devin | A playbook and coordinator build, written as derivation noted rules in [the Devin playbook brief](docs/devin-playbook-brief.md) |
 | Qwen | A conditional draft, with the brief at [the Qwen Code brief](docs/qwen-code-brief.md) and the install route in the Install section above |
-| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and the PreToolUse hook wiring at `.antigravity/hooks.json` carrying the deny and force_ask and auto_approve mapping, with the native shapes as a second extensions namespace beside the portable core, and the build recorded in [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
+| Antigravity | A plugin alteration with its manifest at `.antigravity/plugin.json` and its PreToolUse hook wiring at `.antigravity/hooks.json`, with the build recorded in [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
 
 A Trae adaptation ships nothing. The round 32 check found no Trae skill or plugin surface in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
 

@@ -6,11 +6,13 @@ import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+import zlib
 from contextlib import redirect_stderr
 from pathlib import Path, PureWindowsPath
 from unittest import mock
@@ -1798,7 +1800,7 @@ class TestReadmeStorefront(unittest.TestCase):
             self.HEADLINE,
             self.CANONICAL,
             "[What it does](#what-it-does)",
-            "[![CI]",
+            "[![CI passing]",
             "docs/images/recognitio-demo-chat.gif",
             "In the paired eval recorded in this repo",
             "New here. Start with the [Install](#install) section",
@@ -1820,8 +1822,8 @@ class TestReadmeStorefront(unittest.TestCase):
             if line.startswith("[![")
         ]
         self.assertEqual(len(badge_lines), 1)
-        self.assertIn("[![CI]", badge_lines[0])
-        self.assertIn("[![License]", badge_lines[0])
+        self.assertIn("[![CI passing]", badge_lines[0])
+        self.assertIn("[![License MIT]", badge_lines[0])
 
     def test_the_canonical_sentence_opens_agents_and_the_cursor_readme(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
@@ -1970,18 +1972,83 @@ def _bright_fraction(indices, palette):
     return bright / len(indices)
 
 
+def _png_pixels(path):
+    """Return (width, height, rows) for an RGB PNG file.
+
+    Each row is a list of (red, green, blue) tuples, decoded
+    with the standard library only. The shipped demo stills
+    are 8 bit RGB files with no interlace, and anything else
+    fails here rather than passing unexamined.
+    """
+    raw = path.read_bytes()
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG file"
+    width, height, depth, color = struct.unpack(">IIBB", raw[16:26])
+    assert (depth, color, raw[28]) == (8, 2, 0), "unexpected PNG form"
+    idat = bytearray()
+    pos = 8
+    while pos < len(raw):
+        size = int.from_bytes(raw[pos:pos + 4], "big")
+        kind = raw[pos + 4:pos + 8]
+        if kind == b"IDAT":
+            idat += raw[pos + 8:pos + 8 + size]
+        pos += size + 12
+    data = zlib.decompress(bytes(idat))
+    stride = width * 3
+    rows = []
+    prev = bytearray(stride)
+    pos = 0
+    for _y in range(height):
+        filt = data[pos]
+        line = bytearray(data[pos + 1:pos + 1 + stride])
+        pos += stride + 1
+        for x in range(stride):
+            left = line[x - 3] if x >= 3 else 0
+            up = prev[x]
+            corner = prev[x - 3] if x >= 3 else 0
+            if filt == 1:
+                line[x] = (line[x] + left) & 0xFF
+            elif filt == 2:
+                line[x] = (line[x] + up) & 0xFF
+            elif filt == 3:
+                line[x] = (line[x] + (left + up) // 2) & 0xFF
+            elif filt == 4:
+                guess = left + up - corner
+                pick_a = abs(guess - left)
+                pick_b = abs(guess - up)
+                pick_c = abs(guess - corner)
+                if pick_a <= pick_b and pick_a <= pick_c:
+                    pred = left
+                elif pick_b <= pick_c:
+                    pred = up
+                else:
+                    pred = corner
+                line[x] = (line[x] + pred) & 0xFF
+            elif filt != 0:
+                raise AssertionError("unexpected PNG filter %r" % filt)
+        rows.append(
+            [tuple(line[i:i + 3]) for i in range(0, stride, 3)]
+        )
+        prev = line
+    return width, height, rows
+
+
 class TestDemoAssets(unittest.TestCase):
-    """The visual round 3 demo asset gate.
+    """The visual round 3 demo asset gate, grown in round 6.
 
     The hero GIF is pinned on dimensions, a byte budget, a
     frame zero content threshold, a clean verdict rest frame
     and a total duration window. The stills must exist as
     real PNG frames and every image the README names must
-    exist at its named path.
+    exist at its named path. Round 6 adds the border ring
+    every asset carries inside its canvas edge, the detail
+    crop geometry and clean band, and a hash pin on every
+    still, so a regeneration that moves any of them fails
+    until the pin is deliberately reset.
     """
 
     IMAGES = ROOT / "docs" / "images"
     HERO = IMAGES / "recognitio-demo-chat.gif"
+    DETAIL = "recognitio-demo-poster-detail.png"
     STILLS = (
         "recognitio-demo-poster.png",
         "recognitio-demo-poster-detail.png",
@@ -1989,6 +2056,26 @@ class TestDemoAssets(unittest.TestCase):
         "recognitio-demo-still-verified.png",
         "recognitio-demo-still-verdict.png",
     )
+    STILL_GEOMETRY = {
+        "recognitio-demo-poster.png": (796, 624),
+        "recognitio-demo-poster-detail.png": (360, 74),
+        "recognitio-demo-still-diff.png": (796, 450),
+        "recognitio-demo-still-verified.png": (796, 450),
+        "recognitio-demo-still-verdict.png": (796, 450),
+    }
+    STILL_SHA256 = {
+        "recognitio-demo-poster.png":
+            "0ec65fe4350909bc7142dfa9ae4c4c0076396157a9f23d1c21515093092251dd",
+        "recognitio-demo-poster-detail.png":
+            "9127188eb397cafa8b4476442380abc03c83a1c3b82e58ec80b6caa4b194f47a",
+        "recognitio-demo-still-diff.png":
+            "b24af369032244ed2a1b816198811f3b5f93cc0e9ca8e00f085b8e88247cdd94",
+        "recognitio-demo-still-verified.png":
+            "2a77161da8414be9067d2e149eac16838a3c2b938b2f0893566fa9c188bed247",
+        "recognitio-demo-still-verdict.png":
+            "fb7f5dd54cc749ceb7caa332400ef068ad77d255e51948cd1a8291e3ef774aac",
+    }
+    RING = (128, 135, 148)
     BYTE_BUDGET = 750000
 
     def test_the_hero_dimensions_and_byte_budget_are_pinned(self):
@@ -2024,7 +2111,81 @@ class TestDemoAssets(unittest.TestCase):
             path = self.IMAGES / name
             self.assertTrue(path.is_file(), name)
             self.assertEqual(path.read_bytes()[:8], b"\x89PNG\r\n\x1a\n", name)
-            self.assertGreater(path.stat().st_size, 5000, name)
+            floor = 2000 if name == self.DETAIL else 5000
+            self.assertGreater(path.stat().st_size, floor, name)
+
+    def test_the_still_geometry_is_pinned(self):
+        for name, size in self.STILL_GEOMETRY.items():
+            width, height, _rows = _png_pixels(self.IMAGES / name)
+            self.assertEqual((width, height), size, name)
+
+    def test_the_still_hashes_are_pinned(self):
+        for name, digest in self.STILL_SHA256.items():
+            found = hashlib.sha256(
+                (self.IMAGES / name).read_bytes()
+            ).hexdigest()
+            self.assertEqual(found, digest, name)
+
+    def test_every_still_carries_the_border_ring(self):
+        # The ring is two pixels wide inside every canvas
+        # edge, in the one ring colour, so the asset keeps a
+        # visible edge on the GitHub dark canvas. A recapture
+        # or a rebuild that drops the ring fails here.
+        for name in self.STILLS:
+            width, height, rows = _png_pixels(self.IMAGES / name)
+            for row in rows[:2] + rows[-2:]:
+                self.assertTrue(
+                    all(pixel == self.RING for pixel in row), name
+                )
+            for row in rows:
+                self.assertTrue(
+                    all(pixel == self.RING for pixel in row[:2]), name
+                )
+                self.assertTrue(
+                    all(pixel == self.RING for pixel in row[-2:]), name
+                )
+
+    def test_the_hero_carries_the_border_ring(self):
+        # The GIF encoder stores later frames as partial
+        # updates over the first, so the ring is pinned on
+        # frame zero, the one full canvas frame the stream
+        # carries and the frame every later frame builds on.
+        width, height, palette, frames, _delays = _gif_frames(self.HERO)
+        self.assertIn(self.RING, palette)
+        ring_index = palette.index(self.RING)
+        for frame in (frames[0][:width * height],):
+            for row_number in (0, 1, height - 2, height - 1):
+                band = frame[row_number * width:(row_number + 1) * width]
+                self.assertTrue(
+                    all(idx == ring_index for idx in band),
+                    "hero frame row %d is not ring" % row_number,
+                )
+            for row_number in range(height):
+                band = frame[row_number * width:(row_number + 1) * width]
+                self.assertEqual(band[0], ring_index)
+                self.assertEqual(band[-1], ring_index)
+
+    def test_the_detail_crop_edges_slice_no_glyph_row(self):
+        # The crop opens on the blank band above the card, so
+        # the rows between the ring and the card header carry
+        # no glyph bright pixels at all, and the packet line
+        # band near the foot carries the full line of text.
+        # A crop edge moved onto a glyph row fails one side
+        # or the other of this check.
+        width, height, rows = _png_pixels(self.IMAGES / self.DETAIL)
+        self.assertEqual((width, height), (360, 74))
+        for row in rows[2:25]:
+            bright = sum(
+                1 for pixel in row[2:-2] if sum(pixel) > 300
+            )
+            self.assertEqual(bright, 0, "sliced glyph in the top band")
+        packet_bright = sum(
+            1
+            for row in rows[55:72]
+            for pixel in row[2:-2]
+            if sum(pixel) > 300
+        )
+        self.assertGreater(packet_bright, 200)
 
     def test_every_readme_image_reference_resolves(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
