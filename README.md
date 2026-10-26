@@ -56,7 +56,7 @@ index 0327324..522392d 100644
          # Verb plus membership from S4. A listed verb within
 ```
 
-The packet for the same commit shows the change inside its whole enclosing function. The function runs 163 lines at the base revision and the packet carries all of it.
+The packet for the same commit shows the change inside its whole enclosing function. The excerpt below shows the packet heading for the file, the context around the edit, and all ten lines the commit added to the function. The full packet carries the whole function, which runs 163 lines at the base revision and 173 at the head.
 
 ```text
 ### scripts/check_devin.py
@@ -69,9 +69,32 @@ index 0327324..522392d 100644
 +++ b/scripts/check_devin.py
 @@ -421,163 +421,173 @@ def naming_problems(root=None):
  def semantic_problems(root=None):
+[Elided. The body of the function up to the edit stands in the full packet]
+         membership_near_resolved = bool(re.search(
+             r"\b(" + MEMBERSHIP_PHRASES + r")\b.{0,15}\bresolved\b",
+             low,
+         ))
++        # Modifier chain from R36-E1-02. A membership phrase
++        # followed by a pure modifier chain and then
++        # resolved states the same membership at any gap
++        # length, so it fires beside the bounded form.
++        membership_modifier_chain = bool(re.search(
++            r"\b(" + MEMBERSHIP_PHRASES + r")\b"
++            + MEMBERSHIP_MODIFIER_GAP + r"resolved\b",
++            low,
++        ))
+         # Verb plus membership from S4. A listed verb within
+[Elided. The lines between this comment and the condition below stand in the full packet]
+                 verb_then_equivalence
+                 or membership_near_resolved
++                or membership_modifier_chain
+                 or verb_then_membership_near_resolved
+[Elided. The rest of the function stands in the full packet]
 ```
 
-The same packet names the test files that mention the changed code and closes with the recount.
+The packet excerpt above is trimmed. It shows 19 of the 173 lines of the function at the head revision, chosen around the ten added lines, and the other 154 lines are elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file.
+
+The same packet names the test files that mention the changed code and closes with its verification recount.
 
 ```text
 ### Test files that mention the changed code
@@ -86,15 +109,29 @@ The same packet names the test files that mention the changed code and closes wi
 50:         self.mod = load_script("check_devin")
 ```
 
-The packet closes with its recount.
+The packet closes with its verification recount.
 
 ```text
-No tier was dropped.
+## Verification recount
 
-Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
+### Recount
+
+Recount passed
+
+A separate recount counted the change a second time
+
+The recount covered 2 files with their statuses and old paths, 2 hunks, and 24 added lines and 0 deleted lines
+
+The recount matches the manifest on every count
+
+Every tier is included
+
+Verified means this packet holds the whole change it names
+
+Verified does not mean the change is correct or safe
 ```
 
-Both excerpts are trimmed for length, and the fence lines inside the packet itself are dropped so the excerpts can sit inside the fences of this file. The full packet for this commit runs 579 lines, and the commands that produce one for any change are in the Usage section below.
+The test files and recount excerpts above are trimmed for length too. The full packet for this commit runs 622 lines, and the commands that produce one for any change are in the Usage section below.
 
 The same run without the chat framing. These frames come from the raw terminal recording of the run at the top of this page, and nothing in them is a second run or a redrawn output.
 
@@ -271,28 +308,28 @@ Set a token budget on a large change. The budget is an approximate token count t
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --budget 60000 --out packet --repo .
 ```
 
-Choose tiers directly when a review only needs part of the packet. Triage and the change always stay in.
+Choose tiers directly when a review only needs part of the packet. Triage and the change always stay in. The companions and history headings stand in every packet too, and a tier the selection leaves out carries one placeholder sentence in place of its contents, either Not selected for this run. The change in T1 is complete. or, when the budget sheds it, Dropped under the token budget. The change in T1 is complete.
 
 ```bash
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --tiers 0-1 --out packet --repo .
 ```
 
-A run that builds a packet writes two files into the output directory. The packet file is the reading document, and its title calls it the pericope for the change. The manifest file is the receipt, with the resolved refs, the command that produced it, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A run that fails, at argument checking or later, removes any earlier packet from the directory first and leaves a manifest whose verified flag is false, so a stale packet can never stand as the result of the latest run, as long as the run named an output directory.
+A run that builds a packet writes two files into the output directory. The packet file is the reading document, and its title calls it the pericope for the change. The manifest file is the receipt, with the resolved refs, the command that produced it, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. The packet closes with the same check stated for its own reader, as a verification recount of the files and hunks and lines against the manifest. A run that fails, at argument checking or later, removes any earlier packet from the directory first and leaves a manifest whose verified flag is false, so a stale packet can never stand as the result of the latest run, as long as the run named an output directory.
 
 The script at `scripts/check_packet.py` validates a packet directory before a review is stamped on it. It confirms the manifest is verified, that the head it records is still the head of the repository under review, and that the sections the manifest records are present and filled in the packet.
 
 ## The tier model
 
-The packet is built in four tiers.
+The packet is built in four tiers and closes with a receipt. The packet reads in four tiers, T0 Triage and T1 The change and T2 Companions and T3 History, and it closes with its verification recount.
 
 - T0 is triage, with the pull request title, body and spec references when the mode resolves them, the file list, the numstat summary, and the commit list for the range. A changed file whose name marks it as an instruction bearing file, such as an AGENTS.md or a SKILL.md at any depth, is flagged as an instruction file in that list, and its record in the manifest carries the same flag, so a reviewer can tell which changed files will steer the next agent that loads the tree.
 - T1 is the change, with per file diffs that carry whole enclosing function context instead of a fixed line radius.
 - T2 is the companions, with call sites of the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and test files that mention the changed modules. Companions come from deterministic search only, each one is capped, and the packet says when a cap was hit.
 - T3 is history, with a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. That lookup checks the three most changed files against the thirty most recent pull requests and shows at most five matches, and the packet states that window where it reports the results. When the CLI cannot name them, the tier says so.
 
-Some files stand in the change as named placeholders rather than diffs. A binary file is named with its byte count. A file detected as generated or as a lockfile is named with its detection reason, and detection works from a list of known lockfile names, known generated suffixes, and the do not edit marker in a file header. The header marker withholds a diff only when it already stood at the base revision. A marker that arrives in the change itself is flagged in the packet header and the change is shown in full, because a file cannot exempt itself with words it just wrote. Every placeholder keeps its lines and hunks counted in the manifest, and the packet header lists each one with its reason. A text file that the tree marks binary through its attributes file is counted and shown as text instead, and the header names that too. A file that changed from binary content to text in the change itself is counted and shown as text as well, its receipt names the transition as the real reason, and the manifest records the transition on the file record.
+Some files stand in the change as named placeholders rather than diffs. A binary file is named with its byte count. A file detected as generated or as a lockfile is named with its detection reason, and detection works from a list of known lockfile names, known generated suffixes, and the do not edit marker in a file header. The header marker withholds a diff only when it already stood at the base revision. A marker that arrives in the change itself is flagged in the packet header and the change is shown in full, because a file cannot exempt itself with words it just wrote. Every placeholder keeps its lines and hunks counted in the manifest, and the packet header lists each one with its reason under the heading Files not shown in full. A text file that the tree marks binary through its attributes file is counted and shown as text instead, and the header names that too, under the heading Files shown in full, so no file that stands shown in full in the packet stands under a heading that says it was withheld. A file that changed from binary content to text in the change itself is counted and shown as text as well, its receipt names the transition as the real reason, and the manifest records the transition on the file record.
 
-A budget spends itself in tier order. T3 drops first and T2 drops second, and the manifest records every drop with its reason. The receipt reports tokens per tier, files per tier, and what was cut. Files per tier counts what each tier worked over. T0 and T1 count every changed file, T2 counts the changed source files it searched for companions, and T3 counts the capped subset of most changed files it drew history from. The change itself never drops and never truncates. When T0 and T1 alone exceed the budget, the run fails with a clear message instead of handing over a partial change dressed as a whole one.
+A budget spends itself in tier order. T3 drops first and T2 drops second, and the manifest records every drop with its reason. The closing receipt reports tokens per tier, files per tier, and what was cut. Files per tier counts what each tier worked over. T0 and T1 count every changed file, T2 counts the changed source files it searched for companions, and T3 counts the capped subset of most changed files it drew history from. The change itself never drops and never truncates. When T0 and T1 alone exceed the budget, the run fails with a clear message instead of handing over a partial change dressed as a whole one.
 
 ## The completeness guarantee
 

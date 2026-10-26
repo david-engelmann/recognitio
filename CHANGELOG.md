@@ -669,6 +669,25 @@ This unreleased work carries version 1.3.0.
   a new asset gate pins the hero dimensions and byte
   budget, the frame zero content, the verdict rest
   frame, the stills and every README image reference.
+
+- The packet face rebuilt in visual round 4. The header
+  fields stand in their own blocks with the verified
+  marker pointing at the closing recount, a contents
+  block generated from the manifest opens the packet,
+  and the closing section is now the verification
+  recount, printing the manifest counts and the recount
+  agreement with the budget figures as facts and ending
+  on the limit sentence. The header lists split files
+  shown in full from files not shown in full, cap notes
+  stand grouped under one Cap notes block in one
+  wording, and a history cap prints once in the packet.
+  The describing surfaces name the packet as four tiers
+  and a closing receipt, the output style marks its
+  Re-review heading as standing only on re-review runs
+  and gains the fixed P1 and P2 and P3 severity
+  vocabulary for the review side, and the README worked
+  example shows the real added lines of its function
+  with its elisions marked and counted.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

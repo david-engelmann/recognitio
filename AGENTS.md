@@ -632,3 +632,23 @@ and growing the demo asset gate in the gate tests
 over the hero dimensions and byte budget, the frame
 zero content, the verdict rest frame, the stills
 and the README image references.
+
+The visual round 4 pass on 2026-10-26 then
+rebuilt the packet face with no new build, giving
+the header one field per block with the verified
+marker pointing at the closing recount, opening the
+packet with a contents block generated from the
+manifest, and closing it with the verification
+recount receipt that prints the manifest counts and
+ends on the limit sentence. The header lists now
+split files shown in full from files not shown in
+full, cap notes stand grouped under one Cap notes
+block in one wording with a history cap printed
+once, the describing surfaces name the packet as
+four tiers and a closing receipt with the tier
+headings standing in every packet, the output
+style marks its Re-review heading as conditional
+and carries the fixed P1 and P2 and P3 severity
+vocabulary for the review side, and the README
+worked example shows the real added lines of its
+function with its elisions marked and counted.

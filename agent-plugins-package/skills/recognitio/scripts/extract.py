@@ -333,17 +333,35 @@ def estimate_tokens(text):
     return len(text) // 4
 
 
-def cap_text(text, limit, label):
+def cap_text(text, limit, label, mark=True):
     if len(text) <= limit:
         return text, False
+    if not mark:
+        # The cap is stated once, in the cap notes block of the
+        # tier that owns the text, so the text itself carries no
+        # second wording of the same event inside its fence.
+        return text[:limit], True
     return text[:limit] + "\n[recognitio] %s capped at %d characters.\n" % (label, limit), True
 
 
 def render_notes(notes):
+    """The cap notes of one tier, grouped under one labelled block.
+
+    Every note carries the one wording, and a note the tier
+    recorded more than once stands once in the packet. The
+    manifest keeps the recorded list as it stands.
+    """
     lines = []
+    seen = []
     for note in notes:
+        if note not in seen:
+            seen.append(note)
+    if not seen:
+        return lines
+    lines.append("### Cap notes")
+    lines.append("")
+    for note in seen:
         lines.append("Cap note: %s." % note)
-    if notes:
         lines.append("")
     return lines
 
@@ -998,34 +1016,140 @@ def enrich_files(repo, diff_base, head, change):
 
 
 def build_header(resolved, diff_base, verified, exclusions):
+    """The packet header, one field per line block.
+
+    Consecutive raw lines with no blank line between them render
+    as one wrapped paragraph, so every field stands in its own
+    block and the verified marker is never the last field of a
+    hash paragraph. The marker points at the closing recount
+    where its proof stands.
+    """
     lines = []
     lines.append("# The pericope for %s" % resolved["label"])
     lines.append("")
     lines.append(
-        "A recognitio review packet. It holds the change and the context "
-        "appointed to be read with it, and nothing else."
+        "A recognitio review packet. The pericope named in the "
+        "title is this packet, holding the change and the context "
+        "a reviewer needs to read it, and nothing else."
     )
     lines.append("")
     lines.append("Mode: %s" % resolved["mode"])
+    lines.append("")
     if resolved["base"] is None:
         lines.append("Base: the empty tree, because the head is a root commit")
     else:
         lines.append("Base: %s" % resolved["base"])
+    lines.append("")
     lines.append("Head: %s" % resolved["head"])
+    lines.append("")
     if resolved["merge_base"] is None:
         lines.append("Merge base: none, because the head is a root commit")
     else:
         lines.append("Merge base: %s" % resolved["merge_base"])
     if resolved["since"]:
-        lines.append("Since: %s" % resolved["since"])
-    lines.append(
-        "Verified: %s" % ("yes" if verified else "NO, see the completeness section")
-    )
-    if exclusions:
         lines.append("")
-        lines.append("Exclusions and placeholders:")
-        for item in exclusions:
+        lines.append("Since: %s" % resolved["since"])
+    lines.append("")
+    if verified:
+        lines.append(
+            "Verified: yes. The recount at the close of this "
+            "packet carries the proof."
+        )
+    else:
+        lines.append(
+            "Verified: NO. See the verification recount at the "
+            "close of this packet."
+        )
+    shown = [item for item in exclusions if item["shown_as_text"]]
+    withheld = [item for item in exclusions if not item["shown_as_text"]]
+    if withheld:
+        lines.append("")
+        lines.append("Files not shown in full:")
+        for item in withheld:
             lines.append("- %s: %s" % (display_path(item["path"]), item["reason"]))
+    if shown:
+        lines.append("")
+        lines.append("Files shown in full:")
+        for item in shown:
+            lines.append("- %s: %s" % (display_path(item["path"]), item["reason"]))
+    lines.append("")
+    return "\n".join(lines)
+
+
+def packet_counts(manifest_files):
+    """The manifest totals the contents block and the receipt print."""
+    return {
+        "files": len(manifest_files),
+        "hunks": sum(entry["hunks"] for entry in manifest_files),
+        "additions": sum(entry["additions"] for entry in manifest_files),
+        "deletions": sum(entry["deletions"] for entry in manifest_files),
+    }
+
+
+def _counted(count, singular, plural):
+    return "%d %s" % (count, singular if count == 1 else plural)
+
+
+def build_contents(counts, tier_info, rereview):
+    """The contents block at the packet head.
+
+    A one line summary from the manifest totals above a grouped
+    index of the packet sections in order. Every word of it is
+    generated from the manifest data the run already computed,
+    so the block can name nothing the run did not count.
+    """
+    lines = []
+    lines.append("Contents")
+    lines.append("")
+    lines.append(
+        "This packet holds %s, %s, %s and %s"
+        % (
+            _counted(counts["files"], "file", "files"),
+            _counted(counts["hunks"], "hunk", "hunks"),
+            _counted(counts["additions"], "added line", "added lines"),
+            _counted(counts["deletions"], "deleted line", "deleted lines"),
+        )
+    )
+    lines.append("")
+    standing = [
+        tier for tier in ("T0", "T1", "T2", "T3")
+        if tier_info[tier]["state"] == "included"
+    ]
+    placeholders = [
+        tier for tier in ("T0", "T1", "T2", "T3")
+        if tier_info[tier]["state"] != "included"
+    ]
+    if not placeholders:
+        lines.append("All four tiers stand in full")
+    else:
+        parts = []
+        if standing:
+            verb = "stands" if len(standing) == 1 else "stand"
+            parts.append(
+                "%s %s in full" % (" and ".join(standing), verb)
+            )
+        if placeholders:
+            verb = "stands" if len(placeholders) == 1 else "stand"
+            noun = "a placeholder" if len(placeholders) == 1 else "placeholders"
+            parts.append(
+                "%s %s as %s"
+                % (" and ".join(placeholders), verb, noun)
+            )
+        joined = " and ".join(parts)
+        lines.append(joined[:1].upper() + joined[1:])
+    lines.append("")
+    lines.append("The tiers, in order")
+    lines.append("")
+    lines.append("- T0 Triage")
+    lines.append("- T1 The change")
+    lines.append("- T2 Companions")
+    lines.append("- T3 History")
+    lines.append("")
+    lines.append("The close")
+    lines.append("")
+    if rereview is not None:
+        lines.append("- Re-review")
+    lines.append("- Verification recount")
     lines.append("")
     return "\n".join(lines)
 
@@ -1837,7 +1961,8 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
                 lines.append("")
                 continue
             text, capped = cap_text(
-                result.stdout.rstrip(), MAX_LOG_L_CHARS, "history for %s" % name
+                result.stdout.rstrip(), MAX_LOG_L_CHARS,
+                "history for %s" % name, mark=False,
             )
             if capped:
                 notes.append("history for %s capped" % name)
@@ -2465,16 +2590,27 @@ def tier_placeholder(tier, state):
     return "%s\n\n%s\n" % (title, body)
 
 
-def render_completeness(budget, packet_estimate, tier_info, dropped,
-                        verified, discrepancies):
+def render_receipt(budget, packet_estimate, tier_info, dropped,
+                   verified, discrepancies, counts):
+    """The closing receipt of the packet.
+
+    The budget account stands under its own subheading as facts,
+    then the recount prints the manifest counts it covered, the
+    agreement, and the limit sentence last, so the final line of
+    the packet states what verified does not mean.
+    """
     lines = []
-    lines.append("## Budget and completeness")
+    lines.append("## Verification recount")
+    lines.append("")
+    lines.append("### Budget")
     lines.append("")
     lines.append(
         "Budget in tokens: %s"
         % (budget if budget is not None else "none set")
     )
+    lines.append("")
     lines.append("Packet estimate in tokens: %d" % packet_estimate)
+    lines.append("")
     for tier in ("T0", "T1", "T2", "T3"):
         info = tier_info[tier]
         if info["state"] == "included":
@@ -2490,29 +2626,67 @@ def render_completeness(budget, packet_estimate, tier_info, dropped,
             )
         else:
             lines.append("%s not selected for this run" % tier)
+        lines.append("")
     if dropped:
         for item in dropped:
             lines.append(
                 "Dropped %s because of the %s." % (item["tier"], item["reason"])
             )
+            lines.append("")
     else:
         lines.append("No tier was dropped.")
+        lines.append("")
+    lines.append("### Recount")
     lines.append("")
+    covered = (
+        "The recount covered %s with their statuses and old paths, "
+        "%s, and %s and %s"
+        % (
+            _counted(counts["files"], "file", "files"),
+            _counted(counts["hunks"], "hunk", "hunks"),
+            _counted(counts["additions"], "added line", "added lines"),
+            _counted(counts["deletions"], "deleted line", "deleted lines"),
+        )
+    )
     if verified:
+        lines.append("Recount passed")
+        lines.append("")
+        lines.append("A separate recount counted the change a second time")
+        lines.append("")
+        lines.append(covered)
+        lines.append("")
+        lines.append("The recount matches the manifest on every count")
+        lines.append("")
+        if not dropped and all(
+            tier_info[tier]["state"] == "included"
+            for tier in ("T0", "T1", "T2", "T3")
+        ):
+            lines.append("Every tier is included")
+            lines.append("")
         lines.append(
-            "Completeness check passed. A separate recount of files, "
-            "statuses, old paths, hunks and lines matches the manifest."
+            "Verified means this packet holds the whole change it names"
         )
+        lines.append("")
     else:
+        lines.append("Recount FAILED")
+        lines.append("")
         lines.append(
-            "Completeness check FAILED. This packet must not be reviewed "
-            "as if it were whole. Discrepancies follow."
+            "This packet must not be reviewed as if it were whole"
         )
+        lines.append("")
+        lines.append(covered)
+        lines.append("")
+        lines.append("Discrepancies follow")
+        lines.append("")
         for item in discrepancies:
             lines.append(
                 "Missing or mismatched: %s"
                 % item.replace("\n", "\\n").replace("\r", "\\r")
             )
+            lines.append("")
+    lines.append(
+        "Verified does not mean the change is correct or safe"
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -2661,7 +2835,7 @@ def assemble_tiers(args, repo, resolved, diff_base, change, files,
 
 
 def apply_budget(args, selected, tier_texts, tier_files, rereview,
-                 header_provisional):
+                 header_provisional, counts):
     """Decide which optional tiers the budget sheds.
 
     Returns the drop list and, when T0 and T1 alone exceed the
@@ -2672,7 +2846,7 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
     it would emit and settling its token estimate, the same fixed
     point the shipped packet is measured at, so a packet the
     budget accepts is a packet that measures inside the budget.
-    A fixed allowance for the completeness section undercounted
+    A fixed allowance for the closing receipt undercounted
     it whenever the section grew, drop lines and all, and let
     emitted packets land over the budget they were accepted
     under. The measurement reads the verified form of the packet.
@@ -2693,7 +2867,7 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
         )
         _packet, estimate = build_packet_text(
             header_provisional, tier_texts, rereview, info,
-            candidate, args.budget, True, [],
+            candidate, args.budget, True, [], counts,
         )
         return estimate
 
@@ -2742,12 +2916,13 @@ def tier_accounting(selected, dropped_names, tier_texts, tier_files):
 
 
 def build_packet_text(header, tier_texts, rereview, tier_info, dropped,
-                      budget, verified, discrepancies):
+                      budget, verified, discrepancies, counts):
     """Join the sections and settle the completeness fixed point.
 
     Returns the packet text and its settled token estimate.
     """
-    sections = [header, tier_texts["T0"], tier_texts["T1"]]
+    contents = build_contents(counts, tier_info, rereview)
+    sections = [header, contents, tier_texts["T0"], tier_texts["T1"]]
     for tier in ("T2", "T3"):
         if tier_info[tier]["state"] == "included":
             sections.append(tier_texts[tier])
@@ -2760,9 +2935,9 @@ def build_packet_text(header, tier_texts, rereview, tier_info, dropped,
     packet_estimate = 0
     packet = ""
     for _round in range(5):
-        completeness = render_completeness(
+        completeness = render_receipt(
             budget, packet_estimate, tier_info, dropped,
-            verified, discrepancies,
+            verified, discrepancies, counts,
         )
         packet = sanitize_packet_text("\n".join(sections + [completeness]))
         new_estimate = estimate_tokens(packet)
@@ -2857,18 +3032,18 @@ def run_pipeline(args, repo, out_dir, argv):
         args, repo, resolved, diff_base, change, files, findings
     )
     selected = args.tiers_selected
+    manifest_files = manifest_file_records(files)
+    counts = packet_counts(manifest_files)
     header_provisional = build_header(resolved, diff_base, True, exclusions)
     dropped, failure = apply_budget(
         args, selected, tier_texts, tier_files, rereview,
-        header_provisional
+        header_provisional, counts
     )
     if failure is not None:
         write_failure_manifest(out_dir, argv, failure, resolved)
         print("recognitio: %s" % failure, file=sys.stderr)
         return 2
     dropped_names = {item["tier"] for item in dropped}
-
-    manifest_files = manifest_file_records(files)
 
     try:
         discrepancies = verify_counts(repo, diff_base, head, manifest_files)
@@ -2882,7 +3057,7 @@ def run_pipeline(args, repo, out_dir, argv):
     header = build_header(resolved, diff_base, verified, exclusions)
     packet, packet_estimate = build_packet_text(
         header, tier_texts, rereview, tier_info, dropped,
-        args.budget, verified, discrepancies,
+        args.budget, verified, discrepancies, counts,
     )
     manifest = assemble_manifest(
         argv, args, resolved, head, manifest_files, exclusions,
