@@ -2028,9 +2028,15 @@ class TestReadmePhoneWidth(unittest.TestCase):
         )
         self.assertIn(
             'src="docs/images/recognitio-cursor-agent-demo.gif" '
-            'width="792" height="608">',
+            'width="792">',
             block,
         )
+        # The hero image declares its width and no height.
+        # GitHub honours a height attribute as a fixed CSS
+        # height, and the WP1 rendered pass caught it
+        # stretching the phone crop into a 608 tall box.
+        # With the width alone declared, both sources
+        # render at their natural aspect on the live page.
 
     def test_every_readme_image_alt_and_dimensions(self):
         alts = re.findall(r'alt="([^"]+)"', self.readme)
@@ -2040,7 +2046,10 @@ class TestReadmePhoneWidth(unittest.TestCase):
             self.assertLessEqual(len(alt), 125, alt)
         for tag in re.findall(r"<img [^>]+>", self.readme):
             self.assertIn('width="', tag)
-            self.assertIn('height="', tag)
+            if "wordmark" in tag:
+                self.assertIn('height="', tag)
+            if "cursor-agent-demo" in tag:
+                self.assertNotIn('height="', tag)
 
     def test_the_worked_example_lines_fit_phone_width(self):
         for fence in self.fences(
@@ -2077,11 +2086,30 @@ class TestReadmePhoneWidth(unittest.TestCase):
         )
 
     def test_the_flow_diagram_runs_wide_with_its_nodes(self):
-        # The diagram pairs its nodes in left to right
-        # rows, the compact form the WP1 rendered pass
-        # settled on after the single wide row failed
-        # phone legibility on the live page.
-        self.assertEqual(self.readme.count("direction LR"), 3)
+        # The diagram keeps its tall form. The WP1 rendered
+        # pass tried the wide single row and the paired
+        # subgraph rows on the live page. The wide row
+        # failed phone legibility and the subgraph rows
+        # failed to render at all, so the tall form is the
+        # compact arrangement that passes both widths.
+        self.assertIn("flowchart TB", self.readme)
+        # The subgraph form is the form that failed to
+        # render, so it stays out by name, and the tall
+        # edges stand in their exact single column form.
+        # Without these two pins the label checks above
+        # pass on the subgraph form as well, which the
+        # WP1 completion mutation run proved.
+        self.assertNotIn("subgraph", self.readme)
+        self.assertNotIn("direction LR", self.readme)
+        for edge in (
+            "A([Pull request or commit range]) --> "
+            "B[Extract from the local clone]",
+            "B --> C[Assemble the packet in four tiers]",
+            "C --> D{Recount the change}",
+            "D -->|Counts agree| E([Verified packet])",
+            "E --> G[The review reads the packet]",
+        ):
+            self.assertIn(edge, self.readme)
         for label in (
             "Pull request or commit range",
             "Extract from the local clone",
