@@ -1799,10 +1799,29 @@ def packet_dir_problems(packet_dir):
     return problems
 
 
+class _VersionAction(argparse.Action):
+    """Print the extractor version this check stamps against."""
+
+    def __init__(self, option_strings, dest=None, **kwargs):
+        super().__init__(
+            option_strings=option_strings, dest=dest, nargs=0, **kwargs
+        )
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        extractor = load_extractor()
+        version = extractor.EXTRACTOR_VERSION if extractor else "unknown"
+        print("check_packet.py, extractor version %s" % version)
+        parser.exit(0)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="check_packet.py",
         description="Validate a recognitio packet directory.",
+    )
+    parser.add_argument(
+        "--version", action=_VersionAction,
+        help="print the extractor version and exit",
     )
     parser.add_argument("packet_dir", help="directory holding the packet")
     parser.add_argument(

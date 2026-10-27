@@ -37,7 +37,7 @@ without reading three audit reports first.
 | The re-review range diff ran without the textconv pins | `test_range_diff_cannot_be_rewritten_by_a_textconv_driver` in the extractor suite |
 | Companion searches omitted attribute marked files and reported that nothing exists | `test_call_sites_found_when_tree_marks_sources_binary` in the extractor suite |
 | GitHub CLI failures escaped as tracebacks | `test_missing_gh_fails_with_a_receipt_not_a_traceback` and `test_gh_view_returning_a_list_fails_cleanly` and `test_gh_list_with_wrongly_shaped_files_degrades` in the extractor suite |
-| A failure inside argument parsing left the old packet standing | `test_invalid_tiers_clears_the_previous_verified_packet` in the extractor suite |
+| A failure inside argument parsing left the old packet standing | `test_invalid_tiers_leaves_the_previous_verified_packet` in the extractor suite |
 | A generated marker arriving in the change exempted its own file | `test_marker_arriving_in_the_change_is_shown_and_flagged` in the extractor suite |
 | Pull request body text broke out of its fence and forged sections | `test_forged_completeness_section_stays_inside_the_fence` in the extractor suite |
 | A thin packet could wear a full packet manifest | `test_a_thin_packet_wearing_a_full_manifest_fails` and `test_a_manifest_without_sections_fails` in the gate script suite |

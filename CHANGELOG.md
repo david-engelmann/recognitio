@@ -1451,3 +1451,23 @@ This unreleased work carries version 1.3.0.
   0, where the shipped fixture read the event from argv and
   exited 1 in its fail mode, a code the host reads as a
   script error that defaults to allow.
+- The extractor output directory is no longer cleared before
+  a run is validated. Argument rejections and the new version
+  flag leave every named output directory untouched, and the
+  raw argument scan that chose a directory the parser had not
+  chosen is gone. The inputs are resolved and read before the
+  directory is opened, the output location is resolved once
+  and pinned for the run, and the finished pair is staged
+  inside the pinned directory and renamed into place under an
+  exclusive lock, so a second run naming the same directory is
+  refused while the first is working and a link swapped during
+  the build cannot redirect or borrow the writes. A run that
+  fails after its inputs were read leaves a failure receipt
+  whose error field names the specific cause, a blocked output
+  path reports the operating system reason instead of a bare
+  refusal, and a run pointed at the root of a working tree is
+  refused when tracked files named packet.md or manifest.json
+  stand there. The packet check gained a version flag as well,
+  and the smoke script now scrubs the git location environment
+  like its siblings, so a stray GIT_DIR can no longer plant
+  its fixture commits on another repository.

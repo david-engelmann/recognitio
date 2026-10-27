@@ -24,7 +24,7 @@
       "test_gh_list_with_wrongly_shaped_files_degrades",
       "test_gh_view_returning_a_list_fails_cleanly",
       "test_glob_named_file_shows_its_own_diff",
-      "test_invalid_tiers_clears_the_previous_verified_packet",
+      "test_invalid_tiers_leaves_the_previous_verified_packet",
       "test_marker_arriving_in_the_change_is_shown_and_flagged",
       "test_missing_gh_fails_with_a_receipt_not_a_traceback",
       "test_range_diff_cannot_be_rewritten_by_a_textconv_driver",

@@ -1588,7 +1588,7 @@ class TestGhFailureShapes(unittest.TestCase):
 
 
 class TestParseFailureReceipts(unittest.TestCase):
-    """Argument rejections clear the output directory too (N7)."""
+    """Argument rejections leave the output directory untouched."""
 
     def setUp(self):
         self.tmp = RetryingTemporaryDirectory()
@@ -1602,20 +1602,32 @@ class TestParseFailureReceipts(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(read_manifest(self.out)["verified"])
+        self.packet_bytes = (self.out / "packet.md").read_bytes()
+        self.manifest_bytes = (self.out / "manifest.json").read_bytes()
 
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_invalid_tiers_clears_the_previous_verified_packet(self):
+    def assert_previous_packet_intact(self):
+        self.assertEqual(
+            (self.out / "packet.md").read_bytes(), self.packet_bytes
+        )
+        self.assertEqual(
+            (self.out / "manifest.json").read_bytes(),
+            self.manifest_bytes,
+        )
+        self.assertTrue(read_manifest(self.out)["verified"])
+
+    def test_invalid_tiers_leaves_the_previous_verified_packet(self):
         result = run_extract_cli(
             self.repo, self.out, "--range", "HEAD~1..HEAD",
             "--tiers", "9",
         )
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertFalse((self.out / "packet.md").exists())
-        self.assertFalse(read_manifest(self.out)["verified"])
+        self.assertIn("tier '9' is not one of", result.stderr)
+        self.assert_previous_packet_intact()
 
-    def test_findings_without_since_clears_the_previous_packet(self):
+    def test_findings_without_since_leaves_the_previous_packet(self):
         findings = Path(self.tmp.name) / "findings.txt"
         findings.write_text("a.py:1: a note\n")
         result = run_extract_cli(
@@ -1623,8 +1635,8 @@ class TestParseFailureReceipts(unittest.TestCase):
             "--findings", str(findings),
         )
         self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertFalse((self.out / "packet.md").exists())
-        self.assertFalse(read_manifest(self.out)["verified"])
+        self.assertIn("--findings needs --since", result.stderr)
+        self.assert_previous_packet_intact()
 
 
 class TestGeneratedMarkerTiming(unittest.TestCase):
@@ -3509,6 +3521,467 @@ class TestTypechangePairing(unittest.TestCase):
         chunks = ["diff --git a/a.py b/a.py\n@@ -1 +1 @@\n-x\n+y\n"]
         with self.assertRaises(extract_mod.GitError):
             extract_mod.pair_diff_chunks(files, chunks)
+
+
+def install_blame_shim(tmp, body):
+    """A git stand in that runs a shell body on the first blame call."""
+    bindir = Path(tmp) / "shimbin"
+    bindir.mkdir(exist_ok=True)
+    real_git = shutil.which("git")
+    marker = Path(tmp) / "shim-marker"
+    script = (
+        "#!/bin/sh\n"
+        "for a in \"$@\"; do\n"
+        "  if [ \"$a\" = \"blame\" ]; then\n"
+        "    if [ ! -e \"%s\" ]; then\n"
+        "      touch \"%s\"\n"
+        "%s\n"
+        "    fi\n"
+        "  fi\n"
+        "done\n"
+        "exec \"%s\" \"$@\"\n"
+    ) % (marker, marker, body, real_git)
+    shim = bindir / "git"
+    shim.write_text(script)
+    shim.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = str(bindir) + os.pathsep + env["PATH"]
+    return env, marker
+
+
+class TestOutputPathDiscipline(unittest.TestCase):
+    """The output directory discipline of rounds 7, 16 and 23.
+
+    No run touches the output directory before its arguments and
+    inputs are validated, the location is resolved once and pinned,
+    a second run into the same directory is refused, a failed run
+    leaves a specific receipt or the prior state intact, and a run
+    pointed at a working tree root cannot delete tracked files.
+    """
+
+    def setUp(self):
+        self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = make_repo(self.tmp.name, [
+            {"a.py": "x = 1\n"},
+            {"a.py": "x = 2\n"},
+        ])
+
+    def make_sentinel(self, name):
+        out = Path(self.tmp.name) / name
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "packet.md").write_text("SENTINEL PACKET\n")
+        (out / "manifest.json").write_text(
+            '{"verified": true, "sentinel": true}\n'
+        )
+        (out / "keep.txt").write_text("keep\n")
+        return out
+
+    def assert_sentinel_intact(self, out):
+        self.assertEqual(
+            (out / "packet.md").read_text(), "SENTINEL PACKET\n"
+        )
+        self.assertEqual(
+            (out / "manifest.json").read_text(),
+            '{"verified": true, "sentinel": true}\n',
+        )
+        self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def raw_run(self, args, env=None):
+        return subprocess.run(
+            [sys.executable, str(EXTRACT)] + list(args),
+            capture_output=True, text=True, env=env,
+        )
+
+    def test_argument_rejection_battery_leaves_the_sentinel_intact(self):
+        findings = Path(self.tmp.name) / "findings.txt"
+        findings.write_text("a.py:1: a note\n")
+        cases = [
+            ("version", 0, lambda out: [
+                "--version", "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("help", 0, lambda out: [
+                "--help", "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("unknown flag", 2, lambda out: [
+                "--range", "HEAD~1..HEAD", "--bogus",
+                "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("two modes", 2, lambda out: [
+                "--range", "HEAD~1..HEAD", "--commit", "HEAD",
+                "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("bad tier", 2, lambda out: [
+                "--range", "HEAD~1..HEAD", "--tiers", "9",
+                "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("no mode", 2, lambda out: [
+                "--out", str(out), "--repo", str(self.repo),
+            ]),
+            ("findings without since", 2, lambda out: [
+                "--range", "HEAD~1..HEAD", "--findings", str(findings),
+                "--out", str(out), "--repo", str(self.repo),
+            ]),
+        ]
+        for index, (name, code, build) in enumerate(cases):
+            with self.subTest(case=name):
+                out = self.make_sentinel("victim%d" % index)
+                result = self.raw_run(build(out))
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assert_sentinel_intact(out)
+
+    def test_version_flags_answer_without_an_output_directory(self):
+        result = self.raw_run(["--version"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(extract_mod.EXTRACTOR_VERSION, result.stdout)
+        check = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "check_packet.py"),
+             "--version"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertIn(extract_mod.EXTRACTOR_VERSION, check.stdout)
+
+    def test_duplicate_out_flags_spare_the_first_directory(self):
+        first = self.make_sentinel("first")
+        second = self.make_sentinel("second")
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--tiers", "9",
+            "--out", str(first), "--out", str(second),
+            "--repo", str(self.repo),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assert_sentinel_intact(first)
+        self.assert_sentinel_intact(second)
+
+    def test_out_token_after_the_terminator_is_not_a_directory(self):
+        victim = self.make_sentinel("after-terminator")
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--repo", str(self.repo),
+            "--", "--out", str(victim),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assert_sentinel_intact(victim)
+
+    def test_input_failure_receipt_battery(self):
+        cases = [
+            ("bad range end", ["--range", "nope..HEAD"]),
+            ("bad commit", ["--commit", "deadbeefdeadbeef"]),
+            ("bad since", [
+                "--range", "HEAD~1..HEAD", "--since", "nope123",
+            ]),
+            ("malformed range", ["--range", "HEAD"]),
+            ("missing findings file", [
+                "--range", "HEAD~1..HEAD", "--since", "HEAD~1",
+                "--findings", str(Path(self.tmp.name) / "absent.txt"),
+            ]),
+            ("empty change", ["--range", "HEAD..HEAD"]),
+            ("budget of one", [
+                "--range", "HEAD~1..HEAD", "--budget", "1",
+            ]),
+        ]
+        for index, (name, args) in enumerate(cases):
+            with self.subTest(case=name):
+                out = self.make_sentinel("receipt%d" % index)
+                result = self.raw_run(
+                    args + ["--out", str(out), "--repo", str(self.repo)]
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertFalse((out / "packet.md").exists())
+                manifest = read_manifest(out)
+                self.assertFalse(manifest["verified"])
+                self.assertTrue(manifest["error"])
+                self.assertNotIn(
+                    "rejected while its arguments were checked",
+                    manifest["error"],
+                )
+                self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def test_missing_repository_leaves_a_receipt_not_a_hole(self):
+        out = self.make_sentinel("missing-repo")
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--out", str(out),
+            "--repo", str(Path(self.tmp.name) / "no-such-repo"),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse((out / "packet.md").exists())
+        self.assertFalse(read_manifest(out)["verified"])
+        self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def test_shallow_clone_failure_leaves_a_receipt(self):
+        shallow = Path(self.tmp.name) / "shallow"
+        clone = subprocess.run(
+            ["git", "clone", "--depth", "1",
+             "file://%s" % self.repo, str(shallow)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(clone.returncode, 0, clone.stderr)
+        out = self.make_sentinel("shallow-out")
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--out", str(out),
+            "--repo", str(shallow),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse((out / "packet.md").exists())
+        self.assertFalse(read_manifest(out)["verified"])
+        self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def test_blocked_output_paths_name_the_cause(self):
+        blocker = Path(self.tmp.name) / "afile"
+        blocker.write_text("not a directory\n")
+        for out in (blocker, blocker / "sub"):
+            with self.subTest(out=str(out)):
+                result = run_extract_cli(
+                    self.repo, out, "--range", "HEAD~1..HEAD"
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(
+                    "cannot prepare the output directory", result.stderr
+                )
+                self.assertTrue(
+                    "Not a directory" in result.stderr
+                    or "File exists" in result.stderr,
+                    result.stderr,
+                )
+                self.assertEqual(blocker.read_text(), "not a directory\n")
+
+    def test_a_directory_at_a_packet_name_blocks_without_half_clearing(self):
+        out = Path(self.tmp.name) / "dirnames"
+        out.mkdir()
+        (out / "packet.md").write_text("SENTINEL PACKET\n")
+        (out / "manifest.json").mkdir()
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("manifest.json", result.stderr)
+        self.assertEqual(
+            (out / "packet.md").read_text(), "SENTINEL PACKET\n"
+        )
+        self.assertTrue((out / "manifest.json").is_dir())
+
+        other = Path(self.tmp.name) / "dirnames2"
+        other.mkdir()
+        (other / "packet.md").mkdir()
+        (other / "manifest.json").write_text(
+            '{"verified": true, "sentinel": true}\n'
+        )
+        failed = run_extract_cli(
+            self.repo, other, "--range", "nope..HEAD"
+        )
+        self.assertEqual(failed.returncode, 2, failed.stderr)
+        self.assertIn("packet.md", failed.stderr)
+        self.assertTrue((other / "packet.md").is_dir())
+        self.assertEqual(
+            (other / "manifest.json").read_text(),
+            '{"verified": true, "sentinel": true}\n',
+        )
+
+    def test_working_tree_root_with_a_tracked_packet_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"packet.md": "tracked source\n", "a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            for args in (
+                ["--range", "HEAD~1..HEAD"],
+                ["--range", "nope..HEAD"],
+            ):
+                result = self.raw_run(
+                    args + ["--out", str(repo), "--repo", str(repo)]
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("tracked", result.stderr)
+                self.assertEqual(
+                    (repo / "packet.md").read_text(), "tracked source\n"
+                )
+                self.assertEqual(
+                    git(repo, "status", "--porcelain"), ""
+                )
+
+    def test_output_symlink_reaches_the_pinned_target(self):
+        target = Path(self.tmp.name) / "target"
+        target.mkdir()
+        link = Path(self.tmp.name) / "linkout"
+        link.symlink_to(target, target_is_directory=True)
+        result = run_extract_cli(
+            self.repo, link, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(read_manifest(target)["verified"])
+        self.assertTrue((target / "packet.md").is_file())
+
+    def test_packet_path_symlink_cannot_escape_the_directory(self):
+        out = Path(self.tmp.name) / "escape"
+        out.mkdir()
+        outside = Path(self.tmp.name) / "outside.txt"
+        outside.write_text("outside sentinel\n")
+        (out / "packet.md").symlink_to(outside)
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(outside.read_text(), "outside sentinel\n")
+        self.assertFalse((out / "packet.md").is_symlink())
+        self.assertTrue(read_manifest(out)["verified"])
+
+    def test_symlinked_parent_swap_during_the_build_stays_pinned(self):
+        side_a = Path(self.tmp.name) / "side-a"
+        side_b = Path(self.tmp.name) / "side-b"
+        side_a.mkdir()
+        (side_b / "out").mkdir(parents=True)
+        (side_b / "out" / "packet.md").write_text("SENTINEL PACKET\n")
+        (side_b / "out" / "manifest.json").write_text(
+            '{"verified": true, "sentinel": true}\n'
+        )
+        parent = Path(self.tmp.name) / "parent"
+        parent.symlink_to(side_a, target_is_directory=True)
+        body = "      ln -sfn \"%s\" \"%s\"" % (side_b, parent)
+        env, _marker = install_blame_shim(self.tmp.name, body)
+        result = run_extract_cli(
+            self.repo, parent / "out", "--range", "HEAD~1..HEAD",
+            env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(read_manifest(side_a / "out")["verified"])
+        self.assertEqual(
+            (side_b / "out" / "packet.md").read_text(),
+            "SENTINEL PACKET\n",
+        )
+        self.assertEqual(
+            (side_b / "out" / "manifest.json").read_text(),
+            '{"verified": true, "sentinel": true}\n',
+        )
+
+    def test_output_directory_swap_during_the_build_is_refused(self):
+        out = Path(self.tmp.name) / "swapped"
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        victim = Path(self.tmp.name) / "swap-victim"
+        victim.mkdir()
+        (victim / "packet.md").write_text("VICTIM PACKET\n")
+        (victim / "manifest.json").write_text('{"victim": true}\n')
+        moved = Path(self.tmp.name) / "swapped-moved"
+        body = "      mv \"%s\" \"%s\"\n      ln -s \"%s\" \"%s\"" % (
+            out, moved, victim, out,
+        )
+        env, _marker = install_blame_shim(self.tmp.name, body)
+        refused = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD", env=env
+        )
+        self.assertEqual(refused.returncode, 2, refused.stderr)
+        self.assertIn("moved or replaced", refused.stderr)
+        self.assertEqual(
+            (victim / "packet.md").read_text(), "VICTIM PACKET\n"
+        )
+        self.assertEqual(
+            (victim / "manifest.json").read_text(), '{"victim": true}\n'
+        )
+
+    def test_concurrent_pair_refuses_the_second_run(self):
+        out = Path(self.tmp.name) / "shared"
+        env, marker = install_blame_shim(
+            self.tmp.name, "      sleep 6"
+        )
+        first = subprocess.Popen(
+            [sys.executable, str(EXTRACT), "--range", "HEAD~1..HEAD",
+             "--out", str(out), "--repo", str(self.repo)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, env=env,
+        )
+        try:
+            deadline = time.time() + 60
+            while not marker.exists() and time.time() < deadline:
+                time.sleep(0.1)
+            self.assertTrue(marker.exists(), "the first run never built")
+            second = run_extract_cli(
+                self.repo, out, "--range", "HEAD~1..HEAD",
+                "--tiers", "0,1",
+            )
+            self.assertEqual(second.returncode, 2, second.stderr)
+            self.assertIn("another recognitio run", second.stderr)
+        finally:
+            _stdout, stderr = first.communicate(timeout=120)
+        self.assertEqual(first.returncode, 0, stderr)
+        self.assertTrue(read_manifest(out)["verified"])
+        check = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "check_packet.py"),
+             str(out), "--repo", str(self.repo)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr + check.stdout)
+
+    def test_interrupted_run_leaves_the_prior_packet_intact(self):
+        out = Path(self.tmp.name) / "interrupt"
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        packet_bytes = (out / "packet.md").read_bytes()
+        manifest_bytes = (out / "manifest.json").read_bytes()
+        env, marker = install_blame_shim(
+            self.tmp.name, "      sleep 30"
+        )
+        # The trampoline resets the SIGINT disposition before exec,
+        # because a suite neighbour that left the signal ignored in
+        # this process would otherwise hand the child an interpreter
+        # that keeps ignoring it, and the interrupt would never land.
+        trampoline = (
+            "import os, signal, sys;"
+            "signal.signal(signal.SIGINT, signal.SIG_DFL);"
+            "os.execv(sys.argv[1], sys.argv[1:])"
+        )
+        proc = subprocess.Popen(
+            [sys.executable, "-c", trampoline, sys.executable,
+             str(EXTRACT), "--range", "HEAD~1..HEAD",
+             "--out", str(out), "--repo", str(self.repo)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, env=env,
+        )
+        deadline = time.time() + 60
+        while not marker.exists() and time.time() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(marker.exists(), "the second run never built")
+        proc.send_signal(2)
+        _stdout, stderr = proc.communicate(timeout=60)
+        self.assertEqual(proc.returncode, 130, stderr)
+        self.assertNotIn("Traceback", stderr)
+        self.assertEqual((out / "packet.md").read_bytes(), packet_bytes)
+        self.assertEqual(
+            (out / "manifest.json").read_bytes(), manifest_bytes
+        )
+
+    def test_findings_inside_the_output_directory_are_read_first(self):
+        out = Path(self.tmp.name) / "selffindings"
+        out.mkdir()
+        (out / "packet.md").write_text("a.py:1: a note\n")
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD",
+            "--since", "HEAD~1", "--findings", str(out / "packet.md"),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(read_manifest(out)["verified"])
+
+    def test_smoke_script_scrubs_the_git_location_environment(self):
+        with RetryingTemporaryDirectory() as tmp:
+            victim = make_repo(tmp, [{"a.py": "x = 1\n"}])
+            head_before = git(victim, "rev-parse", "HEAD")
+            env = dict(os.environ)
+            env["GIT_DIR"] = str(victim / ".git")
+            env["GIT_WORK_TREE"] = str(victim)
+            elsewhere = Path(tmp) / "elsewhere"
+            elsewhere.mkdir()
+            run = subprocess.run(
+                [sys.executable,
+                 str(ROOT / "scripts" / "smoke_extract.py")],
+                capture_output=True, text=True, env=env,
+                cwd=str(elsewhere),
+            )
+            self.assertEqual(run.returncode, 0, run.stderr + run.stdout)
+            self.assertEqual(git(victim, "rev-parse", "HEAD"), head_before)
+            self.assertEqual(git(victim, "status", "--porcelain"), "")
 
 
 if __name__ == "__main__":

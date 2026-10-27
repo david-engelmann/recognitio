@@ -21,8 +21,46 @@ ROOT = Path(__file__).resolve().parents[1]
 EXTRACT = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHECK_PACKET = ROOT / "scripts" / "check_packet.py"
 
+# The same git location scrub its sibling scripts run under. An
+# exported GIT_DIR defeats git -C, so a smoke run launched from a git
+# hook would otherwise build its fixture commits on whatever
+# repository the environment names instead of its throwaway one.
+# The driver and configuration variables are scrubbed beside the
+# location variables, for the same reason the extractor scrubs them.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+)
+GIT_DRIVER_ENV_VARS = (
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "GIT_PAGER",
+    "GIT_EXEC_PATH",
+)
+GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+
+
+def scrubbed_git_env():
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+        and key not in GIT_DRIVER_ENV_VARS
+        and not key.startswith(GIT_CONFIG_ENV_PREFIX)
+    }
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return env
+
+
 GIT_ENV = dict(
-    os.environ,
+    scrubbed_git_env(),
     GIT_AUTHOR_NAME="Recognitio Smoke",
     GIT_AUTHOR_EMAIL="smoke@example.invalid",
     GIT_COMMITTER_NAME="Recognitio Smoke",
@@ -102,6 +140,7 @@ def main():
             ],
             capture_output=True,
             text=True,
+            env=GIT_ENV,
         )
         if run.returncode != 0:
             return fail("extractor exited %d" % run.returncode, run)
@@ -137,6 +176,7 @@ def main():
             ],
             capture_output=True,
             text=True,
+            env=GIT_ENV,
         )
         if check.returncode != 0:
             return fail("packet check rejected the smoke packet", check)

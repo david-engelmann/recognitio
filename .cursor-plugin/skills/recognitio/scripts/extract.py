@@ -23,19 +23,38 @@ File paths reach git as literal pathspecs, never as patterns. Path data
 moves through NUL delimited output, so quoted, spaced and Unicode
 paths survive end to end. All subprocess output is handled as bytes
 first, so binary files and non UTF-8 content cannot crash the run.
+
+The output directory is written only by a finished run. Arguments are
+checked before any output path is touched, and the inputs are resolved
+and read before the directory is opened. The output location is
+resolved once and pinned for the whole run, the pair is staged beside
+its final names inside that directory and moved into place with
+renames under an exclusive lock, and a second run naming the same
+directory is refused while the first is working. A run that fails
+after its inputs were read leaves a failure receipt in place of the
+old packet, and a run that is refused or interrupted leaves whatever
+already stood in the directory untouched.
 """
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover, the shipped hosts carry fcntl
+    fcntl = None
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 EXTRACTOR_VERSION = "1.3.0"
@@ -2807,13 +2826,13 @@ def base_manifest(argv):
     }
 
 
-def write_manifest(out_dir, manifest):
+def manifest_bytes(manifest):
     text = json.dumps(manifest, indent=2) + "\n"
-    (out_dir / "manifest.json").write_bytes(text.encode("utf-8"))
+    return text.encode("utf-8")
 
 
-def write_failure_manifest(out_dir, argv, message, resolved=None):
-    """Leave a receipt that cannot be mistaken for a verified packet."""
+def build_failure_manifest(argv, message, resolved=None):
+    """The receipt a failed run leaves, specific about its own cause."""
     manifest = base_manifest(argv)
     manifest.update({
         "mode": resolved["mode"] if resolved else None,
@@ -2832,16 +2851,295 @@ def write_failure_manifest(out_dir, argv, message, resolved=None):
         "error": message,
         "discrepancies": [message],
     })
-    try:
-        write_manifest(out_dir, manifest)
-    except OSError:
-        pass
+    return manifest
+
+
+class OutputRefusal(Exception):
+    """The output location cannot be written, with the reason named."""
+
+
+class OutputTarget:
+    """One output directory, pinned once and written under a lock.
+
+    The path is resolved a single time, before any input is read, so a
+    link swapped while the run builds cannot redirect the writes to a
+    different directory. The directory itself is opened once the run
+    is ready to build and the descriptor is held for the rest of the
+    run, so the writes land in the directory the run opened even if a
+    path component above it is renamed afterwards. The finished pair
+    is staged under temporary names inside that directory and renamed
+    over the final names, so no reader can meet a torn file, and a
+    link standing at a final name is replaced as a link rather than
+    followed to a file outside the directory. An exclusive lock keyed
+    on the pinned path is held from the build to the publish, so a
+    second run naming the same directory is refused instead of
+    interleaving its writes with the first.
+    """
+
+    def __init__(self, pinned):
+        self.path = pinned
+        self.lock_fd = None
+        self.dir_fd = None
+
+    def acquire_lock(self):
+        if fcntl is None or self.lock_fd is not None:
+            return
+        digest = hashlib.sha256(
+            str(self.path).encode("utf-8")
+        ).hexdigest()
+        lock_path = Path(tempfile.gettempdir()) / (
+            "recognitio-out-%s.lock" % digest[:32]
+        )
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot take the output lock for %s because %s"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            raise OutputRefusal(
+                "another recognitio run is already writing to the "
+                "output directory %s. Wait for it to finish or pick "
+                "another output directory" % self.path
+            )
+        except OSError as exc:
+            os.close(fd)
+            raise OutputRefusal(
+                "cannot take the output lock for %s because %s"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        self.lock_fd = fd
+
+    def open_dir(self):
+        if self.dir_fd is not None:
+            return
+        try:
+            self.path.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot prepare the output directory %s because %s. "
+                "Fix the path or pick another output directory"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        try:
+            info = os.lstat(self.path)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot prepare the output directory %s because %s. "
+                "Fix the path or pick another output directory"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            raise OutputRefusal(
+                "cannot prepare the output directory %s because it is "
+                "not a directory. Fix the path or pick another output "
+                "directory" % self.path
+            )
+        try:
+            self.dir_fd = os.open(
+                self.path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            )
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot open the output directory %s because %s. "
+                "Fix the path or pick another output directory"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+
+    def close(self):
+        for attr in ("dir_fd", "lock_fd"):
+            fd = getattr(self, attr)
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                setattr(self, attr, None)
+
+    def _verify_still_pinned(self):
+        """Refuse a publish if the pinned path stopped naming this dir.
+
+        The descriptor pins the writes, but a directory renamed aside
+        and replaced at its path during the build would leave the
+        success line naming a path that no longer holds the packet.
+        Comparing the path identity with the descriptor identity at
+        publish time turns that swap into a refusal instead.
+        """
+        try:
+            current = os.stat(self.path)
+            opened = os.fstat(self.dir_fd)
+        except OSError as exc:
+            raise OutputRefusal(
+                "the output directory %s could not be rechecked "
+                "because %s, so nothing was published"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        if (current.st_dev, current.st_ino) != (
+                opened.st_dev, opened.st_ino):
+            raise OutputRefusal(
+                "the output directory %s was moved or replaced "
+                "while the run was building, so nothing was "
+                "published at that path" % self.path
+            )
+
+    def _check_names(self, names):
+        """Refuse before any mutation when a final name cannot move."""
+        for name in names:
+            try:
+                info = os.stat(
+                    name, dir_fd=self.dir_fd, follow_symlinks=False
+                )
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise OutputRefusal(
+                    "cannot replace %s in the output directory %s "
+                    "because %s. Move it aside or pick another output "
+                    "directory"
+                    % (name, self.path, exc.strerror or exc)
+                ) from exc
+            if not (stat.S_ISREG(info.st_mode)
+                    or stat.S_ISLNK(info.st_mode)):
+                raise OutputRefusal(
+                    "cannot replace %s in the output directory %s "
+                    "because it is not a regular file. Move it aside "
+                    "or pick another output directory"
+                    % (name, self.path)
+                )
+
+    def _stage(self, hint, data):
+        """Write one finished file under a temporary name in place."""
+        temp_name = ".recognitio-tmp-%d-%s" % (os.getpid(), hint)
+        try:
+            fd = os.open(
+                temp_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o644,
+                dir_fd=self.dir_fd,
+            )
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot stage the %s in the output directory %s "
+                "because %s" % (hint, self.path, exc.strerror or exc)
+            ) from exc
+        try:
+            view = memoryview(data)
+            while view:
+                written = os.write(fd, view)
+                view = view[written:]
+            os.fsync(fd)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot stage the %s in the output directory %s "
+                "because %s" % (hint, self.path, exc.strerror or exc)
+            ) from exc
+        finally:
+            os.close(fd)
+        return temp_name
+
+    def _discard(self, temp_name):
+        try:
+            os.unlink(temp_name, dir_fd=self.dir_fd)
+        except OSError:
+            pass
+
+    def _discard_stale_temps(self):
+        """Drop staging files a killed run left in the directory.
+
+        The publish lock is held here, so a staging file can only
+        belong to a run that died between staging and renaming.
+        Leaving one behind would make the packet directory carry an
+        entry no manifest receipts.
+        """
+        try:
+            entries = os.listdir(self.dir_fd)
+        except OSError:
+            return
+        for entry in entries:
+            if entry.startswith(".recognitio-tmp-"):
+                self._discard(entry)
+
+    def _replace(self, temp_name, final_name):
+        try:
+            os.replace(
+                temp_name, final_name,
+                src_dir_fd=self.dir_fd, dst_dir_fd=self.dir_fd,
+            )
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot move the finished %s into place in the output "
+                "directory %s because %s"
+                % (final_name, self.path, exc.strerror or exc)
+            ) from exc
+
+    def publish_pair(self, packet_data, manifest):
+        """Move a finished packet and manifest into place together."""
+        self.open_dir()
+        self._verify_still_pinned()
+        self._check_names(("packet.md", "manifest.json"))
+        self._discard_stale_temps()
+        temp_packet = self._stage("packet.md", packet_data)
+        try:
+            temp_manifest = self._stage(
+                "manifest.json", manifest_bytes(manifest)
+            )
+        except OutputRefusal:
+            self._discard(temp_packet)
+            raise
+        try:
+            self._replace(temp_packet, "packet.md")
+            self._replace(temp_manifest, "manifest.json")
+        finally:
+            self._discard(temp_packet)
+            self._discard(temp_manifest)
+        os.fsync(self.dir_fd)
+
+    def publish_failure(self, argv, message, resolved=None):
+        """Replace the old packet with a failure receipt, or nothing.
+
+        Both final names are checked before either is touched, so a
+        blocked name leaves the directory exactly as it stood instead
+        of half cleared.
+        """
+        self.open_dir()
+        self._verify_still_pinned()
+        self._check_names(("packet.md", "manifest.json"))
+        self._discard_stale_temps()
+        manifest = build_failure_manifest(argv, message, resolved)
+        temp_manifest = self._stage(
+            "manifest.json", manifest_bytes(manifest)
+        )
+        try:
+            try:
+                os.unlink("packet.md", dir_fd=self.dir_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise OutputRefusal(
+                    "cannot clear the old packet in the output "
+                    "directory %s because %s"
+                    % (self.path, exc.strerror or exc)
+                ) from exc
+            self._replace(temp_manifest, "manifest.json")
+        finally:
+            self._discard(temp_manifest)
+        os.fsync(self.dir_fd)
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="extract.py",
         description="Assemble a verified recognitio review packet from a local clone.",
+    )
+    parser.add_argument(
+        "--version", action="version",
+        version="recognitio extract.py %s" % EXTRACTOR_VERSION,
+        help="print the extractor version and exit",
     )
     parser.add_argument("--pr", type=int, default=None, help="pull request number")
     parser.add_argument("--range", dest="range", default=None, help="A..B or A...B")
@@ -3117,20 +3415,24 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
     return manifest
 
 
-def run_pipeline(args, repo, out_dir, argv):
-    resolved = resolve_inputs(repo, args)
+def run_pipeline(args, repo, target, argv, prepared=None):
+    if prepared is not None:
+        resolved, findings, change = prepared
+    else:
+        resolved = resolve_inputs(repo, args)
+        findings = load_findings(args)
+        change = None
     diff_base = resolved["merge_base"]
     if diff_base is None:
         diff_base = EMPTY_TREE
     head = resolved["head"]
 
-    findings = load_findings(args)
-
-    change = fetch_change(repo, diff_base, head)
+    if change is None:
+        change = fetch_change(repo, diff_base, head)
     files = change["files"]
     if not files:
         message = "the resolved change is empty, no packet was built"
-        write_failure_manifest(out_dir, argv, message, resolved)
+        target.publish_failure(argv, message, resolved)
         print("recognitio: %s" % message, file=sys.stderr)
         return 2
     exclusions = enrich_files(repo, diff_base, head, change)
@@ -3147,7 +3449,7 @@ def run_pipeline(args, repo, out_dir, argv):
         header_provisional, counts
     )
     if failure is not None:
-        write_failure_manifest(out_dir, argv, failure, resolved)
+        target.publish_failure(argv, failure, resolved)
         print("recognitio: %s" % failure, file=sys.stderr)
         return 2
     dropped_names = {item["tier"] for item in dropped}
@@ -3172,15 +3474,9 @@ def run_pipeline(args, repo, out_dir, argv):
         cap_notes, verified, discrepancies,
     )
 
-    try:
-        (out_dir / "packet.md").write_bytes(
-            packet.encode("utf-8", "surrogateescape")
-        )
-        write_manifest(out_dir, manifest)
-    except OSError as exc:
-        # A failed write is a run failure in the same voice as every
-        # other one, so main can leave the failure receipt.
-        raise GitError("cannot write the packet files: %s" % exc) from exc
+    target.publish_pair(
+        packet.encode("utf-8", "surrogateescape"), manifest
+    )
 
     if not verified:
         for item in discrepancies:
@@ -3193,69 +3489,131 @@ def run_pipeline(args, repo, out_dir, argv):
         return 3
     print(
         "recognitio: packet written to %s with %d files, verified"
-        % (out_dir, len(files))
+        % (target.path, len(files))
     )
     return 0
 
 
-def prepare_out_dir(out_dir):
-    """Create the output directory and clear any earlier packet."""
+def _git_read(path, *args):
+    """One pinned git read against a path, or None when it fails."""
     try:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        for name in ("packet.md", "manifest.json"):
-            stale = out_dir / name
-            if stale.exists():
-                stale.unlink()
-    except OSError:
-        return False
-    return True
+        result = run_process(
+            ["git", "--no-pager", "--no-replace-objects",
+             "-C", str(path)] + list(args)
+        )
+    except GitError:
+        # A read that cannot run proves nothing about the path, and
+        # the input resolution that follows reports the same failure
+        # in the run voice. This probe must never be the traceback.
+        return None
+    if result.returncode != 0:
+        return None
+    return decode_bytes(result.stdout).strip()
 
 
-def find_out_dir(raw_argv):
-    """The --out value in a raw argument list, or None when absent."""
-    for index, token in enumerate(raw_argv):
-        if token == "--out" and index + 1 < len(raw_argv):
-            return Path(raw_argv[index + 1])
-        if token.startswith("--out="):
-            return Path(token[len("--out="):])
-    return None
+def refuse_tracked_output_root(target):
+    """Refuse an output directory that is a working tree root.
+
+    A run pointed at the root of a working tree would replace files
+    named packet.md and manifest.json that the tree tracks as its own
+    content, and deleting tracked work is never a packet operation.
+    The check reads only, so a refused run leaves the tree untouched.
+    A directory that is not the root of a working tree, including a
+    bare repository root, is not refused by this rule.
+    """
+    pinned = target.path
+    if not pinned.is_dir():
+        return
+    toplevel = _git_read(pinned, "rev-parse", "--show-toplevel")
+    if toplevel is None:
+        return
+    if Path(toplevel).resolve() != pinned:
+        return
+    tracked = _git_read(
+        pinned, "ls-files", "--", "packet.md", "manifest.json"
+    )
+    if not tracked:
+        return
+    names = ", ".join(sorted(tracked.splitlines()))
+    raise OutputRefusal(
+        "the output directory %s is the root of a git working tree "
+        "and the tracked files %s stand there. A packet run must not "
+        "replace tracked files, so pick another output directory "
+        "and nothing was written" % (pinned, names)
+    )
+
+
+def publish_failure_quietly(target, argv, message, resolved=None):
+    """Leave a failure receipt where one can be left, else say why."""
+    try:
+        target.publish_failure(argv, message, resolved)
+    except OutputRefusal as exc:
+        print("recognitio: %s" % exc, file=sys.stderr)
 
 
 def main(argv=None):
     raw_argv = list(sys.argv[1:]) if argv is None else list(argv)
-    try:
-        args = parse_args(argv)
-    except SystemExit as exc:
-        # Argument checking rejects the run before the pipeline ever
-        # starts, and it still named an output directory. No earlier
-        # verified packet may stand as the apparent result of this
-        # run, so the directory is cleared and the failure receipt is
-        # written here too, and the exit code passes through.
-        code = exc.code if isinstance(exc.code, int) else 2
-        if code != 0:
-            out_dir = find_out_dir(raw_argv)
-            if out_dir is not None and prepare_out_dir(out_dir):
-                write_failure_manifest(
-                    out_dir, raw_argv,
-                    "the run was rejected while its arguments were "
-                    "checked, and no packet was built",
-                )
-                return code
-        raise
+    # Argument checking completes before any output path is touched.
+    # A rejection, a help print and a version print all leave every
+    # named output directory exactly as it stood, so the specific
+    # message argparse prints is the whole record of an argument
+    # failure and no generic receipt overwrites it or the packet.
+    args = parse_args(argv)
     repo = Path(args.repo).resolve()
-    out_dir = Path(args.out)
-    if not prepare_out_dir(out_dir):
-        print(
-            "recognitio: cannot prepare the output directory %s" % out_dir,
-            file=sys.stderr,
-        )
-        return 2
+    target = OutputTarget(Path(args.out).resolve())
     try:
-        return run_pipeline(args, repo, out_dir, raw_argv)
-    except GitError as exc:
-        write_failure_manifest(out_dir, raw_argv, str(exc))
+        refuse_tracked_output_root(target)
+        # The inputs are resolved and read before the output
+        # directory is opened or locked. Only a run whose arguments
+        # and inputs stood up reaches the build, and only the build
+        # and its publish ever write into the directory.
+        try:
+            resolved = resolve_inputs(repo, args)
+            findings = load_findings(args)
+            diff_base = resolved["merge_base"]
+            if diff_base is None:
+                diff_base = EMPTY_TREE
+            change = fetch_change(repo, diff_base, resolved["head"])
+        except GitError as exc:
+            try:
+                target.acquire_lock()
+            except OutputRefusal as lock_exc:
+                print("recognitio: %s" % lock_exc, file=sys.stderr)
+            else:
+                publish_failure_quietly(target, raw_argv, str(exc))
+            print("recognitio: %s" % exc, file=sys.stderr)
+            return 2
+        try:
+            target.acquire_lock()
+            target.open_dir()
+        except OutputRefusal as exc:
+            print("recognitio: %s" % exc, file=sys.stderr)
+            return 2
+        try:
+            return run_pipeline(
+                args, repo, target, raw_argv,
+                prepared=(resolved, findings, change),
+            )
+        except GitError as exc:
+            publish_failure_quietly(target, raw_argv, str(exc))
+            print("recognitio: %s" % exc, file=sys.stderr)
+            return 2
+        except OutputRefusal as exc:
+            print("recognitio: %s" % exc, file=sys.stderr)
+            return 2
+    except OutputRefusal as exc:
         print("recognitio: %s" % exc, file=sys.stderr)
         return 2
+    except KeyboardInterrupt:
+        print(
+            "recognitio: the run was interrupted and no packet was "
+            "published, so whatever already stood in the output "
+            "directory %s was left untouched" % target.path,
+            file=sys.stderr,
+        )
+        return 130
+    finally:
+        target.close()
 
 
 if __name__ == "__main__":

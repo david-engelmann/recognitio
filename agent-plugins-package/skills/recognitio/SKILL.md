@@ -90,7 +90,7 @@ Never present a partial packet as a complete one. Never let a review begin on a 
 
 A path that carries a newline or another control character is escaped wherever the packet names the file, so a crafted name cannot print a forged section in the packet voice.
 
-A failed run never leaves an earlier packet standing in the output directory. The run removes the old packet and manifest first and leaves a manifest whose verified flag is false, so whatever a reader finds in the directory belongs to the latest run.
+A failed run leaves a failure receipt or leaves the packet untouched, and never a half state. A run rejected on its arguments, refused for its output location or interrupted touches nothing, and a second run into the same directory is refused while the first is working.
 
 ## Re-review
 
