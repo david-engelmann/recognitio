@@ -398,10 +398,18 @@ class TestCheckCodexPlugin(unittest.TestCase):
             root = self.make_layout(tmp)
             rel = "docs/decisions.md"
             text = self.read(root, rel)
-            broken = text + (
+            # Decision 30 now closes the file, so the plant
+            # lands inside decision 29 ahead of its heading
+            # rather than at the end of the file.
+            plant = (
                 "\nInstallation through the desktop app stands "
                 "verified.\n"
             )
+            marker = "\n## 30. "
+            if marker in text:
+                broken = text.replace(marker, plant + marker, 1)
+            else:
+                broken = text + plant
             self.write(root, rel, broken)
             problems = self.problems(root)
             self.assertTrue(

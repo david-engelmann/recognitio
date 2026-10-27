@@ -63,12 +63,6 @@ capture record, so no document in this set stands unlisted.
   repo marketplace that offers the package, and the one Codex
   file inside the skill folder.
 
-## The release
-
-- [Recognitio 1.3.0 release draft](release-1.3.0.md) (draft) carries the
-  notes for the first tagged release, its highlights graphic and the
-  ordered tag checklist its owner works through to ship it.
-
 ## The submission packs
 
 - [The Cursor Marketplace submission pack](submission-cursor.md) (ready) holds

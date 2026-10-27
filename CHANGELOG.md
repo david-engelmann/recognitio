@@ -1506,3 +1506,25 @@ This unreleased work carries version 1.3.0.
   detection also runs under the harder rule, so a copy whose
   source the change itself does not modify reads as a copy with
   its real line counts instead of as a plain addition.
+
+### Removed
+
+- The 1.3.0 release draft and its highlights graphic are
+  retired. The draft named a release base that later
+  landings had already replaced, and five audit rounds
+  indicted it without a repair ever landing, so its facts
+  moved faster than its repair cycle. A fresh draft will
+  be written just in time when a head is named for
+  tagging, gated at that head, with the post publish
+  record updates built into its checklist from the start.
+  The prepared topics list the retired draft carried is
+  preserved here so a future draft can start from it.
+  The 17 topics are `agent-skills` and `ai-agents` and
+  `claude-code` and `code-review` and `diff` and `git`
+  and `pull-request` and `python` and `codex` and
+  `cursor` and `github-copilot` and `coderabbit` and
+  `devin` and `qwen` and `kimi` and `zcode` and
+  `antigravity`. Seven of them stand live on the
+  repository today, namely the first seven in that list,
+  and `python` stands among the ten additions rather
+  than among the kept topics.

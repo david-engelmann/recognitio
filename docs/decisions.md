@@ -1155,3 +1155,19 @@ records the contract with a derivation note on every rule,
 and the gate at `scripts/check_codex_plugin.py` pins the
 extension, the marketplace, the skill folder file, and the
 brief. Decision 4 binds this build like every other build.
+
+## 30. The release draft is retired and written just in time
+
+Recorded on 2026-10-27 under the round 54 verdict of the
+300 round audit program. The release draft and its
+highlights graphic are deleted rather than repaired,
+because the draft named a base that later landings had
+already replaced and its facts moved faster than its
+repair cycle across five rounds of indictment. A fresh
+draft will be written just in time when a head is named
+for tagging, gated at that head, with the post publish
+record updates built into its checklist from the start.
+The prepared 17 topics list survives in the changelog
+entry that records this retirement, and decision 7
+keeps the tag rule standing as the governing process
+text in the meantime.
