@@ -244,9 +244,10 @@ class TestCheckPackage(unittest.TestCase):
 
     def test_a_native_file_inside_the_portable_core_fails(self):
         # R24-RT-01. The allowed contents of
-        # agent-plugins-package/ are plugin.json and the skills/
-        # tree. A native platform file placed inside the portable
-        # core must fail the gate instead of blending in silence.
+        # agent-plugins-package/ are plugin.json, the skills/
+        # tree, and the assets/icon-512.png file. A native
+        # platform file placed inside the portable core must
+        # fail the gate instead of blending in silence.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             package = root / "agent-plugins-package"
@@ -415,6 +416,23 @@ class TestCheckPackage(unittest.TestCase):
             cache.mkdir(exist_ok=True)
             (cache / "extract.cpython-312.pyc").write_bytes(b"cache")
             self.assertEqual(self.problems(root), [])
+
+    def test_a_stray_asset_inside_the_portable_core_fails(self):
+        # The tree pin admits the one asset the Codex interface
+        # names and no other, so a second file under assets/
+        # fails instead of riding the admission in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            stray = (
+                root / "agent-plugins-package" / "assets" / "stray.png"
+            )
+            stray.parent.mkdir(parents=True, exist_ok=True)
+            stray.write_bytes(b"stray")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("assets/stray.png" in p for p in problems),
+                problems,
+            )
 
     def test_an_em_dash_in_the_portable_description_fails_the_copy_gate(
         self,

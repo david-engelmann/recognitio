@@ -198,6 +198,17 @@ cp -r .cursor-plugin \
 recognitio
 ```
 
+### Codex
+
+The Codex route offers the same skill through the Codex plugin host. Register this repo as a marketplace in Codex with the first command below, then install the plugin with the second, or install recognitio from that marketplace in the Plugins Directory of the ChatGPT desktop app, the surface the primary documentation names for installing and testing a local plugin. The marketplace file stands at `.agents/plugins/marketplace.json` and points at the portable package, whose manifest carries the OpenAI extension with the display fields and the brand icon under its interface. The plugin ships in this repo in plugin package form. No universal plugin directory listing exists or has been submitted for it, so the repo marketplace route below is the route. The skill also works on its own, because the canonical skill stands at `.agents/skills/recognitio`, the location Codex scans in a repo, and the brief at [the Codex plugin brief](docs/codex-plugin-brief.md) states the full Codex contract.
+
+```bash
+codex plugin marketplace add \
+  david-engelmann/recognitio
+codex plugin add \
+  recognitio@recognitio
+```
+
 ### Any agent
 
 The generic route works with any agent that reads the skill format.
@@ -288,7 +299,7 @@ Each adaptation restates the packet discipline in the surface its platform reads
 | Platform | What ships |
 | --- | --- |
 | Claude Code | The home platform plugin, with the canonical skill, output style and reviewer persona |
-| Codex | Derivation noted review rules. [the Codex review brief](docs/codex-review-brief.md) |
+| Codex | Derivation noted review rules and a plugin whose OpenAI extension rides the portable manifest, offered through a repo marketplace. [the Codex review brief](docs/codex-review-brief.md) and [the Codex plugin brief](docs/codex-plugin-brief.md) |
 | Cursor | A plugin under `.cursor-plugin/` with the skill as a real directory copy, one rule file and the Bugbot rules. [the Cursor plugin brief](docs/cursor-plugin-brief.md) |
 | Copilot | A Copilot SDK agent build of derivation noted rules. [the Copilot SDK brief](docs/copilot-sdk-brief.md) |
 | CodeRabbit | Review guidelines in `.coderabbit.yaml`. [the CodeRabbit review brief](docs/coderabbit-review-brief.md) |

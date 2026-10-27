@@ -23,9 +23,11 @@ sentence, so the package cannot drift into claiming a native
 Claude Code install it does not have, and must record the Agent
 Skills donation transfer as primary on both halves, so the round
 21 one sentence correction cannot quietly revert. The tree shape
-of agent-plugins-package/ itself is pinned to plugin.json and
-the skills/ tree, so a native platform shape placed inside the
-portable core fails the gate instead of blending in silence.
+of agent-plugins-package/ itself is pinned to plugin.json, the
+skills/ tree, and the one asset file the builds name inside
+the portable core, so a native platform shape placed inside
+the portable core fails the gate instead of blending in
+silence.
 """
 
 import json
@@ -315,12 +317,13 @@ def tree_problems(root):
     """Problems with the package root tree shape.
 
     R24-RT-01. The allowed contents of agent-plugins-package/
-    are plugin.json and the skills/ tree, and anything else
-    fails the gate. The manifest schema pin cannot catch a
-    native platform file placed inside the portable core,
-    because these are files and not manifest keys, and the
-    skills pin only walks skills/recognitio, so the tree shape
-    needs its own pin.
+    are plugin.json, the skills/ tree, and the
+    assets/icon-512.png the Codex interface names, and
+    anything else fails the gate. The manifest
+    schema pin cannot catch a native platform file placed
+    inside the portable core, because these are files and not
+    manifest keys, and the skills pin only walks
+    skills/recognitio, so the tree shape needs its own pin.
     """
     problems = []
     package = root / "agent-plugins-package"
@@ -336,9 +339,16 @@ def tree_problems(root):
             continue
         if rel.parts[0] == "skills":
             continue
+        if str(rel) == "assets/icon-512.png":
+            # The one asset a build names inside the portable
+            # core, the Codex interface icon whose bytes the
+            # Build 19 gate pins against the brand master.
+            continue
         problems.append(
             "agent-plugins-package/%s sits inside the portable core, "
-            "but only plugin.json and the skills/ tree may live there"
+            "but only plugin.json, the skills/ tree, and the "
+            "assets/icon-512.png the Codex interface names may "
+            "live there"
             % rel
         )
     return problems

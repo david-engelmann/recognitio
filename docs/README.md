@@ -58,6 +58,10 @@ capture record, so no document in this set stands unlisted.
 - [The Build 17 Devin playbook and coordinator build](devin-playbook-brief.md) (landed)
   writes the packet discipline as derivation noted rules for
   the Devin review surface and its coordinator surfaces.
+- [The Build 19 Codex plugin build](codex-plugin-brief.md) (landed)
+  carries the OpenAI extension in the portable manifest, the
+  repo marketplace that offers the package, and the one Codex
+  file inside the skill folder.
 
 ## The release
 

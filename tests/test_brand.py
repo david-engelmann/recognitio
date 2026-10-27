@@ -68,6 +68,11 @@ class TestCheckBrand(unittest.TestCase):
             target = root / "docs" / "brand" / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+        asset = ROOT / "agent-plugins-package" / "assets" / "icon-512.png"
+        if asset.is_file():
+            target = root / "agent-plugins-package" / "assets" / "icon-512.png"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(asset, target)
         return root
 
     def problems(self, root):
@@ -298,8 +303,8 @@ class TestCheckBrand(unittest.TestCase):
             data["extensions"]["com.openai"] = {
                 "interface": {
                     "brandColor": "#D97758",
-                    "composerIcon": "docs/brand/recognitio-icon-512.png",
-                    "logo": "docs/brand/recognitio-wordmark-1600.png",
+                    "composerIcon": "./assets/icon-512.png",
+                    "logo": "./assets/icon-512.png",
                 }
             }
             self.write_json(root, "agent-plugins-package/plugin.json", data)
@@ -309,14 +314,18 @@ class TestCheckBrand(unittest.TestCase):
             )
 
     def test_p16_a_matching_openai_namespace_holds(self):
+        # The fixture carries the shipped values, with the icon
+        # paths in the ./assets form the primary path rules
+        # resolve against the plugin root, and the layout
+        # builder places the package asset beside the manifest.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_json(root, "agent-plugins-package/plugin.json")
             data["extensions"]["com.openai"] = {
                 "interface": {
                     "brandColor": "#D97757",
-                    "composerIcon": "docs/brand/recognitio-icon-512.png",
-                    "logo": "docs/brand/recognitio-wordmark-1600.png",
+                    "composerIcon": "./assets/icon-512.png",
+                    "logo": "./assets/icon-512.png",
                 }
             }
             self.write_json(root, "agent-plugins-package/plugin.json", data)

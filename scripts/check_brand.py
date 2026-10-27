@@ -243,6 +243,12 @@ def openai_problems(root, portable):
         problems.append(
             "the OpenAI interface brandColor %r does not equal the "
             "palette accent %s" % (interface.get("brandColor"), accent))
+    # The primary Package your plugin page's path rules resolve
+    # extension paths against the plugin root, not the repo
+    # root, and the plugin root here is agent-plugins-package/.
+    # A value without the ./ prefix keeps the repo root reading
+    # the other manifests in this repo use.
+    package = root / "agent-plugins-package"
     for key in ("composerIcon", "logo"):
         value = interface.get(key)
         if value is None:
@@ -250,7 +256,7 @@ def openai_problems(root, portable):
         if not isinstance(value, str):
             problems.append("the OpenAI interface %s is not a path" % key)
             continue
-        target = root / value[2:] if value.startswith("./") else root / value
+        target = package / value[2:] if value.startswith("./") else root / value
         if not target.is_file():
             problems.append(
                 "the OpenAI interface %s names %s and that path "
@@ -261,7 +267,7 @@ def openai_problems(root, portable):
             if not isinstance(value, str):
                 problems.append("an OpenAI interface screenshot is not a path")
                 continue
-            target = root / value[2:] if value.startswith("./") else root / value
+            target = package / value[2:] if value.startswith("./") else root / value
             if not target.is_file():
                 problems.append(
                     "an OpenAI interface screenshot names %s and "

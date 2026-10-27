@@ -18,6 +18,7 @@ check:
 	$(PYTHON) scripts/check_mod.py
 	$(PYTHON) scripts/check_package.py
 	$(PYTHON) scripts/check_codex.py
+	$(PYTHON) scripts/check_codex_plugin.py
 	$(PYTHON) scripts/check_cursor.py
 	$(PYTHON) scripts/check_coderabbit.py
 	$(PYTHON) scripts/check_antigravity.py

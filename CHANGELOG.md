@@ -1422,3 +1422,16 @@ This unreleased work carries version 1.3.0.
   well, so its mode flag must name the mode the manifest
   records and any full hash it carries must name the refs
   the manifest records.
+- The Codex plugin build. The portable manifest gains the
+  OpenAI extension with the interface discovery fields and
+  the brand icon in the package assets, a repo marketplace
+  at `.agents/plugins/marketplace.json` offers the package
+  to Codex, and the skill folder gains `agents/openai.yaml`
+  with implicit invocation left on and no tool dependencies.
+  The Codex CLI on this box registered the marketplace,
+  listed the plugin with its source at the package, and
+  installed it into a scratch home cache with the package
+  files inside, and invocation in a live Codex session stays
+  unverified. A new gate pins the
+  extension, the marketplace, and the skill folder file
+  against the primary OpenAI documentation.

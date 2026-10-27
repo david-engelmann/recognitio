@@ -36,7 +36,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_fanout.py`, the mod contract check at
 `scripts/check_mod.py`, the portable package check at
 `scripts/check_package.py`, the Codex review rules check at
-`scripts/check_codex.py`, the Cursor plugin check at
+`scripts/check_codex.py`, the Codex plugin build check at
+`scripts/check_codex_plugin.py`, the Cursor plugin check at
 `scripts/check_cursor.py`, the CodeRabbit guidelines check at
 `scripts/check_coderabbit.py`, the Antigravity plugin contract check at
 `scripts/check_antigravity.py`, the Copilot SDK agent build check at
@@ -162,13 +163,24 @@ not a gate.
   extensions declared in the manifest. The Build 8 brief lives
   at `docs/agent-plugins-brief.md`. The package skill is a
   byte identical copy of the canonical skill, pinned by the
-  gate, and the package carries no `mcp.json`.
+  gate, and the package carries no `mcp.json`. The Build 19
+  Codex extension rides in the same manifest under the
+  `com.openai` namespace, with the brand icon it names under
+  `agent-plugins-package/assets/`.
 - `docs/codex-review-brief.md` holds the brief for Build 9, the
   Codex review rules package. Every rule carries a derivation
   note naming the canonical skill section or gate it restates or
   the primary OpenAI citation it reports, pinned by the gate at
   `scripts/check_codex.py`, so the scoped guidance cannot become
   a rival instruction source.
+- `docs/codex-plugin-brief.md` holds the brief for Build 19, the
+  Codex plugin build. The build rides the Build 8 portable
+  package, with the OpenAI extension in its manifest, the repo
+  marketplace at `.agents/plugins/marketplace.json` offering
+  the package, and the `agents/openai.yaml` file inside the
+  skill folder, pinned by the gate at
+  `scripts/check_codex_plugin.py`, so the scoped guidance
+  cannot become a rival instruction source.
 - `docs/cursor-plugin-brief.md` holds the brief for Build 10, the
   Cursor plugin. Every Bugbot rule carries a derivation note naming
   the canonical skill section or the primary Cursor citation it

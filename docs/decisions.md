@@ -1123,3 +1123,28 @@ not at the top of the changelog, so the round 25 pin
 naming it as newest is corrected here. The secondary
 acquisition context stays watch only on reviewer
 independence.
+
+## 29. Build 19, the Codex plugin build
+
+Recorded on 2026-10-27 in the top 20 program. Recognitio
+ships on Codex as a plugin whose OpenAI specific settings
+ride the portable manifest under the com.openai extension,
+with the interface carrying the discovery fields and the
+brand icon from the package assets. The repo marketplace at
+`.agents/plugins/marketplace.json` offers the package with
+its source at `./agent-plugins-package`. The canonical skill
+already stands in the `.agents/skills` location Codex scans,
+so the build adds no skill copy, and the one Codex specific
+file `agents/openai.yaml` rides inside the skill folder with
+implicit invocation left on and no tool dependencies. The
+extension replaces the `.codex-plugin/plugin.json` overlay
+whole on the primary packaging page, so no overlay directory
+ships. The Codex CLI on this box registered the marketplace,
+listed the plugin, and installed it into a scratch home
+cache on 2026-10-27, and invocation in a live session stays
+unverified. No universal plugin directory listing exists or
+has been submitted. The brief at `docs/codex-plugin-brief.md`
+records the contract with a derivation note on every rule,
+and the gate at `scripts/check_codex_plugin.py` pins the
+extension, the marketplace, the skill folder file, and the
+brief. Decision 4 binds this build like every other build.

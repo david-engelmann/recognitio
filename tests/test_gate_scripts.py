@@ -347,6 +347,7 @@ class TestCheckCopy(unittest.TestCase):
              ".cursor-plugin/marketplace.json",
              ".antigravity/plugin.json",
              ".zcode-plugin/plugin.json",
+             ".agents/plugins/marketplace.json",
              "agent-plugins-package/plugin.json"},
         )
 
@@ -1843,6 +1844,7 @@ class TestReadmeStorefront(unittest.TestCase):
     HEADLINE = "**A review starts from evidence instead of a bare diff.**"
     BRIEF_LINKS = (
         "[the Codex review brief](docs/codex-review-brief.md)",
+        "[the Codex plugin brief](docs/codex-plugin-brief.md)",
         "[the Cursor plugin brief](docs/cursor-plugin-brief.md)",
         "[the Copilot SDK brief](docs/copilot-sdk-brief.md)",
         "[the CodeRabbit review brief](docs/coderabbit-review-brief.md)",
@@ -2781,6 +2783,7 @@ class TestDocsIndex(unittest.TestCase):
         "agent-plugins-brief.md",
         "antigravity-plugin-brief.md",
         "coderabbit-review-brief.md",
+        "codex-plugin-brief.md",
         "codex-review-brief.md",
         "copilot-sdk-brief.md",
         "cursor-plugin-brief.md",
@@ -2802,6 +2805,7 @@ class TestDocsIndex(unittest.TestCase):
         "agent-plugins-brief.md",
         "antigravity-plugin-brief.md",
         "coderabbit-review-brief.md",
+        "codex-plugin-brief.md",
         "codex-review-brief.md",
         "copilot-sdk-brief.md",
         "cursor-plugin-brief.md",
