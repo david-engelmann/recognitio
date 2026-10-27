@@ -201,7 +201,7 @@ class TestPinLists(unittest.TestCase):
                 Path("."), "b" * 40, "c" * 40, "d" * 40, []
             )
         stat_call = next(
-            c for c in calls if c[0][:2] == ["diff", "--stat"]
+            c for c in calls if c[0][0] == "diff" and "--stat" in c[0]
         )
         for flag in (
             "--stat-width=80", "--stat-name-width=50",

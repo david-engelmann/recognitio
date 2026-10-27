@@ -1483,8 +1483,9 @@ class TestRereviewPins(unittest.TestCase):
             "--attr-source=" + extract_mod.EMPTY_TREE, range_call[1]
         )
         stat_call = next(
-            c for c in calls if c[0][:2] == ["diff", "--stat"]
+            c for c in calls if c[0][0] == "diff" and "--stat" in c[0]
         )
+        self.assertIn("--histogram", stat_call[0])
         self.assertIn("--no-textconv", stat_call[0])
         self.assertIn("--no-ext-diff", stat_call[0])
         self.assertIn("fn.py | 1 +", text)
@@ -4062,6 +4063,37 @@ class TestDiffAlgorithmAgreement(unittest.TestCase):
             ])
             self.assert_algorithms_disagree(repo, "notes.txt")
             self.assert_packet_verifies(repo, tmp, "notes.txt")
+
+    def test_attribute_marked_copy_counts_its_own_delta(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    ".gitattributes": "*.txt binary\n",
+                    "src.txt": "z\ny\ny\ny\n",
+                },
+                {
+                    "src.txt": "x\ny\ny\nz\n",
+                    "copy.txt": "q\ny\ny\nz\n",
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            entries = {f["path"]: f for f in manifest["files"]}
+            copy_entry = entries["copy.txt"]
+            self.assertEqual(copy_entry["status"], "copied")
+            self.assertEqual(
+                (copy_entry["additions"], copy_entry["deletions"]), (3, 3)
+            )
+            self.assertEqual(copy_entry["hunks"], 1)
+            self.assertEqual(
+                sum(f["additions"] for f in manifest["files"]), 6
+            )
+            self.assertEqual(
+                sum(f["deletions"] for f in manifest["files"]), 6
+            )
 
     def test_per_file_text_count_uses_the_same_algorithm(self):
         with RetryingTemporaryDirectory() as tmp:

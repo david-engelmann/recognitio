@@ -1079,19 +1079,41 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
     pathspecs, so rename detection pairs the two sides of a rename
     and the chunk is the file's real delta rather than its whole new
     size, and a path carrying glob characters names itself alone.
+
+    The pathspec can pull a second file into the run. When the
+    source of a copy stands in the pathspec beside its copy and
+    the source itself changed in the range, git emits the source
+    change as its own section, and that section is not the copy's
+    delta. The run therefore pairs its sections with its own name
+    status output, under the same detection flags, and keeps only
+    the section the entry itself owns. A typechange entry still
+    emits its two sections inside that one pairing, and grouping
+    has already reunited them, so the entry is measured and shown
+    whole instead of by its deletion half alone.
     """
+    paths = entry_paths(entry)
     result = run_git(
         repo,
         ["diff", "--text", "--histogram", "--find-renames",
          "--find-copies", "--find-copies-harder", context_flag] + DIFF_FLAGS
-        + [diff_base, head, "--"] + entry_paths(entry),
+        + [diff_base, head, "--"] + paths,
         global_flags=["--attr-source=" + head],
     )
-    # The pathspec scopes this diff to the one entry, and a
-    # typechange entry still emits its two sections inside it.
-    # Grouping reunites them, so the entry is measured and shown
-    # whole instead of by its deletion half alone.
-    return "".join(group_diff_chunks(split_diff(result.stdout)))
+    status_text = run_git(
+        repo, ["diff", "--name-status", "-z", "-M", "-C",
+               "--find-copies-harder"] + DIFF_FLAGS
+        + [diff_base, head, "--"] + paths,
+        global_flags=["--attr-source=" + head],
+    ).stdout
+    paired = pair_diff_chunks(
+        parse_name_status_z(status_text), split_diff(result.stdout)
+    )
+    if entry["path"] not in paired:
+        raise GitError(
+            "the per file diff for %s holds no section the entry "
+            "owns, so it cannot be measured as text" % entry["path"]
+        )
+    return paired[entry["path"]]
 
 
 def per_file_text_numstat(repo, diff_base, head, entry):
@@ -2951,7 +2973,7 @@ def build_rereview(repo, diff_base, head, since, findings,
         # checking clone cannot reshape the fallback text.
         delta = run_git(
             repo,
-            ["diff", "--stat", "--stat-width=80",
+            ["diff", "--histogram", "--stat", "--stat-width=80",
              "--stat-name-width=50", "--stat-graph-width=30"]
             + DIFF_FLAGS + ["%s...%s" % (since, head)],
             global_flags=["--attr-source=" + head],

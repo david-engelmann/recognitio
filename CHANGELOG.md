@@ -1635,7 +1635,18 @@ This unreleased work carries version 1.3.0.
   the recount of the diff body to the one reading. The packet
   over the WP1 landing range and the packet over the typechange
   pairing fix commit, the two ranges that failure stood on,
-  verify.
+  verify. The re-review diff stat fallback is read under the
+  same algorithm, so its counts cannot drift with ambient
+  configuration.
+- An attribute marked copy whose source also changed in the
+  range is now measured by its own delta alone. Its per file
+  re-measurement ran over the source path beside its own, and
+  the source change rode into the copy's chunk, so the copy
+  counted the source lines a second time and the packet
+  verified with totals the change never made. The
+  re-measurement now pairs its sections with its own name
+  status output and keeps the section the entry owns, and a
+  regression test holds the copy to its own counts.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
