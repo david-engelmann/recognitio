@@ -101,7 +101,9 @@ not a gate.
   tests themselves.
 - `scripts/` holds the gate checks and the smoke script.
   `scripts/check_packet.py` validates a packet directory before a
-  review is stamped on it.
+  review is stamped on it, against the packet manifest schema at
+  `scripts/packet-manifest.schema.json` and a recount of the
+  recorded change from the repository itself.
 - `docs/decisions.md` records the design decisions that depart from
   the research sketch, with the reason for each one.
 - `docs/submission-cursor.md`, `docs/submission-claude.md` and

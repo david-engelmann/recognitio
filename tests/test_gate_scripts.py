@@ -28,6 +28,13 @@ def load_script(name):
     return module
 
 
+def load_script_at(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def git(repo, *args):
     result = subprocess.run(
         ["git", "-C", str(repo)] + list(args),
@@ -3945,6 +3952,26 @@ class TestCanonicalSkillLayout(unittest.TestCase):
 
 
 class TestCheckPacket(unittest.TestCase):
+    """The packet check as a verifier, over genuine packets.
+
+    The fixture packet is built by the shipped extractor over a
+    real two commit repository, because the check now recounts the
+    change it stamps and a hand written manifest is exactly the
+    fabrication the check exists to refuse. Tamper tests copy the
+    genuine packet and edit the copy.
+    """
+
+    CALC_V1 = (
+        "def total(values):\n    result = 0\n"
+        "    for value in values:\n        result += value\n"
+        "    return result\n"
+    )
+    CALC_V2 = CALC_V1.replace("result = 0", "result = 1")
+    CALLER = (
+        "from calc import total\n\n\ndef run():\n"
+        "    return total([1, 2])\n"
+    )
+
     def setUp(self):
         self.mod = load_script("check_packet")
         self.tmp = RetryingTemporaryDirectory()
@@ -3954,10 +3981,26 @@ class TestCheckPacket(unittest.TestCase):
         git(self.repo, "config", "user.email", "test@example.com")
         git(self.repo, "config", "user.name", "Test User")
         git(self.repo, "config", "commit.gpgsign", "false")
-        (self.repo / "a.py").write_text("x = 1\n")
+        (self.repo / "calc.py").write_text(self.CALC_V1, encoding="utf-8")
+        (self.repo / "caller.py").write_text(self.CALLER, encoding="utf-8")
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-m", "one")
+        (self.repo / "calc.py").write_text(self.CALC_V2, encoding="utf-8")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "two")
         self.head = git(self.repo, "rev-parse", "HEAD")
+        extract = load_script_at(
+            ROOT / ".agents" / "skills" / "recognitio" / "scripts"
+            / "extract.py", "gate_extract_for_check_packet",
+        )
+        self.genuine = Path(self.tmp.name) / "genuine"
+        with redirect_stderr(io.StringIO()):
+            code = extract.main([
+                "--range", "HEAD~1..HEAD",
+                "--repo", str(self.repo),
+                "--out", str(self.genuine),
+            ])
+        self.assertEqual(code, 0)
 
     def test_child_env_scrubs_config_and_driver_variables(self):
         # Round 7 F4 in the 300 round program. The head read this
@@ -3984,199 +4027,158 @@ class TestCheckPacket(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def write_packet(self, name, manifest):
+    def clone_packet(self, name):
         out = Path(self.tmp.name) / name
-        out.mkdir()
-        (out / "packet.md").write_text("# packet\n", encoding="utf-8")
-        if manifest is not None:
-            (out / "manifest.json").write_text(
-                json.dumps(manifest), encoding="utf-8"
-            )
+        shutil.copytree(self.genuine, out)
         return out
 
-    def run_check(self, out):
+    def read_manifest(self, out):
+        return json.loads(
+            (out / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def write_manifest(self, out, manifest):
+        (out / "manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+
+    def read_packet(self, out):
+        return (out / "packet.md").read_text(encoding="utf-8")
+
+    def write_packet_text(self, out, text):
+        (out / "packet.md").write_text(text, encoding="utf-8")
+
+    def run_check(self, out, *extra):
         with redirect_stderr(io.StringIO()):
-            return self.mod.main([str(out), "--repo", str(self.repo)])
+            return self.mod.main(
+                [str(out), "--repo", str(self.repo)] + list(extra)
+            )
 
     def test_verified_packet_for_the_current_head_passes(self):
-        out = self.write_sections_packet(
-            "good",
-            ["## T0 Triage"],
-            "# packet\n\n## T0 Triage\n\nThe triage.\n",
-        )
+        out = self.clone_packet("good")
         self.assertEqual(self.run_check(out), 0)
 
     def test_a_manifest_without_sections_fails(self):
-        out = self.write_packet(
-            "nosections", {"verified": True, "head": self.head}
-        )
+        out = self.clone_packet("nosections")
+        manifest = self.read_manifest(out)
+        del manifest["sections"]
+        self.write_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
 
     def test_unverified_packet_fails(self):
-        out = self.write_packet(
-            "bad", {"verified": False, "head": self.head}
-        )
+        out = self.clone_packet("bad")
+        manifest = self.read_manifest(out)
+        manifest["verified"] = False
+        self.write_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
 
     def test_packet_for_a_stale_head_fails(self):
-        out = self.write_sections_packet(
-            "stale",
-            ["## T0 Triage"],
-            "# packet\n\n## T0 Triage\n\nThe triage.\n",
-            head="0" * 40,
-        )
+        out = self.clone_packet("stale")
+        (self.repo / "later.py").write_text("x = 3\n", encoding="utf-8")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-m", "three")
         self.assertEqual(self.run_check(out), 1)
 
     def test_missing_manifest_fails(self):
-        out = self.write_packet("empty", None)
+        out = Path(self.tmp.name) / "empty"
+        out.mkdir()
+        (out / "packet.md").write_text("# packet\n", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
     def test_empty_packet_file_fails(self):
-        out = self.write_packet(
-            "hollow", {"verified": True, "head": self.head}
-        )
+        out = self.clone_packet("hollow")
         (out / "packet.md").write_text("", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
     def test_null_manifest_fails(self):
-        out = self.write_packet(
-            "nullman", {"verified": True, "head": self.head}
-        )
+        out = self.clone_packet("nullman")
         (out / "manifest.json").write_text("null", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
     def test_non_object_manifest_fails(self):
-        out = self.write_packet(
-            "listman", {"verified": True, "head": self.head}
+        out = self.clone_packet("listman")
+        (out / "manifest.json").write_text(
+            '["verified"]', encoding="utf-8"
         )
-        (out / "manifest.json").write_text('["verified"]', encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
-    def write_sections_packet(self, name, sections, packet_text,
-                              head=None):
-        out = Path(self.tmp.name) / name
-        out.mkdir()
-        (out / "packet.md").write_text(packet_text, encoding="utf-8")
-        (out / "manifest.json").write_text(
-            json.dumps({
-                "verified": True,
-                "head": self.head if head is None else head,
-                "sections": sections,
-            }),
-            encoding="utf-8",
-        )
-        return out
-
     def test_recorded_sections_present_and_filled_pass(self):
-        out = self.write_sections_packet(
-            "whole",
-            ["## T0 Triage", "## T2 Companions"],
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T2 Companions\n\nThe companions.\n",
+        out = self.clone_packet("whole")
+        manifest = self.read_manifest(out)
+        self.assertEqual(
+            manifest["sections"],
+            [
+                "## T0 Triage", "## T1 The change",
+                "## T2 Companions", "## T3 History",
+                "## Verification recount",
+            ],
         )
         self.assertEqual(self.run_check(out), 0)
 
     def test_a_thin_packet_wearing_a_full_manifest_fails(self):
-        out = self.write_sections_packet(
-            "thin",
-            ["## T0 Triage", "## T2 Companions", "## T3 History"],
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T2 Companions\n\nNot selected for this run.\n",
+        out = self.clone_packet("thin")
+        text = self.read_packet(out)
+        start = text.index("## T2 Companions")
+        end = text.index("## T3 History")
+        text = (
+            text[:start]
+            + "## T2 Companions\n\n"
+            + "Not selected for this run. "
+            + "The change in T1 is complete.\n\n"
+            + text[end:]
         )
+        self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
 
-    def write_receipt_packet(self, name, packet_text, tiers=None,
-                             files=None):
-        out = Path(self.tmp.name) / name
-        out.mkdir()
-        (out / "packet.md").write_text(packet_text, encoding="utf-8")
-        manifest = {
-            "verified": True,
-            "head": self.head,
-            "sections": [
-                "## T0 Triage", "## T1 The change",
-                "## T2 Companions", "## T3 History",
-            ],
-        }
-        if tiers is not None:
-            manifest["tiers"] = tiers
-        if files is not None:
-            manifest["files"] = files
-        (out / "manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
-        return out
-
-    FULL_TIERS = {
-        "T0": {"state": "included", "included": True},
-        "T1": {"state": "included", "included": True},
-        "T2": {"state": "included", "included": True},
-        "T3": {"state": "included", "included": True},
-    }
-
-    def test_a_thin_packet_wearing_a_full_tier_receipt_fails(self):
-        out = self.write_receipt_packet(
-            "thinreceipt",
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
-            "## T2 Companions\n\n"
-            "Not selected for this run. The change in T1 is complete.\n\n"
-            "## T3 History\n\nThe history.\n",
-            tiers=self.FULL_TIERS,
-        )
+    def test_a_dropped_section_wearing_a_full_manifest_fails(self):
+        out = self.clone_packet("dropppedsection")
+        text = self.read_packet(out)
+        start = text.index("## T3 History")
+        end = text.index("## Verification recount")
+        text = text[:start] + text[end:]
+        self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
 
     def test_an_included_tier_with_real_content_passes(self):
-        out = self.write_receipt_packet(
-            "fullreceipt",
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
-            "## T2 Companions\n\nThe companions.\n\n"
-            "## T3 History\n\nThe history.\n",
-            tiers=self.FULL_TIERS,
-        )
+        out = self.clone_packet("fullreceipt")
+        manifest = self.read_manifest(out)
+        self.assertTrue(manifest["tiers"]["T2"]["included"])
+        self.assertIn("## T2 Companions", self.read_packet(out))
         self.assertEqual(self.run_check(out), 0)
 
     def test_a_manifest_file_missing_from_the_change_tier_fails(self):
-        out = self.write_receipt_packet(
-            "droppedfile",
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
-            "## T2 Companions\n\nThe companions.\n\n"
-            "## T3 History\n\nThe history.\n",
-            files=[{"path": "a.py"}, {"path": "b.py"}],
-        )
+        out = self.clone_packet("droppedfile")
+        text = self.read_packet(out)
+        start = text.index("### calc.py")
+        end = text.index("## T2 Companions")
+        text = text[:start] + text[end:]
+        self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
 
     def test_manifest_files_present_in_the_change_tier_pass(self):
-        out = self.write_receipt_packet(
-            "wholefiles",
-            "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "## T1 The change\n\n### a.py\n\nThe diff.\n\n"
-            "### b.py\n\nThe other diff.\n\n"
-            "## T2 Companions\n\nThe companions.\n\n"
-            "## T3 History\n\nThe history.\n",
-            files=[{"path": "a.py"}, {"path": "b.py"}],
-        )
+        out = self.clone_packet("wholefiles")
+        text = self.read_packet(out)
+        self.assertIn("### calc.py", text)
         self.assertEqual(self.run_check(out), 0)
 
     def test_a_recorded_section_with_no_content_fails(self):
-        out = self.write_sections_packet(
-            "gutted",
-            ["## T0 Triage", "## T2 Companions"],
-            "# packet\n\n## T0 Triage\n\n"
-            "## T2 Companions\n\nThe companions.\n",
-        )
+        out = self.clone_packet("gutted")
+        text = self.read_packet(out)
+        start = text.index("## T3 History")
+        end = text.index("## Verification recount")
+        text = text[:start] + "## T3 History\n\n" + text[end:]
+        self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
 
     def test_a_heading_inside_a_fence_satisfies_nothing(self):
-        out = self.write_sections_packet(
-            "fenced",
-            ["## T0 Triage", "## T3 History"],
+        packet = (
             "# packet\n\n## T0 Triage\n\nThe triage.\n\n"
-            "````\n## T3 History\n\nQuoted text, not a section.\n````\n",
+            "````\n## T3 History\n\nQuoted text, not a section.\n````\n"
         )
-        self.assertEqual(self.run_check(out), 1)
+        problems = self.mod.section_problems(
+            packet, ["## T0 Triage", "## T3 History"]
+        )
+        self.assertTrue(problems)
 
     def test_exported_git_dir_does_not_redirect_the_packet_check(self):
         decoy = Path(self.tmp.name) / "decoy"
@@ -4188,11 +4190,7 @@ class TestCheckPacket(unittest.TestCase):
         (decoy / "z.py").write_text("z = 1\n")
         git(decoy, "add", "-A")
         git(decoy, "commit", "-m", "decoy")
-        out = self.write_sections_packet(
-            "good",
-            ["## T0 Triage"],
-            "# packet\n\n## T0 Triage\n\nThe triage.\n",
-        )
+        out = self.clone_packet("goodenv")
         env = dict(os.environ)
         env["GIT_DIR"] = str(decoy / ".git")
         env["GIT_WORK_TREE"] = str(decoy)
@@ -4203,6 +4201,7 @@ class TestCheckPacket(unittest.TestCase):
         finally:
             os.environ = original
         self.assertEqual(code, 0)
+
 
 
 SIGN_OFF = (

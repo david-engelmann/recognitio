@@ -64,7 +64,7 @@ Raise a tier when the evidence runs out. When a call site in the companion tier 
 
 ## Stamping the gate report
 
-A review is stamped only on a verified packet. The gate report records the base, the head, and the merge base from the manifest, the exact extractor command, and the reviewed head. Run the packet check script against the packet directory when the working repo carries one. It confirms the manifest is verified, that its recorded head is still the head being reviewed, and that the sections the manifest records are present and filled in the packet, which is the guard against stamping a review on stale or thin evidence.
+A review is stamped only on a verified packet. The gate report records the base, the head, and the merge base from the manifest, the exact extractor command, and the reviewed head. Run the packet check script against the packet directory when the working repo carries one. It validates the manifest against the shipped schema, recounts the recorded change from the repository, and reads the packet body against the manifest and the recount, the guard against stamping a review on stale, thin or fabricated evidence.
 
 ## The tier model
 

@@ -1388,3 +1388,37 @@ This unreleased work carries version 1.3.0.
   listing, whose one prerequisite is the release tag only the
   owner can cut. A new gate pins the packs and the manifest
   facts their evidence checks rest on.
+- The packet check is now a verifier rather than a structural
+  reader. It reads the manifest with a strict reader that
+  refuses a repeated key, validates the manifest against the
+  packet manifest schema that now ships at
+  `scripts/packet-manifest.schema.json`, rejects a verified
+  claim whose own discrepancies list is not empty, and
+  confirms the recorded base, head and merge base against the
+  repository itself, with expect flags that let a reviewer
+  name the range the stamp must cover. It recounts the
+  recorded change from the repository through the extractor
+  code and requires every file record and exclusion receipt
+  to match the recount, and it reads the packet body against
+  the manifest and the recount across the header, the
+  contents totals, the triage list, numstat block and commit
+  list, the change tier sections and diff bodies, the tier
+  accounting and the closing receipt. A hand written packet
+  could previously earn the verified stamp, and a genuine
+  packet whose filename carries a Unicode line separator
+  could never earn it, because the checker display path copy
+  lacked the separator escapes. Both are fixed, and an
+  adversarial name battery in the test suite holds the two
+  display path copies to one behaviour.
+- The packet check now also treats the packet directory as
+  the sealed pair the stamp covers. A packet or a manifest
+  standing as a symbolic link fails, and so does any further
+  entry in the directory, including a whole nested packet,
+  because the stamp covers the two files that live in the
+  directory and nothing else. The packet is decoded as
+  strict UTF-8, so a packet carrying a non UTF-8 filename
+  byte, which no UTF-8 reader can open, no longer earns the
+  stamp. The recorded extractor command is read back as
+  well, so its mode flag must name the mode the manifest
+  records and any full hash it carries must name the refs
+  the manifest records.
