@@ -4011,5 +4011,73 @@ class TestOutputPathDiscipline(unittest.TestCase):
             self.assertEqual(git(victim, "status", "--porcelain"), "")
 
 
+class TestDiffAlgorithmAgreement(unittest.TestCase):
+    """The counts and the recount read the change under one algorithm.
+
+    The manifest line counts come from numstat and the recount
+    counts the lines of the zero context diff body. The two
+    readings must use the one diff algorithm, because git's
+    default algorithm and the histogram algorithm pair repeated
+    lines differently and can stand a pair of lines apart on the
+    same change. The fixtures below are four line files the two
+    algorithms count differently, and each test proves that
+    divergence on its own fixture before it runs the extractor,
+    so the test cannot pass on a git whose algorithms agree.
+    """
+
+    BASE = "z\ny\ny\ny\n"
+    HEAD = "x\ny\ny\nz\n"
+
+    def numstat_pair(self, repo, path, *extra):
+        out = git(
+            repo, "diff", "--numstat", *(extra + ("HEAD~1", "HEAD", "--", path))
+        )
+        adds, dels, _ = out.split("\t")
+        return int(adds), int(dels)
+
+    def assert_algorithms_disagree(self, repo, path, *extra):
+        self.assertNotEqual(
+            self.numstat_pair(repo, path, *extra),
+            self.numstat_pair(repo, path, *(extra + ("--histogram",))),
+        )
+
+    def assert_packet_verifies(self, repo, tmp, path):
+        out = Path(tmp) / "out"
+        result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(out)
+        self.assertTrue(manifest["verified"], manifest["discrepancies"])
+        entry = [
+            f for f in manifest["files"] if f["path"] == path
+        ][0]
+        self.assertEqual(
+            (entry["additions"], entry["deletions"]), (3, 3)
+        )
+
+    def test_repeated_lines_verify(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"notes.txt": self.BASE},
+                {"notes.txt": self.HEAD},
+            ])
+            self.assert_algorithms_disagree(repo, "notes.txt")
+            self.assert_packet_verifies(repo, tmp, "notes.txt")
+
+    def test_per_file_text_count_uses_the_same_algorithm(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"notes.txt": self.BASE},
+                {"notes.txt": self.HEAD},
+            ])
+            self.assert_algorithms_disagree(repo, "notes.txt", "--text")
+            base = git(repo, "rev-parse", "HEAD~1")
+            head = git(repo, "rev-parse", "HEAD")
+            entry = {"path": "notes.txt", "old_path": None}
+            self.assertEqual(
+                extract_mod.per_file_text_numstat(repo, base, head, entry),
+                (3, 3),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

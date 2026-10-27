@@ -782,23 +782,6 @@ This unreleased work carries version 1.3.0.
   compressed form, and the storefront tests re-pin
   the first screen order, the picture form, the image
   references and the page weight.
-- The Claude marketplace listing now offers the Build 7
-  mod as its own entry beside the skill plugin. The
-  recognitio-mod entry is sourced from the new plugin
-  folder at `plugins/recognitio-mod/`, which carries its
-  own manifest, its own README and byte identical copies
-  of the hooks module and its host side tests, so a setup
-  can install the spawn gate without the skill bundle.
-  The discovery gate pins the entry set by name and the
-  mod entry by its source in place of the earlier single
-  entry count, with each entry carrying the tags of its
-  own manifest, the mod gate pins the copies to the
-  originals, and the submissions gate pins the mod entry
-  beside the plugin entry. The README install section gains the shell form
-  of the marketplace add command, a table with one line
-  per plugin the listing offers, a layout subsection and
-  the hooks disclosure the Claude submission pack had
-  recorded as open.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
@@ -1627,6 +1610,14 @@ This unreleased work carries version 1.3.0.
   a snapshot from that fetch and never as a live claim,
   and the history tier words the states of prior pull
   requests as a snapshot on the same terms.
+- The line counts are now read under the histogram algorithm
+  at the numstat calls themselves, beside the pin every reader
+  carries, and a regression test built on a file the two
+  algorithms count differently holds the manifest counts and
+  the recount of the diff body to the one reading. The packet
+  over the WP1 landing range and the packet over the typechange
+  pairing fix commit, the two ranges that failure stood on,
+  verify.
 
 ### Removed
 

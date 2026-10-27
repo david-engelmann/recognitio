@@ -1025,8 +1025,15 @@ def fetch_change(repo, diff_base, head):
         repo, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head], global_flags=attr_flags
     ).stdout
+    # The counts are read under the histogram algorithm, the same
+    # algorithm both diff bodies in this fetch are produced under.
+    # Git's default algorithm pairs repeated lines differently, so
+    # on a file whose lines repeat its numstat can stand one pair
+    # of lines away from any count of the diff body, and the
+    # recount then reports a disagreement that is not there.
     numstat_text = run_git(
-        repo, ["diff", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
+        repo, ["diff", "--histogram", "--numstat", "-z", "-M", "-C",
+               "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head], global_flags=attr_flags
     ).stdout
     commit_log = run_git(
@@ -1093,11 +1100,14 @@ def per_file_text_numstat(repo, diff_base, head, entry):
     Returns the (additions, deletions) pair numstat reports for the
     entry's path, or None when git still reports the file as binary.
     This is the independent second count for attribute marked files,
-    the same numstat source ordinary files are measured from.
+    the same numstat source ordinary files are measured from. It is
+    read under the histogram algorithm, like the per file text diff
+    it is cross checked against, for the reason fetch_change gives.
     """
     result = run_git(
         repo,
-        ["diff", "--text", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
+        ["diff", "--text", "--histogram", "--numstat", "-z", "-M", "-C",
+         "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
         global_flags=["--attr-source=" + head],
     )
