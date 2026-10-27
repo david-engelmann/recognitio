@@ -418,6 +418,173 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertNotIn("HIDDEN", packet)
 
 
+class TestBlameTextconv(unittest.TestCase):
+    """Blame must not run a configured textconv driver (round 7 F4).
+
+    The diff family already refused text conversion, and the blame
+    reader in the history tier did not. A driver named by the tree
+    attributes and defined in clone configuration executed during a
+    default extraction, and its output rewrote the content lines the
+    porcelain reader carries. The same definition supplied through
+    the GIT_CONFIG environment variables fired as well, because the
+    child environment scrub did not cover them.
+    """
+
+    def build_repo(self, tmp):
+        repo = Path(tmp) / "repo"
+        init_repo(repo)
+        marker = Path(tmp) / "driver-ran.txt"
+        script = Path(tmp) / "forge.sh"
+        script.write_text(
+            "#!/bin/sh\n"
+            "echo ran >> \"%s\"\n"
+            "sed 's/alpha/FORGED/' \"$1\"\n" % marker
+        )
+        script.chmod(0o755)
+        write_tree(repo, {
+            ".gitattributes": "*.py diff=drv\n",
+            "module.py": MODULE_V1,
+            "caller.py": CALLER,
+            "test_module.py": TEST_MODULE,
+        })
+        commit_all(repo, "one")
+        write_tree(repo, {"module.py": MODULE_V2})
+        commit_all(repo, "two")
+        return repo, script, marker
+
+    def test_blame_driver_defined_in_clone_config_does_not_run(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, script, marker = self.build_repo(tmp)
+            git(repo, "config", "diff.drv.textconv", str(script))
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(
+                marker.exists(),
+                "the textconv driver ran during extraction",
+            )
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Blame summary for changed ranges", packet)
+            self.assertNotIn("FORGED", packet)
+
+    def test_blame_driver_supplied_through_the_environment_does_not_run(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, script, marker = self.build_repo(tmp)
+            env = dict(os.environ)
+            env["GIT_CONFIG_COUNT"] = "1"
+            env["GIT_CONFIG_KEY_0"] = "diff.drv.textconv"
+            env["GIT_CONFIG_VALUE_0"] = str(script)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD", env=env
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(
+                marker.exists(),
+                "the environment supplied textconv driver ran",
+            )
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            self.assertNotIn("FORGED", (out / "packet.md").read_text())
+
+    def test_history_and_content_readers_carry_the_refusals(self):
+        calls = []
+
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            calls.append(list(args))
+            return extract_mod.Proc(1, "", "no data")
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git):
+            extract_mod.git_grep_lines(Path("."), "a" * 40, "alpha")
+            extract_mod.git_grep_bulk(
+                Path("."), "a" * 40, ["alpha", "beta"]
+            )
+        grep_calls = [call for call in calls if call[0] == "grep"]
+        self.assertTrue(grep_calls)
+        for call in grep_calls:
+            self.assertIn("--no-textconv", call)
+
+        calls.clear()
+
+        def quiet_run_git(repo, args, check=True, global_flags=()):
+            calls.append(list(args))
+            return extract_mod.Proc(0, "", "")
+
+        with mock.patch.object(extract_mod, "run_git", quiet_run_git):
+            extract_mod.blame_section(
+                Path("."), "a" * 40,
+                [{"path": "mod.py"}], {"mod.py": [(1, 2)]}, [],
+            )
+        blame_calls = [call for call in calls if call[0] == "blame"]
+        self.assertEqual(len(blame_calls), 1)
+        self.assertIn("--no-textconv", blame_calls[0])
+        self.assertIn("--no-ext-diff", blame_calls[0])
+
+        calls.clear()
+        with mock.patch.object(extract_mod, "run_git", quiet_run_git), \
+                mock.patch.object(
+                    extract_mod, "show_file",
+                    return_value="def alpha():\n    return 1\n",
+                ):
+            extract_mod.evolution_section(
+                Path("."), "a" * 40, [{"path": "mod.py"}],
+                {"mod.py": ["alpha"]}, [],
+            )
+        log_calls = [call for call in calls if call[0] == "log"]
+        self.assertEqual(len(log_calls), 1)
+        self.assertIn("--no-textconv", log_calls[0])
+        self.assertIn("--no-ext-diff", log_calls[0])
+
+        captured = {}
+
+        def fake_run_process(argv, cwd=None):
+            captured["argv"] = list(argv)
+            return subprocess.CompletedProcess(argv, 0, b"x = 1\n", b"")
+
+        with mock.patch.object(extract_mod, "run_process", fake_run_process):
+            data = extract_mod.file_bytes(Path("."), "a" * 40, "mod.py")
+        self.assertEqual(data, b"x = 1\n")
+        self.assertIn("--no-textconv", captured["argv"])
+        self.assertIn("--no-ext-diff", captured["argv"])
+        self.assertIn("--no-pager", captured["argv"])
+
+    def test_child_environment_scrubs_config_and_driver_variables(self):
+        captured = {}
+        original = subprocess.run
+
+        def recording_run(*args, **kwargs):
+            captured["env"] = kwargs.get("env") or {}
+            return subprocess.CompletedProcess(
+                args[0] if args else [], 0, b"", b""
+            )
+
+        poisoned = {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "diff.drv.textconv",
+            "GIT_CONFIG_VALUE_0": "/tmp/forge.sh",
+            "GIT_CONFIG_PARAMETERS": "'diff.drv.textconv=/tmp/forge.sh'",
+            "GIT_CONFIG_GLOBAL": "/tmp/forge.config",
+            "GIT_CONFIG_SYSTEM": "/tmp/forge.config",
+            "GIT_EXTERNAL_DIFF": "/tmp/forge.sh",
+            "GIT_DIFF_OPTS": "--ext-diff",
+            "GIT_PAGER": "/tmp/forge.sh",
+            "GIT_EXEC_PATH": "/tmp",
+        }
+        subprocess.run = recording_run
+        try:
+            with mock.patch.dict(os.environ, poisoned):
+                extract_mod.run_process(["git", "--version"])
+        finally:
+            subprocess.run = original
+        env = captured["env"]
+        for name in poisoned:
+            self.assertNotIn(name, env)
+        self.assertEqual(env["GIT_NO_REPLACE_OBJECTS"], "1")
+        self.assertIn("PATH", env)
+
+
 class TestBinaryAndAttributeMarking(unittest.TestCase):
     def test_binary_file_gets_a_placeholder_not_a_crash(self):
         with RetryingTemporaryDirectory() as tmp:

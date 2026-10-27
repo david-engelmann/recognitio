@@ -3791,6 +3791,28 @@ class TestCheckPacket(unittest.TestCase):
         git(self.repo, "commit", "-m", "one")
         self.head = git(self.repo, "rev-parse", "HEAD")
 
+    def test_child_env_scrubs_config_and_driver_variables(self):
+        # Round 7 F4 in the 300 round program. The head read this
+        # script stamps against must run under the same scrub as the
+        # extractor, so configuration or a driver program supplied
+        # through the environment never reaches its git child.
+        poisoned = {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "diff.drv.textconv",
+            "GIT_CONFIG_VALUE_0": "/tmp/forge.sh",
+            "GIT_CONFIG_PARAMETERS": "'diff.drv.textconv=/tmp/forge.sh'",
+            "GIT_EXTERNAL_DIFF": "/tmp/forge.sh",
+            "GIT_DIFF_OPTS": "--ext-diff",
+            "GIT_PAGER": "/tmp/forge.sh",
+            "GIT_EXEC_PATH": "/tmp",
+        }
+        with mock.patch.dict(os.environ, poisoned):
+            env = self.mod.scrubbed_child_env()
+        for name in poisoned:
+            self.assertNotIn(name, env)
+        self.assertEqual(env["GIT_NO_REPLACE_OBJECTS"], "1")
+        self.assertIn("PATH", env)
+
     def tearDown(self):
         self.tmp.cleanup()
 
@@ -4108,6 +4130,30 @@ class TestDcoWorkflow(unittest.TestCase):
 class TestCheckEvals(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_evals")
+
+    def test_child_env_scrubs_config_and_driver_variables(self):
+        # Round 7 F4 in the 300 round program. The fixture rebuild
+        # diff in this gate runs under the same scrub as the
+        # extractor, so configuration or a driver program supplied
+        # through the environment never reaches its git children.
+        poisoned = {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "diff.drv.textconv",
+            "GIT_CONFIG_VALUE_0": "/tmp/forge.sh",
+            "GIT_CONFIG_PARAMETERS": "'diff.drv.textconv=/tmp/forge.sh'",
+            "GIT_EXTERNAL_DIFF": "/tmp/forge.sh",
+            "GIT_DIFF_OPTS": "--ext-diff",
+            "GIT_PAGER": "/tmp/forge.sh",
+            "GIT_EXEC_PATH": "/tmp",
+        }
+        with mock.patch.dict(os.environ, poisoned):
+            env = self.mod.scrubbed_child_env()
+            anchor_env = self.mod._anchor_env()
+        for name in poisoned:
+            self.assertNotIn(name, env)
+            self.assertNotIn(name, anchor_env)
+        self.assertEqual(env["GIT_NO_REPLACE_OBJECTS"], "1")
+        self.assertNotIn("PYTHONPATH", anchor_env)
 
     def copy_fixture(self, tmp):
         root = Path(tmp) / "root"

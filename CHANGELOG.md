@@ -1332,3 +1332,18 @@ This unreleased work carries version 1.3.0.
   counter restarts at the second section header, and a diff
   whose grouped sections still cannot be paired with the
   name status entries fails closed instead of guessing.
+- The blame reader in the history tier now refuses text
+  conversion and external diff drivers like every diff
+  invocation, and configuration supplied through the
+  GIT_CONFIG environment variables no longer reaches any
+  child process. A textconv driver named by the attributes
+  of the reviewed tree and defined in clone configuration
+  previously ran during a default extraction and rewrote
+  the blamed content lines in the packet evidence, and the
+  same driver defined through the environment fired as
+  well. The line history reader, the blob reader and the
+  companion search carry the same refusals, and every git
+  child now runs with the pager disabled and with the
+  caller supplied driver variables scrubbed from its
+  environment. The packet check and eval gate scripts run
+  their git children under the same scrub.

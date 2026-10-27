@@ -46,19 +46,38 @@ GIT_SCRUB_VARS = (
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
 )
+# The same driver and configuration scrub the extractor runs under.
+# Configuration supplied through the environment can define a driver
+# program outright, and the remaining names hand a child process a
+# program to run in place of its pager or its own subcommands.
+GIT_DRIVER_ENV_VARS = (
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "GIT_PAGER",
+    "GIT_EXEC_PATH",
+)
+GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
 PROCESS_TIMEOUT_SECONDS = 120
 
 
-def current_head(repo):
+def scrubbed_child_env():
+    """The environment the git child process runs under."""
     env = {
         key: value
         for key, value in os.environ.items()
         if key not in GIT_SCRUB_VARS
+        and key not in GIT_DRIVER_ENV_VARS
+        and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return env
+
+
+def current_head(repo):
+    env = scrubbed_child_env()
     try:
         result = subprocess.run(
-            ["git", "--no-replace-objects", "-C", str(repo),
+            ["git", "--no-pager", "--no-replace-objects", "-C", str(repo),
              "rev-parse", "HEAD"],
             capture_output=True,
             text=True,

@@ -124,6 +124,33 @@ GIT_SCRUB_VARS = (
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
 )
+# The same driver and configuration scrub the extractor runs under.
+# Configuration supplied through the environment can define a driver
+# program outright, and the remaining names hand a child process a
+# program to run in place of its pager or its own subcommands.
+GIT_DRIVER_ENV_VARS = (
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "GIT_PAGER",
+    "GIT_EXEC_PATH",
+)
+GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+
+
+def scrubbed_child_env(extra_drop=()):
+    """The environment a child process runs under."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_SCRUB_VARS
+        and key not in GIT_DRIVER_ENV_VARS
+        and key not in extra_drop
+        and not key.startswith(GIT_CONFIG_ENV_PREFIX)
+    }
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return env
+
+
 GIT_PIN = [
     "-c", "core.quotepath=false",
     "-c", "diff.noprefix=false",
@@ -519,11 +546,7 @@ def recorded_task06_scores(root):
 
 def _anchor_env():
     """Scrub the probe environment so imports resolve from the fixture."""
-    return {
-        key: value
-        for key, value in os.environ.items()
-        if key not in GIT_SCRUB_VARS and key != "PYTHONPATH"
-    }
+    return scrubbed_child_env(extra_drop=("PYTHONPATH",))
 
 
 def _anchor_import_breaks(repo, d1_file):
@@ -1159,14 +1182,10 @@ def write_source_anchors(root):
 
 
 def git(repo, *args, raw=False):
-    env = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in GIT_SCRUB_VARS
-    }
-    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env = scrubbed_child_env()
     argv = (
-        ["git", "--no-replace-objects", "--literal-pathspecs"]
+        ["git", "--no-pager", "--no-replace-objects",
+         "--literal-pathspecs"]
         + ["-C", str(repo)] + GIT_PIN + list(args)
     )
     result = subprocess.run(

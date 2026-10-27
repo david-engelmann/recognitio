@@ -13,6 +13,12 @@ configuration in the clone or in the user's global config cannot reshape
 the diff under the packet. Every invocation also refuses replace
 objects, so a replace ref planted in the clone cannot swap the objects
 the packet is built from while the packet keeps the real head's name.
+No invocation runs a driver program a repository or the caller's
+environment defines. The diff family, blame, the line history reader,
+the blob reader and the companion search all refuse text conversion,
+the diff family also refuses external diff drivers, and configuration
+the caller supplies through the environment never reaches a child
+process at all.
 File paths reach git as literal pathspecs, never as patterns. Path data
 moves through NUL delimited output, so quoted, spaced and Unicode
 paths survive end to end. All subprocess output is handled as bytes
@@ -147,8 +153,16 @@ GIT_PIN = [
     "-c", "grep.column=false",
     "-c", "diff.interHunkContext=0",
 ]
-# Diff invocations also refuse external diff drivers and textconv
-# filters, both of which can rewrite the text of a change.
+# Every invocation that can produce or read diff text also refuses
+# external diff drivers and textconv filters, both of which can
+# rewrite the text of a change. A textconv driver is named by the
+# attributes of the tree under review and defined in configuration,
+# so an unpinned reader would run a program the reviewed party or
+# the caller's environment chose and would read its output as
+# evidence. Blame applies a textconv filter by default, so it
+# carries these flags beside the diff family, the line history
+# reader and the blob reader. The companion search takes the
+# textconv refusal alone, because it has no external diff form.
 DIFF_FLAGS = ["--no-ext-diff", "--no-textconv"]
 
 
@@ -245,21 +259,44 @@ GIT_LOCATION_VARS = (
     "GIT_REPLACE_REF_BASE",
 )
 
+# Driver and configuration variables are scrubbed beside the location
+# variables. Configuration supplied through the environment can define
+# a textconv or external diff driver outright, with no entry in any
+# config file a reviewer could read first, and the remaining names hand
+# a child process a program to run in place of its pager, its diff
+# renderer or its own subcommands. None of them may reach a child.
+GIT_DRIVER_ENV_VARS = (
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "GIT_PAGER",
+    "GIT_EXEC_PATH",
+)
+GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+
+
+def scrubbed_child_env():
+    """The environment every child process runs under."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+        and key not in GIT_DRIVER_ENV_VARS
+        and not key.startswith(GIT_CONFIG_ENV_PREFIX)
+    }
+    # The second belt behind the --no-replace-objects flag every git
+    # invocation carries. Whichever layer a future call site forgets,
+    # the other still refuses replacement objects.
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return env
+
+
 # Every child process gets a timeout, the network calls to the GitHub
 # CLI included. A stalled call must fail the run, never hang it.
 PROCESS_TIMEOUT_SECONDS = 120
 
 
 def run_process(argv, cwd=None):
-    env = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in GIT_LOCATION_VARS
-    }
-    # The second belt behind the --no-replace-objects flag every git
-    # invocation carries. Whichever layer a future call site forgets,
-    # the other still refuses replacement objects.
-    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env = scrubbed_child_env()
     try:
         return subprocess.run(
             list(argv), cwd=str(cwd) if cwd is not None else None,
@@ -304,8 +341,13 @@ def run_git(repo, args, check=True, global_flags=()):
     # makes every pathspec in the invocation a literal path, so a
     # file named with glob characters is measured as itself and never
     # as a pattern that borrows a neighbour's diff.
+    # --no-pager stands beside the replace and pathspec refusals, so
+    # a pager program named by clone config, global config or the
+    # environment can never run for an invocation whose output the
+    # packet reads as data.
     argv = (
-        ["git", "--no-replace-objects", "--literal-pathspecs"]
+        ["git", "--no-pager", "--no-replace-objects",
+         "--literal-pathspecs"]
         + list(global_flags)
         + ["-C", str(repo)] + GIT_PIN + list(args)
     )
@@ -740,9 +782,10 @@ def file_bytes(repo, ref, path):
     if ref is None or path is None:
         return None
     result = run_process(
-        ["git", "--no-replace-objects", "--literal-pathspecs",
+        ["git", "--no-pager", "--no-replace-objects",
+         "--literal-pathspecs",
          "-C", str(repo)] + GIT_PIN
-        + ["show", "%s:%s" % (ref, path)]
+        + ["show"] + DIFF_FLAGS + ["%s:%s" % (ref, path)]
     )
     if result.returncode != 0:
         return None
@@ -1509,11 +1552,15 @@ def git_grep_lines(repo, head, term, fixed=True):
     exactly. Terms are fixed strings by default, never patterns. The
     text flag makes the search read files the tree marks binary as
     text, so an attributes line cannot hide a caller from this tier
-    and leave the section reporting that no call sites exist.
+    and leave the section reporting that no call sites exist. The
+    textconv refusal stands on the call as well, so the search reads
+    the bytes the tree holds and never a driver rewriting of them.
     """
-    args = ["grep", "--text", "-n", "-z", "-w", "-e", term, head]
+    args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w",
+            "-e", term, head]
     if fixed:
-        args = ["grep", "--text", "-n", "-z", "-w", "-F", "-e", term, head]
+        args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w",
+                "-F", "-e", term, head]
     result = run_git(repo, args, check=False)
     if result.returncode not in (0, 1):
         # A search that failed is not a search that found nothing.
@@ -1574,7 +1621,7 @@ def git_grep_bulk(repo, head, terms):
         return {}
     if len(unique) == 1:
         return {unique[0]: git_grep_lines(repo, head, unique[0])}
-    args = ["grep", "--text", "-n", "-z", "-w", "-F"]
+    args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w", "-F"]
     for term in unique:
         args.extend(["-e", term])
     args.append(head)
@@ -1948,8 +1995,9 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
             range_count += 1
             result = run_git(
                 repo,
-                ["blame", "--porcelain", "-L", "%d,%d" % (start, end),
-                 head, "--", path],
+                ["blame", "--porcelain"] + DIFF_FLAGS
+                + ["-L", "%d,%d" % (start, end),
+                   head, "--", path],
                 check=False,
             )
             if result.returncode != 0:
@@ -2008,8 +2056,9 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
             log_count += 1
             result = run_git(
                 repo,
-                ["log", "-L", "%d,%d:%s" % (span[0], span[1], path),
-                 "--format=commit %h %s", head],
+                ["log"] + DIFF_FLAGS
+                + ["-L", "%d,%d:%s" % (span[0], span[1], path),
+                   "--format=commit %h %s", head],
                 check=False,
             )
             lines.append("#### %s in %s" % (name, display_path(path)))
