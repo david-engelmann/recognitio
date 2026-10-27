@@ -365,6 +365,29 @@ class TestCheckCopy(unittest.TestCase):
             self.assertIn("evals/tasks/task-99/planted.md", found)
             self.assertNotIn("evals/tasks/task-99/packet.md", found)
 
+    def test_discovery_keeps_the_example_packet_out_only(self):
+        # WP2. The packet saved under examples is extractor
+        # output shipped for reading without an install, so it
+        # stays out by the generated packet rule, while the
+        # authored note in the same folder stays inside.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            packet_dir = root / "examples" / "example-packet-991ac6a"
+            packet_dir.mkdir(parents=True)
+            (packet_dir / "packet.md").write_text(
+                "Mode: commit\n", encoding="utf-8"
+            )
+            note = root / "examples" / "README.md"
+            note.write_text("An authored note.\n", encoding="utf-8")
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertNotIn(
+                "examples/example-packet-991ac6a/packet.md", found
+            )
+            self.assertIn("examples/README.md", found)
+
     def test_discovery_skips_dependency_dirs_and_outside_symlinks(self):
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1838,11 +1861,15 @@ class TestReadmeStorefront(unittest.TestCase):
             "docs/brand/wordmark-dark.svg",
             self.HEADLINE,
             self.CANONICAL,
+            "For reviewers and the agents who assist them",
             "[What it does](#what-it-does)",
             "[![CI passing]",
             "docs/images/recognitio-cursor-agent-demo.gif",
-            "In the paired eval recorded in this repo",
+            "docs/images/eval-chart.svg",
+            "Eight planted defects across four fixture tasks",
             "New here. Start with the [Install](#install) section",
+            "**Sixty second quickstart**",
+            "--commit 991ac6a",
             "## What it does",
         )
         positions = []
@@ -2259,6 +2286,118 @@ class TestReadmeRound9(unittest.TestCase):
             "this hunk opens on the def line of "
             "semantic_problems itself.",
             self.flat,
+        )
+
+
+class TestReadmeWp2(unittest.TestCase):
+    """The WP2 proof and story landing is pinned.
+
+    The paired eval paragraph of numbers became a chart with
+    a caption that keeps its pinned claims, the examples
+    folder holds the complete packet for commit 991ac6a with
+    its entry note, the who this is for line and the sixty
+    second quickstart stand in the first screen, and the
+    objections section answers its three questions between
+    the Why section and the Install section.
+    """
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.flat = " ".join(self.readme.split())
+
+    def test_the_eval_chart_stands_in_the_first_screen(self):
+        first_screen = self.readme.split("## What it does", 1)[0]
+        self.assertIn("docs/images/eval-chart.svg", first_screen)
+        chart = ROOT / "docs" / "images" / "eval-chart.svg"
+        self.assertTrue(chart.is_file())
+        self.assertIn("8 of 8", chart.read_text(encoding="utf-8"))
+
+    def test_the_eval_caption_keeps_its_pinned_claims(self):
+        for fragment in (
+            "Eight planted defects across four fixture tasks.",
+            "The packet pass found 8 of 8 and the raw diff "
+            "pass found 4 of 8.",
+            "A defect in an unchanged file is unreachable by "
+            "a raw diff pass by construction, because the pass "
+            "holds no content from any unchanged file.",
+            "On the defects inside the diff itself the two "
+            "passes tied at 4 of 4 each.",
+            "[the paired eval results](evals/RESULTS.md)",
+        ):
+            self.assertIn(fragment, self.flat)
+
+    def test_the_example_packet_is_complete_and_verified(self):
+        folder = ROOT / "examples" / "example-packet-991ac6a"
+        packet = (folder / "packet.md").read_text(encoding="utf-8")
+        self.assertEqual(len(packet.splitlines()), 622)
+        manifest = json.loads(
+            (folder / "manifest.json").read_text(encoding="utf-8")
+        )
+        self.assertIs(manifest["verified"], True)
+        self.assertEqual(manifest["discrepancies"], [])
+        self.assertEqual(
+            manifest["head"],
+            "991ac6ae80d3c00c0b6c7fc06a4a35bdafb2d965",
+        )
+        self.assertEqual(
+            manifest["base"],
+            "eba549658f9c21e78115f6caf96034dd142af4e6",
+        )
+
+    def test_the_examples_entry_note_and_readme_link_resolve(self):
+        entry = (ROOT / "examples" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "one complete real packet a visitor can open "
+            "without installing anything",
+            " ".join(entry.split()),
+        )
+        self.assertIn(
+            "example-packet-991ac6a/packet.md", entry
+        )
+        self.assertIn(
+            "example-packet-991ac6a/manifest.json", entry
+        )
+        self.assertIn(
+            "[the examples folder](examples/README.md)", self.readme
+        )
+
+    def test_the_quickstart_names_the_verified_commit(self):
+        first_screen = self.readme.split("## What it does", 1)[0]
+        self.assertIn("**Sixty second quickstart**", first_screen)
+        self.assertIn("--commit 991ac6a", first_screen)
+        self.assertIn(
+            "For reviewers and the agents who assist them, "
+            "judging a pull request or a commit range they did "
+            "not write",
+            self.flat,
+        )
+        for step in ("1. Clone this repo", "2. Build a packet",
+                     "3. Read the verdict", "4. Open `packet.md`"):
+            self.assertIn(step, first_screen)
+
+    def test_the_objections_answer_their_three_questions(self):
+        objections = self.readme.split("## Objections", 1)[1].split(
+            "## Install", 1
+        )[0]
+        positions = []
+        for heading in (
+            "### Why not just run gh pr diff",
+            "### Why does it run locally",
+            "### What verified does not mean",
+        ):
+            self.assertIn(heading, objections)
+            positions.append(objections.index(heading))
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn(
+            "Verified does not prove the change is correct "
+            "or safe",
+            " ".join(objections.split()),
+        )
+        self.assertLess(
+            self.readme.index("## Objections"),
+            self.readme.index("## Install"),
         )
 
 
@@ -2680,6 +2819,7 @@ class TestDemoAssets(unittest.TestCase):
                 "docs/images/recognitio-cursor-agent-poster.png",
                 "docs/images/recognitio-cursor-agent-verified-crop.png",
                 "docs/images/recognitio-cursor-agent-demo.gif",
+                "docs/images/eval-chart.svg",
             ],
         )
         for ref in refs:
@@ -2807,6 +2947,10 @@ class TestBrandAssets(unittest.TestCase):
     # of 1,300,000 held the 1,274,392 byte first encode.
     # The new ceiling of 700,000 is the work order hero
     # target and holds 28,480 of headroom over the ledger.
+    # WP2 adds the eval chart at 2,914 bytes to the ledger,
+    # which moves the total to 674,434 in the open. The
+    # ceiling does not move, because 700,000 still holds
+    # the new ledger with 25,566 of headroom over it.
     PAGE_CEILING = 700000
 
     def test_the_brand_files_exist(self):
@@ -2975,7 +3119,7 @@ class TestBrandAssets(unittest.TestCase):
         unique = list(dict.fromkeys(refs))
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 671520)
+        self.assertEqual(total, 674434)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

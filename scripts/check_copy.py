@@ -102,6 +102,13 @@ def is_fence_excluded(root, path):
     if len(parts) == 4 and parts[:2] == ("evals", "tasks") \
             and parts[3] == "packet.md":
         return True
+    if parts[0] == "examples" and parts[-1] == "packet.md":
+        # A packet saved under examples is extractor output
+        # shipped so a visitor can read one without installing,
+        # so it stays out by the same rule as the eval packets.
+        # Every other file under examples is authored prose and
+        # stays inside the fence.
+        return True
     if len(parts) >= 2 and parts[:2] == (".cursor-plugin", "skills"):
         # The plugin skill copy is pinned byte identical to the
         # canonical skill by scripts/check_cursor.py, and the

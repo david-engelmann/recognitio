@@ -1,0 +1,105 @@
+{
+  "extractor": "recognitio extract.py",
+  "version": "1.3.0",
+  "command": [
+    "extract.py",
+    "--commit",
+    "991ac6a",
+    "--out",
+    "/home/hatch/workspace/wp2-groundwork/example-packet-991ac6a",
+    "--repo",
+    "/home/hatch/workspace/recognitio-wp1"
+  ],
+  "created_utc": "2026-10-26T22:49:08.275142+00:00",
+  "mode": "commit",
+  "label": "commit 991ac6ae80d3",
+  "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
+  "head": "991ac6ae80d3c00c0b6c7fc06a4a35bdafb2d965",
+  "merge_base": "eba549658f9c21e78115f6caf96034dd142af4e6",
+  "since": null,
+  "pr": null,
+  "files": [
+    {
+      "path": "scripts/check_antigravity.py",
+      "old_path": null,
+      "status": "modified",
+      "status_code": "M",
+      "additions": 14,
+      "deletions": 0,
+      "hunks": 1,
+      "binary": false,
+      "attribute_text": false,
+      "binary_transition": false,
+      "placeholder": null,
+      "instruction_file": false
+    },
+    {
+      "path": "scripts/check_devin.py",
+      "old_path": null,
+      "status": "modified",
+      "status_code": "M",
+      "additions": 10,
+      "deletions": 0,
+      "hunks": 1,
+      "binary": false,
+      "attribute_text": false,
+      "binary_transition": false,
+      "placeholder": null,
+      "instruction_file": false
+    }
+  ],
+  "exclusions": [],
+  "selected_tiers": [
+    "T0",
+    "T1",
+    "T2",
+    "T3"
+  ],
+  "tiers": {
+    "T0": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 78,
+      "emitted_tokens": 78,
+      "files": 2
+    },
+    "T1": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 3040,
+      "emitted_tokens": 3040,
+      "files": 2
+    },
+    "T2": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 249,
+      "emitted_tokens": 249,
+      "files": 2
+    },
+    "T3": {
+      "state": "included",
+      "included": true,
+      "estimated_tokens": 1573,
+      "emitted_tokens": 1573,
+      "files": 2
+    }
+  },
+  "sections": [
+    "## T0 Triage",
+    "## T1 The change",
+    "## T2 Companions",
+    "## T3 History",
+    "## Verification recount"
+  ],
+  "budget": {
+    "budget_tokens": null,
+    "estimated_tokens": 5281,
+    "dropped": []
+  },
+  "cap_notes": [
+    "history for semantic_problems capped"
+  ],
+  "verified": true,
+  "discrepancies": []
+}

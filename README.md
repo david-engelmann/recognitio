@@ -10,7 +10,9 @@
 
 Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.
 
-[What it does](#what-it-does) · [See it on a real change](#see-it-on-a-real-change) · [How it works](#how-it-works) · [Why](#why) · [Install](#install) · [Platform adaptations](#platform-adaptations) · [Usage](#usage) · [Going deeper](#going-deeper)
+For reviewers and the agents who assist them, judging a pull request or a commit range they did not write and needing the whole change with its context in hand before they judge it.
+
+[What it does](#what-it-does) · [See it on a real change](#see-it-on-a-real-change) · [How it works](#how-it-works) · [Why](#why) · [Objections](#objections) · [Install](#install) · [Platform adaptations](#platform-adaptations) · [Usage](#usage) · [Going deeper](#going-deeper)
 
 [![CI passing](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -21,9 +23,41 @@ One recorded run in full. A session in the Cursor agent uses the recognitio skil
   <img alt="A Cursor agent session using recognitio on a 28 file change, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792">
 </picture>
 
-In the paired eval recorded in this repo the packet pass found 8 of 8 planted defects across four fixture tasks and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. On the defects inside the diff itself the two passes tied at 4 of 4 each. The full record lives in [the paired eval results](evals/RESULTS.md).
+<img alt="Paired eval chart. The packet pass found 8 of 8 planted defects and the raw diff pass found 4 of 8." src="docs/images/eval-chart.svg" width="720">
+
+Eight planted defects across four fixture tasks. The packet pass found 8 of 8 and the raw diff pass found 4 of 8. Every defect the raw pass missed lived in a file the diff never showed. A defect in an unchanged file is unreachable by a raw diff pass by construction, because the pass holds no content from any unchanged file. On the defects inside the diff itself the two passes tied at 4 of 4 each. The full record stands in [the paired eval results](evals/RESULTS.md) and the per pass notes stand beside it.
 
 New here. Start with the [Install](#install) section below and take the plugin route first.
+
+**Sixty second quickstart**
+
+Start from a terminal in a folder where you keep code. You need Python 3.10 or newer and git, and nothing else, because the extractor takes no third party dependencies.
+
+1. Clone this repo and enter it.
+
+```bash
+git clone \
+  https://github.com/\
+david-engelmann/\
+recognitio.git
+cd recognitio
+```
+
+2. Build a packet for one small commit from the history of this repo. The commit below is the same one the worked example further down this README reads, so a first run here ends on a verified packet.
+
+```bash
+python3 .agents/skills/\
+recognitio/scripts/\
+extract.py \
+  --commit 991ac6a \
+  --out packet --repo .
+```
+
+3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a run that fails leaves no packet standing and prints the disagreement.
+
+4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The `manifest.json` file beside it is the receipt for the run.
+
+That is the whole first pass. For your own work the single commit flag takes HEAD or any commit you name, and pull request numbers and commit ranges swap into the same command, and the Usage section of this README shows each spelling. Pin the clone to a commit SHA you reviewed before you rely on it for real review work, as the Install section sets out.
 
 ## What it does
 
@@ -95,7 +129,7 @@ index 0327324..522392d 100644
 
 The packet excerpt above is trimmed, chosen around the ten added lines, and the rest of the function is elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file. Both excerpts show the same edit inside semantic_problems, and the packet header names naming_problems because git labels a hunk with the nearest function line above its opening line, and this hunk opens on the def line of semantic_problems itself.
 
-The same packet names the test files that mention the changed code, `tests/test_antigravity.py` at line 47 and `tests/test_devin.py` at lines 20 and 50, and closes with a verification recount. The recount records 2 files with their statuses and old paths, 2 hunks, and 24 added lines and 0 deleted lines, matches the manifest on every count, and passes with every tier included. The full packet for this commit runs 622 lines.
+The same packet names the test files that mention the changed code, `tests/test_antigravity.py` at line 47 and `tests/test_devin.py` at lines 20 and 50, and closes with a verification recount. The recount records 2 files with their statuses and old paths, 2 hunks, and 24 added lines and 0 deleted lines, matches the manifest on every count, and passes with every tier included. The full packet for this commit runs 622 lines. The complete packet stands in [the examples folder](examples/README.md) for any visitor who wants to read one whole before installing anything.
 
 ## How it works
 
@@ -124,6 +158,20 @@ A diff alone is not what a reviewer reads.
 - Recognitio runs against the local clone instead, where there is no file count cap and the full history is present, and a packet is only called verified when two separate counts of it agree.
 
 Recognitio serves the pull request review workflow. It is the step before the review itself, for a reviewer judging a change they did not write.
+
+## Objections
+
+### Why not just run gh pr diff
+
+Because that output is a hosted diff, and the research this project grew out of found hosted diffs capping the file counts they return and dropping oversized patches entirely with no flag on either. A large pull request can therefore read as complete while part of it never reached the page. Recognitio builds the packet from the local clone instead, where there is no file count cap, and then recounts the change so the reader knows the packet holds all of it.
+
+### Why does it run locally
+
+Because the local clone is the one source that holds the whole change and the full history behind it. Extraction reads git objects on disk, so the file list in the packet is the file list in the range, and a file that cannot be accounted for fails the run instead of passing unnoticed. A shallow clone is refused outright for the same reason. Nothing in the extraction points at an untrusted network source.
+
+### What verified does not mean
+
+Verified proves the packet is complete and nothing more. A separate recount of the files and hunks and lines agreed with the manifest, so the packet holds the whole change it names. Verified does not prove the change is correct or safe, and recognitio never approves or rejects the code it gathers. Judgement belongs to the review that reads the packet, and a packet whose verified flag is false is not a packet and nobody reviews it as if it were whole.
 
 ## Install
 
