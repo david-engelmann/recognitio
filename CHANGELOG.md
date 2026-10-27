@@ -1677,6 +1677,26 @@ This unreleased work carries version 1.3.0.
   re-measurement now pairs its sections with its own name
   status output and keeps the section the entry owns, and a
   regression test holds the copy to its own counts.
+- The severity vocabulary now stands as one vocabulary on
+  every surface, P0 and P1 and P2 and P3, the set the
+  shipped fan out and headless gates already enforced.
+  The skill in all three copies, the packet output style
+  and the reviewer persona state it in one shared sentence,
+  with the persona gaining the sentence it lacked. The
+  findings template in REVIEW.md gains a P0 heading above
+  its P1 heading with a dated note, so reports written
+  before the unification carry no P0 heading as record of
+  their day and stand unedited. The fan out runbook states
+  the vocabulary in prose for the first time, and both
+  validator messages name the allowed values when they
+  refuse one, where the fan out message once named none
+  and the headless message named the vocabulary without
+  its values. The shipped proof run keeps its historical
+  P0 grade untouched and reads green under its own gate.
+  A single pin in the test suite holds every surface to
+  the set and classifies every file in the tree that
+  names a severity, so a new surface cannot join in
+  silence and a drift on a listed surface fails the gate.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

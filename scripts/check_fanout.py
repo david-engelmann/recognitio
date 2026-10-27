@@ -202,7 +202,8 @@ def schema_problems(schema, value, where):
         return ["%s uses an unsupported type %r" % (where, stype)]
     if "enum" in schema and value not in schema["enum"]:
         problems.append(
-            "%s is %r, outside the allowed values" % (where, value)
+            "%s is %r, outside the allowed values %s"
+            % (where, value, ", ".join(str(v) for v in schema["enum"]))
         )
     return problems
 

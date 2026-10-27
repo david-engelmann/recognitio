@@ -122,7 +122,8 @@ def findings_problems(structured, manifest_files, packet_head=None):
         if severity not in SEVERITIES:
             problems.append(
                 "%s carries severity %r, outside the shipped "
-                "vocabulary" % (where, severity)
+                "vocabulary %s"
+                % (where, severity, ", ".join(SEVERITIES))
             )
         location_path = parse_location(finding.get("location"))
         if location_path is None:

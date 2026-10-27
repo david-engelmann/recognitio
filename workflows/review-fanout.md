@@ -38,7 +38,10 @@ per group. Groups may overlap. Each reviewer reads the
 packet and returns structured output through
 `claude -p --json-schema` against the schema at
 `workflows/findings.schema.json`, which lands in the
-`structured_output` field. A reviewer that returns no
+`structured_output` field. Every finding a reviewer
+returns carries a severity from the one shipped
+vocabulary, P0 and P1 and P2 and P3, which the schema
+enumerates and the validator enforces. A reviewer that returns no
 valid structured output has its group marked uncovered,
 and the run stops.
 

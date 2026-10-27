@@ -44,8 +44,9 @@ must match, and it ships as a file at
 `workflows/headless-findings.schema.json` in this same
 shape. The run reports a verdict and a findings list, and
 every finding carries a severity from the shipped
-vocabulary, a location naming a packet path and a line, and
-the evidence paths it rests on. A finding may also carry
+vocabulary, P0 and P1 and P2 and P3, a location naming
+a packet path and a line, and the evidence paths it
+rests on. A finding may also carry
 the id it held in a fan out merged set, its summary, and
 its rule, and the structured output may name the packet
 head it summarises.

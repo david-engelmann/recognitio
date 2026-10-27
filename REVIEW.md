@@ -65,6 +65,12 @@ judged, and a rising share of wrong or not worth it findings
 is the shape that says the review is spending effort in the
 wrong places.
 
+The P0 heading entered this template on 2026-10-27, when the
+severity vocabulary unified on P0 and P1 and P2 and P3 on every
+surface. Reports written before that date carry no P0 heading,
+so a report with no P0 section may predate the grade rather
+than record that no P0 finding stood in its round.
+
 ```
 # Review of the change under review
 
@@ -74,6 +80,13 @@ What the change does and the scope it touches, in plain words.
 The verdict, and the one reason that carries it.
 
 ## Findings by severity
+
+### P0
+
+- The finding in one line.
+  Evidence. The file and line the finding rests on.
+  Impact. What breaks because of it.
+  Action. The fix, or the decision owed and who owes it.
 
 ### P1
 

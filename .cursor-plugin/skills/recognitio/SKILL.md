@@ -110,4 +110,4 @@ Extraction is local only, and nothing here points at an untrusted network source
 
 ## The boundary
 
-Recognitio assembles what reviewers read and proves the assembly is whole. It does not approve, reject, rank, or comment on the code. Those acts belong to the review skill downstream, which keeps its own axes and its own reporting rules. Findings written from a packet carry one fixed severity vocabulary, P1 and P2 and P3. When a review finds nothing where evidence should have been, check the packet first and the reviewer second, because the split between extraction and judgement is what makes either side auditable.
+Recognitio assembles what reviewers read and proves the assembly is whole. It does not approve, reject, rank, or comment on the code. Those acts belong to the review skill downstream, which keeps its own axes and its own reporting rules. Findings from a packet carry the fixed severity vocabulary, P0 and P1 and P2 and P3. When a review finds nothing where evidence should have been, check the packet first and the reviewer second, because the split between extraction and judgement is what makes either side auditable.

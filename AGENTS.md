@@ -805,3 +805,18 @@ form, the storefront and demo and brand tests re-pin
 the moved pins, and the page weight ledger stands
 at 1,277,948 bytes under a ceiling of 1,300,000,
 raised once and on the record for the recording.
+
+The severity vocabulary pass on 2026-10-27 then unified
+the severity vocabulary on the set the shipped gates
+already enforced, P0 and P1 and P2 and P3, with the
+skill in all three copies, the packet output style and
+the reviewer persona stating it in one shared sentence,
+the findings template gaining a P0 heading with a dated
+note, the fan out runbook stating it in prose, and both
+validator messages naming the allowed values they
+refuse outside. The shipped proof run keeps its
+historical P0 grade untouched and reads green under
+its own gate, the historical chronicle sentences stand
+unedited as record, and a single pin in the test suite
+classifies every file that names a severity so a new
+surface cannot join in silence.
