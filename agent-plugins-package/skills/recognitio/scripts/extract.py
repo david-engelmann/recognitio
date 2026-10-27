@@ -595,7 +595,7 @@ def resolve_pr(repo, args, since_sha):
         [
             "gh", "pr", "view", str(args.pr),
             "--json",
-            "baseRefOid,headRefOid,baseRefName,headRefName,title,body",
+            "baseRefOid,headRefOid,title,body,state",
         ],
     )
     try:
@@ -630,6 +630,13 @@ def resolve_pr(repo, args, since_sha):
         "title": data.get("title") or "",
         "body": body,
         "spec_references": find_spec_references(body),
+        # The state of the pull request under review, recorded
+        # with the moment this fetch read it. The state is a
+        # snapshot from this fetch and is never presented as a
+        # live claim, and a record that carries no state names
+        # it unknown rather than inventing one.
+        "state": str(data.get("state") or "unknown").lower(),
+        "state_as_of": datetime.now(timezone.utc).isoformat(),
     }
     return {
         "mode": "pr",
@@ -1617,6 +1624,14 @@ def build_t0(files, commit_log, pr_info):
     if pr_info is not None:
         lines.append("Pull request #%d: %s" % (pr_info["number"], pr_info["title"]))
         lines.append("")
+        if pr_info.get("state"):
+            lines.append(
+                "Pull request state at fetch time: %s, recorded at %s. "
+                "The state is a snapshot from that fetch and is not a "
+                "live claim."
+                % (pr_info["state"], pr_info.get("state_as_of", ""))
+            )
+            lines.append("")
         lines.append("### Pull request body")
         lines.append("")
         body = pr_info["body"].strip()
@@ -2413,6 +2428,13 @@ def prior_prs_section(repo, top_files):
         "matches shown. A pull request outside that window is not "
         "reported here."
         % (MAX_HISTORY_FILES, MAX_PRIOR_PR_LIST, MAX_PRIOR_PRS)
+    )
+    lines.append("")
+    lines.append(
+        "The states in this list are a snapshot from the fetch "
+        "that built this packet. They are not refreshed after "
+        "that fetch and they are not a live claim about any "
+        "pull request."
     )
     lines.append("")
     paths = [entry["path"] for entry in top_files]
@@ -3758,6 +3780,8 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
                 "number": resolved["pr"]["number"],
                 "title": resolved["pr"]["title"],
                 "spec_references": resolved["pr"]["spec_references"],
+                "state": resolved["pr"].get("state", "unknown"),
+                "state_as_of": resolved["pr"].get("state_as_of", ""),
             }
             if resolved["pr"] else None
         ),

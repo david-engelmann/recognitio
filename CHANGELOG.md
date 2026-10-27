@@ -1587,6 +1587,29 @@ This unreleased work carries version 1.3.0.
   findings file standing at the recorded path against that
   hash and reads its header against the manifest head and
   since anchor.
+- The packet check now rebuilds the change tier whole
+  from the recount, so free prose inserted into that tier
+  refuses the stamp. A packet whose Contents line is
+  missing or damaged is refused rather than stamped with
+  its header and contents rebuilds silently skipped. In
+  pull request mode the check compares the base and head
+  identifiers the GitHub CLI reports against the
+  manifest, and a pull request body that cannot be read
+  back and carries no cap line is refused rather than
+  checked on presence alone. A relative findings path in
+  the recorded command resolves beside the packet
+  directory, in the directory that holds the packet
+  directory, and never against the working directory the
+  check was launched from. The manifest creation time is
+  refused when it names a moment more than the stated
+  allowance of one hour before the recorded head commit
+  was committed or more than that allowance after the
+  check runs. The extractor records the state of the
+  pull request under review with the moment the fetch
+  read it, in the packet and in the manifest, worded as
+  a snapshot from that fetch and never as a live claim,
+  and the history tier words the states of prior pull
+  requests as a snapshot on the same terms.
 
 ### Removed
 

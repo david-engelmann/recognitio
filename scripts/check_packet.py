@@ -378,16 +378,59 @@ def manifest_schema_problems(manifest):
     return schema_problems_at(manifest, schema, schema, "the manifest")
 
 
-def created_problems(manifest):
-    """Check the recorded creation time is a time at all.
+CREATED_ALLOWANCE_SECONDS = 3600
+
+
+def parse_timestamp(value):
+    """Parse one recorded timestamp, or return None."""
+    if not isinstance(value, str) or "T" not in value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(
+            value[:-1] + "+00:00" if value.endswith("Z") else value
+        )
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed
+
+
+def head_committer_time(repo, head):
+    """The committer time of the recorded head, or None."""
+    if repo is None or not isinstance(head, str):
+        return None
+    out = run_git(repo, ["show", "-s", "--format=%ct", head])
+    if out is None:
+        return None
+    try:
+        return datetime.fromtimestamp(int(out.strip()), timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+def created_problems(manifest, repo=None):
+    """Check the recorded creation time against the repository.
 
     The true creation time cannot be verified against a
     repository, and the schema only types the field. The shapes
     a stamp must still refuse are the ones no clock reading can
-    take. A value that is not an ISO timestamp, a value no UTF-8
-    reader can encode, a value with no offset, and a value that
-    names a moment well after the check itself runs are none of
-    them times a run could have recorded.
+    take and the ones the repository itself refutes. A value
+    that is not an ISO timestamp, a value no UTF-8 reader can
+    encode, and a value with no offset are none of them times a
+    run could have recorded. A value that names a moment before
+    the recorded head commit existed is a time the repository
+    in the checker hands proves impossible, because a packet
+    cannot have been extracted from a commit before that commit
+    was committed. A value that names a moment after the check
+    itself runs claims a creation that has not happened. Both
+    bounds carry the same stated allowance of one hour for clock
+    skew between the machine that committed the head, the
+    machine that ran the extraction and the machine that runs
+    this check, and that allowance replaces the earlier one day
+    of silent grace. The pull request state fetch time recorded
+    in the pull request record is held inside the same bounds,
+    because that fetch happened inside the same run.
     """
     problems = []
     value = manifest.get("created_utc")
@@ -422,12 +465,62 @@ def created_problems(manifest):
         )
         return problems
     now = datetime.now(timezone.utc)
-    if (parsed - now).total_seconds() > 24 * 3600:
+    if (parsed - now).total_seconds() > CREATED_ALLOWANCE_SECONDS:
         problems.append(
-            "the manifest creation time %s names a moment after "
-            "this check runs, so the packet claims a creation "
-            "that has not happened" % ascii(value)[:60]
+            "the manifest creation time %s names a moment more "
+            "than the stated allowance of one hour after this "
+            "check runs, so the packet claims a creation that has "
+            "not happened" % ascii(value)[:60]
         )
+    head_time = head_committer_time(repo, manifest.get("head"))
+    if head_time is not None and \
+            (head_time - parsed).total_seconds() > \
+            CREATED_ALLOWANCE_SECONDS:
+        problems.append(
+            "the manifest creation time %s names a moment more "
+            "than the stated allowance of one hour before the "
+            "recorded head commit was committed at %s, so the "
+            "packet claims it was created before the change it "
+            "holds existed"
+            % (ascii(value)[:60], head_time.isoformat())
+        )
+    pr_record = manifest.get("pr")
+    if isinstance(pr_record, dict) and \
+            isinstance(pr_record.get("state_as_of"), str):
+        fetched = parse_timestamp(pr_record["state_as_of"])
+        if fetched is None:
+            problems.append(
+                "the manifest pull request state fetch time %s "
+                "is not an ISO timestamp with an offset, so the "
+                "state it carries records no fetch moment"
+                % ascii(pr_record["state_as_of"])[:60]
+            )
+        else:
+            if (fetched - parsed).total_seconds() > \
+                    CREATED_ALLOWANCE_SECONDS:
+                problems.append(
+                    "the manifest pull request state fetch time "
+                    "%s names a moment more than the stated "
+                    "allowance of one hour after the manifest "
+                    "creation time, so the state cannot have been "
+                    "fetched inside the run that built the packet"
+                    % ascii(pr_record["state_as_of"])[:60]
+                )
+            if head_time is not None and \
+                    (head_time - fetched).total_seconds() > \
+                    CREATED_ALLOWANCE_SECONDS:
+                problems.append(
+                    "the manifest pull request state fetch time "
+                    "%s names a moment more than the stated "
+                    "allowance of one hour before the recorded "
+                    "head commit was committed at %s, so the "
+                    "state cannot have been fetched for the "
+                    "change this packet holds"
+                    % (
+                        ascii(pr_record["state_as_of"])[:60],
+                        head_time.isoformat(),
+                    )
+                )
     return problems
 
 
@@ -2254,13 +2347,40 @@ def parse_packet_findings(span):
     return findings, True, padding + bad_lines
 
 
-def rereview_problems(packet_text, manifest, repo, extractor):
+def resolve_findings_file(findings_path, packet_dir):
+    """Resolve the recorded findings path against its pinned base.
+
+    An absolute spelling stands as it stands. A relative
+    spelling resolves against the directory that holds the
+    packet directory, never against the working directory the
+    check itself was launched from, so the same packet and the
+    same findings file give the same verdict from every
+    directory. The packet directory itself is a sealed pair
+    and a findings file cannot lawfully stand inside it, so a
+    relative spelling names a file beside the pair, in the
+    directory that holds it.
+    """
+    candidate = Path(findings_path)
+    if candidate.is_absolute():
+        return candidate
+    if packet_dir is not None:
+        return Path(packet_dir).resolve().parent / candidate
+    return candidate
+
+
+def rereview_problems(packet_text, manifest, repo, extractor,
+                      packet_dir=None):
     """Rebuild the re-review section and compare it whole.
 
     The section rests on the since anchor and on a findings
     file. When the file the recorded command names is still
     where the run left it, its findings are read directly and
-    the rebuild stands on them alone. When it is not, the
+    the rebuild stands on them alone. A relative findings
+    spelling is resolved against the pinned base the resolver
+    above names, so a file that merely shares the spelling in
+    the directory the check was launched from is never read
+    and a genuine file beside the packet is never missed for
+    that reason. When the file is not at the pinned path, the
     anchor, the commit list and the range diff are still
     readings of the repository, and the findings are read back
     out of the packet lines, so the whole section can be
@@ -2281,12 +2401,15 @@ def rereview_problems(packet_text, manifest, repo, extractor):
         ]
     flags, _parse = parse_command_flags(manifest)
     findings_path = last_flag(flags, "--findings") if flags else None
-    if findings_path and Path(findings_path).is_file():
+    findings_file = None
+    if findings_path:
+        findings_file = resolve_findings_file(findings_path, packet_dir)
+    if findings_file is not None and findings_file.is_file():
         # The findings file the command records is still where
         # the run left it, so its findings are the ground truth
         # and no reading of the packet lines is needed at all.
         try:
-            findings_bytes = Path(findings_path).read_bytes()
+            findings_bytes = findings_file.read_bytes()
             findings_text = findings_bytes.decode(
                 "utf-8", "surrogateescape"
             )
@@ -2378,8 +2501,7 @@ def fetch_pr_view(repo, number):
         result = subprocess.run(
             [
                 "gh", "pr", "view", str(number), "--json",
-                "baseRefOid,headRefOid,baseRefName,headRefName,"
-                "title,body",
+                "baseRefOid,headRefOid,title,body",
             ],
             cwd=str(repo),
             capture_output=True,
@@ -2438,6 +2560,26 @@ def parse_pr_body(packet_text):
     return None
 
 
+def pr_state_line(pr_record):
+    """The triage line that presents the pull request state.
+
+    The wording matches the line the extractor builder prints,
+    because this reading is the presence form of that line for
+    a packet whose body cannot be read back. The state is the
+    state the extractor fetched when the packet was built and
+    the line names its fetch moment, so the packet presents the
+    state as the snapshot it is and never as a live claim.
+    """
+    if not isinstance(pr_record, dict) or not pr_record.get("state"):
+        return None
+    return (
+        "Pull request state at fetch time: %s, recorded at %s. "
+        "The state is a snapshot from that fetch and is not a "
+        "live claim."
+        % (pr_record["state"], pr_record.get("state_as_of", ""))
+    )
+
+
 def pr_triage_problems(packet_text, manifest, repo, fresh_change,
                        extractor):
     """Rebuild the pull request triage tier and compare it whole.
@@ -2447,14 +2589,32 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
     request record. That record is read back here. When the
     GitHub CLI in the checking environment answers, its title
     and body are the ground truth, the spec references are
-    recomputed from that body, and the manifest record must
-    equal all three. When the CLI does not answer, the body is
-    read back out of the packet and the spec references are
-    recomputed from it, which pins the manifest record and the
-    preamble against each other and against the body the packet
-    carries. A title forged in the manifest and the packet
-    together, in an environment with no CLI, is the shape that
-    still stands, and it is recorded in the fix report.
+    recomputed from that body, the base and head identifiers
+    in that same record are compared against the manifest base
+    and head, and the manifest record must equal all of them.
+    No identifier the view carries is fetched and left unread.
+    The branch names the view also offers are no longer
+    requested, because no surface in the pair records a branch
+    name for them to be compared against. The live state of
+    the pull request is not compared against the recorded
+    state, because the recorded state is a snapshot from the
+    fetch that built the packet and a state that has since
+    moved does not falsify it. The rebuild carries the recorded
+    state and its fetch moment from the manifest, so the
+    packet line that presents them is compared whole. When the
+    CLI does not answer, the body is read back out of the
+    packet and the spec references are recomputed from it,
+    which pins the manifest record and the preamble against
+    each other and against the body the packet carries. A body
+    that cannot be read back takes the presence only reading
+    only where the packet carries the cap line the builder
+    writes for a capped body. A body whose fence is damaged or
+    missing, with no cap line standing, is refused, because a
+    mutation of the packet alone must not convert the whole
+    rebuild into a presence only reading in silence. A title
+    forged in the manifest and the packet together, in an
+    environment with no CLI, is the shape that still stands,
+    and it is recorded in the fix report.
     """
     problems = []
     recorded = manifest["pr"]
@@ -2475,21 +2635,64 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
                 "disagree with the references in the body the "
                 "GitHub CLI reports"
             )
+        for key, field in (
+            ("baseRefOid", "base"), ("headRefOid", "head")
+        ):
+            reported = data.get(key)
+            if not reported:
+                problems.append(
+                    "the pull request record the GitHub CLI "
+                    "reports carries no %s, so the %s the packet "
+                    "records cannot be checked against the pull "
+                    "request as it stands" % (key, field)
+                )
+            elif reported != manifest.get(field):
+                problems.append(
+                    "the manifest records %s %s but the pull "
+                    "request record the GitHub CLI reports names "
+                    "%s %s, so the packet range no longer matches "
+                    "the pull request it names"
+                    % (
+                        field, manifest.get(field), key, reported,
+                    )
+                )
         pr_info = {
             "number": recorded["number"], "title": title,
             "body": body_text, "spec_references": spec,
+            "state": recorded.get("state"),
+            "state_as_of": recorded.get("state_as_of"),
         }
     else:
         body_text = parse_pr_body(packet_text)
         if body_text is None:
+            body = section_body(packet_text, "## T0 Triage") or []
+            capped = any(
+                line.startswith("The body was capped at ")
+                for line in body
+            )
+            if not capped:
+                problems.append(
+                    "the pull request body in the triage tier "
+                    "cannot be read back and the packet carries "
+                    "no cap line for it, so its fence is damaged "
+                    "or missing and the packet is refused rather "
+                    "than checked on the presence of its title "
+                    "and spec reference lines alone"
+                )
+                return problems
             line = "Pull request #%d: %s" % (
                 recorded["number"], recorded["title"]
             )
-            body = section_body(packet_text, "## T0 Triage") or []
             if line not in body:
                 problems.append(
                     "the triage tier does not carry the pull "
                     "request title line its manifest records"
+                )
+            state_line = pr_state_line(recorded)
+            if state_line is not None and state_line not in body:
+                problems.append(
+                    "the triage tier does not carry the pull "
+                    "request state line its manifest records"
                 )
             if recorded["spec_references"]:
                 wanted = (
@@ -2518,6 +2721,8 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
             "number": recorded["number"],
             "title": recorded["title"], "body": body_text,
             "spec_references": recorded["spec_references"],
+            "state": recorded.get("state"),
+            "state_as_of": recorded.get("state_as_of"),
         }
     expected = extractor.build_t0(
         fresh_change["files"], fresh_change["commit_log"], pr_info
@@ -2530,15 +2735,21 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
     return problems
 
 
-def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
+def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
+                     packet_dir=None):
     """Rebuild the deterministic tiers and compare them whole.
 
     Token accounting catches a tier that shrinks or grows, but
     a same length edit inside a tier body keeps its measure.
-    The triage, companion and history tiers are deterministic
-    readings of the repository, so the checker rebuilds them
-    with the extractor's own builders and compares the text,
-    which catches an edit of any size. The builders also hand
+    The triage, change, companion and history tiers are
+    deterministic readings of the repository, so the checker
+    rebuilds them with the extractor's own builders and
+    compares the text, which catches an edit of any size. The
+    change tier rebuild stands on the recount chunks and the
+    recount file records, so every line of that tier, the tier
+    introduction and the prose inside a file section outside
+    its diff fence included, is compared against builder
+    output and no free prose can stand there. The builders also hand
     back the cap notes and the tier sizes, and those readings
     pin the manifest cap notes list and the recorded size of a
     dropped tier, two accounts the packet receipt lines alone
@@ -2574,6 +2785,15 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
                 problems.append(
                     "the triage tier disagrees with the tier the "
                     "recount rebuilds from the repository"
+                )
+        if tiers["T1"]["state"] == "included":
+            expected_t1 = extractor.build_t1(files, chunks)
+            if span_text(packet_text, "## T1 The change") != expected_t1:
+                problems.append(
+                    "the change tier disagrees with the change "
+                    "tier the recount rebuilds from the repository, "
+                    "so a line in it was inserted, removed or "
+                    "rewritten after the run"
                 )
         if tiers["T2"]["state"] != "not selected":
             text2, notes2, count2 = extractor.build_t2(
@@ -2674,7 +2894,8 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
             )
     if manifest.get("since") is not None:
         problems.extend(rereview_problems(
-            packet_text, manifest, repo, extractor
+            packet_text, manifest, repo, extractor,
+            packet_dir=packet_dir,
         ))
     return problems
 
@@ -2712,6 +2933,14 @@ def whole_section_problems(packet_text, manifest, extractor):
             resolved, diff_base, True, manifest["exclusions"]
         )
         lines = packet_text.split("\n")
+        if "Contents" not in lines:
+            problems.append(
+                "the packet carries no Contents line, and that "
+                "line is the marker the header and contents "
+                "rebuilds stand on, so the packet is refused "
+                "rather than stamped with those two rebuilds "
+                "silently skipped"
+            )
         if "Contents" in lines:
             actual_header = "\n".join(lines[:lines.index("Contents")])
             if actual_header.rstrip("\n") != \
@@ -2764,12 +2993,12 @@ def whole_section_problems(packet_text, manifest, extractor):
 
 
 def body_problems(packet_text, manifest, fresh_change, extractor,
-                  repo="."):
+                  repo=".", packet_dir=None):
     problems = []
     totals = manifest_totals(manifest)
     problems.extend(
         rebuild_problems(packet_text, manifest, repo, fresh_change,
-                         extractor)
+                         extractor, packet_dir=packet_dir)
     )
     problems.extend(section_sequence_problems(packet_text, manifest))
     problems.extend(header_problems(packet_text, manifest))
@@ -2950,7 +3179,7 @@ def main(argv=None):
     if manifest is not None:
         schema_problem_list = manifest_schema_problems(manifest)
         problems.extend(schema_problem_list)
-        problems.extend(created_problems(manifest))
+        problems.extend(created_problems(manifest, args.repo))
         if manifest.get("verified") is not True:
             problems.append(
                 "the manifest does not report verified. A packet "
@@ -3043,7 +3272,7 @@ def main(argv=None):
                     problems.extend(
                         body_problems(
                             packet_text, manifest, fresh_change, extractor,
-                            repo=args.repo,
+                            repo=args.repo, packet_dir=packet_dir,
                         )
                     )
         else:
