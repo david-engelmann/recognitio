@@ -110,6 +110,37 @@ ENUMERATION_RE = re.compile(r"P[0-3](?:\s+and\s+P[0-3])+")
 P_TOKEN_RE = re.compile(r"P[0-3]\b")
 
 
+def partial_enumeration_offenders():
+    """Lines enumerating a partial vocabulary outside the records."""
+    offenders = []
+    for rel, text in tree_text_files():
+        for line in text.splitlines():
+            match = ENUMERATION_RE.search(line)
+            if not match:
+                continue
+            named = set(P_TOKEN_RE.findall(match.group(0)))
+            if named == set(VOCABULARY):
+                continue
+            if line.strip() in RECORD_LINES:
+                continue
+            offenders.append("%s: %s" % (rel, line.strip()))
+    return offenders
+
+
+def p_token_enum_offenders():
+    """JSON enums holding a P token that are not the vocabulary."""
+    offenders = []
+    for rel, text in tree_text_files():
+        if not rel.endswith(".json"):
+            continue
+        for match in re.finditer(r'"enum":\s*\[([^\]]*)\]', text):
+            values = re.findall(r'"([^"]+)"', match.group(1))
+            if any(P_TOKEN_RE.fullmatch(v) for v in values):
+                if values != VOCABULARY:
+                    offenders.append("%s: %s" % (rel, values))
+    return offenders
+
+
 def load_script(name):
     path = ROOT / "scripts" / (name + ".py")
     spec = importlib.util.spec_from_file_location(
@@ -274,33 +305,10 @@ class TestSeverityVocabulary(unittest.TestCase):
         self.assertEqual(found, set(CLASSIFIED))
 
     def test_no_partial_vocabulary_enumeration_stands_unrecorded(self):
-        offenders = []
-        for rel, text in tree_text_files():
-            for line in text.splitlines():
-                match = ENUMERATION_RE.search(line)
-                if not match:
-                    continue
-                named = set(P_TOKEN_RE.findall(match.group(0)))
-                if named == set(VOCABULARY):
-                    continue
-                if line.strip() in RECORD_LINES:
-                    continue
-                offenders.append("%s: %s" % (rel, line.strip()))
-        self.assertEqual(offenders, [])
+        self.assertEqual(partial_enumeration_offenders(), [])
 
     def test_every_p_token_enum_is_the_vocabulary(self):
-        offenders = []
-        for rel, text in tree_text_files():
-            if not rel.endswith(".json"):
-                continue
-            for match in re.finditer(
-                r'"enum":\s*\[([^\]]*)\]', text
-            ):
-                values = re.findall(r'"([^"]+)"', match.group(1))
-                if any(P_TOKEN_RE.fullmatch(v) for v in values):
-                    if values != VOCABULARY:
-                        offenders.append("%s: %s" % (rel, values))
-        self.assertEqual(offenders, [])
+        self.assertEqual(p_token_enum_offenders(), [])
 
     def test_test_suite_severity_literals_stay_classified(self):
         literals = set()
