@@ -1627,6 +1627,36 @@ This unreleased work carries version 1.3.0.
   a snapshot from that fetch and never as a live claim,
   and the history tier words the states of prior pull
   requests as a snapshot on the same terms.
+- The token budget is now counted with a per shape token
+  estimate priced by character class, replacing the rule
+  that counted characters and divided by four and mispriced
+  whole shape families by multiples, with CJK text priced
+  near a quarter of its real cost and space runs near seven
+  times theirs. On the shape families the audit measured, the
+  real count lands between 0.49 and 1.35 times the estimate,
+  so a measured family is never underpriced by a multiple and
+  the emptiest family is overpriced by about twice at most. The shedding choice is cost aware, keeping
+  the drop set that fits and keeps the most estimated tokens
+  with history shedding before companions at equal kept size,
+  so a budget that fits the small tier whole no longer sheds
+  it under the fixed order. The refusal sentence names the
+  true size of each core tier and of the smallest packet the
+  selection can emit instead of blaming the core tiers for
+  the whole shed packet, and the failure receipt a refusal
+  leaves records the budget it was given, the measured size
+  of that smallest packet, the tiers it would have dropped
+  and what each tier would have cost. A budget under one is
+  refused while the arguments are checked, matching the
+  minimum the manifest schema records, and a budget refusal
+  never replaces a standing verified packet with a failure
+  receipt. The manifest records the prior pull requests
+  passage of the history tier, and the packet check settles
+  the size of a dropped history tier against that record, so
+  an honest shed packet now stamps in any environment and
+  not only in the one whose GitHub state built it. What did
+  not change is the packet pair a successful run writes, the
+  meaning of the verified flag, and the rule that the change
+  itself is never truncated.
 
 - The line counts are now read under the histogram algorithm
   at the numstat calls themselves, beside the pin every reader

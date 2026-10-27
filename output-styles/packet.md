@@ -38,7 +38,7 @@ The packet is built in four tiers and a closing receipt, and each tier is a name
 - The Re-review section holds the commits since the previous review and the range diff against it, and it stands only on a run that carries a since ref.
 - The packet closes with a verification recount that prints the manifest counts and the recount agreement, keeps the budget figures as facts, and ends on the limit sentence.
 
-The T2 and T3 headings stand in every packet. Cap notes stand grouped under a Cap notes block in the tier they belong to.
+The T2 and T3 headings stand in every packet. Cap notes stand under a Cap notes block in the tier they belong to.
 
 ## The contract
 

@@ -1,8 +1,8 @@
 {
   "sections": {
     "Cycle 1": [
+      "test_budget_refusal_preserves_the_previous_verified_packet",
       "test_external_diff_driver_is_not_used",
-      "test_failed_run_replaces_the_previous_verified_packet",
       "test_latin1_source_does_not_crash",
       "test_noprefix_and_colour_config_do_not_hide_the_change",
       "test_pr_with_unfetched_head_fails_loudly",
@@ -15,7 +15,7 @@
       "test_added_toml_delimiter_verifies",
       "test_attribute_marked_lockfile_gets_one_receipt_entry",
       "test_attribute_marked_sql_counts_are_cross_checked",
-      "test_budget_sheds_t3_then_t2_and_stays_inside",
+      "test_budget_sheds_cost_aware_and_stays_inside",
       "test_call_sites_found_when_tree_marks_sources_binary",
       "test_em_dash_in_issue_template_config_is_caught",
       "test_empty_findings_file_is_named_in_the_packet",

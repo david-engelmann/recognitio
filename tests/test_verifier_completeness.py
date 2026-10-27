@@ -214,7 +214,7 @@ class CompletenessFixture(unittest.TestCase):
                 span = check_mod.section_span(text, heading)
                 self.assertIsNotNone(span)
                 body = span[:-1] if span.endswith("\n") else span
-                estimate = len(body) // 4
+                estimate = extract_mod.estimate_tokens(body)
                 if info["estimated_tokens"] != estimate or \
                         info["emitted_tokens"] != estimate:
                     info["estimated_tokens"] = estimate
@@ -232,7 +232,7 @@ class CompletenessFixture(unittest.TestCase):
                 if new != text:
                     text = new
                     changed = True
-            estimate = len(text) // 4
+            estimate = extract_mod.estimate_tokens(text)
             new, count = re.subn(
                 r"Packet estimate in tokens: [0-9]+",
                 "Packet estimate in tokens: %d" % estimate,

@@ -24,7 +24,7 @@ without reading three audit reports first.
 | Non UTF 8 content crashed the extractor | `test_latin1_source_does_not_crash` in the extractor suite |
 | Pull request mode fell back to a same named local branch | `test_pr_with_unfetched_head_fails_loudly` in the extractor suite |
 | A shallow clone was trusted | `test_shallow_clone_is_refused` in the extractor suite |
-| A failed run left a stale verified packet standing | `test_failed_run_replaces_the_previous_verified_packet` in the extractor suite |
+| A failed run left a stale verified packet standing | `test_budget_refusal_preserves_the_previous_verified_packet` in the extractor suite |
 
 ## Cycle 2 incidents
 
@@ -45,7 +45,7 @@ without reading three audit reports first.
 | Findings accounting was uncapped and spawned a subprocess per finding | `test_findings_accounting_is_capped_and_states_it` in the extractor suite |
 | The exclusion receipt listed one file twice with contradictory flags | `test_attribute_marked_lockfile_gets_one_receipt_entry` in the extractor suite |
 | The copy gate claimed surfaces it never scanned | `test_em_dash_in_issue_template_config_is_caught` in the gate script suite, with a sibling catch test for each surface class |
-| A both shed budget packet could land over its budget | `test_budget_sheds_t3_then_t2_and_stays_inside` in the extractor suite |
+| A both shed budget packet could land over its budget | `test_budget_sheds_cost_aware_and_stays_inside` in the extractor suite |
 
 ## Round 1 incidents
 

@@ -1,0 +1,21 @@
+# Budget system readings
+
+This file carries the budget readings the skill text points at. The budget gate, the shedding choice, the refusal, and the failure receipt all follow these readings, and the packet check settles a dropped history tier from the same record.
+
+## The estimate
+
+Every size the budget system uses comes from one estimator, the per shape token estimate. The estimator prices each run of text by the shape of the run instead of dividing a character count by a constant. Newlines price at about one token each, because a tokenizer rarely merges across a line break. Blank space prices far under a token per character, because a run of spaces packs into few tokens. A character outside plain ASCII prices at about one token each, because scripts whose characters a tokenizer cannot merge cost about a token a character. Runs carrying digits price high, because digit strings fragment under tokenizers built for prose. Letter runs carrying hex letters price high for the same reason. Plain letter runs price by length with a per run and a per character part, and a run repeating one character many times prices low, because repeated characters pack tightly. The docstring on the estimator in the extractor carries the exact rates.
+
+The bound the gate stands on is the one the audit measured. On the shape families the audit priced, prose and code and CJK text and base64 and hex and space runs and repeated characters and identifiers and JSON, the true token count lands between about one half and about one and a third of the estimate. A packet accepted at a stated budget therefore never carries a multiple of that budget in real tokens on those families, and the old rule that underpriced CJK text about fourfold and base64 and hex nearly threefold no longer prices anything.
+
+## The shedding choice
+
+When a packet runs over its budget, the script measures every drop set the gathered optional tiers allow, keeping both tiers, dropping the history tier, dropping the companion tier, and dropping both, and it keeps the fitting set whose packet carries the most estimated tokens. A tie goes to the set that drops history before companions, and the recorded drop order is always history before companions, so an unspent remainder at an accepted budget is smaller than the estimated cost of restoring any one dropped tier on its own. That whole tier granularity is the stated limit of the choice, because a tier is kept whole or dropped whole and is never trimmed to spend the last tokens of a budget. The core tiers never drop and the change itself is never truncated.
+
+## The refusal and the failure receipt
+
+A budget under one is refused while the arguments are checked, before any output path is touched. When even the smallest packet the selection can emit exceeds the budget, the refusal names that packet size and the budget, and it names what the triage tier and the change tier measure on their own, with the header and the contents and the receipts and any re-review section making up the remainder, so the sizes it names are the true tier sizes. The failure receipt such a run leaves records the budget the run was given, the measured size of the smallest packet, the tiers the run dropped, and a tier account carrying the size every tier was measured at. A run that fails before any tier is measured still records the budget it was given in its failure receipt, with the tier account empty because those costs were never measured. A refused or budget failed run never replaces a verified packet already standing at the output, and the refusal leaves that packet and its manifest byte for byte intact while the refusal itself is still reported.
+
+## The dropped history record
+
+The manifest records the prior pull requests passage the history tier carried, or records that no passage was built when the history tier was not gathered. The packet check settles a dropped history tier from that record, comparing the packet the check rebuilds with its history settled from the recorded passage, and never from the state the checking environment's own GitHub access reports. A packet that shed its history at build time therefore stamps in any environment, and a recorded passage that the packet itself does not carry is refused when the history tier stands included.

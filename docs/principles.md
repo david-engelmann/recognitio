@@ -104,7 +104,8 @@ cannot find a defect in a file the evidence never carried.
 A real change in this record ran 3,233 lines over 28 files. Read raw, it
 floods the session and the review degrades into skimming. The packet
 answers with tiers. Triage and the change itself always stand, and
-history and companions are what a budget drops, in that order, with the
+history and companions are what a budget drops, keeping
+whichever of them the budget can still carry whole, with the
 drop recorded where the reader can see it.
 
 The budget has its own failure in this record. In the first hardening

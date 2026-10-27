@@ -1534,7 +1534,10 @@ def tier_span_problems(packet_text, manifest, extractor):
             continue
         text = span[:-1] if span.endswith("\n") else span
         if info["state"] == "included":
-            estimate = len(text) // 4
+            estimate = (
+                extractor.estimate_tokens(text)
+                if extractor is not None else len(text) // 4
+            )
             if estimate != info["estimated_tokens"] or \
                     estimate != info["emitted_tokens"]:
                 problems.append(
@@ -1553,7 +1556,7 @@ def tier_span_problems(packet_text, manifest, extractor):
                     "the %s section in the packet is not the "
                     "placeholder its manifest state requires" % tier
                 )
-            if len(expected) // 4 != info["emitted_tokens"]:
+            if extractor.estimate_tokens(expected) != info["emitted_tokens"]:
                 problems.append(
                     "the %s placeholder in the packet measures "
                     "differently than its manifest receipt names"
@@ -1688,7 +1691,7 @@ def tier_receipt_problems(manifest):
     return problems
 
 
-def receipt_problems(packet_text, manifest, totals):
+def receipt_problems(packet_text, manifest, totals, extractor=None):
     problems = []
     body = section_body(packet_text, "## Verification recount")
     if body is None:
@@ -1710,11 +1713,17 @@ def receipt_problems(packet_text, manifest, totals):
             "the closing receipt does not carry the packet "
             "estimate its manifest records"
         )
-    if budget["estimated_tokens"] != len(packet_text) // 4:
+    if extractor is None:
+        extractor = load_extractor()
+    packet_measure = (
+        extractor.estimate_tokens(packet_text)
+        if extractor is not None else len(packet_text) // 4
+    )
+    if budget["estimated_tokens"] != packet_measure:
         problems.append(
             "the manifest packet estimate of %d tokens does not "
             "measure the packet, which measures %d tokens"
-            % (budget["estimated_tokens"], len(packet_text) // 4)
+            % (budget["estimated_tokens"], packet_measure)
         )
     for tier in TIER_ORDER:
         info = tiers[tier]
@@ -2808,13 +2817,14 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
                         "repository"
                     )
             else:
-                if tiers["T2"]["estimated_tokens"] != len(text2) // 4:
+                if tiers["T2"]["estimated_tokens"] != \
+                        extractor.estimate_tokens(text2):
                     problems.append(
                         "the manifest records the dropped T2 tier "
                         "at %d tokens, but the recount rebuilds "
                         "that tier at %d tokens"
                         % (tiers["T2"]["estimated_tokens"],
-                           len(text2) // 4)
+                           extractor.estimate_tokens(text2))
                     )
                 if tiers["T2"]["files"] != count2:
                     problems.append(
@@ -2843,14 +2853,36 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
                         "the history tier disagrees with the tier "
                         "the recount rebuilds from the repository"
                     )
+                recorded_passage = manifest.get(
+                    "prior_pull_requests_passage"
+                )
+                if actual is not None and recorded_passage is not None and \
+                        extractor.prior_prs_passage(actual) != \
+                        recorded_passage:
+                    problems.append(
+                        "the manifest records a prior pull requests "
+                        "passage that the packet history tier does "
+                        "not carry"
+                    )
             else:
-                if tiers["T3"]["estimated_tokens"] != len(text3) // 4:
+                recorded_passage = manifest.get(
+                    "prior_pull_requests_passage"
+                )
+                if recorded_passage is not None:
+                    settled3 = extractor.settled_history_text(
+                        text3, recorded_passage
+                    )
+                else:
+                    settled3 = text3
+                if tiers["T3"]["estimated_tokens"] != \
+                        extractor.estimate_tokens(settled3):
                     problems.append(
                         "the manifest records the dropped T3 tier "
                         "at %d tokens, but the recount rebuilds "
-                        "that tier at %d tokens"
+                        "that tier at %d tokens against the prior "
+                        "pull requests passage the manifest records"
                         % (tiers["T3"]["estimated_tokens"],
-                           len(text3) // 4)
+                           extractor.estimate_tokens(settled3))
                     )
                 if tiers["T3"]["files"] != count3:
                     problems.append(
@@ -3010,7 +3042,7 @@ def body_problems(packet_text, manifest, fresh_change, extractor,
         change_tier_problems(packet_text, manifest, fresh_change, extractor)
     )
     problems.extend(tier_span_problems(packet_text, manifest, extractor))
-    problems.extend(receipt_problems(packet_text, manifest, totals))
+    problems.extend(receipt_problems(packet_text, manifest, totals, extractor))
     problems.extend(
         whole_section_problems(packet_text, manifest, extractor)
     )

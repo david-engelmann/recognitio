@@ -883,33 +883,42 @@ class TestBudget(unittest.TestCase):
         self.assertEqual(manifest["tiers"]["T1"]["files"], 1)
         self.assertEqual(manifest["tiers"]["T2"]["files"], 1)
 
-    def test_budget_sheds_t3_then_t2_and_stays_inside(self):
+    def test_budget_sheds_cost_aware_and_stays_inside(self):
         full_out = Path(self.tmp.name) / "full"
         result = run_extract_cli(self.repo, full_out, "--range", "HEAD~1..HEAD")
         self.assertEqual(result.returncode, 0, result.stderr)
-        full_tokens = len((full_out / "packet.md").read_bytes()) // 4
+        full_tokens = extract_mod.estimate_tokens((full_out / "packet.md").read_text(encoding="utf-8", errors="surrogateescape"))
         out = Path(self.tmp.name) / "shed"
         result = run_extract_cli(
             self.repo, out, "--range", "HEAD~1..HEAD",
             "--budget", str(full_tokens - 40),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        packet_tokens = len((out / "packet.md").read_bytes()) // 4
+        packet_tokens = extract_mod.estimate_tokens((out / "packet.md").read_text(encoding="utf-8", errors="surrogateescape"))
         self.assertLessEqual(packet_tokens, full_tokens - 40)
         manifest = read_manifest(out)
-        self.assertEqual(manifest["tiers"]["T3"]["state"], "dropped")
-        self.assertGreater(manifest["tiers"]["T3"]["estimated_tokens"], 0)
-        self.assertTrue(manifest["budget"]["dropped"])
+        # The cost aware order drops the smaller companions tier
+        # alone and keeps the larger history tier, because that
+        # drop set fits and keeps the most estimated tokens. The
+        # old fixed order dropped the history tier first here.
+        self.assertEqual(manifest["tiers"]["T2"]["state"], "dropped")
+        self.assertEqual(manifest["tiers"]["T3"]["state"], "included")
+        self.assertGreater(manifest["tiers"]["T2"]["estimated_tokens"], 0)
+        self.assertEqual(
+            [item["tier"] for item in manifest["budget"]["dropped"]],
+            ["T2"],
+        )
         # A budget down at the core size sheds both optional tiers,
-        # T3 before T2, and the title's order is pinned on the drop
-        # list itself, not inferred from the surviving packet.
+        # because no single drop fits there, and the drop list
+        # records them in the canonical T3 before T2 order, not
+        # inferred from the surviving packet.
         core_out = Path(self.tmp.name) / "core"
         result = run_extract_cli(
             self.repo, core_out, "--range", "HEAD~1..HEAD",
             "--tiers", "0-1",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        core_tokens = len((core_out / "packet.md").read_bytes()) // 4
+        core_tokens = extract_mod.estimate_tokens((core_out / "packet.md").read_text(encoding="utf-8", errors="surrogateescape"))
         both_out = Path(self.tmp.name) / "both"
         result = run_extract_cli(
             self.repo, both_out, "--range", "HEAD~1..HEAD",
@@ -923,7 +932,7 @@ class TestBudget(unittest.TestCase):
             [item["tier"] for item in both["budget"]["dropped"]],
             ["T3", "T2"],
         )
-        both_tokens = len((both_out / "packet.md").read_bytes()) // 4
+        both_tokens = extract_mod.estimate_tokens((both_out / "packet.md").read_text(encoding="utf-8", errors="surrogateescape"))
         self.assertLessEqual(both_tokens, core_tokens + 80)
         # The manifest estimate is the emitted packet's own measure,
         # so the budget the run accepted is the budget it kept.
@@ -961,16 +970,24 @@ class TestTierSelection(Fixture):
 
 
 class TestOutputReceipts(Fixture):
-    def test_failed_run_replaces_the_previous_verified_packet(self):
+    def test_budget_refusal_preserves_the_previous_verified_packet(self):
         result, out = self.run_extract()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(read_manifest(out)["verified"])
+        packet_before = (out / "packet.md").read_bytes()
+        manifest_before = (out / "manifest.json").read_bytes()
         failed = run_extract_cli(
             self.repo, out, "--range", "main...feature", "--budget", "1"
         )
         self.assertEqual(failed.returncode, 2, failed.stderr)
-        self.assertFalse((out / "packet.md").exists())
-        self.assertFalse(read_manifest(out)["verified"])
+        # A budget refusal never replaces a standing verified
+        # packet with a failure receipt, so the pair a reviewer
+        # already holds stays byte for byte what it was.
+        self.assertEqual((out / "packet.md").read_bytes(), packet_before)
+        self.assertEqual(
+            (out / "manifest.json").read_bytes(), manifest_before
+        )
+        self.assertTrue(read_manifest(out)["verified"])
 
     def test_empty_change_writes_a_failure_receipt(self):
         out = Path(self.tmp.name) / "empty"
@@ -3702,9 +3719,6 @@ class TestOutputPathDiscipline(unittest.TestCase):
                 "--findings", str(Path(self.tmp.name) / "absent.txt"),
             ]),
             ("empty change", ["--range", "HEAD..HEAD"]),
-            ("budget of one", [
-                "--range", "HEAD~1..HEAD", "--budget", "1",
-            ]),
         ]
         for index, (name, args) in enumerate(cases):
             with self.subTest(case=name):
@@ -3722,6 +3736,37 @@ class TestOutputPathDiscipline(unittest.TestCase):
                     manifest["error"],
                 )
                 self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def test_budget_of_one_receipt_records_the_budget_and_tiers(self):
+        out = Path(self.tmp.name) / "budget-receipt"
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--budget", "1",
+            "--out", str(out), "--repo", str(self.repo),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse((out / "packet.md").exists())
+        manifest = read_manifest(out)
+        self.assertFalse(manifest["verified"])
+        self.assertEqual(manifest["budget"]["budget_tokens"], 1)
+        self.assertGreater(manifest["budget"]["estimated_tokens"], 1)
+        self.assertEqual(
+            [item["tier"] for item in manifest["budget"]["dropped"]],
+            ["T3", "T2"],
+        )
+        for tier in ("T0", "T1", "T2", "T3"):
+            self.assertIn(tier, manifest["tiers"])
+            self.assertGreater(
+                manifest["tiers"][tier]["estimated_tokens"], 0
+            )
+
+    def test_budget_refusal_leaves_a_standing_verified_pair_intact(self):
+        out = self.make_sentinel("budget-victim")
+        result = self.raw_run([
+            "--range", "HEAD~1..HEAD", "--budget", "1",
+            "--out", str(out), "--repo", str(self.repo),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assert_sentinel_intact(out)
 
     def test_missing_repository_leaves_a_receipt_not_a_hole(self):
         out = self.make_sentinel("missing-repo")

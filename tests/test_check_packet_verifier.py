@@ -596,7 +596,7 @@ class TestGenuineShapes(VerifierFixture):
     def test_a_budget_dropped_packet_passes(self):
         out = extract_packet(
             self.repo, Path(self.tmp.name) / "budgeted",
-            "--range", "HEAD~2..HEAD", "--budget", "800",
+            "--range", "HEAD~2..HEAD", "--budget", "1000",
         )
         manifest = self.manifest(out)
         self.assertTrue(manifest["budget"]["dropped"])
@@ -927,7 +927,7 @@ class Round27Fixture(VerifierFixture):
                 span = check_mod.section_span(text, heading)
                 self.assertIsNotNone(span)
                 body = span[:-1] if span.endswith("\n") else span
-                estimate = len(body) // 4
+                estimate = extract_mod.estimate_tokens(body)
                 if info["estimated_tokens"] != estimate or \
                         info["emitted_tokens"] != estimate:
                     info["estimated_tokens"] = estimate
@@ -945,7 +945,7 @@ class Round27Fixture(VerifierFixture):
                 if new != text:
                     text = new
                     changed = True
-            estimate = len(text) // 4
+            estimate = extract_mod.estimate_tokens(text)
             new, count = re.subn(
                 r"Packet estimate in tokens: [0-9]+",
                 "Packet estimate in tokens: %d" % estimate,
@@ -1276,7 +1276,7 @@ class TestRound27Budget(Round27Fixture):
     def make_budgeted(self, name="budget27"):
         return extract_packet(
             self.repo, Path(self.tmp.name) / name,
-            "--range", "HEAD~2..HEAD", "--budget", "800",
+            "--range", "HEAD~2..HEAD", "--budget", "1000",
         )
 
     def test_a_forged_budget_with_a_matching_receipt_line_fails(self):
@@ -1286,9 +1286,9 @@ class TestRound27Budget(Round27Fixture):
         manifest["budget"]["budget_tokens"] = 31337
         self.save_manifest(out, manifest)
         text = self.packet_text(out)
-        self.assertIn("Budget in tokens: 800", text)
+        self.assertIn("Budget in tokens: 1000", text)
         self.save_packet(out, text.replace(
-            "Budget in tokens: 800", "Budget in tokens: 31337"
+            "Budget in tokens: 1000", "Budget in tokens: 31337"
         ))
         self.fix_accounting(out)
         self.assertEqual(self.run_check(out), 1)
@@ -1299,7 +1299,7 @@ class TestRound27Budget(Round27Fixture):
         dropped = manifest["budget"]["dropped"]
         self.assertTrue(dropped)
         tier = dropped[0]["tier"]
-        genuine_line = "Dropped %s because of the budget of 800 tokens." % tier
+        genuine_line = "Dropped %s because of the budget of 1000 tokens." % tier
         forged_line = "Dropped %s because of the a security redaction order." % tier
         dropped[0]["reason"] = "a security redaction order"
         self.save_manifest(out, manifest)

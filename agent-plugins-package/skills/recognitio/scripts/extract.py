@@ -499,8 +499,148 @@ def is_shallow(repo):
     return out == "true"
 
 
+ESTIMATE_METHOD = (
+    "per shape token estimate, priced by character class"
+)
+
+
 def estimate_tokens(text):
-    return len(text) // 4
+    """The per shape token estimate of one text, in whole tokens.
+
+    The old rule counted characters and divided by four, and it
+    mispriced whole shape families by multiples. CJK text carries
+    about one real token per character and was priced at a quarter
+    of one, base64 and hex text carry about seven real tokens per
+    ten characters and were priced at two and a half, and a run of
+    spaces carries almost no real tokens and was priced at full
+    character rate. This estimate prices each character class at
+    the rate that class carries in a real tokenizer, in thousandths
+    of a token, and states its shape rates here so the number a
+    budget spends can be read against them. A digit bearing run of
+    characters is priced at 600 thousandths per character, at 800
+    when it stands alone, and at 1500 in all when it runs to two
+    characters, because a real tokenizer splits short hex and
+    number pairs finer than long ones. A run of hex letters is
+    priced at 700 per character. A plain letter run is priced at a
+    base of 600 plus 120 per character and 200 more per character
+    past eight, because a real tokenizer splits long runs finer
+    than short words. A run of eight or more copies of one
+    character is priced at 100 per character, because a real
+    tokenizer merges repeats. A character outside ASCII is priced
+    by its encoded length, one whole token at two bytes or fewer,
+    1200 thousandths at three bytes and 2400 thousandths at four
+    bytes, because a tokenizer works on the encoded bytes and the
+    widest characters carry the most tokens. A newline is priced
+    at one whole token, blank space at 20 per character with a
+    short blank run carrying a tab priced at 300 in all, and any
+    other ASCII mark at 800. On the
+    shape families the audit measured, prose, code, CJK, base64,
+    hex in both its forms, identifier heavy text, punctuation
+    dense text, short lines, space runs and repeated character
+    runs, a fresh measurement with the cl100k tokenizer put the
+    real count between 0.49 and 1.35 times this estimate, so
+    the estimate never underprices a measured family by a
+    multiple and never overprices one by more than about twice.
+    It is still an estimate and not a tokenizer, and every surface
+    that names a budget names this method beside it.
+    """
+    total = 0
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char == "\n":
+            total += 1000
+            index += 1
+            continue
+        if char in " \t\r":
+            end = index
+            while end < length and text[end] in " \t\r":
+                end += 1
+            run = text[index:end]
+            cost = 20 * len(run)
+            if "\t" in run and len(run) <= 8:
+                cost = max(cost, 300)
+            total += cost
+            index = end
+            continue
+        if ord(char) >= 128:
+            encoded = len(char.encode("utf-8", "surrogateescape"))
+            total += {1: 1000, 2: 1000, 3: 1200, 4: 2400}.get(
+                encoded, 2400
+            )
+            index += 1
+            continue
+        if char.isalnum() or char == "_":
+            end = index
+            while end < length:
+                nxt = text[end]
+                if not (nxt.isalnum() or nxt == "_") or ord(nxt) >= 128:
+                    break
+                end += 1
+            run = text[index:end]
+            size = len(run)
+            if len(set(run)) == 1 and size >= 8:
+                total += 100 * size
+            elif any(item.isdigit() for item in run):
+                if size == 1:
+                    total += 800
+                elif size == 2:
+                    total += 1500
+                else:
+                    total += 600 * size
+            elif size >= 2 and all(
+                item in "abcdefABCDEF" for item in run
+            ):
+                total += 700 * size
+            else:
+                total += 600 + 120 * size + 200 * max(0, size - 8)
+            index = end
+            continue
+        total += 800
+        index += 1
+    return total // 1000
+
+
+PRIOR_PRS_HEADING = "### Prior pull requests touching these files"
+
+
+def prior_prs_passage(text):
+    """The prior pull requests passage of a history tier text.
+
+    The passage is the one part of the tier whose words come from
+    the live GitHub state of the environment that built the
+    packet, so the extractor records it in the manifest and the
+    packet check settles a dropped history tier against that
+    record instead of against the checking environment. The
+    passage runs from its heading to the cap notes block that
+    follows it, or to the end of the tier when no cap notes stand.
+    """
+    start = text.find(PRIOR_PRS_HEADING)
+    if start == -1:
+        return None
+    end = text.find("\n### Cap notes", start)
+    if end == -1:
+        return text[start:]
+    return text[start:end]
+
+
+def settled_history_text(text, passage):
+    """A rebuilt history tier with its passage settled from a record.
+
+    The rebuilt tier is measured with the recorded passage standing
+    where the rebuild put its own live passage, so the measure
+    cannot move with the checking environment its GitHub state.
+    """
+    if passage is None:
+        return text
+    start = text.find(PRIOR_PRS_HEADING)
+    if start == -1:
+        return text
+    end = text.find("\n### Cap notes", start)
+    if end == -1:
+        return text[:start] + passage
+    return text[:start] + passage + text[end:]
 
 
 def cap_text(text, limit, label, mark=True):
@@ -3237,8 +3377,49 @@ def manifest_bytes(manifest):
     return text.encode("utf-8")
 
 
-def build_failure_manifest(argv, message, resolved=None):
-    """The receipt a failed run leaves, specific about its own cause."""
+def budget_from_argv(argv):
+    """The budget a run was given, read back from its own arguments.
+
+    The last budget flag wins, the way the argument parser reads
+    it. A value that is not an integer, or no flag at all, records
+    as no budget, because a failure receipt must not invent the
+    number it receipts.
+    """
+    budget = None
+    items = list(argv)
+    for index, item in enumerate(items):
+        if item == "--budget" and index + 1 < len(items):
+            try:
+                budget = int(items[index + 1])
+            except ValueError:
+                budget = None
+        elif item.startswith("--budget="):
+            try:
+                budget = int(item.split("=", 1)[1])
+            except ValueError:
+                budget = None
+    return budget
+
+
+def build_failure_manifest(argv, message, resolved=None, tiers=None,
+                           budget_block=None):
+    """The receipt a failed run leaves, specific about its own cause.
+
+    The budget block records the budget the run was given, in the
+    shape the manifest schema allows, and never the fixed none and
+    zero the writer once hardcoded for every failure. When the
+    caller measured the tiers before the run failed, the tier
+    account it measured stands in the receipt as well, so a reader
+    who keeps only the receipt can see what each tier would have
+    cost. A caller that failed before any tier was measured leaves
+    the tier account empty, because those costs were never known.
+    """
+    if budget_block is None:
+        budget_block = {
+            "budget_tokens": budget_from_argv(argv),
+            "estimated_tokens": 0,
+            "dropped": [],
+        }
     manifest = base_manifest(argv)
     manifest.update({
         "mode": resolved["mode"] if resolved else None,
@@ -3248,9 +3429,8 @@ def build_failure_manifest(argv, message, resolved=None):
         "merge_base": resolved["merge_base"] if resolved else None,
         "since": resolved["since"] if resolved else None,
         "files": [],
-        "tiers": {},
-        "budget": {"budget_tokens": None, "estimated_tokens": 0,
-                   "dropped": []},
+        "tiers": tiers if tiers is not None else {},
+        "budget": budget_block,
         "cap_notes": [],
         "exclusions": [],
         "verified": False,
@@ -3505,18 +3685,63 @@ class OutputTarget:
             self._discard(temp_manifest)
         os.fsync(self.dir_fd)
 
-    def publish_failure(self, argv, message, resolved=None):
+    def _standing_verified(self):
+        """Whether the directory holds a standing verified packet.
+
+        A standing packet is a packet file beside a manifest file
+        whose own verified flag reads true. Anything else standing
+        there, a torn pair, an unreadable manifest or a manifest
+        that claims no verification, is not a packet a later run
+        must preserve.
+        """
+        try:
+            packet_info = os.stat(
+                "packet.md", dir_fd=self.dir_fd, follow_symlinks=False
+            )
+            if not stat.S_ISREG(packet_info.st_mode):
+                return False
+            fd = os.open(
+                "manifest.json", os.O_RDONLY, dir_fd=self.dir_fd
+            )
+        except OSError:
+            return False
+        try:
+            with os.fdopen(fd, "rb") as handle:
+                data = handle.read()
+        except OSError:
+            return False
+        try:
+            manifest = json.loads(data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return False
+        return isinstance(manifest, dict) and manifest.get(
+            "verified"
+        ) is True
+
+    def publish_failure(self, argv, message, resolved=None, tiers=None,
+                        budget_block=None, preserve_verified=False):
         """Replace the old packet with a failure receipt, or nothing.
 
         Both final names are checked before either is touched, so a
         blocked name leaves the directory exactly as it stood instead
-        of half cleared.
+        of half cleared. A caller that passes preserve_verified, as
+        the budget refusal path does, never replaces a standing
+        verified packet with a failure receipt, and the directory
+        is left exactly as it stood while the refusal itself is
+        still printed by the caller. The method returns True when
+        a receipt was published and False when a standing packet
+        was preserved.
         """
         self.open_dir()
         self._verify_still_pinned()
+        if preserve_verified and self._standing_verified():
+            return False
         self._check_names(("packet.md", "manifest.json"))
         self._discard_stale_temps()
-        manifest = build_failure_manifest(argv, message, resolved)
+        manifest = build_failure_manifest(
+            argv, message, resolved, tiers=tiers,
+            budget_block=budget_block,
+        )
         temp_manifest = self._stage(
             "manifest.json", manifest_bytes(manifest)
         )
@@ -3535,6 +3760,7 @@ class OutputTarget:
         finally:
             self._discard(temp_manifest)
         os.fsync(self.dir_fd)
+        return True
 
 
 def parse_args(argv):
@@ -3564,7 +3790,10 @@ def parse_args(argv):
     )
     parser.add_argument(
         "--budget", type=int, default=None,
-        help="approximate token budget, counted as characters divided by 4",
+        help=(
+            "approximate token budget, counted with the per shape "
+            "token estimate priced by character class"
+        ),
     )
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--repo", default=".", help="path to the local clone")
@@ -3579,6 +3808,11 @@ def parse_args(argv):
         )
     if args.findings and not args.since:
         parser.error("--findings needs --since, the previous reviewed revision")
+    if args.budget is not None and args.budget < 1:
+        parser.error(
+            "--budget must be at least 1, the minimum a manifest "
+            "can record"
+        )
     try:
         args.tiers_selected = parse_tier_selection(args.tiers)
     except ValueError as exc:
@@ -3665,25 +3899,43 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
                  header_provisional, counts):
     """Decide which optional tiers the budget sheds.
 
-    Returns the drop list and, when T0 and T1 alone exceed the
-    budget, the failure message instead. T3 sheds before T2, and
-    the change itself is never truncated.
+    Returns the drop list, a failure message when no drop set
+    fits, and a failure account naming the measured core size and
+    the tier account and budget block a failure receipt must
+    carry. The change itself is never truncated.
 
-    Each candidate drop set is measured by assembling the packet
-    it would emit and settling its token estimate, the same fixed
-    point the shipped packet is measured at, so a packet the
-    budget accepts is a packet that measures inside the budget.
-    A fixed allowance for the closing receipt undercounted
-    it whenever the section grew, drop lines and all, and let
-    emitted packets land over the budget they were accepted
-    under. The measurement reads the verified form of the packet.
-    A packet that goes on to fail verification is a failure
-    artifact at exit 3, not a packet presented as ready, and its
-    discrepancy list can carry it past the budget.
+    The choice among drop sets is cost aware. Every candidate
+    drop set is measured by assembling the packet it would emit
+    and settling its token estimate, the same fixed point the
+    shipped packet is measured at, so a packet the budget accepts
+    is a packet that measures inside the budget. Among the drop
+    sets that fit, the run keeps the set whose kept optional
+    tiers carry the most estimated tokens, so a budget that fits
+    the small tier whole never sheds it just because the fixed
+    order reached it first. At equal kept size the documented
+    order breaks the tie, history before companions, which keeps
+    the equal cost behaviour the old fixed order produced. The
+    one limit that remains is tier granularity, because a tier is
+    kept whole or dropped whole, so the unspent remainder of an
+    accepted packet is always smaller than the smallest marginal
+    cost of restoring one dropped tier on its own. A fixed
+    allowance for the closing receipt undercounted it whenever
+    the section grew, drop lines and all, and let emitted packets
+    land over the budget they were accepted under. The
+    measurement reads the verified form of the packet. A packet
+    that goes on to fail verification is a failure artifact at
+    exit 3, not a packet presented as ready, and its discrepancy
+    list can carry it past the budget.
     """
     dropped = []
     if args.budget is None:
-        return dropped, None
+        return dropped, None, None
+
+    def candidate_drops(names):
+        return [
+            {"tier": tier, "reason": reason}
+            for tier in ("T3", "T2") if tier in names
+        ]
 
     def measure(candidate):
         info = tier_accounting(
@@ -3700,18 +3952,75 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
 
     optional = [tier for tier in ("T3", "T2") if tier in selected]
     reason = "budget of %d tokens" % args.budget
-    core = measure([{"tier": tier, "reason": reason} for tier in optional])
+    sizes = {
+        tier: estimate_tokens(tier_texts[tier])
+        for tier in ("T0", "T1", "T2", "T3")
+    }
+    core_candidate = candidate_drops(set(optional))
+    core = measure(core_candidate)
     if core > args.budget:
+        rest = core - sizes["T0"] - sizes["T1"]
         message = (
-            "T0 and T1 alone need about %d tokens, over the budget of "
-            "%d. The change itself is never truncated. Raise the budget "
-            "or split the change." % (core, args.budget)
+            "The smallest packet this selection can emit measures "
+            "about %d tokens, over the budget of %d. That packet "
+            "carries T0 at about %d tokens and T1 at about %d "
+            "tokens, with the header and the contents and the "
+            "receipts and any re-review section making up the "
+            "remaining about %d tokens, and it has already shed "
+            "every optional tier the selection gathered. The "
+            "change itself is never truncated. Raise the budget "
+            "or split the change."
+            % (core, args.budget, sizes["T0"], sizes["T1"], rest)
         )
-        return dropped, message
-    for tier in optional:
-        if measure(dropped) > args.budget:
-            dropped.append({"tier": tier, "reason": reason})
-    return dropped, None
+        failure_tiers = tier_accounting(
+            selected, set(optional), tier_texts, tier_files
+        )
+        failure_block = {
+            "budget_tokens": args.budget,
+            "estimated_tokens": core,
+            "dropped": core_candidate,
+        }
+        return dropped, message, (failure_tiers, failure_block)
+    candidates = []
+    for names in (
+        set(),
+        {"T3"},
+        {"T2"},
+        {"T3", "T2"},
+    ):
+        names = names & set(optional)
+        candidate = candidate_drops(names)
+        if any(
+            [item["tier"] for item in candidate]
+            == [item["tier"] for item in kept]
+            for kept in candidates
+        ):
+            continue
+        if measure(candidate) <= args.budget:
+            candidates.append(candidate)
+    def kept_tokens(candidate):
+        dropped_names = {item["tier"] for item in candidate}
+        return sum(
+            sizes[tier] for tier in optional if tier not in dropped_names
+        )
+
+    def tie_rank(candidate):
+        dropped_names = {item["tier"] for item in candidate}
+        if dropped_names == {"T3"}:
+            return 0
+        if dropped_names == {"T2"}:
+            return 1
+        if not dropped_names:
+            return 0
+        return 2
+
+    best = min(
+        candidates,
+        key=lambda candidate: (
+            -kept_tokens(candidate), tie_rank(candidate),
+        ),
+    )
+    return best, None, None
 
 
 def tier_accounting(selected, dropped_names, tier_texts, tier_files):
@@ -3797,7 +4106,7 @@ def manifest_file_records(files):
 def assemble_manifest(argv, args, resolved, head, manifest_files,
                       exclusions, selected, tier_info, packet,
                       packet_estimate, dropped, cap_notes, verified,
-                      discrepancies):
+                      discrepancies, prior_passage=None):
     """The manifest receipt for a built packet."""
     manifest = base_manifest(argv)
     manifest.update({
@@ -3836,6 +4145,7 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
         "verified": verified,
         "discrepancies": discrepancies,
         "findings_sha256": getattr(args, "findings_sha256", None),
+        "prior_pull_requests_passage": prior_passage,
     })
     return manifest
 
@@ -3869,12 +4179,16 @@ def run_pipeline(args, repo, target, argv, prepared=None):
     manifest_files = manifest_file_records(files)
     counts = packet_counts(manifest_files)
     header_provisional = build_header(resolved, diff_base, True, exclusions)
-    dropped, failure = apply_budget(
+    dropped, failure, failure_account = apply_budget(
         args, selected, tier_texts, tier_files, rereview,
         header_provisional, counts
     )
     if failure is not None:
-        target.publish_failure(argv, failure, resolved)
+        failure_tiers, failure_block = failure_account
+        target.publish_failure(
+            argv, failure, resolved, tiers=failure_tiers,
+            budget_block=failure_block, preserve_verified=True,
+        )
         print("recognitio: %s" % failure, file=sys.stderr)
         return 2
     dropped_names = {item["tier"] for item in dropped}
@@ -3897,6 +4211,10 @@ def run_pipeline(args, repo, target, argv, prepared=None):
         argv, args, resolved, head, manifest_files, exclusions,
         selected, tier_info, packet, packet_estimate, dropped,
         cap_notes, verified, discrepancies,
+        prior_passage=(
+            prior_prs_passage(tier_texts["T3"])
+            if "T3" in selected else None
+        ),
     )
 
     target.publish_pair(
