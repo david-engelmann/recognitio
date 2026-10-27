@@ -4,28 +4,32 @@
 The top 20 program prepared one submission pack per directory
 for the Cursor Marketplace, the Claude plugin directory, and
 the Agent Plugins portable package. Nothing in any pack has
-been submitted, and each pack says so in a pinned sentence, so
-a later edit cannot quietly turn a prepared pack into a
-claimed listing. Each pack also states the version it was
-written against and the date its requirements were read, and
-this gate holds both against the shipped manifests, so a
-version bump or a stale pack fails here instead of reaching
-a filing.
+been submitted, and each pack says so in a pinned sentence.
+The claim check reads the packs the way the later build gates
+read their briefs, on flattened lower case text with the
+honest sentence lifted out first, so a filed or live listing
+claim fails here in any case and in the ordinary wordings of
+such a claim, and a promised review timeline fails with it,
+since no primary source states one. Each pack also states the
+version it was written against and the date its requirements
+were read, and this gate holds both against the shipped
+manifests, so a version bump or a stale pack fails here
+instead of reaching a filing. The load bearing figures in
+the pack prose stand pinned beside the sentences.
 
 The evidence half pins the manifest facts the packs assert.
 The Cursor marketplace file carries its required name and
 owner and one entry, and the Cursor manifest carries the
 description, author, and license the checklist asks about,
 with the logo, skill, and rule paths resolving in the tree.
-The Claude manifest carries the author and license its
-directory validation warns or blocks on, its marketplace
-file carries the required owner, and its one entry name
-matches the manifest name. The portable manifest stays
-inside the closed ten field set of the Agent Plugins
-specification, with a name inside the pattern the
-specification names, a semantic version, lowercase
-hyphenated keywords, and an HTTPS GitHub repository value.
-A license file stands at the root the Claude pack names as
+The Claude manifest carries the fields its evidence check
+names, with its component paths resolving inside the folder,
+its marketplace file carries the required name and owner,
+and its one entry matches the manifest in name, source, and
+strict mode. The portable manifest stays inside the closed
+ten field set of the Agent Plugins specification and carries
+the exact values the host listing would read from it. A
+license file stands at the root the Claude pack names as
 the plugin folder.
 
 Exits nonzero with one line per problem when anything fails.
@@ -47,6 +51,10 @@ CURSOR_PLUGIN = ".cursor-plugin/plugin.json"
 CURSOR_MARKET = ".cursor-plugin/marketplace.json"
 PORTABLE = "agent-plugins-package/plugin.json"
 
+REPO_URL = "https://github.com/david-engelmann/recognitio"
+SCHEMA_URL = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
+HONEST_SENTENCE = "nothing in this pack has been submitted."
+
 PACK_ROUTES = {
     CURSOR_PACK: ("cursor.com/marketplace/publish",),
     CLAUDE_PACK: ("claude.ai/directory/manage",),
@@ -57,6 +65,23 @@ PACK_ROUTES = {
     ),
 }
 
+# Load bearing figures and promises in the pack prose. A
+# drift in any of them is a falsified pack under a green
+# gate, so each stands pinned word for word.
+PACK_PINS = {
+    CURSOR_PACK: (
+        "must stay at or under 10 MB",
+        "Every plugin is manually reviewed before it is listed",
+    ),
+    CLAUDE_PACK: (
+        "at least 40 words",
+        "must stay under 5 MiB",
+    ),
+    PORTABLE_PACK: (
+        "six month cycle",
+    ),
+}
+
 COMMON_FRAGMENTS = (
     "Nothing in this pack has been submitted.",
     "Requirements were read from the primary sources named "
@@ -64,16 +89,42 @@ COMMON_FRAGMENTS = (
     "## What remains David's act",
 )
 
-# Claims of a filed or live listing. A prepared pack must
-# never carry one, in the same spirit as the stale wording
-# refusals the other gates hold.
+# Claims of a filed or live listing, read on the flattened
+# lower case text with the honest sentence lifted out. A
+# prepared pack must never carry one, in the same spirit as
+# the stale wording refusals the other gates hold.
 BANNED_CLAIMS = (
-    "is now listed",
     "listing is live",
+    "is now listed",
+    "is listed in",
+    "is listed on",
+    "listed in the marketplace",
+    "pack has been submitted",
+    "was approved and listed",
+    "approved for listing",
+    "we filed",
+    "filed the submission",
     "submission was filed",
     "has been filed",
-    "was approved for listing",
+    "is now live",
 )
+
+PACK_BANNED_CLAIMS = {
+    CLAUDE_PACK: ("is available in the directory",),
+    PORTABLE_PACK: (
+        "runs a package registry",
+        "runs a registry",
+        "operates a directory",
+    ),
+}
+
+# No primary source states a review timeline for any of the
+# three routes, so a promised one fails in any pack, in
+# digits or in number words.
+TIMELINE_CLAIM = re.compile(
+    r"within ([0-9]+|one|two|three|four|five|six|seven|"
+    r"eight|nine|ten|fourteen|thirty|sixty|ninety) "
+    r"(business )?(day|days|week|weeks)")
 
 CLOSED_FIELDS = {
     "$schema", "name", "version", "description", "author",
@@ -81,9 +132,23 @@ CLOSED_FIELDS = {
     "extensions",
 }
 
-NAME_PATTERN = re.compile(r"^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$")
-SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
-KEYWORD_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+NAME_PATTERN = re.compile(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?")
+KEYWORD_PATTERN = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*")
+
+
+def semver_ok(value):
+    """The house version shape, ASCII digits, no leading zeros."""
+    if not isinstance(value, str):
+        return False
+    parts = value.split(".")
+    if len(parts) != 3:
+        return False
+    for part in parts:
+        if not part or not part.isascii() or not part.isdigit():
+            return False
+        if len(part) > 1 and part.startswith("0"):
+            return False
+    return True
 
 
 class DuplicateKeyError(ValueError):
@@ -91,7 +156,7 @@ class DuplicateKeyError(ValueError):
 
 
 def strict_json_loads(text):
-    """Parse JSON refusing a repeated key, like the other gates."""
+    """Parse JSON refusing a repeated key and the loose constants."""
     def reject(pairs):
         seen = {}
         for key, value in pairs:
@@ -99,7 +164,12 @@ def strict_json_loads(text):
                 raise DuplicateKeyError("repeated key %r" % (key,))
             seen[key] = value
         return seen
-    return json.loads(text, object_pairs_hook=reject)
+
+    def reject_constant(value):
+        raise ValueError("loose JSON constant %r" % (value,))
+    return json.loads(
+        text, object_pairs_hook=reject,
+        parse_constant=reject_constant)
 
 
 def load_manifest(root, rel, problems):
@@ -127,8 +197,27 @@ def author_name(data):
     return None
 
 
-def single_entry(rel, data, problems):
-    entries = data.get("plugins")
+def field_problems(rel, data, field, problems, why):
+    if not data.get(field):
+        problems.append("%s carries no %s, %s" % (rel, field, why))
+
+
+def license_problems(rel, data, problems):
+    if data.get("license") != "MIT":
+        problems.append(
+            "%s carries license %r and the pack states MIT"
+            % (rel, data.get("license")))
+
+
+def owner_problems(rel, market, problems, why):
+    owner = market.get("owner")
+    if not isinstance(owner, dict) or not owner.get("name"):
+        problems.append(
+            "%s carries no owner name, %s" % (rel, why))
+
+
+def entry_problems(rel, market, plugin, problems):
+    entries = market.get("plugins")
     if not isinstance(entries, list) or len(entries) != 1:
         problems.append(
             "%s must list exactly one plugin entry" % rel)
@@ -137,7 +226,32 @@ def single_entry(rel, data, problems):
     if not isinstance(entry, dict):
         problems.append("%s carries an entry that is not an object" % rel)
         return None
+    if plugin is not None and entry.get("name") != plugin.get("name"):
+        problems.append(
+            "%s entry name %r does not match the manifest "
+            "name %r" % (rel, entry.get("name"), plugin.get("name")))
     return entry
+
+
+def shipped_path(root, value):
+    """Resolve a manifest path, refusing the forbidden shapes.
+
+    An absolute value, a parent reference, and an empty value
+    resolve to nothing here rather than being normalised into
+    the tree, because both platforms forbid those shapes and
+    a gate that rewrites them before judging them cannot
+    fail for the reason it exists.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    if value.startswith("/") or value.startswith("\\"):
+        return None
+    parts = value.split("/")
+    if ".." in parts:
+        return None
+    if value.startswith("./"):
+        value = value[2:]
+    return root / value
 
 
 def pack_problems(root, version, problems):
@@ -165,36 +279,36 @@ def pack_problems(root, version, problems):
             if route not in text:
                 problems.append(
                     "%s no longer names %r" % (rel, route))
-        for claim in BANNED_CLAIMS:
-            if claim in text:
+        for pin in PACK_PINS[rel]:
+            if pin not in text:
+                problems.append(
+                    "%s no longer states %r" % (rel, pin))
+        lowered = text.lower().replace(HONEST_SENTENCE, "")
+        claims = BANNED_CLAIMS + PACK_BANNED_CLAIMS.get(rel, ())
+        for claim in claims:
+            if claim in lowered:
                 problems.append(
                     "%s carries the filed listing claim %r and "
                     "nothing in the pack has been submitted"
                     % (rel, claim))
-
-
-def shipped_path(root, value):
-    if not isinstance(value, str):
-        return None
-    return root / value.lstrip("./")
+        if TIMELINE_CLAIM.search(lowered):
+            problems.append(
+                "%s promises a review timeline and no primary "
+                "source states one" % rel)
 
 
 def cursor_problems(root, problems):
     plugin = load_manifest(root, CURSOR_PLUGIN, problems)
     market = load_manifest(root, CURSOR_MARKET, problems)
     if plugin is not None:
-        if not plugin.get("description"):
-            problems.append(
-                "%s carries no description and the submission "
-                "checklist asks for one that states the purpose"
-                % CURSOR_PLUGIN)
+        field_problems(
+            CURSOR_PLUGIN, plugin, "description", problems,
+            "and the submission checklist asks for one that "
+            "states the purpose")
         if not author_name(plugin):
             problems.append(
                 "%s carries no author name" % CURSOR_PLUGIN)
-        if plugin.get("license") != "MIT":
-            problems.append(
-                "%s carries license %r and the pack states MIT"
-                % (CURSOR_PLUGIN, plugin.get("license")))
+        license_problems(CURSOR_PLUGIN, plugin, problems)
         logo = shipped_path(root, plugin.get("logo"))
         if logo is None or not logo.is_file():
             problems.append(
@@ -205,8 +319,7 @@ def cursor_problems(root, problems):
         # Cursor gate reads them. The logo value resolves
         # from the repo root, as the reference states.
         plugin_dir = root / ".cursor-plugin"
-        skills = plugin.get("skills") or []
-        for value in skills:
+        for value in plugin.get("skills") or []:
             target = shipped_path(plugin_dir, value)
             if target is None or not (target / "SKILL.md").is_file():
                 problems.append(
@@ -219,23 +332,13 @@ def cursor_problems(root, problems):
                     "%s names a rule path that does not resolve "
                     "in the tree" % CURSOR_PLUGIN)
     if market is not None:
-        if not market.get("name"):
-            problems.append(
-                "%s carries no name and the reference marks it "
-                "required" % CURSOR_MARKET)
-        owner = market.get("owner")
-        if not isinstance(owner, dict) or not owner.get("name"):
-            problems.append(
-                "%s carries no owner name and the reference "
-                "marks it required" % CURSOR_MARKET)
-        entry = single_entry(CURSOR_MARKET, market, problems)
-        if entry is not None and plugin is not None:
-            if entry.get("name") != plugin.get("name"):
-                problems.append(
-                    "%s entry name %r does not match the "
-                    "manifest name %r"
-                    % (CURSOR_MARKET, entry.get("name"),
-                       plugin.get("name")))
+        field_problems(
+            CURSOR_MARKET, market, "name", problems,
+            "and the reference marks it required")
+        owner_problems(
+            CURSOR_MARKET, market, problems,
+            "and the reference marks it required")
+        entry_problems(CURSOR_MARKET, market, plugin, problems)
 
 
 def claude_problems(root, problems):
@@ -244,33 +347,63 @@ def claude_problems(root, problems):
     version = None
     if plugin is not None:
         version = plugin.get("version")
+        if not version:
+            problems.append(
+                "%s carries no version and the packs state the "
+                "version they were written against" % CLAUDE_PLUGIN)
+        for field in ("displayName", "description", "keywords",
+                      "homepage"):
+            field_problems(
+                CLAUDE_PLUGIN, plugin, field, problems,
+                "and the pack evidence check names it as carried")
+        if plugin.get("repository") != REPO_URL:
+            problems.append(
+                "%s carries repository %r and the pack states "
+                "the public repo"
+                % (CLAUDE_PLUGIN, plugin.get("repository")))
         if not author_name(plugin):
             problems.append(
                 "%s carries no author name and the directory "
                 "checklist warns on its absence" % CLAUDE_PLUGIN)
-        if plugin.get("license") != "MIT":
-            problems.append(
-                "%s carries license %r and the pack states MIT"
-                % (CLAUDE_PLUGIN, plugin.get("license")))
+        license_problems(CLAUDE_PLUGIN, plugin, problems)
         icon = shipped_path(root, plugin.get("icon"))
         if icon is None or not icon.is_file():
             problems.append(
                 "%s names an icon path that does not resolve "
                 "in the tree" % CLAUDE_PLUGIN)
-    if market is not None:
-        owner = market.get("owner")
-        if not isinstance(owner, dict) or not owner.get("name"):
-            problems.append(
-                "%s carries no owner name and the marketplace "
-                "reference marks it required" % CLAUDE_MARKET)
-        entry = single_entry(CLAUDE_MARKET, market, problems)
-        if entry is not None and plugin is not None:
-            if entry.get("name") != plugin.get("name"):
+        for value in plugin.get("skills") or []:
+            target = shipped_path(root, value)
+            if target is None or not target.is_dir():
                 problems.append(
-                    "%s entry name %r does not match the "
-                    "manifest name %r"
-                    % (CLAUDE_MARKET, entry.get("name"),
-                       plugin.get("name")))
+                    "%s names a skills path that does not "
+                    "resolve inside the folder" % CLAUDE_PLUGIN)
+        for field in ("agents", "outputStyles"):
+            for value in plugin.get(field) or []:
+                target = shipped_path(root, value)
+                if target is None or not target.is_file():
+                    problems.append(
+                        "%s names a %s path that does not "
+                        "resolve inside the folder"
+                        % (CLAUDE_PLUGIN, field))
+    if market is not None:
+        field_problems(
+            CLAUDE_MARKET, market, "name", problems,
+            "and the marketplace reference marks it required")
+        owner_problems(
+            CLAUDE_MARKET, market, problems,
+            "and the marketplace reference marks it required")
+        entry = entry_problems(CLAUDE_MARKET, market, plugin, problems)
+        if entry is not None:
+            if entry.get("source") != "./":
+                problems.append(
+                    "%s entry carries source %r and the pack "
+                    "states the root"
+                    % (CLAUDE_MARKET, entry.get("source")))
+            if entry.get("strict") is not True:
+                problems.append(
+                    "%s entry carries strict %r and the pack "
+                    "states strict mode on"
+                    % (CLAUDE_MARKET, entry.get("strict")))
     if not (root / "LICENSE").is_file():
         problems.append(
             "LICENSE is missing from the plugin folder the "
@@ -288,35 +421,64 @@ def portable_problems(root, problems):
             "%s carries top level fields outside the closed "
             "set of the specification, %s"
             % (PORTABLE, ", ".join(extra)))
+    if data.get("$schema") != SCHEMA_URL:
+        problems.append(
+            "%s carries $schema %r and the pack states the "
+            "canonical 1.0.0 schema"
+            % (PORTABLE, data.get("$schema")))
     name = data.get("name")
-    if not isinstance(name, str) or not NAME_PATTERN.match(name) \
+    if name != "recognitio":
+        problems.append(
+            "%s carries name %r and the pack states the "
+            "shipped package name" % (PORTABLE, name))
+    if not isinstance(name, str) \
+            or not NAME_PATTERN.fullmatch(name) \
             or "--" in name or ".." in name or len(name) > 64:
         problems.append(
             "%s carries name %r outside the pattern the "
             "specification names" % (PORTABLE, name))
-    version = data.get("version")
-    if not isinstance(version, str) \
-            or not SEMVER_PATTERN.match(version):
+    if not semver_ok(data.get("version")):
         problems.append(
             "%s carries version %r and the host listing asks "
-            "for a semantic version" % (PORTABLE, version))
+            "for a semantic version" % (PORTABLE, data.get("version")))
+    field_problems(
+        PORTABLE, data, "description", problems,
+        "and the host listing asks for one")
+    if not author_name(data):
+        problems.append(
+            "%s carries no author name and the host listing "
+            "asks for one" % PORTABLE)
+    license_problems(PORTABLE, data, problems)
+    if data.get("homepage") != REPO_URL:
+        problems.append(
+            "%s carries homepage %r and the pack states the "
+            "public repo" % (PORTABLE, data.get("homepage")))
+    if data.get("repository") != REPO_URL:
+        problems.append(
+            "%s carries repository %r and the host listing "
+            "files against the public repo"
+            % (PORTABLE, data.get("repository")))
+    expected_keywords = ["review-packet", "agent-skill",
+                         "pull-request"]
+    if data.get("keywords") != expected_keywords:
+        problems.append(
+            "%s carries keywords %r and the pack states the "
+            "set the host listing would read"
+            % (PORTABLE, data.get("keywords")))
     keywords = data.get("keywords")
-    if not isinstance(keywords, list) or not keywords:
-        problems.append("%s carries no keyword set" % PORTABLE)
-    else:
+    if isinstance(keywords, list):
         for word in keywords:
             if not isinstance(word, str) \
-                    or not KEYWORD_PATTERN.match(word):
+                    or not KEYWORD_PATTERN.fullmatch(word):
                 problems.append(
                     "%s carries keyword %r outside the lowercase "
                     "hyphenated form the host listing asks for"
                     % (PORTABLE, word))
-    repository = data.get("repository")
-    if not isinstance(repository, str) \
-            or not repository.startswith("https://github.com/"):
+    extensions = data.get("extensions")
+    if not isinstance(extensions, dict) or not extensions:
         problems.append(
-            "%s carries repository %r and the host listing "
-            "asks for an HTTPS GitHub URL" % (PORTABLE, repository))
+            "%s carries no extension declarations and the "
+            "package exists to carry them" % PORTABLE)
     skill = root / "agent-plugins-package" / "skills" \
         / "recognitio" / "SKILL.md"
     if not skill.is_file():

@@ -127,6 +127,14 @@ locator. An approved listing is re-reviewed on a six month
 cycle, and a maintainer may renew it, ask for follow up, or
 remove it.
 
+One more route needs no pack. The owner can publish a
+marketplace file of his own in a repo he controls and have
+readers add it with the Copilot CLI. That is self
+distribution with no third party approval and no place in
+any directory, so it stands outside what this pack
+prepares, and it is recorded here so the route is not
+mistaken for a missing one.
+
 ## Filing steps
 
 1. The release tag for this version stands first, as the

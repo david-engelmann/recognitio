@@ -18,6 +18,10 @@ Every requirement the primary pages state was checked against
 the shipped manifests and files on 2026-10-27. The gate at
 scripts/check_submissions.py pins the facts the check rests
 on, so drift in a manifest or in this pack fails the gate.
+The check is a tree check against the primary text. The one
+tool run the docs describe stands owed, as the filing steps
+record, so this pack is evidence checked and not tool
+verified.
 
 **What is unverified**
 
@@ -56,9 +60,13 @@ can push to the repo before it accepts a submission. The repo
 may stay private while the submission is prepared, and it
 must be public before the listing goes live. Recognitio is
 already public. Plan eligibility is Pro, Max, Team, or
-Enterprise, and free accounts cannot submit. On Team and
-Enterprise plans an owner submits, and the listing belongs to
-the organization that submits it.
+Enterprise, and free accounts cannot submit. On Pro and Max
+plans the account holder submits with no role check. On Team
+plans an owner submits. On Enterprise plans an owner submits,
+and an Enterprise owner can also grant the directory
+permission to other members through a custom role, who may
+then submit in the name of the organization. The listing
+belongs to the organization that submits it.
 
 ## What the listing needs
 
@@ -119,8 +127,10 @@ the display name, the version, the description, an author
 object with a name and an email, the license value MIT, the
 homepage and repository values, the keyword set, and the icon
 path pointing at the 512 pixel PNG inside the repo. Absence
-of the author or license would only warn, and both stand
-filled regardless.
+of the author would only warn. The license stands in both
+forms the checklist accepts, the value in the manifest and
+the file at the root, and absence in both forms at once is
+what blocks.
 
 **Met, the marketplace file.** The shipped file carries the
 required name, owner, and plugins fields, with one entry
@@ -148,21 +158,29 @@ directory would show. Adding two more worked examples to the
 README is a small pre-filing task, and this pack records it
 as open rather than rounding the quickstart up to an example.
 
-**Named, the hooks in the folder.** The hooks folder stands
-at the repo root beside the manifest, and its wiring loads
-with the plugin even though the manifest names no hooks
-field. The checklist treats that omission as a warning, and
-the README disclosure rule is the obligation that matters.
-The runbook and the mod brief describe what the hooks do,
-and the filing should expect the security scan to read them.
+**Open, the hooks disclosure.** The hooks folder stands at
+the repo root beside the manifest, and its wiring loads with
+the plugin even though the manifest names no hooks field.
+The checklist treats that omission as a warning. The sharper
+point is disclosure. The checklist asks the README to
+describe everything the plugin runs, sends, or fetches, and
+the README the directory would show does not mention the
+hooks or the mod at all. That description stands in the
+headless runbook and the mod brief instead, which are not
+the page a listing shows. Adding a short disclosure of the
+hooks to the README is a pre-filing fix in this repo, and
+until it lands the security scan may hold the version for
+behaviour the listing never disclosed.
 
 **Named, the symlink in the folder.** A symlink stands at
 .claude/skills/recognitio and points at the canonical skill.
 The plugin loads its skill from the real directory the
 manifest names, so the symlink is not a file the plugin
-loads. Whether the portal warns on a symlink that loads
-nothing is unverified, and the portal validation is where
-that answer stands.
+loads. The checklist row settles the shape. A symlink
+standing in for a file the plugin loads blocks, and a
+symlink elsewhere warns. This one loads nothing, so the
+expected outcome is a warning, and the portal run is where
+it would be recorded.
 
 **Named, one file a reviewer will hold.** The demo capture
 record at docs/images/capture.json is a data file of about

@@ -32,9 +32,11 @@ against version 1.3.0 of recognitio. Requirements were read
 from the primary sources named in this pack on 2026-10-27.
 The Cursor plugin already ships in this repo in the shape the
 marketplace reviews, and the evidence check below finds the
-requirement set met, with two recorded open points that are
-conflicts or silences in the primary sources rather than gaps
-in the tree. Filing is one signed in form by the owner, and
+requirement set met in substance. One item stands partly met,
+the local test, for reasons of timing and of a login wall
+rather than of the tree. Three open points stand recorded
+after it, and those are conflicts or silences in the primary
+sources. Filing is one signed in form by the owner, and
 what that involves stands in the filing steps below.
 
 ## The route
@@ -106,16 +108,32 @@ against the 10 MB limit.
 tool does and how it is installed and used, and the plugin
 folder carries its own README for the plugin shape.
 
-**Met, the local test.** The official desktop client loaded
-this plugin from the local plugins folder with zero failures
-in the run recorded in the Cursor brief, and the Customize
-records listed its skill and its rule. That is the checklist
-local test, discharged and on the record.
+**Partly met, the local test.** The official desktop client
+loaded this plugin from the local plugins folder with zero
+failures in the run recorded in the Cursor brief, and the
+Customize backing records listed its skill and its rule. Two
+limits ride with that record. The rendered Customize page
+stayed unobserved behind the login wall of the client, so
+the confirmation rests on the backing records rather than on
+the page itself. And the run predates the logo value a later
+round added to the manifest, so the copy that was loaded is
+not the shipped manifest in that one field. A fresh local
+load of the shipped plugin stands as a small pre-filing
+step, and the verdict here is partly met rather than met.
+
+**Met, no binaries.** The plugin components are markdown,
+JSON, and Python source, with no compiled binary among them,
+which is the shape the security page describes.
+
+**Not required, screenshots.** No primary page asks a plugin
+listing for screenshots or a social preview. The brand
+assets in this repo stand ready for other surfaces and are
+not a filing blocker here.
 
 **Met, open source.** The repo is public and MIT licensed,
 which is the listing condition the primary pages state.
 
-## The two open points
+## The open points
 
 The first is a conflict between two primary sources. The docs
 reference tables place category and tags as marketplace
@@ -136,6 +154,15 @@ without forbidding a single entry. The shipped tree keeps the
 file, because its own gates pin the manifest pair and the
 file does the listing no documented harm. Whether it helps
 or is ignored in a public submission is unverified.
+
+The third is a stale route in the plugin template the
+Cursor project ships. Its README tells an author to have the
+repo link ready for submission to the Cursor team by Slack
+or an email address, which conflicts with the publish page
+route both current docs pages state. This pack files by the
+docs route. Which route Cursor would honour today is
+unverified, and the template text is recorded here so the
+conflict is not lost.
 
 ## Filing steps
 

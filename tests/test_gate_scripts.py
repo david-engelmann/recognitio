@@ -2841,6 +2841,43 @@ class TestDocsIndex(unittest.TestCase):
             text = (ROOT / "docs" / name).read_text(encoding="utf-8")
             self.assertEqual(text.splitlines()[0], self.BACK_LINK, name)
 
+    # WP7. The submission packs adopt the brief furniture, the
+    # summary card and the closing navigation block, without
+    # joining the briefs list, whose anchor rule names a
+    # section the packs do not carry. Their furniture stands
+    # pinned here instead, so a pack cannot drop its card or
+    # its closing block in silence either.
+    PACKS = (
+        "submission-agent-plugins.md",
+        "submission-claude.md",
+        "submission-cursor.md",
+    )
+
+    def test_the_packs_carry_the_card_and_the_navigation(self):
+        labels = (
+            "**What ships**",
+            "**What was proven**",
+            "**What is unverified**",
+        )
+        for name in self.PACKS:
+            text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+            positions = []
+            for label in labels:
+                self.assertEqual(text.count(label), 1, (name, label))
+                positions.append(text.index(label))
+            self.assertEqual(positions, sorted(positions), name)
+            self.assertLess(
+                text.index("## At a glance"),
+                text.index("## Summary"),
+                name,
+            )
+            self.assertIn(self.NAV_BLOCK, text, name)
+            self.assertGreater(
+                text.index(self.NAV_BLOCK),
+                text.index("## Sources"),
+                name,
+            )
+
     def test_every_brief_closes_with_the_navigation_block(self):
         for name in self.BRIEFS:
             text = (ROOT / "docs" / name).read_text(encoding="utf-8")
