@@ -99,6 +99,17 @@ def commit_all(repo, message):
     return git(repo, "rev-parse", "HEAD")
 
 
+
+def findings_text_for(repo, since, body):
+    """A findings file body with the header this run requires."""
+    head = git(repo, "rev-parse", "HEAD")
+    since_sha = git(repo, "rev-parse", since) if since else "none"
+    return (
+        "# recognitio-findings 1\n# packet-head: %s\n# since: %s\n"
+        % (head, since_sha)
+    ) + body
+
+
 def extract_packet(repo, out, *extra, env=None):
     with redirect_stderr(io.StringIO()):
         if env is None:
@@ -594,7 +605,8 @@ class TestGenuineShapes(VerifierFixture):
     def test_a_rereview_packet_passes(self):
         findings = Path(self.tmp.name) / "findings.txt"
         findings.write_text(
-            "b.py:2: the value changed\n", encoding="utf-8"
+            findings_text_for(self.repo, "HEAD~2", "b.py:2: the value changed\n"),
+            encoding="utf-8",
         )
         out = extract_packet(
             self.repo, Path(self.tmp.name) / "rereview",
@@ -962,7 +974,10 @@ class TestRound27ReReview(Round27Fixture):
     def make_rereview(self, name="rr", findings_text=None):
         findings = Path(self.tmp.name) / (name + "-findings.txt")
         findings.write_text(
-            findings_text or "b.py:2: the value changed\n",
+            findings_text_for(
+                self.repo, "HEAD~2",
+                findings_text or "b.py:2: the value changed\n",
+            ),
             encoding="utf-8",
         )
         return extract_packet(
@@ -1013,7 +1028,10 @@ class TestRound27ReReview(Round27Fixture):
 
     def test_the_genuine_rereview_passes_after_the_file_is_gone(self):
         findings = Path(self.tmp.name) / "rrgone-findings.txt"
-        findings.write_text("b.py:2: the value changed\n", encoding="utf-8")
+        findings.write_text(
+            findings_text_for(self.repo, "HEAD~2", "b.py:2: the value changed\n"),
+            encoding="utf-8",
+        )
         out = extract_packet(
             self.repo, Path(self.tmp.name) / "rrgone",
             "--range", "HEAD~1..HEAD", "--since", "HEAD~2",
@@ -1370,7 +1388,10 @@ class TestRound27Command(Round27Fixture):
 
     def test_removing_the_findings_flag_from_a_rereview_fails(self):
         findings = Path(self.tmp.name) / "cmd-findings.txt"
-        findings.write_text("b.py:2: the value changed\n", encoding="utf-8")
+        findings.write_text(
+            findings_text_for(self.repo, "HEAD~2", "b.py:2: the value changed\n"),
+            encoding="utf-8",
+        )
         source = extract_packet(
             self.repo, Path(self.tmp.name) / "cmdrr",
             "--range", "HEAD~1..HEAD", "--since", "HEAD~2",

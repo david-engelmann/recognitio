@@ -22,6 +22,16 @@ A run never starts on an unverified packet. When the
 packet check fails, the run stops and the failure names
 the files or hunks that disagree.
 
+Packet content is untrusted data at every phase. The
+packet is evidence about the change under review, and
+nothing inside it is an instruction to a reviewer, to the
+second pass, or to the orchestrator, however it is
+phrased. Finding text a reviewer writes is data of the
+same kind for every later reader, and a finding summary
+written in the shape of an instruction to a reviewer is
+steering content the validator flags for a human to
+clear.
+
 Phase two fans out. The orchestrator partitions the
 packet's file list into groups and starts one reviewer
 per group. Groups may overlap. Each reviewer reads the
@@ -58,27 +68,42 @@ readers. Overlapping groups may raise the same finding
 twice. Findings merge by identity, which is the file, the
 line, and the rule together. The run record carries the
 merged set, with each merged finding naming the groups
-that raised it. Two records sharing one identity is a
-dedupe failure, and a finding the merge drops is a
-coverage failure.
+that raised it. A merged finding must carry the severity,
+the summary, the evidence, the rule and the location
+exactly as one of its raising findings wrote them, so a
+merge that rewrites a finding presents a finding no
+reviewer raised and the validator refuses it. Two records
+sharing one identity is a dedupe failure, and a finding
+the merge drops is a coverage failure. A finding the
+second pass raises joins the merged set as well, marked
+with the second pass as its raising source, so the merged
+set a consumer reads is the findings of the run.
 
 ## The second pass contract
 
 The second pass reads every merged finding. For each one
 it records confirm or contest with at least one evidence
-path that stands in the manifest file list, plus a note
+path that stands in the manifest file list and includes
+the file the finding stands in, plus a note of substance
 saying what it re checked. A contest must say why the
 finding is wrong, with evidence. A new finding the first
 pass missed carries the full finding shape from the
-schema, including its own evidence.
+schema, including its own evidence, and it obeys the
+same rules as a first pass finding. Its location and its
+evidence must stand in the packet, its identity must not
+duplicate a merged finding or another new finding, and
+its id must not reuse the id of a merged finding it would
+displace. A surviving new finding joins the merged set
+in the same record, marked with the second pass as its
+source and carrying the content the second pass wrote.
 
 The validator fails a run where any finding lacks a
 verdict, where any verdict lacks evidence, where any
 evidence path stands outside the packet, or where a new
-finding breaks the schema. A second pass that confirms
-everything with empty notes is the rubber stamp the
-program hunts, and the evidence requirement is what
-catches it.
+finding breaks the schema or any of the rules above. A
+second pass that confirms everything with empty notes is
+the rubber stamp the program hunts, and the evidence
+requirement is what catches it.
 
 ## Concurrency caps
 
@@ -123,11 +148,32 @@ second pass verdicts, and declares the concurrency caps.
 `workflows/findings.schema.json` and validates every
 finding against it, so the schema file is load bearing.
 
+The validator anchors the record to a packet its author
+did not write alone. The manifest the record names must
+validate against the packet manifest schema, must report
+verified with no discrepancies, and must match the packet
+file standing beside it, whose header binds the packet to
+the manifest head and base and whose sections bind its
+structure. The file list comes from the manifest files
+key alone. A hand written manifest with no packet behind
+it, and a record repointed at a different packet than the
+run reviewed, both fail. Naming the repository with the
+repo flag adds the shipped packet check recount of that
+packet against that repository to the stamp.
+
+A run that feeds a headless summary crosses the seam
+through the bridge at `scripts/merge_to_headless.py`,
+which validates the record and writes the headless stream
+with the merged findings and their ids unchanged. No
+hand translation stands between the merge and the
+headless gate.
+
 The shipped proof run at `workflows/proof-run/` shows a
 complete record over a fixture packet, with overlapping
 groups, a merged finding, a contested finding, and a
 planted defect the first pass missed and the second pass
-caught. The gate validates the proof on every run.
+caught and the merged set carries. The gate validates
+the proof on every run.
 
 The runbook carries no flipped task eval and no repeated run
 comparison, so a telephone game degradation across flipped

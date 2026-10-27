@@ -53,11 +53,20 @@ the discovery metadata check at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
-findings schema, the proof packet manifest, and the primary
+findings schema, the proof packet and its manifest, and the primary
 concurrency caps, and fails a run whose groups drop a file, whose
-merge did not dedupe, whose second pass left a finding without an
-evidenced verdict or judged a finding outside the merged set, or
-whose caps exceed the primary numbers. The mod contract check pins
+merge did not dedupe, whose merged findings rewrite the severity,
+summary, evidence, rule or location a raising review wrote, whose
+second pass left a finding without an evidenced verdict, raised a
+finding outside the packet or under a merged finding id, or kept a
+second pass finding out of the merged set, whose manifest fails
+the packet manifest schema or names no packet file beside it, or
+whose caps exceed the primary numbers. The bridge at
+`scripts/merge_to_headless.py` carries a validated fan out run
+into the headless stream shape with its finding ids unchanged,
+and the headless gate at `scripts/check_headless.py` reads the
+whole captured envelope against the packet the manifest belongs
+to and the exit file the invocation names. The mod contract check pins
 the `hooks/` module list, the `agent.spawn` hook with its `.catch`
 deny handler, the struck `onFailure` language and the withdrawn
 `--mod` flag, the mods API allowlist, and the brief's stated

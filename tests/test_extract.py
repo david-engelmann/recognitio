@@ -139,6 +139,22 @@ def commit_all(repo, message):
     git(repo, "commit", "-m", message)
 
 
+def findings_text_for(repo, since, body):
+    """A findings file body with the header this run requires.
+
+    The header names the current head of the repo as the
+    packet head and the resolved since anchor, which is the
+    reference a findings file must carry to be read by a
+    re-review run over that head and anchor.
+    """
+    head = git(repo, "rev-parse", "HEAD")
+    since_sha = git(repo, "rev-parse", since) if since else "none"
+    return (
+        "# recognitio-findings 1\n# packet-head: %s\n# since: %s\n"
+        % (head, since_sha)
+    ) + body
+
+
 def make_repo(tmp, commits):
     """Build a repo on main from a list of per commit file mappings."""
     repo = Path(tmp) / "repo"
@@ -1030,7 +1046,7 @@ class TestReReviewSemantics(unittest.TestCase):
             write_tree(repo, {"note.txt": "a longer note\n"})
             commit_all(repo, "rename the module")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text("old.py:5: the middle line still worries me\n")
+            findings.write_text(findings_text_for(repo, previous, "old.py:5: the middle line still worries me\n"))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -1054,7 +1070,7 @@ class TestReReviewSemantics(unittest.TestCase):
             write_tree(repo, {"mod.py": "".join(lines)})
             commit_all(repo, "insert a line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text("mod.py:5: the fifth line needs a look\n")
+            findings.write_text(findings_text_for(repo, previous, "mod.py:5: the fifth line needs a look\n"))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -1078,7 +1094,7 @@ class TestReReviewSemantics(unittest.TestCase):
             write_tree(repo, {"mod.py": changed})
             commit_all(repo, "change two far apart lines")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text("mod.py:10: the middle line is untouched\n")
+            findings.write_text(findings_text_for(repo, previous, "mod.py:10: the middle line is untouched\n"))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -1135,10 +1151,11 @@ class TestReReviewSemantics(unittest.TestCase):
             write_tree(repo, {"mod.py": "a = 1\nb = 2\nc = 3\nd = 4\ne = 55\n"})
             commit_all(repo, "fix the e line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "mod.py:5: the e line is wrong\n"
-                "mod.py:2: question about the b line\n"
-            )
+                "mod.py:2: question about the b line\n",
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "HEAD~2..HEAD",
@@ -1829,8 +1846,10 @@ class TestReReviewTraces(unittest.TestCase):
             })
             commit_all(repo, "change the first line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text("".join(
-                "mod.py:5: worry number %d\n" % i for i in range(250)
+            findings.write_text(findings_text_for(
+                repo, previous, "".join(
+                    "mod.py:5: worry number %d\n" % i for i in range(250)
+                ),
             ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
@@ -1944,11 +1963,12 @@ class TestRound1FindingsExistence(unittest.TestCase):
             })
             commit_all(repo, "change the first line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "mod.py:1: the changed line is the control\n"
                 "ghost.py:1: a file that never existed\n"
-                "../outside.py:1: a traversal path\n"
-            )
+                "../outside.py:1: a traversal path\n",
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -2040,7 +2060,7 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
             write_tree(repo, {"mod.py": "a = 1\nb = 2\nc = 33\n"})
             commit_all(repo, "fix the c line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text("mod.py:3: the c line is wrong\n")
+            findings.write_text(findings_text_for(repo, previous, "mod.py:3: the c line is wrong\n"))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "HEAD~2..HEAD",
@@ -2162,10 +2182,11 @@ class TestRound2FindingsDedupe(unittest.TestCase):
             })
             commit_all(repo, "change the first and third lines")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "mod.py:1: the first worry\n" * 100
-                + "mod.py:3: the third worry\n"
-            )
+                + "mod.py:3: the third worry\n",
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -2568,10 +2589,11 @@ class TestRound4FindingsSpelling(unittest.TestCase):
             })
             commit_all(repo, "change the first line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "mod.py:1: the worry\n"
-                "./mod.py:1: the worry\n"
-            )
+                "./mod.py:1: the worry\n",
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -2607,7 +2629,7 @@ class TestRound6CopyRereview(unittest.TestCase):
 
     def run_packet(self, tmp, repo, previous, findings_text):
         findings = Path(tmp) / "findings.txt"
-        findings.write_text(findings_text)
+        findings.write_text(findings_text_for(repo, previous, findings_text))
         out = Path(tmp) / "out"
         result = run_extract_cli(
             repo, out, "--range", "%s..HEAD" % previous,
@@ -2689,7 +2711,7 @@ class TestRound7VerdictContent(unittest.TestCase):
 
     def run_packet(self, tmp, repo, previous, findings_text):
         findings = Path(tmp) / "findings.txt"
-        findings.write_text(findings_text)
+        findings.write_text(findings_text_for(repo, previous, findings_text))
         out = Path(tmp) / "out"
         result = run_extract_cli(
             repo, out, "--range", "%s..HEAD" % previous,
@@ -2795,10 +2817,11 @@ class TestRound6FindingsSpellings(unittest.TestCase):
                 })
                 commit_all(repo, "change the first line")
                 findings = Path(tmp) / "findings.txt"
-                findings.write_text(
+                findings.write_text(findings_text_for(
+                    repo, previous,
                     "sub/mod.py:1: the worry\n"
-                    "%s:1: the worry\n" % spelling
-                )
+                    "%s:1: the worry\n" % spelling,
+                ))
                 out = Path(tmp) / "out"
                 result = run_extract_cli(
                     repo, out, "--range", "%s..HEAD" % previous,
@@ -2823,10 +2846,11 @@ class TestRound6FindingsSpellings(unittest.TestCase):
             })
             commit_all(repo, "change the first line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "mod.py:1: the worry\n"
-                "mod.py :1: the worry\n"
-            )
+                "mod.py :1: the worry\n",
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -2849,10 +2873,11 @@ class TestRound6FindingsSpellings(unittest.TestCase):
             })
             commit_all(repo, "change the first line")
             findings = Path(tmp) / "findings.txt"
-            findings.write_text(
+            findings.write_text(findings_text_for(
+                repo, previous,
                 "%s:1: the worry\n" % composed
-                + "%s:1: the worry\n" % decomposed
-            )
+                + "%s:1: the worry\n" % decomposed,
+            ))
             out = Path(tmp) / "out"
             result = run_extract_cli(
                 repo, out, "--range", "%s..HEAD" % previous,
@@ -3956,10 +3981,12 @@ class TestOutputPathDiscipline(unittest.TestCase):
     def test_findings_inside_the_output_directory_are_read_first(self):
         out = Path(self.tmp.name) / "selffindings"
         out.mkdir()
-        (out / "packet.md").write_text("a.py:1: a note\n")
+        (out / "findings.txt").write_text(
+            findings_text_for(self.repo, "HEAD~1", "a.py:1: a note\n")
+        )
         result = run_extract_cli(
             self.repo, out, "--range", "HEAD~1..HEAD",
-            "--since", "HEAD~1", "--findings", str(out / "packet.md"),
+            "--since", "HEAD~1", "--findings", str(out / "findings.txt"),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(read_manifest(out)["verified"])

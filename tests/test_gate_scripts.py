@@ -396,6 +396,28 @@ class TestCheckCopy(unittest.TestCase):
             )
             self.assertIn("examples/README.md", found)
 
+    def test_discovery_keeps_the_proof_run_packet_out_only(self):
+        # The proof run packet is extractor output shipped as
+        # the record a fan out run stands on, so it stays out by
+        # the generated packet rule, while the authored readme in
+        # the same folder stays inside the fence.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proof = root / "workflows" / "proof-run"
+            proof.mkdir(parents=True)
+            (proof / "packet.md").write_text(
+                "Mode: range\n", encoding="utf-8"
+            )
+            (proof / "README.md").write_text(
+                "An authored note.\n", encoding="utf-8"
+            )
+            found = {
+                str(p.relative_to(root))
+                for p in self.mod.discover_prose_files(root)
+            }
+            self.assertNotIn("workflows/proof-run/packet.md", found)
+            self.assertIn("workflows/proof-run/README.md", found)
+
     def test_discovery_skips_dependency_dirs_and_outside_symlinks(self):
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2823,8 +2845,16 @@ class TestWp4Docs(unittest.TestCase):
         text = (ROOT / "docs" / "headless-review.md").read_text(
             encoding="utf-8"
         )
-        self.assertEqual(text.count("the authoritative"), 1)
         self.assertEqual(text.count("permission_denials"), 1)
+        self.assertIn(
+            "when any permission denied system message stands anywhere",
+            text,
+        )
+        self.assertIn(
+            "when the field is missing from the result altogether",
+            text,
+        )
+        self.assertNotIn("the authoritative", text)
 
 
 class TestDemoAssets(unittest.TestCase):

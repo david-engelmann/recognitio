@@ -4,18 +4,18 @@
   "command": [
     "extract.py",
     "--range",
-    "HEAD~1..HEAD",
+    "bc6e67513b383f4c25b38bda4fbfc68035fa40f0..dbe5978fb89b0c135947b3d9487d126ec13890fd",
     "--repo",
-    "/tmp/r17-proof-repo",
+    "/home/hatch/workspace/chain-fix-scratch/proof/repo",
     "--out",
-    "/tmp/r17-proof-packet"
+    "/home/hatch/workspace/chain-fix-scratch/proof/packet"
   ],
-  "created_utc": "2026-10-24T01:24:44.633114+00:00",
+  "created_utc": "2026-10-27T12:06:57.824517+00:00",
   "mode": "range",
-  "label": "range HEAD~1..HEAD",
-  "base": "9f05061c38bb8aebe03d4f135383d59cc94456fa",
-  "head": "2b613b4a8ac4876ee418d7f01c34a71291cd8541",
-  "merge_base": "9f05061c38bb8aebe03d4f135383d59cc94456fa",
+  "label": "range bc6e67513b383f4c25b38bda4fbfc68035fa40f0..dbe5978fb89b0c135947b3d9487d126ec13890fd",
+  "base": "bc6e67513b383f4c25b38bda4fbfc68035fa40f0",
+  "head": "dbe5978fb89b0c135947b3d9487d126ec13890fd",
+  "merge_base": "bc6e67513b383f4c25b38bda4fbfc68035fa40f0",
   "since": null,
   "pr": null,
   "files": [
@@ -24,7 +24,7 @@
       "old_path": null,
       "status": "modified",
       "status_code": "M",
-      "additions": 2,
+      "additions": 1,
       "deletions": 0,
       "hunks": 1,
       "binary": false,
@@ -38,8 +38,8 @@
       "old_path": null,
       "status": "modified",
       "status_code": "M",
-      "additions": 2,
-      "deletions": 0,
+      "additions": 1,
+      "deletions": 1,
       "hunks": 1,
       "binary": false,
       "attribute_text": false,
@@ -52,8 +52,8 @@
       "old_path": null,
       "status": "modified",
       "status_code": "M",
-      "additions": 2,
-      "deletions": 0,
+      "additions": 10,
+      "deletions": 1,
       "hunks": 1,
       "binary": false,
       "attribute_text": false,
@@ -66,8 +66,8 @@
       "old_path": null,
       "status": "modified",
       "status_code": "M",
-      "additions": 2,
-      "deletions": 0,
+      "additions": 1,
+      "deletions": 1,
       "hunks": 1,
       "binary": false,
       "attribute_text": false,
@@ -87,29 +87,29 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 60,
-      "emitted_tokens": 60,
+      "estimated_tokens": 62,
+      "emitted_tokens": 62,
       "files": 4
     },
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 259,
-      "emitted_tokens": 259,
+      "estimated_tokens": 271,
+      "emitted_tokens": 271,
       "files": 4
     },
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 224,
-      "emitted_tokens": 224,
+      "estimated_tokens": 212,
+      "emitted_tokens": 212,
       "files": 4
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 470,
-      "emitted_tokens": 470,
+      "estimated_tokens": 453,
+      "emitted_tokens": 453,
       "files": 3
     }
   },
@@ -118,11 +118,11 @@
     "## T1 The change",
     "## T2 Companions",
     "## T3 History",
-    "## Budget and completeness"
+    "## Verification recount"
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1199,
+    "estimated_tokens": 1355,
     "dropped": []
   },
   "cap_notes": [],

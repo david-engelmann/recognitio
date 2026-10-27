@@ -1538,6 +1538,55 @@ This unreleased work carries version 1.3.0.
   pinned widths, and the packet check reads and the extractor
   output probe carry the same pin list as every other
   invocation.
+- The review chain no longer reads green on artefacts its
+  author wrote alone. The fan out validator validates the
+  packet manifest against the shipped packet manifest
+  schema, reads the file list from the files key alone, and
+  binds the record to the packet file standing beside the
+  manifest, whose header and sections must match the
+  manifest head, base and structure. Naming a repository
+  adds the packet check recount and a line reading that
+  refuses a finding location past the end of its file.
+  Merged findings are proved by content, carrying the
+  severity, summary, evidence, rule and location a raising
+  review wrote, and merged evidence is read against the
+  packet. Second pass findings obey the same packet
+  evidence and dedupe rules as first pass findings, a new
+  verdict may not reuse a merged finding id, verdict
+  evidence must include the file the finding stands in, a
+  note must carry substance, and every accepted second
+  pass finding reaches the merged set, marked with the
+  second pass as its source. A finding summary shaped as
+  an instruction to a reviewer is flagged as steering
+  content for a human to clear, and the fan out and
+  headless docs name packet content as untrusted data.
+- The headless gate reads the whole envelope. An error flag
+  or an error subtype on any result message fails the run,
+  a stream with more than one result message fails as a
+  merged capture, a missing permission denials field fails,
+  a permission denied system message anywhere in the stream
+  fails, and a finding must cite at least one evidence path,
+  carry a severity from the shipped vocabulary, and name a
+  location inside the packet. The manifest is validated and
+  refused when its verified flag is not true, the packet
+  beside the manifest is compared against it, and a
+  structured output naming a packet head must name the
+  manifest head. The exit code is read from the exit file
+  the invocation names, and a claimed exit code that
+  disagrees with the record fails. The documented
+  invocation passes the shipped headless findings schema
+  as a schema value. A bridge script now carries a
+  validated fan out run into a headless stream with its
+  finding ids unchanged and its contested ids listed.
+- A findings file now opens with a header naming its
+  format version, the packet head it was written for, and
+  the since anchor of its run, and the extractor refuses a
+  file whose header names another run before any packet is
+  built. The manifest records the hash of the findings
+  file the run used, and the packet check compares a
+  findings file standing at the recorded path against that
+  hash and reads its header against the manifest head and
+  since anchor.
 
 ### Removed
 

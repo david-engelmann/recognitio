@@ -2494,6 +2494,89 @@ def normalize_finding_path(path):
     return "/".join(parts)
 
 
+FINDINGS_FORMAT_VERSION = "1"
+
+
+def split_findings_header(text):
+    """The header a findings file opens with, as a dict.
+
+    The header stands in comment lines above the findings and
+    names the format version, the head of the packet the file
+    was written for, and the since anchor of that run, in this
+    shape.
+
+        # recognitio-findings 1
+        # packet-head: <full commit hash>
+        # since: <full commit hash, or none>
+
+    A file with no such lines returns an empty dict. The lines
+    are comments to the line parser below, so a file carrying a
+    header still parses as findings, and the header is the only
+    place the references live.
+    """
+    header = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("# recognitio-findings"):
+            header["version"] = line[len("# recognitio-findings"):].strip()
+        elif line.startswith("# packet-head:"):
+            header["packet_head"] = line[len("# packet-head:"):].strip()
+        elif line.startswith("# since:"):
+            header["since"] = line[len("# since:"):].strip()
+        elif line.startswith("#") or not line:
+            continue
+        else:
+            break
+    return header
+
+
+def findings_header_problems(text, head, since):
+    """Problems with a findings file header against one run.
+
+    A findings file that carries findings must open with a
+    header naming the packet head and the since anchor it was
+    written for, and both must name this run. A file written
+    for another packet, another head, or another anchor is a
+    foreign file here, however plausible its lines look, and a
+    file with no header at all names no run, so its findings
+    cannot be told apart from a foreign file either. A file
+    that carries a header is judged by it even when it carries
+    no findings. A file with neither a header nor findings is
+    an empty findings file and stands as one.
+    """
+    header = split_findings_header(text)
+    findings = parse_findings(text)
+    if not header:
+        if findings:
+            return [
+                "the findings file carries no header naming the "
+                "packet head and since anchor it was written for, "
+                "so its findings cannot be tied to this run"
+            ]
+        return []
+    problems = []
+    if header.get("version") != FINDINGS_FORMAT_VERSION:
+        problems.append(
+            "the findings file header names format version %r, "
+            "which this extractor does not read"
+            % header.get("version")
+        )
+    if header.get("packet_head") != head:
+        problems.append(
+            "the findings file was written for packet head %s, "
+            "which is not the head of this run %s"
+            % (header.get("packet_head"), head)
+        )
+    wanted_since = since if since is not None else "none"
+    if header.get("since") != wanted_since:
+        problems.append(
+            "the findings file was written for since anchor %s, "
+            "which is not the since anchor of this run %s"
+            % (header.get("since"), wanted_since)
+        )
+    return problems
+
+
 def parse_findings(text):
     """Parse a findings file of one finding per line, anchored path:line."""
     findings = []
@@ -3423,7 +3506,7 @@ def parse_args(argv):
     )
     parser.add_argument(
         "--findings", default=None,
-        help="file of prior findings, one per line anchored as path:line: text",
+        help="file of prior findings with its format header, one finding per line anchored as path:line: text",
     )
     parser.add_argument(
         "--budget", type=int, default=None,
@@ -3449,16 +3532,32 @@ def parse_args(argv):
     return args
 
 
-def load_findings(args):
-    """Read and parse the findings file, or an empty list without one."""
+def load_findings(args, resolved=None):
+    """Read and parse the findings file, or an empty list without one.
+
+    When the run it feeds is resolved, the file header is read
+    against that run and a file written for another packet
+    head or another since anchor is refused before any packet
+    is built, and the hash of the file bytes is recorded on
+    the args for the manifest, so the packet check can judge
+    the file the run actually used.
+    """
     if not args.findings:
         return []
     try:
-        findings_text = Path(args.findings).read_text(
-            encoding="utf-8", errors="surrogateescape"
-        )
+        findings_bytes = Path(args.findings).read_bytes()
     except OSError as exc:
         raise GitError("cannot read the findings file: %s" % exc)
+    args.findings_sha256 = hashlib.sha256(findings_bytes).hexdigest()
+    findings_text = findings_bytes.decode(
+        encoding="utf-8", errors="surrogateescape"
+    )
+    if resolved is not None:
+        problems = findings_header_problems(
+            findings_text, resolved["head"], resolved["since"]
+        )
+        if problems:
+            raise GitError(problems[0])
     return parse_findings(findings_text)
 
 
@@ -3680,6 +3779,7 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
         "cap_notes": cap_notes,
         "verified": verified,
         "discrepancies": discrepancies,
+        "findings_sha256": getattr(args, "findings_sha256", None),
     })
     return manifest
 
@@ -3689,7 +3789,7 @@ def run_pipeline(args, repo, target, argv, prepared=None):
         resolved, findings, change = prepared
     else:
         resolved = resolve_inputs(repo, args)
-        findings = load_findings(args)
+        findings = load_findings(args, resolved)
         change = None
     diff_base = resolved["merge_base"]
     if diff_base is None:
@@ -3845,7 +3945,7 @@ def main(argv=None):
         # and its publish ever write into the directory.
         try:
             resolved = resolve_inputs(repo, args)
-            findings = load_findings(args)
+            findings = load_findings(args, resolved)
             diff_base = resolved["merge_base"]
             if diff_base is None:
                 diff_base = EMPTY_TREE

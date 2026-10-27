@@ -78,6 +78,12 @@ class FanoutTestCase(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (Path(tmp) / "packet.md").write_text(
+                (PROOF_RECORD.parent / "packet.md").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
             return self.fanout.run_problems(path)
 
     def test_the_shipped_proof_run_reads_green(self):
@@ -225,6 +231,12 @@ class FanoutTestCase(unittest.TestCase):
             manifest_path = Path(tmp) / "manifest.json"
             manifest_path.write_text(
                 json.dumps(manifest), encoding="utf-8"
+            )
+            (Path(tmp) / "packet.md").write_text(
+                (PROOF_RECORD.parent / "packet.md").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
             )
             record = self.proof_record()
             record["packet_manifest"] = "manifest.json"

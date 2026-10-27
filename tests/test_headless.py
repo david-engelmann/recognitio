@@ -31,6 +31,31 @@ def load_headless():
 headless = load_headless()
 
 MANIFEST_FILES = ["src/app.py", "src/lib.py"]
+PROOF_DIR = ROOT / "workflows" / "proof-run"
+
+
+def write_packet(tmp):
+    """Write a schema sound manifest and its packet into tmp.
+
+    The manifest is the shipped proof manifest with its file
+    records replaced by the two headless fixture files, and
+    the packet is the shipped proof packet, whose header binds
+    it to that manifest in head and base.
+    """
+    manifest = json.loads(
+        (PROOF_DIR / "manifest.json").read_text(encoding="utf-8")
+    )
+    record = manifest["files"][0]
+    manifest["files"] = [
+        dict(record, path=path) for path in MANIFEST_FILES
+    ]
+    manifest_path = Path(tmp) / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (Path(tmp) / "packet.md").write_text(
+        (PROOF_DIR / "packet.md").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def result_event(**fields):
@@ -44,7 +69,7 @@ def clean_structured():
         "verdict": "pass",
         "findings": [
             {
-                "severity": "low",
+                "severity": "P3",
                 "location": "src/app.py:12",
                 "evidence": ["src/app.py"],
             }
@@ -164,7 +189,7 @@ class TestHeadlessCheck(unittest.TestCase):
         )
 
     def test_a_finding_missing_keys_fails_the_gate(self):
-        structured = {"verdict": "fail", "findings": [{"severity": "high"}]}
+        structured = {"verdict": "fail", "findings": [{"severity": "P1"}]}
         events = [
             result_event(
                 permission_denials=[], structured_output=structured
@@ -180,7 +205,7 @@ class TestHeadlessCheck(unittest.TestCase):
             "verdict": "fail",
             "findings": [
                 {
-                    "severity": "high",
+                    "severity": "P1",
                     "location": "src/ghost.py:1",
                     "evidence": ["src/ghost.py"],
                 }
@@ -202,7 +227,7 @@ class TestHeadlessCheck(unittest.TestCase):
             "verdict": "pass",
             "findings": [
                 {
-                    "severity": "low",
+                    "severity": "P3",
                     "location": "src/app.py:1",
                     "evidence": ["src/app.py"],
                 }
@@ -225,7 +250,7 @@ class TestHeadlessCheck(unittest.TestCase):
             "verdict": "fail",
             "findings": [
                 {
-                    "severity": "high",
+                    "severity": "P1",
                     "location": "src/lib.py:40",
                     "evidence": ["src/lib.py"],
                 }
@@ -268,12 +293,7 @@ class TestHeadlessCheck(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            manifest.write_text(
-                json.dumps(
-                    {"files": [{"path": path} for path in MANIFEST_FILES]}
-                ),
-                encoding="utf-8",
-            )
+            write_packet(tmp)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -308,12 +328,7 @@ class TestHeadlessCheck(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            manifest.write_text(
-                json.dumps(
-                    {"files": [{"path": path} for path in MANIFEST_FILES]}
-                ),
-                encoding="utf-8",
-            )
+            write_packet(tmp)
             result = subprocess.run(
                 [
                     sys.executable,

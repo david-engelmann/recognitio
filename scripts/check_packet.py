@@ -55,6 +55,7 @@ Exits nonzero and lists every problem when the packet cannot be used.
 """
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -2285,7 +2286,8 @@ def rereview_problems(packet_text, manifest, repo, extractor):
         # the run left it, so its findings are the ground truth
         # and no reading of the packet lines is needed at all.
         try:
-            findings_text = Path(findings_path).read_bytes().decode(
+            findings_bytes = Path(findings_path).read_bytes()
+            findings_text = findings_bytes.decode(
                 "utf-8", "surrogateescape"
             )
             recorded_findings = extractor.parse_findings(findings_text)
@@ -2294,6 +2296,25 @@ def rereview_problems(packet_text, manifest, repo, extractor):
                 "the findings file the manifest command records "
                 "cannot be read back, so the re-review accounting "
                 "cannot be verified (%s)" % exc
+            ]
+        recorded_hash = manifest.get("findings_sha256")
+        if recorded_hash is not None:
+            actual_hash = hashlib.sha256(findings_bytes).hexdigest()
+            if actual_hash != recorded_hash:
+                return [
+                    "the findings file the manifest command "
+                    "records hashes to %s, which is not the "
+                    "findings hash %s the manifest records, so "
+                    "the file the run used is not the file "
+                    "standing there" % (actual_hash, recorded_hash)
+                ]
+        header_problems = extractor.findings_header_problems(
+            findings_text, manifest["head"], manifest["since"]
+        )
+        if header_problems:
+            return [
+                "the findings file the manifest command records "
+                "does not belong to this run: %s" % header_problems[0]
             ]
         diff_base = manifest["merge_base"] or EMPTY_TREE
         try:
