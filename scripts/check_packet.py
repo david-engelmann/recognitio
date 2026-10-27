@@ -1112,7 +1112,7 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             continue
         match = re.match(
             r"^- (.+) \((%s)(, instruction file)?"
-            r"(, renamed from (.+))?\)$" % "|".join(STATUS_NAMES),
+            r"(, (renamed|copied) from (.+))?\)$" % "|".join(STATUS_NAMES),
             line,
         )
         if not match:
@@ -1126,6 +1126,7 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             match.group(2),
             bool(match.group(3)),
             match.group(5),
+            match.group(6),
         ))
     expected = []
     for entry in manifest["files"]:
@@ -1133,6 +1134,9 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             display_path(entry["path"]),
             entry["status"],
             entry["instruction_file"],
+            (
+                "copied" if entry["status"] == "copied" else "renamed"
+            ) if entry["old_path"] else None,
             display_path(entry["old_path"]) if entry["old_path"] else None,
         ))
     if listed != expected:
@@ -1245,21 +1249,26 @@ def change_tier_problems(packet_text, manifest, fresh_change, extractor):
                 "the change tier section for %s does not carry "
                 "the status its manifest record names" % entry["path"]
             )
-        renamed = [
-            line for line in body_lines if line.startswith("Renamed from: ")
+        sourced = [
+            line for line in body_lines
+            if line.startswith("Renamed from: ")
+            or line.startswith("Copied from: ")
         ]
         if entry["old_path"]:
-            wanted = ["Renamed from: %s" % display_path(entry["old_path"])]
-            if renamed != wanted:
+            verb = "Copied" if entry["status"] == "copied" else "Renamed"
+            wanted = [
+                "%s from: %s" % (verb, display_path(entry["old_path"]))
+            ]
+            if sourced != wanted:
                 problems.append(
                     "the change tier section for %s does not carry "
-                    "the rename source its manifest record names"
+                    "the source its manifest record names"
                     % entry["path"]
                 )
-        elif renamed:
+        elif sourced:
             problems.append(
-                "the change tier section for %s carries a rename "
-                "source its manifest record does not" % entry["path"]
+                "the change tier section for %s carries a source "
+                "its manifest record does not" % entry["path"]
             )
         if "```diff" not in body_lines:
             problems.append(

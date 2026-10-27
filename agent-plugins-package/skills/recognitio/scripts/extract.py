@@ -171,6 +171,13 @@ GIT_PIN = [
     "-c", "color.status=false",
     "-c", "grep.column=false",
     "-c", "diff.interHunkContext=0",
+    # A rename limit of zero is no limit in git, so inexact rename
+    # and copy detection always runs in full. Pinning it here, on
+    # the command line, overrides any diff.renameLimit a clone or
+    # a global config carries, which would otherwise switch the
+    # inexact pass off in silence and read copies as additions and
+    # renames as a deletion beside an addition.
+    "-c", "diff.renameLimit=0",
 ]
 # Every invocation that can produce or read diff text also refuses
 # external diff drivers and textconv filters, both of which can
@@ -382,7 +389,22 @@ def run_git(repo, args, check=True, global_flags=()):
         + list(global_flags)
         + ["-C", str(repo)] + GIT_PIN + list(args)
     )
-    return run_argv(argv, None, check, "git " + " ".join(args))
+    proc = run_argv(argv, None, check, "git " + " ".join(args))
+    # Git reports a skipped rename detection pass on standard error
+    # while still exiting zero, so checking the exit code alone
+    # discards the one warning that says the diff under the packet
+    # was degraded. Surface it as a run failure instead, so it
+    # reaches the failure receipt and no stamped packet can rest on
+    # a detection pass that never ran.
+    lowered = proc.stderr.lower()
+    if "rename detection was skipped" in lowered or \
+            "exhaustive rename detection" in lowered:
+        raise GitError(
+            "git reported that rename detection was skipped, so the "
+            "diff cannot be trusted as a complete reading of the "
+            "change: %s" % proc.stderr.strip()
+        )
+    return proc
 
 
 def run_cmd(cwd, args, check=True):
@@ -858,13 +880,19 @@ def fetch_change(repo, diff_base, head):
     identity through pair_diff_chunks, so the two sections a
     typechange emits land on the typechanged file itself and never
     shift a later file onto the wrong diff body.
+
+    Copy detection runs under the harder rule on every call, so a
+    file the change itself does not modify can still stand as the
+    source of a copy. Without that rule such a copy reads as a
+    plain addition and its lines count as new to the tree when
+    they already stood in it.
     """
     status_text = run_git(
-        repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
+        repo, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head]
     ).stdout
     numstat_text = run_git(
-        repo, ["diff", "--numstat", "-z", "-M", "-C"] + DIFF_FLAGS
+        repo, ["diff", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head]
     ).stdout
     commit_log = run_git(
@@ -872,12 +900,12 @@ def fetch_change(repo, diff_base, head):
     ).stdout
     full_diff = run_git(
         repo,
-        ["diff", "--histogram", "--find-renames", "--find-copies", "-W"]
+        ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-W"]
         + DIFF_FLAGS + [diff_base, head],
     ).stdout
     precise_diff = run_git(
         repo,
-        ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
+        ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-U0"]
         + DIFF_FLAGS + [diff_base, head],
     ).stdout
     files = parse_name_status_z(status_text)
@@ -914,7 +942,7 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
     result = run_git(
         repo,
         ["diff", "--text", "--histogram", "--find-renames",
-         "--find-copies", context_flag] + DIFF_FLAGS
+         "--find-copies", "--find-copies-harder", context_flag] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
     )
     # The pathspec scopes this diff to the one entry, and a
@@ -934,7 +962,7 @@ def per_file_text_numstat(repo, diff_base, head, entry):
     """
     result = run_git(
         repo,
-        ["diff", "--text", "--numstat", "-z", "-M", "-C"] + DIFF_FLAGS
+        ["diff", "--text", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
     )
     stats, binary_paths = parse_numstat_z(result.stdout)
@@ -1419,9 +1447,38 @@ def entry_is_instruction(entry):
 
     A rename is judged from either name, so renaming a file into
     an instruction name or out of one flags the entry either way.
+    A copy is judged from its destination alone. Its old path is
+    not a former name of the copy at all. It is a different file
+    that still stands in the tree under that name, with its own
+    entry in the same packet, so a copy taken from an instruction
+    file under a plain name is not itself an instruction file,
+    while a copy taken to an instruction name is flagged on the
+    strength of its own destination path.
     """
+    if entry.get("status") == "copied":
+        return is_instruction_path(entry.get("path"))
     return is_instruction_path(entry.get("path")) or \
         is_instruction_path(entry.get("old_path"))
+
+
+def source_verb(entry):
+    """The verb that names where an entry with an old path came from.
+
+    A copied entry was copied from its source, which still stands
+    in the tree. A renamed entry was renamed from its old name,
+    which no longer stands. The two verbs are not interchangeable,
+    so every surface that names a source takes the verb from the
+    entry status rather than printing the rename wording for both.
+    """
+    return "copied" if entry.get("status") == "copied" else "renamed"
+
+
+def source_line(entry):
+    """The change tier source line for an entry with an old path."""
+    return "%s from: %s" % (
+        source_verb(entry).capitalize(),
+        display_path(entry["old_path"]),
+    )
 
 
 def build_t0(files, commit_log, pr_info):
@@ -1464,8 +1521,9 @@ def build_t0(files, commit_log, pr_info):
         marker = ", instruction file" if entry_is_instruction(entry) else ""
         if entry.get("old_path"):
             lines.append(
-                "- %s (%s%s, renamed from %s)"
+                "- %s (%s%s, %s from %s)"
                 % (display_path(entry["path"]), entry["status"], marker,
+                   source_verb(entry),
                    display_path(entry["old_path"]))
             )
         else:
@@ -1517,7 +1575,7 @@ def build_t1(files, chunks):
         lines.append("")
         lines.append("Status: %s" % entry["status"])
         if entry.get("old_path"):
-            lines.append("Renamed from: %s" % display_path(entry["old_path"]))
+            lines.append(source_line(entry))
         lines.append("")
         lines.append("```diff")
         if entry["placeholder"] is not None:
@@ -2377,11 +2435,11 @@ def rereview_ranges(repo, since, head):
     """
     precise = run_git(
         repo,
-        ["diff", "--histogram", "--find-renames", "--find-copies", "-U0"]
+        ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-U0"]
         + DIFF_FLAGS + [since, head],
     ).stdout
     status_text = run_git(
-        repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
+        repo, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [since, head]
     ).stdout
     tree_text = run_git(

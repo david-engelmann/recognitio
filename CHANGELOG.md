@@ -1490,3 +1490,19 @@ This unreleased work carries version 1.3.0.
   extractor and the check now escape bidirectional controls
   and zero width marks, so a crafted filename can no longer
   display as a different filename in a packet heading.
+- A copied file is no longer labelled as renamed in a packet.
+  The triage list and the change tier section name a copy with
+  the copied wording and a rename with the renamed wording, and
+  the packet check accepts the corrected wording and refuses
+  the old mislabel in both places. The instruction file flag is
+  judged from a copy destination path alone, so a copy taken
+  from an instruction file under a plain name no longer carries
+  the flag while a copy taken to an instruction name still does.
+  Rename and copy detection now runs with no rename limit pinned
+  on every git invocation, so a rename limit set in a clone or a
+  global config can no longer switch inexact detection off, and
+  a git warning that detection was skipped fails the run and
+  reaches the failure receipt instead of being discarded. Copy
+  detection also runs under the harder rule, so a copy whose
+  source the change itself does not modify reads as a copy with
+  its real line counts instead of as a plain addition.
