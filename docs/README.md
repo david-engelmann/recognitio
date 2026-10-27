@@ -57,6 +57,12 @@ decisions file at the end of this page.
   writes the packet discipline as derivation noted rules for
   the Devin review surface and its coordinator surfaces.
 
+## The release
+
+- [Recognitio 1.3.0 release draft](release-1.3.0.md) (draft) carries the
+  notes for the first tagged release, its highlights graphic and the
+  ordered tag checklist its owner works through to ship it.
+
 ## The records
 
 - [Decisions](decisions.md) (living) is the numbered record of the
