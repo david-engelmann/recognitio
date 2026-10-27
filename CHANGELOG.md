@@ -1347,3 +1347,12 @@ This unreleased work carries version 1.3.0.
   caller supplied driver variables scrubbed from its
   environment. The packet check and eval gate scripts run
   their git children under the same scrub.
+- The test vacuity guard no longer credits an assertion a
+  test cannot fail on. Helper bodies are judged by the same
+  rules as test bodies, a name bound to a literal in one body
+  counts as a constant at the assertion, assertions after a
+  return or inside a handler that swallows the assertion
+  error no longer count, and asynchronous methods and files
+  under the runner discovery patterns stand under the guard.
+  The success line now names the limits recorded in the
+  guard docstring instead of claiming more than it proves.
