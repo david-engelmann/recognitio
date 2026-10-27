@@ -2786,6 +2786,9 @@ class TestDocsIndex(unittest.TestCase):
         "qwen-code-brief.md",
         "release-1.3.0.md",
         "reviewer-persona.md",
+        "submission-agent-plugins.md",
+        "submission-claude.md",
+        "submission-cursor.md",
         "zcode-plugin-brief.md",
     )
     BRIEFS = (

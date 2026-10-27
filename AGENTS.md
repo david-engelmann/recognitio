@@ -47,7 +47,8 @@ build check at `scripts/check_devin.py`, the Qwen Code
 marketplace presence build check at `scripts/check_qwen.py`,
 the brand asset check at `scripts/check_brand.py`,
 the discovery metadata check at
-`scripts/check_discovery.py`, the test vacuity guard at
+`scripts/check_discovery.py`, the submission pack check at
+`scripts/check_submissions.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the
@@ -103,6 +104,16 @@ not a gate.
   review is stamped on it.
 - `docs/decisions.md` records the design decisions that depart from
   the research sketch, with the reason for each one.
+- `docs/submission-cursor.md`, `docs/submission-claude.md` and
+  `docs/submission-agent-plugins.md` hold the submission packs
+  for the Cursor Marketplace, the Claude plugin directory and
+  the Agent Plugins portable package. Each pack states its
+  filing route, the requirement set read from the primary
+  pages, an evidence check against the shipped tree, and what
+  remains the act of the owner, and each states plainly that
+  nothing in it has been submitted. The gate at
+  `scripts/check_submissions.py` pins the packs and the
+  manifest facts their evidence checks rest on.
 - `docs/reviews/` holds review reports written from the template
   in `REVIEW.md`, with their findings disposition counts.
 - `docs/brand/` holds the brand assets, the palette record at

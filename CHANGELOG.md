@@ -1372,3 +1372,19 @@ This unreleased work carries version 1.3.0.
   packet output style section of the README and in the
   reviewer persona brief, with the full record filed beside
   the demo capture record.
+- Submission packs for the three directories, prepared and
+  evidence checked, with nothing submitted. The Cursor pack
+  holds the marketplace filing route and the requirement set
+  from the primary Cursor pages, with the evidence check met
+  and two open points recorded where the primary sources
+  conflict or stay silent. The Claude pack holds the
+  directory portal route, the validation and policy
+  obligations, and the evidence check, with the listing URL
+  choice, the three examples gap, and the privacy
+  determination recorded as open for the owner. The Agent
+  Plugins pack records that the project runs no directory of
+  packages, checks the portable package against its
+  specification, and prepares the Awesome Copilot host
+  listing, whose one prerequisite is the release tag only the
+  owner can cut. A new gate pins the packs and the manifest
+  facts their evidence checks rest on.

@@ -65,6 +65,21 @@ capture record, so no document in this set stands unlisted.
   notes for the first tagged release, its highlights graphic and the
   ordered tag checklist its owner works through to ship it.
 
+## The submission packs
+
+- [The Cursor Marketplace submission pack](submission-cursor.md) (ready) holds
+  the filing route, the requirement set read from the primary
+  Cursor pages, and the evidence check for a listing that has
+  not been filed.
+- [The Claude plugin directory submission pack](submission-claude.md) (ready)
+  holds the filing route through the directory portal, the
+  validation and policy obligations, and the evidence check
+  for a listing that has not been filed.
+- [The Agent Plugins submission pack](submission-agent-plugins.md) (ready)
+  records that the project runs no directory of packages and
+  prepares the host listing that takes the portable package,
+  with its route, its criteria, and its one owner prerequisite.
+
 ## The records
 
 - [Decisions](decisions.md) (living) is the numbered record of the

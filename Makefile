@@ -28,6 +28,7 @@ check:
 	$(PYTHON) scripts/check_qwen.py
 	$(PYTHON) scripts/check_brand.py
 	$(PYTHON) scripts/check_discovery.py
+	$(PYTHON) scripts/check_submissions.py
 	$(PYTHON) scripts/check_test_vacuity.py
 	$(PYTHON) scripts/smoke_extract.py
 
