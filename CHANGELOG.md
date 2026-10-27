@@ -1506,6 +1506,38 @@ This unreleased work carries version 1.3.0.
   detection also runs under the harder rule, so a copy whose
   source the change itself does not modify reads as a copy with
   its real line counts instead of as a plain addition.
+- The remaining ambient configuration surface is pinned. The
+  diff algorithm is pinned to histogram on every reader, so the
+  numstat counts the manifest is built from and the diff bodies
+  agree under any clone algorithm setting. Submodule pointer
+  moves are always reported and always shown in the short form,
+  so an ambient ignore or display setting can neither delete a
+  submodule change from a verified packet nor rewrite its body
+  or break its extraction. Shortened hashes stand at seven
+  characters on the log lines, the diff index lines and the
+  range diff output alike. Commit subjects are recoded to UTF-8
+  under a pinned log output encoding, so a legacy encoded
+  subject can no longer turn a verified packet into bytes that
+  are not valid UTF-8. Attributes are read only from the tree
+  under review, under an attribute source pin on every diff
+  reading, a switched off user attributes file and a scrubbed
+  attribute source environment, and the exclusion receipt now
+  names that tree as the source of a marking. The one source
+  no pin can confine, the attributes file inside the clone git
+  directory, which git reads ahead of the tree itself, refuses
+  the run and the packet stamp in plain words instead. Blame
+  credit is confined the same way, with the configuration
+  mailmap file switched off, the mailmap blob pinned to the
+  mailmap file the reviewed head itself carries, the working
+  tree mailmap out of reach of the reading, and the ignore
+  revs list cleared, while a mailmap committed inside the
+  recorded range still applies as reviewed content. The caller
+  environment pathspec mode variables are scrubbed beside the
+  driver family, so they can no longer break extraction on
+  attribute marked files, the range diff stat fallback carries
+  pinned widths, and the packet check reads and the extractor
+  output probe carry the same pin list as every other
+  invocation.
 
 ### Removed
 

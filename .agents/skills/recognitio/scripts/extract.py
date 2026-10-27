@@ -178,6 +178,48 @@ GIT_PIN = [
     # inexact pass off in silence and read copies as additions and
     # renames as a deletion beside an addition.
     "-c", "diff.renameLimit=0",
+    # The diff algorithm is histogram on every reader, not only on
+    # the body diffs that carry the flag in their argument list.
+    # The numstat family, the name status family, the stat
+    # fallback and the line history reader obey this pin, so the
+    # counts the manifest is built from and the bodies the packet
+    # shows are one reading of the change under one algorithm,
+    # whatever algorithm a clone or a global config prefers.
+    "-c", "diff.algorithm=histogram",
+    # A submodule pointer move is a change in the packet. An
+    # ambient ignore setting at all would delete it in silence
+    # from every diff the fetch reads, and a display setting of
+    # diff or log would rewrite its body with content from inside
+    # the submodule or break the run outright, so the ignore
+    # behaviour is pinned to the value that reports pointer moves
+    # and the display is pinned to the short form.
+    "-c", "diff.ignoreSubmodules=none",
+    "-c", "diff.submodule=short",
+    # Shortened hashes stand at seven characters on every surface
+    # that prints one, the oneline commit lists, the index lines
+    # inside diff bodies and the range diff output alike, so a
+    # packet stamped in one clone is not refused in another over
+    # display width alone.
+    "-c", "core.abbrev=7",
+    # Commit subjects are recoded to UTF-8 on every log reading.
+    # A commit that declares a legacy encoding otherwise hands the
+    # packet raw legacy bytes under an ambient log output
+    # encoding, and the shipped packet is then not a valid UTF-8
+    # document at all.
+    "-c", "i18n.logOutputEncoding=UTF-8",
+    # Attributes come from the tree under review alone. The user
+    # attributes file, named by configuration or standing at its
+    # default location, is switched off by the empty value, the
+    # attribute tree configuration is switched off the same way,
+    # and every diff reading invocation also carries an attribute
+    # source pin naming the reviewed tree, which overrides the
+    # attribute source variable in the caller environment. The
+    # clone info attributes file is the one source no pin can
+    # confine, because git gives it the highest precedence of any
+    # attribute source, so a clone carrying one is refused where
+    # the inputs are resolved rather than read under it.
+    "-c", "core.attributesFile=",
+    "-c", "attr.tree=",
 ]
 # Every invocation that can produce or read diff text also refuses
 # external diff drivers and textconv filters, both of which can
@@ -311,6 +353,33 @@ GIT_DRIVER_ENV_VARS = (
 )
 GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
 
+# Attribute source variables are scrubbed beside the driver family.
+# The attribute source variable names a tree whose attributes every
+# child would read in place of the reviewed tree, and the global
+# and system attribute variables name files outside the reviewed
+# tree that would reshape its markings the same way. The diff
+# readings carry an attribute source pin of their own as well, so
+# either layer alone confines the markings to the reviewed tree.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+
+# Pathspec mode variables are scrubbed for the same reason. The
+# wrapper hands every pathspec to git under the literal pathspecs
+# flag, and a caller shell that exports the case insensitive or
+# glob pathspec mode for its own work makes git refuse that
+# combination outright, which fails extraction closed on exactly
+# the attribute marked files whose per file readings carry a
+# pathspec. No pathspec mode from the caller may reach a child.
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
+
 
 def scrubbed_child_env():
     """The environment every child process runs under."""
@@ -319,12 +388,18 @@ def scrubbed_child_env():
         for key, value in os.environ.items()
         if key not in GIT_LOCATION_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     # The second belt behind the --no-replace-objects flag every git
     # invocation carries. Whichever layer a future call site forgets,
     # the other still refuses replacement objects.
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    # The system attributes file stands outside the reviewed tree
+    # beside the user attributes file the pin list switches off,
+    # so its readings are refused here as well.
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     return env
 
 
@@ -470,6 +545,50 @@ def refuse_shallow(repo):
         )
 
 
+def refuse_info_attributes(repo):
+    """Refuse a clone whose info attributes would reshape the packet.
+
+    Git gives the attributes file inside the clone git directory
+    the highest precedence of any attribute source, above the
+    attributes of the tree under review itself, and no command
+    line pin, configuration pin or environment scrub on this git
+    can confine or disable that reading. A clone carrying an
+    effective line in that file would hand the packet markings
+    the reviewed tree never made while the packet credits the
+    tree, so the run refuses in its own words instead. A file
+    holding only comments and blank lines assigns nothing and
+    does not refuse the run.
+    """
+    common = run_git(
+        repo, ["rev-parse", "--git-common-dir"], check=False
+    )
+    if common.returncode != 0 or not common.stdout.strip():
+        return
+    common_path = Path(common.stdout.strip())
+    if not common_path.is_absolute():
+        common_path = Path(repo) / common_path
+    info_attributes = common_path / "info" / "attributes"
+    try:
+        text = info_attributes.read_text(
+            encoding="utf-8", errors="surrogateescape"
+        )
+    except OSError:
+        return
+    effective = [
+        line for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if effective:
+        raise GitError(
+            "the clone carries attributes in %s and those attributes "
+            "sit outside the reviewed tree while git reads them ahead "
+            "of the tree attributes themselves, so no packet built in "
+            "this clone can credit its markings to the tree under "
+            "review. Empty or remove that file, then run again"
+            % info_attributes
+        )
+
+
 def resolve_pr(repo, args, since_sha):
     view = run_cmd(
         repo,
@@ -591,6 +710,7 @@ def resolve_commit(repo, args, since_sha):
 def resolve_inputs(repo, args):
     """Return a dict with mode, refs, merge base, label, since and pr."""
     refuse_shallow(repo)
+    refuse_info_attributes(repo)
     since_sha = rev_parse(repo, args.since) if args.since else None
     if args.pr is not None:
         return resolve_pr(repo, args, since_sha)
@@ -887,13 +1007,20 @@ def fetch_change(repo, diff_base, head):
     plain addition and its lines count as new to the tree when
     they already stood in it.
     """
+    # Every diff reading in the fetch takes its attributes from
+    # the head tree alone, under the attribute source pin the
+    # range diff reading already carried in its own form. Markings
+    # planted in the working tree, in a user attributes file or
+    # through the caller environment then cannot reach the packet,
+    # and a marking the head tree itself carries still can.
+    attr_flags = ["--attr-source=" + head]
     status_text = run_git(
         repo, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
-        + [diff_base, head]
+        + [diff_base, head], global_flags=attr_flags
     ).stdout
     numstat_text = run_git(
         repo, ["diff", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
-        + [diff_base, head]
+        + [diff_base, head], global_flags=attr_flags
     ).stdout
     commit_log = run_git(
         repo, ["log", "--oneline", "--reverse", "%s..%s" % (diff_base, head)]
@@ -901,12 +1028,12 @@ def fetch_change(repo, diff_base, head):
     full_diff = run_git(
         repo,
         ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-W"]
-        + DIFF_FLAGS + [diff_base, head],
+        + DIFF_FLAGS + [diff_base, head], global_flags=attr_flags
     ).stdout
     precise_diff = run_git(
         repo,
         ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-U0"]
-        + DIFF_FLAGS + [diff_base, head],
+        + DIFF_FLAGS + [diff_base, head], global_flags=attr_flags
     ).stdout
     files = parse_name_status_z(status_text)
     stats, binary_paths = parse_numstat_z(numstat_text)
@@ -944,6 +1071,7 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
         ["diff", "--text", "--histogram", "--find-renames",
          "--find-copies", "--find-copies-harder", context_flag] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
+        global_flags=["--attr-source=" + head],
     )
     # The pathspec scopes this diff to the one entry, and a
     # typechange entry still emits its two sections inside it.
@@ -964,6 +1092,7 @@ def per_file_text_numstat(repo, diff_base, head, entry):
         repo,
         ["diff", "--text", "--numstat", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
+        global_flags=["--attr-source=" + head],
     )
     stats, binary_paths = parse_numstat_z(result.stdout)
     if entry["path"] in binary_paths:
@@ -1089,8 +1218,8 @@ def measure_binary_entry(repo, diff_base, head, entry, chunks, precise):
         entry["attribute_text"] = True
         receipt = {
             "path": path,
-            "reason": "marked binary by repository attributes, "
-                      "counted and shown as text",
+            "reason": "marked binary by the attributes of the "
+                      "tree under review, counted and shown as text",
             "shown_as_text": True,
         }
     return counts, receipt
@@ -1650,7 +1779,9 @@ def git_grep_lines(repo, head, term, fixed=True):
     if fixed:
         args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w",
                 "-F", "-e", term, head]
-    result = run_git(repo, args, check=False)
+    result = run_git(
+        repo, args, check=False, global_flags=["--attr-source=" + head]
+    )
     if result.returncode not in (0, 1):
         # A search that failed is not a search that found nothing.
         # Returning no hits would let the tier report an absence
@@ -1714,7 +1845,9 @@ def git_grep_bulk(repo, head, terms):
     for term in unique:
         args.extend(["-e", term])
     args.append(head)
-    result = run_git(repo, args, check=False)
+    result = run_git(
+        repo, args, check=False, global_flags=["--attr-source=" + head]
+    )
     if result.returncode not in (0, 1):
         raise GitError(
             "git grep failed with exit %d: %s"
@@ -2066,11 +2199,70 @@ def top_history_files(files, stats):
     return [e for e in ranked if e["status"] != "deleted"][:MAX_HISTORY_FILES]
 
 
+def blame_git_dir(repo):
+    """The absolute git directory of the repo, or None when unread.
+
+    The blame reader runs against the git directory directly, so
+    it needs the directory as a path of its own rather than as a
+    working tree spelling.
+    """
+    result = run_git(
+        repo, ["rev-parse", "--absolute-git-dir"], check=False
+    )
+    if result.returncode != 0:
+        return None
+    text = result.stdout.strip()
+    return text or None
+
+
+def run_blame(repo, git_dir, head, start, end, path):
+    """One blame reading with its attribution sources confined.
+
+    Blame applies a mailmap and an ignore revs file by default,
+    and both can sit outside the change under review. A mailmap
+    file named by clone configuration and a mailmap file standing
+    untracked in the working tree rewrite the credited author,
+    and a clone configuration ignore revs file moves the credit
+    to a different commit, all with no trace in the packet. The
+    reading therefore runs against the git directory from outside
+    the working tree, where no untracked working tree mailmap is
+    read, with the configuration mailmap file switched off, with
+    the mailmap blob pinned to the mailmap file the reviewed
+    head itself carries, which is reviewed content and stays in
+    force, and with the ignore revs list cleared by the empty
+    file name the blame flag provides for that clearing. When
+    the git directory cannot be resolved the reading falls back
+    to the ordinary wrapper with the same flag and file pins the
+    wrapper can carry.
+    """
+    args = (
+        ["blame", "--porcelain"] + DIFF_FLAGS
+        + ["--ignore-revs-file", "",
+           "-L", "%d,%d" % (start, end), head, "--", path]
+    )
+    if git_dir is None:
+        return run_git(
+            repo, args, check=False,
+            global_flags=["-c", "mailmap.file="],
+        )
+    argv = (
+        ["git", "--no-pager", "--no-replace-objects",
+         "--literal-pathspecs", "--git-dir", git_dir,
+         "--attr-source=" + head]
+        + GIT_PIN
+        + ["-c", "mailmap.file=",
+           "-c", "mailmap.blob=" + head + ":.mailmap"]
+        + args
+    )
+    return run_argv(argv, git_dir, False, "git blame")
+
+
 def blame_section(repo, head, top_files, ranges_by_file, notes):
     lines = []
     lines.append("### Blame summary for changed ranges")
     lines.append("")
     range_count = 0
+    git_dir = blame_git_dir(repo)
     for entry in top_files:
         path = entry["path"]
         ranges = ranges_by_file.get(path, [])
@@ -2082,13 +2274,7 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
                 notes.append("blame ranges capped at %d" % MAX_BLAME_RANGES)
                 break
             range_count += 1
-            result = run_git(
-                repo,
-                ["blame", "--porcelain"] + DIFF_FLAGS
-                + ["-L", "%d,%d" % (start, end),
-                   head, "--", path],
-                check=False,
-            )
+            result = run_blame(repo, git_dir, head, start, end, path)
             if result.returncode != 0:
                 continue
             pending_sha = None
@@ -2149,6 +2335,7 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
                 + ["-L", "%d,%d:%s" % (span[0], span[1], path),
                    "--format=commit %h %s", head],
                 check=False,
+                global_flags=["--attr-source=" + head],
             )
             lines.append("#### %s in %s" % (name, display_path(path)))
             lines.append("")
@@ -2437,10 +2624,11 @@ def rereview_ranges(repo, since, head):
         repo,
         ["diff", "--histogram", "--find-renames", "--find-copies", "--find-copies-harder", "-U0"]
         + DIFF_FLAGS + [since, head],
+        global_flags=["--attr-source=" + head],
     ).stdout
     status_text = run_git(
         repo, ["diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder"] + DIFF_FLAGS
-        + [since, head]
+        + [since, head], global_flags=["--attr-source=" + head]
     ).stdout
     tree_text = run_git(
         repo, ["ls-tree", "-r", "-z", "--name-only", head]
@@ -2638,9 +2826,20 @@ def build_rereview(repo, diff_base, head, since, findings,
         )
         lines.append(text)
     else:
+        # The fallback stat stands under the same pins as every
+        # other diff reading, and its widths are pinned in its
+        # argument list, because the width family has no working
+        # config form a pin list could carry on the measured git.
+        # The widths are the values
+        # git itself defaults to away from a terminal, so a clean
+        # reading is unchanged and a configured width in the
+        # checking clone cannot reshape the fallback text.
         delta = run_git(
             repo,
-            ["diff", "--stat"] + DIFF_FLAGS + ["%s...%s" % (since, head)],
+            ["diff", "--stat", "--stat-width=80",
+             "--stat-name-width=50", "--stat-graph-width=30"]
+            + DIFF_FLAGS + ["%s...%s" % (since, head)],
+            global_flags=["--attr-source=" + head],
         ).stdout
         lines.append(
             "Range diff was not available. Diff stat since the previous review:"
@@ -3565,11 +3764,18 @@ def run_pipeline(args, repo, target, argv, prepared=None):
 
 
 def _git_read(path, *args):
-    """One pinned git read against a path, or None when it fails."""
+    """One pinned git read against a path, or None when it fails.
+
+    The reader carries the same pin list and the same literal
+    pathspecs flag as every other invocation, so the written
+    claim that every invocation runs pinned holds for this
+    helper as well and not only for the main wrapper.
+    """
     try:
         result = run_process(
             ["git", "--no-pager", "--no-replace-objects",
-             "-C", str(path)] + list(args)
+             "--literal-pathspecs",
+             "-C", str(path)] + GIT_PIN + list(args)
         )
     except GitError:
         # A read that cannot run proves nothing about the path, and

@@ -15,9 +15,9 @@ A reviewer reads the change inside its enclosing function, follows the changed n
 
 ## Input modes
 
-Every run uses one of three input modes. A since ref can ride along with any mode for re-review rather than a mode of its own.
+Every run uses one of three input modes. A since ref can ride along with any mode for re-review.
 
-- Pull request mode takes a PR number and resolves the base and head with the GitHub CLI. Both refs must already live in the local clone. When either ref is missing the run stops with an error and says to fetch it, because a same named local branch is not evidence of the pull request head.
+- Pull request mode takes a PR number and resolves the base and head with the GitHub CLI. Both refs must already live in the local clone. When either is missing the run stops and says to fetch it, because a same named local branch is not evidence of the pull request head.
 - Range mode takes two refs, A..B or A...B, and extracts what the second proposes against their merge base.
 - Commit mode takes one commit and extracts that commit against its parent. A root commit extracts against the empty tree and its manifest records no merge base.
 
@@ -27,12 +27,12 @@ Extraction always runs against the local clone. The hosted API diff is never tru
 
 Follow these steps in order.
 
-1. Resolve the refs and confirm that the base, the head, and the merge base all resolve in the local clone. Stop and report the problem when a ref does not resolve.
+1. Resolve the refs and confirm the base, the head and the merge base all resolve in the local clone. Stop and report when a ref does not resolve.
 2. Choose the tiers and a budget for the size of the change, following the guidance below.
-3. Run the bundled extractor script with the chosen mode, an output directory, and the tier and budget choices from the step above.
+3. Run the bundled extractor script with the chosen mode, an output directory, and the tier and budget choices from step 2.
 4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step.
 5. Hand the packet to the review skill when verification passed. Stop and say exactly what is missing when verification failed.
-6. Record the base, the head, and the merge base from the manifest wherever the review is recorded, so the review can be reproduced later.
+6. Record the three refs from the manifest wherever the review is recorded, so it can be reproduced later.
 
 Run the commands from the repository root.
 
@@ -43,28 +43,28 @@ python3 .agents/skills/recognitio/scripts/extract.py --commit HEAD --out packet 
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
 
-When the host runs the skill in a forked subagent, the return carries only the packet directory, the verified flag, and the base, head and merge base refs. The reviewer opens the packet itself and never works from a reprinted copy.
+When the host runs the skill in a forked subagent, the return carries only the packet directory, the verified flag, and the three refs. The reviewer opens the packet itself, never a reprinted copy.
 
 ## Choosing tiers
 
 Size decides the packet shape.
 
 - A small change gets every tier and no budget. Read the whole packet.
-- A medium change gets every tier and a budget sized to the reading. The budget sheds history before companions, and the packet records what it shed.
-- A large change gets a tier selection. Run once with `--tiers 0-1` for triage and the change, then again per area with the companion and history tiers where depth is needed.
-- A change whose core tiers alone exceed the budget is too large for one packet. Split the review by directory or by module instead of raising the budget until the packet is unreadable.
+- A medium change gets every tier and a sized budget. The budget sheds history before companions and records what it shed.
+- A large change gets a tier selection. Run once with `--tiers 0-1`, then again per area with the companion and history tiers where depth is needed.
+- A change whose core tiers alone exceed the budget is too large for one packet. Split it by directory or module instead of raising the budget.
 
 ## Fanning out
 
-A packet fans out by file or by module. Each review lane takes its slice of the change tier plus the companion and history entries for the same files, and lanes never share a slice. A verifier lane re-reads the cited slices against the manifest, so a finding that rests on a line the packet does not hold is caught as a packet defect rather than shipped as a review comment.
+A packet fans out by file or by module. Each lane takes its slice of the change tier plus the matching companion and history entries, and lanes never share a slice. A verifier lane re-reads the cited slices against the manifest, so a finding resting on a line the packet does not hold is caught as a packet defect, not shipped as a review comment.
 
 ## Escalation
 
-Raise a tier when the evidence runs out. When a call site in the companion tier shows a caller the packet did not gather context for, re-run with the history tier or a wider budget and say in the gate report that the first packet was thin. When verification fails, escalation is forbidden until the failure is explained. A failed packet is a stop, not a smaller yes.
+Raise a tier when the evidence runs out. When a call site shows a caller the packet gathered no context for, re-run with the history tier or a wider budget and say so in the gate report. When verification fails, escalation is forbidden until the failure is explained. A failed packet is a stop, not a smaller yes.
 
 ## Stamping the gate report
 
-A review is stamped only on a verified packet. The gate report records the base, the head, and the merge base from the manifest, the exact extractor command, and the reviewed head. Run the packet check script against the packet directory when the working repo carries one. It validates the manifest against the shipped schema, recounts the recorded change from the repository, and reads the packet body against the manifest and the recount, the guard against stamping a review on stale, thin or fabricated evidence.
+A review is stamped only on a verified packet. The gate report records the base, the head, and the merge base from the manifest, the exact extractor command, and the reviewed head. Run the packet check script against the packet directory when the working repo carries one. It validates the manifest against the shipped schema, recounts the change from the repository, and reads the packet body against the manifest and the recount.
 
 ## The tier model
 
@@ -80,11 +80,13 @@ the tree. A renamed file is flagged when either its old name or its new name sta
 - T2 holds the companions. It carries call sites for the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and the test files that mention the changed modules, all found by deterministic search and capped with the caps stated in the packet. One bulk search over the tree gathers every term the tier needs, so the gathering cost stays with the size of the tree and the change rather than growing with their product. The bulk search hands each line only to the terms it word matches under the same boundary rule the per term search uses, at both ends of the term whatever characters the term begins or ends with. In the test files section one line is one piece of evidence however many terms match it, and the hits are deduped by file and line before the cap applies, so the cap and its note count distinct lines. A module that was renamed in the change is searched under its old name as well as its new one, so a test file that still mentions the module under the name it carried before the change is found and named. A companion search that fails ends the run with a failure receipt rather than reporting that nothing was found. The search is line based and pattern based, so a definition split across lines or in a language outside the five the patterns know will not be found.
 - T3 holds history. It carries a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. It checks the three most changed files against the thirty most recent pull requests, shows at most five matches, and states its window. When the CLI cannot name them, the tier says so instead of staying silent.
 
-A token budget spends itself in tier order and the accounting covers the whole packet, header and notes and re-review section included. When a packet runs over budget, T3 drops first and T2 drops second, and the packet records what was dropped and why. T0 and T1 never drop and never truncate. When T0 and T1 alone exceed the budget, the script exits with an error and no packet is presented as ready. A tier selection is a separate control. It chooses which of the companion and history tiers are gathered, and the budget can only shed tiers the selection kept. The T2 and T3 headings stand in every packet. A tier that was not gathered carries one placeholder sentence, either Not selected for this run. The change in T1 is complete. or Dropped under the token budget. The change in T1 is complete. Cap notes stand grouped under a Cap notes block in the tier they belong to.
+A token budget spends itself in tier order and the accounting covers the whole packet, header, notes and re-review included. When a packet runs over budget, T3 drops first and T2 drops second, and the packet records what was dropped and why. T0 and T1 never drop and never truncate. When T0 and T1 alone exceed the budget, the script exits with an error and no packet is presented as ready. A tier selection is a separate control over which companion and history tiers are gathered, and the budget can only shed tiers the selection kept. The T2 and T3 headings stand in every packet. A tier that was not gathered carries one placeholder sentence, either Not selected for this run. The change in T1 is complete. or Dropped under the token budget. The change in T1 is complete. Cap notes stand grouped under a Cap notes block in the tier they belong to.
 
 ## Completeness discipline
 
 A copy is labelled as a copy and a rename as a rename wherever the packet names a source, and a copy takes its instruction flag from its destination name alone. Detection runs with no rename limit and under the harder copy rule, so clone configuration cannot switch it off, a copy from an untouched source reads as a copy, and a git warning that detection was skipped fails the run.
+
+Every git reading runs under pinned settings for the algorithm, the submodule rules, the abbreviation length and the log encoding, and attributes come only from the tree under review, so clone or global configuration and the caller environment cannot reshape a packet. Blame takes no mailmap or ignored revisions from outside that tree, and a clone whose info attributes cannot be confined fails the run.
 
 The completeness check is the heart of this skill. After the packet is assembled, the script recounts the changed files, their statuses, their old paths, their hunks, and their added and deleted lines with separate git invocations and compares the recount against the manifest. Any disagreement sets the verified flag to false and the script exits nonzero with the discrepancy printed. The packet closes with a verification recount that prints the manifest counts and the recount agreement, keeps the budget figures as facts, and ends on the limit sentence.
 
@@ -104,7 +106,7 @@ When the since ref shares no history with the change, the re-review section says
 
 ## Trust and limits
 
-Extraction is local only, and nothing in this skill points at an untrusted network source. A verified packet proves the packet is complete. It does not prove the change is correct or safe. Run the packet check script before a packet is trusted, as step 4 of the workflow already orders.
+Extraction is local only, and nothing here points at an untrusted network source. A verified packet proves the packet is complete. It does not prove the change is correct or safe. Run the packet check script before a packet is trusted, as step 4 of the workflow already orders.
 
 ## The boundary
 

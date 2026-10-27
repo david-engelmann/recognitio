@@ -92,6 +92,43 @@ GIT_DRIVER_ENV_VARS = (
     "GIT_EXEC_PATH",
 )
 GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+# The same attribute source and pathspec mode scrub the extractor
+# runs under, so a recount in this script reads the reviewed tree
+# and nothing the caller environment names beside it.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
+# The same output pins the extractor carries, so the small reads
+# this script makes on its own run under the discipline its header
+# claims for every invocation and not only through the recount
+# the extractor code performs.
+GIT_PIN = [
+    "-c", "core.quotepath=false",
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "color.ui=false",
+    "-c", "color.diff=false",
+    "-c", "color.grep=false",
+    "-c", "color.status=false",
+    "-c", "grep.column=false",
+    "-c", "diff.interHunkContext=0",
+    "-c", "diff.renameLimit=0",
+    "-c", "diff.algorithm=histogram",
+    "-c", "diff.ignoreSubmodules=none",
+    "-c", "diff.submodule=short",
+    "-c", "core.abbrev=7",
+    "-c", "i18n.logOutputEncoding=UTF-8",
+    "-c", "core.attributesFile=",
+    "-c", "attr.tree=",
+]
 PROCESS_TIMEOUT_SECONDS = 120
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 SCHEMA_PATH = Path(__file__).resolve().parent / "packet-manifest.schema.json"
@@ -108,9 +145,12 @@ def scrubbed_child_env():
         for key, value in os.environ.items()
         if key not in GIT_SCRUB_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     return env
 
 
@@ -119,7 +159,8 @@ def run_git(repo, args):
     try:
         result = subprocess.run(
             ["git", "--no-pager", "--no-replace-objects",
-             "-C", str(repo)] + list(args),
+             "--literal-pathspecs",
+             "-C", str(repo)] + GIT_PIN + list(args),
             capture_output=True,
             text=True,
             env=scrubbed_child_env(),
@@ -420,6 +461,33 @@ def repo_state_problems(repo):
             "check again" % repo
         )
         return problems, True
+    common = run_git(repo, ["rev-parse", "--git-common-dir"])
+    if common is not None and common.strip():
+        common_path = Path(common.strip())
+        if not common_path.is_absolute():
+            common_path = Path(repo) / common_path
+        info_attributes = common_path / "info" / "attributes"
+        try:
+            info_text = info_attributes.read_text(
+                encoding="utf-8", errors="surrogateescape"
+            )
+        except OSError:
+            info_text = ""
+        if any(
+            line.strip() and not line.lstrip().startswith("#")
+            for line in info_text.splitlines()
+        ):
+            problems.append(
+                "the repository at %s carries attributes in %s and "
+                "those attributes sit outside the reviewed tree "
+                "while git reads them ahead of the tree attributes "
+                "themselves, so the recount cannot credit its "
+                "markings to the tree under review and the packet "
+                "cannot be stamped from this clone. Empty or "
+                "remove that file, then run the check again"
+                % (repo, info_attributes)
+            )
+            return problems, True
     git_dir_path = Path(git_dir.strip())
     if (git_dir_path / "rebase-merge").is_dir() or \
             (git_dir_path / "rebase-apply").is_dir():
