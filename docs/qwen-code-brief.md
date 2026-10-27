@@ -2,6 +2,20 @@
 
 # The Build 15 Qwen Code marketplace presence brief
 
+## At a glance
+
+**What ships**
+
+A conditional draft and nothing more, because no listing file ships in this repo and nothing in this build presents the presence as published.
+
+**What was proven**
+
+The conversion tests recorded in this brief ran against scratch installs and prove file carriage and conversion fidelity for the shapes they name.
+
+**What is unverified**
+
+The conditional publication decision stays with David, and the brief records in its own sections the routes and shapes that stay unverified rather than borrowing strength for them here.
+
 ## Summary
 
 Build 15 prepares a Qwen Code marketplace presence and stops

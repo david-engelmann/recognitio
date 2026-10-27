@@ -2,6 +2,20 @@
 
 # The Build 11 CodeRabbit guidelines build
 
+## At a glance
+
+**What ships**
+
+The CodeRabbit config at the repo root, carrying the packet discipline as derivation noted review guidelines that pair with the packet and never replace it.
+
+**What was proven**
+
+Every guideline carries a derivation note and the gate pins the notes, and the rename direction and the focus table in the brief rest on the primary sources it cites.
+
+**What is unverified**
+
+No live CodeRabbit review of a pull request stands in this brief, so behaviour on a real pull request stays unverified here.
+
 ## Summary
 
 Build 11 writes the packet discipline as review guidelines

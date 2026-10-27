@@ -5,7 +5,9 @@ review packet owes its reader, then take the headless runbook
 for how an unattended review runs, and keep the decision record
 open while you read any brief. Every brief below states one
 platform build, and the record behind every brief stands in the
-decisions file at the end of this page.
+decisions entry in the records section. The filed records at
+the end of this page list every review report and the demo
+capture record, so no document in this set stands unlisted.
 
 ## Start here
 
@@ -69,3 +71,37 @@ decisions file at the end of this page.
   design decisions that depart from the research sketch this
   project grew from, with the reason for each one and dated
   notes where later rounds amended an entry.
+
+## The filed records
+
+- [The demo capture record](images/capture-record.md) (record) states how
+  the hero recording was captured from one real Cursor agent
+  session, with its prompt, its range and its disclosed
+  shaping choice.
+- [The round 4 fix review](reviews/round4-fix-review.md) (record) closes the
+  round 4 findings, covering the renamed module search, the
+  YAML fence scope and the findings path spelling.
+- [The round 6 fix review](reviews/round6-fix-review.md) (record) closes the
+  round 6 findings, covering copied entry ranges, the strict
+  marketplace entry and the copy fence structure reading.
+- [The round 7 fix review](reviews/round7-fix-review.md) (record) closes the
+  round 7 findings, covering the manifest conflict gate, the
+  instruction file flags and the skill size guard in bytes.
+- [The round 8 fix review](reviews/round8-fix-review.md) (record) closes the
+  round 8 findings, landing the eval integrity gate with its
+  checksum record over the eval artefacts.
+- [The round 9 fix review](reviews/round9-fix-review.md) (record) closes the
+  round 9 findings, hardening the eval integrity gate and
+  completing the corpus index for round 8.
+- [The round 11 fix review](reviews/round11-fix-review.md) (record) closes the
+  round 11 findings and lands Build 1, the skill frontmatter
+  control panel.
+- [The round 12 fix review](reviews/round12-fix-review.md) (record) closes the
+  round 12 findings and lands Build 2, the canonical skill
+  location.
+- [The round 13 fix review](reviews/round13-fix-review.md) (record) closes the
+  round 13 findings and lands Build 3, the packet output
+  style.
+- [The round 14 fix review](reviews/round14-fix-review.md) (record) closes the
+  round 14 findings and lands Build 4, the headless print
+  mode CI shape.

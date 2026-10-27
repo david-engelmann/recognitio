@@ -2,6 +2,20 @@
 
 # The Build 7 mod, in process hooks for the review fan out
 
+## At a glance
+
+**What ships**
+
+The hooks module under `hooks/` with its host side tests, registering one agent.spawn hook that gates a reviewer spawn on the packet manifest verified flag.
+
+**What was proven**
+
+The module list, the spawn hook, its fail closed catch handler and the deny shape are pinned by the gate in this repo, as the deployment gate section of this brief records.
+
+**What is unverified**
+
+Live host behaviour stands unverified in this brief, and the brief itself records the limit that a catch handler which throws or times out lets the spawn proceed.
+
 ## Summary
 
 Build 7 adds an in process hook on the home platform that reads

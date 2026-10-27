@@ -2,6 +2,20 @@
 
 # The Build 17 Devin playbook and coordinator build
 
+## At a glance
+
+**What ships**
+
+The derivation noted Devin rule set in this brief, covering the Devin Review surface and the coordinator surfaces a packet workflow can trigger or must guard against.
+
+**What was proven**
+
+Every rule carries a derivation note naming its primary Devin citation or binding decision, and the gate pins the notes against silent drift.
+
+**What is unverified**
+
+No live Devin review run stands in this brief, so the rules rest on the primary sources cited here and their live effect stays unverified.
+
 ## Summary
 
 Build 17 writes the packet discipline for Devin as a playbook

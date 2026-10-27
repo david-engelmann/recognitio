@@ -2,6 +2,20 @@
 
 # The Build 12 Antigravity plugin alteration
 
+## At a glance
+
+**What ships**
+
+The Antigravity plugin tree under `.antigravity` with its manifest and its PreToolUse hook wiring, plus the second extensions namespace entry in the portable manifest.
+
+**What was proven**
+
+The wiring and the contract sentences are pinned by the gate in this repo, and the dated sunset evidence and the v0.65.0 pin rest on the primary Google pages the brief cites.
+
+**What is unverified**
+
+No Antigravity product ran in this build, so the host enforcement of the hook contract stays unverified, as the brief states in its harness limit.
+
 ## Summary
 
 Build 12 alters the plugin for Antigravity as a second

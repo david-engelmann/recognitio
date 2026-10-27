@@ -2,6 +2,20 @@
 
 # The Build 14 Kimi managed plugin
 
+## At a glance
+
+**What ships**
+
+The derivation noted Kimi managed plugin rule set in this brief, covering the manifest agents field, the hook events and the size limits.
+
+**What was proven**
+
+Every rule carries a derivation note naming its skill section or primary citation, and the gate pins the notes against silent drift.
+
+**What is unverified**
+
+No live Kimi run stands in this brief, so the rule set rests on the primary pages cited here and live plugin behaviour stays unverified.
+
 ## Summary
 
 Build 14 carries recognitio into Kimi as a managed plugin, and

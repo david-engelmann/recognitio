@@ -6,6 +6,16 @@ What a review packet owes its reader, stated as claims. Every claim on
 this page answers a failure in this project record, and the failure
 stands beside the claim that came out of it.
 
+<img alt="The failure to packet story. A hosted diff drops content in silence and the local packet counts every file." src="images/principles-packet-story.svg" width="880">
+
+The graphic above tells the first failure on this page in one
+frame. A hosted diff can drop content with no flag on the loss,
+while a packet built from the local clone must account for
+every file in the range or fail the run. The prose below it
+stays the record the graphic draws from, and the graphic
+carries its own dark ground so it reads the same on a light
+page and on a dark one.
+
 ## Build from the local clone, never from a hosted diff
 
 A hosted diff is a summary written by a service with limits of its own.

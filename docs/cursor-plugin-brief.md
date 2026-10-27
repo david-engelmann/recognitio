@@ -2,6 +2,20 @@
 
 # The Build 10 Cursor plugin
 
+## At a glance
+
+**What ships**
+
+The Cursor plugin tree under `.cursor-plugin` with the skill as a real directory copy and one rule file, plus the Bugbot rules and their repo config under `.cursor`.
+
+**What was proven**
+
+The official desktop client ran on this box and loaded the plugin with zero failures before any sign in, and live agent CLI sessions settled invocation precedence on that surface, both as recorded in this brief.
+
+**What is unverified**
+
+Marketplace installation and Bugbot behaviour on a real pull request stay unverified, and invocation precedence on the desktop client stays open, as this brief records.
+
 ## Summary
 
 Build 10 carries recognitio into Cursor as a plugin that holds

@@ -4,8 +4,8 @@
 
 This doc defines the unattended review shape the repo gates.
 A headless run reviews a packet with no human in the loop, so
-every failure mode must fail closed. The shape below is the
-Build 4 adaptation from the round 10 plan, and decision 11 of
+every failure mode must fail closed. The shape is the Build 4
+adaptation from the round 10 plan, and decision 11 of
 `docs/decisions.md` records why it is shaped this way.
 
 ## The invocation
@@ -34,7 +34,7 @@ echo $? > run.exit
 ## The findings schema
 
 The schema below is the contract the run's structured output
-must match. It is deliberately small. The run reports a
+must match, and it is deliberately small. The run reports a
 verdict and a findings list, and every finding carries a
 severity, a location, and the evidence paths it rests on.
 
@@ -65,9 +65,9 @@ severity, a location, and the evidence paths it rests on.
 Four documented limits shape the gate, and the gate treats
 each one as a failure rather than as an ambiguity.
 
-First, the exit code contract says a nonzero exit means the
-run failed. The gate fails the run on any nonzero exit and
-reads nothing further from the stream.
+First, a nonzero exit means the run failed. The gate fails
+the run on any nonzero exit and reads nothing further from
+the stream.
 
 Second, a failure inside the run prints as the result on
 stdout, so exit zero is not proof of a clean run. The gate
@@ -81,20 +81,21 @@ missing field fails the run.
 Fourth, the findings must match the schema above. Schema
 drift between the packet and the CI output fails the gate,
 because a run that cannot describe its findings in the
-agreed shape has not produced a review the pipeline can
-trust.
+agreed shape has produced no review the pipeline can trust.
 
 ## Denial detection
 
-The headless docs page documents the denial signal in its
-section on turning off permission prompts in unattended runs.
 Denials appear as `permission_denied` system messages in the
 stream, and the final result message lists them in
-`permission_denials`. The gate reads the final result message
+`permission_denials`, as the headless docs page documents in
+its section on turning off permission prompts in unattended
+runs. The gate reads the final result message
 of the stream and fails the run when that list is not empty.
 A run whose tools were denied can otherwise look clean, so
 the denial list is a load bearing input to the verdict and
-never an advisory one.
+never an advisory one. The mid stream messages are the
+secondary signal, and the final list is the authoritative
+one, because that is the list the docs name.
 
 ## Evidence must stand in the packet
 
@@ -126,13 +127,9 @@ python3 scripts/check_headless.py \
 The check cannot run a live host on the gate box, so its
 adversarial pass runs against fixtures rather than against
 real runs, and the fixtures name the exact stream shapes they
-stand in for. The `permission_denied` system messages that
-appear mid stream are the secondary signal. The gate reads
-the final result message's `permission_denials` list as the
-authoritative one, because that is the list the docs name.
-Decision 4 still binds this shape. The headless run consumes
-the packet as a reviewer, and nothing it judges replaces a
-check the shipped scripts run.
+stand in for. Decision 4 still binds this shape. The headless
+run consumes the packet as a reviewer, and nothing it judges
+replaces a check the shipped scripts run.
 
 Inside a provider session the packet is never rendered for
 the person watching the session.

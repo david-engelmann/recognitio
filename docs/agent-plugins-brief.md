@@ -2,6 +2,20 @@
 
 # The Build 8 portable package, Agent Plugins 1.0.0
 
+## At a glance
+
+**What ships**
+
+The portable package under `agent-plugins-package`, holding the closed schema manifest and a byte identical copy of the canonical skill, with no MCP file in the package.
+
+**What was proven**
+
+The package shape and the byte identical skill copy are pinned by the gate on every run, and the brief records that the package does not install natively in Claude Code on current evidence.
+
+**What is unverified**
+
+No live install of the portable package in an implementing host stands in this brief, so host behaviour beyond the documented format stays unproven here.
+
 ## Summary
 
 Build 8 packages the portable core on its own as a skills tree

@@ -2,6 +2,20 @@
 
 # The Build 13 Copilot SDK agent build
 
+## At a glance
+
+**What ships**
+
+The derivation noted Copilot rule set in this brief, written as a review advisory layer beside the canonical packet.
+
+**What was proven**
+
+Every rule carries a derivation note and the gate pins the notes, and the dated platform claims rest on the primary GitHub entries the brief cites.
+
+**What is unverified**
+
+No live Copilot review run stands in this brief, and the vendor reported ensemble figures and the client telemetry metrics stay as reported rather than proven here.
+
 ## Summary
 
 Build 13 builds a Copilot SDK agent as a review advisory layer

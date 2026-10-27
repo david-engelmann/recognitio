@@ -2,6 +2,20 @@
 
 # The Build 9 Codex review rules package
 
+## At a glance
+
+**What ships**
+
+The derivation noted Codex review rule set in this brief, written for the Codex custom review rules surface.
+
+**What was proven**
+
+Every rule carries a derivation note naming its skill section, gate or primary source, and the gate pins the notes against silent drift.
+
+**What is unverified**
+
+No live Codex review run stands in this brief, so the rules are documented guidance here and their effect in a live review stays unverified.
+
 ## Summary
 
 Build 9 writes the packet discipline as review rules for Codex,

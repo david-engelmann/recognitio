@@ -2808,10 +2808,28 @@ class TestDocsIndex(unittest.TestCase):
         "- [Principles](principles.md)"
     )
 
+    # WP4. The filed records under docs join the index, so the
+    # listing pin grows from the top level set to every Markdown
+    # document under docs. The back link pin below stays scoped
+    # to the top level set, because the filed records are dated
+    # reports that keep the heads they were filed with.
+    FILED = (
+        "images/capture-record.md",
+        "reviews/round4-fix-review.md",
+        "reviews/round6-fix-review.md",
+        "reviews/round7-fix-review.md",
+        "reviews/round8-fix-review.md",
+        "reviews/round9-fix-review.md",
+        "reviews/round11-fix-review.md",
+        "reviews/round12-fix-review.md",
+        "reviews/round13-fix-review.md",
+        "reviews/round14-fix-review.md",
+    )
+
     def test_the_index_lists_every_document_once_and_links_resolve(self):
         index = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
         targets = re.findall(r"\]\(([^)]+\.md)\)", index)
-        self.assertEqual(sorted(targets), sorted(self.DOCS))
+        self.assertEqual(sorted(targets), sorted(self.DOCS + self.FILED))
         for target in targets:
             self.assertTrue((ROOT / "docs" / target).is_file(), target)
 
@@ -2836,6 +2854,70 @@ class TestDocsIndex(unittest.TestCase):
                 text.index(anchor),
                 name,
             )
+
+
+class TestWp4Docs(unittest.TestCase):
+    """The WP4 docs depth pins.
+
+    Every platform brief opens with the same three field summary
+    card between its title and its summary section, the principles
+    page carries its failure to packet graphic with the palette
+    values and the story strings the page itself proves, and the
+    headless runbook carries its denial rule in one place only
+    after its lean pass, so a later edit cannot drop the card,
+    hollow the graphic, or redouble the runbook claim in silence.
+    """
+
+    CARD_LABELS = (
+        "**What ships**",
+        "**What was proven**",
+        "**What is unverified**",
+    )
+
+    def test_every_brief_opens_with_the_summary_card(self):
+        for name in TestDocsIndex.BRIEFS:
+            text = (ROOT / "docs" / name).read_text(encoding="utf-8")
+            self.assertIn("## At a glance", text, name)
+            positions = []
+            for label in self.CARD_LABELS:
+                self.assertEqual(text.count(label), 1, (name, label))
+                positions.append(text.index(label))
+            self.assertEqual(positions, sorted(positions), name)
+            self.assertLess(text.index("# "), text.index("## At a glance"), name)
+            self.assertLess(
+                text.index("## At a glance"), text.index("## Summary"), name
+            )
+            self.assertLess(
+                text.index("**What is unverified**"),
+                text.index("## Summary"),
+                name,
+            )
+
+    def test_the_principles_graphic_carries_the_page_story(self):
+        page = (ROOT / "docs" / "principles.md").read_text(encoding="utf-8")
+        self.assertIn("images/principles-packet-story.svg", page)
+        svg = (
+            ROOT / "docs" / "images" / "principles-packet-story.svg"
+        ).read_text(encoding="utf-8")
+        for fragment in (
+            ">The hosted diff<",
+            ">The packet from the local clone<",
+            "File counts capped by the service",
+            "Oversized patches dropped whole",
+            "An unaccounted file fails the run",
+            "No check downstream can restore a file the source "
+            "never mentioned.",
+        ):
+            self.assertEqual(svg.count(fragment), 1, fragment)
+        for value in ("#13151B", "#181B23", "#343842", "#D97757", "#4AC76A"):
+            self.assertIn(value, svg, value)
+
+    def test_the_headless_runbook_carries_the_denial_rule_once(self):
+        text = (ROOT / "docs" / "headless-review.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(text.count("the authoritative"), 1)
+        self.assertEqual(text.count("permission_denials"), 1)
 
 
 class TestDemoAssets(unittest.TestCase):

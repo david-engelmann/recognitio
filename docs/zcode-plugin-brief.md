@@ -2,6 +2,20 @@
 
 # The ZCode plugin build
 
+## At a glance
+
+**What ships**
+
+The native ZCode plugin manifest at `.zcode-plugin/plugin.json`, with the contract for the build stated as the rule set in this brief.
+
+**What was proven**
+
+The manifest and the rules are pinned by the gate in this repo, and the rules rest on the primary ZCode documentation read in the round 15 research sweep the brief cites.
+
+**What is unverified**
+
+No ZCode client is available on this box, so no live client behaviour stands proven and the brief documents the contract without enforcing it on a live client, in its own words.
+
 ## Summary
 
 Build 16 carries recognitio into ZCode as a native plugin
