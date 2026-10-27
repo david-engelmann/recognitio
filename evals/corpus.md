@@ -539,7 +539,7 @@ a watch item and stands outside this section.
 
 | Incident | Covered by |
 | --- | --- |
-| A hook event without a blocking check and a notification only sentence passed the Kimi plugin gate (R27-RT-01) | `test_each_hook_event_carries_a_blocking_check` and `test_a_notification_only_sentence_fails` in tests/test_kimi.py |
+| A hook event without a blocking check and a notification only sentence passed the Kimi plugin gate (R27-RT-01) | `test_each_hook_event_runs_an_observation_check` and `test_a_notification_only_sentence_fails` in tests/test_kimi.py |
 | A plugin wins collision sentence passed the Kimi plugin gate (R27-RT-02) | `test_the_user_agent_wins_the_collision_fixture` and `test_a_plugin_wins_sentence_fails` in tests/test_kimi.py |
 | A bare name sentence passed the Kimi plugin gate (R27-RT-03) | `test_a_bare_name_sentence_fails` and `test_a_bare_name_works_sentence_fails` in tests/test_kimi.py |
 | A server start directory sentence passed the Kimi plugin gate (R27-RT-04) | `test_a_server_start_directory_sentence_fails` and `test_a_server_start_directory_noun_sentence_fails` in tests/test_kimi.py |
@@ -559,14 +559,14 @@ one name mapping in the reconstructed report.
 
 | Incident | Covered by |
 | --- | --- |
-| A hook blocking rewording passed the Kimi plugin gate (R28-RT-01) | `test_a_replacement_hook_rewording_fails` and `test_a_failed_check_proceeds_sentence_fails` and `test_an_advisory_failure_sentence_fails` in tests/test_kimi.py |
+| A hook blocking rewording passed the Kimi plugin gate (R28-RT-01) | `test_a_replacement_hook_rewording_fails` and `test_a_blocking_check_sentence_fails` and `test_a_stops_the_turn_sentence_fails` in tests/test_kimi.py |
 | A collision precedence rewording passed the Kimi plugin gate (R28-RT-02) | `test_a_replacement_collision_rewording_fails` and `test_a_resolves_to_plugin_sentence_fails` and `test_a_plugin_precedence_sentence_fails` in tests/test_kimi.py |
 | A qualified names rewording passed the Kimi plugin gate (R28-RT-03) | `test_a_replacement_qualified_rewording_fails` in tests/test_kimi.py |
 | A server start directory rewording passed the Kimi plugin gate (R28-RT-04) | `test_a_replacement_workdir_rewording_fails` in tests/test_kimi.py |
 | Five pinned claims stood with no negative of their own (R28-RT-05) | `test_a_swapped_fixture_pair_fails` and `test_dropped_secondary_sentences_fail` and `test_a_missing_numbering_note_fails` and `test_a_honoured_fields_sentence_fails` and `test_an_immediate_source_edit_sentence_fails` and `test_a_per_project_scope_sentence_fails` in tests/test_kimi.py |
 | Derivation escapes and bare citation derivation notes passed the Kimi plugin gate (R28-RT-06 and R28-RT-07) | `test_an_unnumbered_rule_heading_fails` and `test_a_bare_paragraph_rule_fails` and `test_a_late_rule_section_fails` and `test_a_bare_kimi_citation_fails` and `test_a_bare_decision_citation_fails` in tests/test_kimi.py |
 | A gutted decision record passed the Kimi plugin gate (R28-RT-09) | `test_a_gutted_decision_record_fails` in tests/test_kimi.py |
-| Fixture contents stood unchecked and the live probe could fail open (R28-RT-10 and R28-RT-11) | `test_a_hostile_fixture_fails` and `test_an_always_blocking_fixture_fails_the_pass_probe` in tests/test_kimi.py |
+| Fixture contents stood unchecked and the live probe could fail open (R28-RT-10 and R28-RT-11) | `test_a_hostile_fixture_fails` and `test_a_blocking_fixture_fails_the_observation_probe` in tests/test_kimi.py |
 
 The extractor flagging of the Kimi plugin surfaces
 (R28-RT-08) stands in the extractor suite. Four

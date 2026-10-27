@@ -890,12 +890,19 @@ reviewer persona through `kimi -p --agent reviewer`, and the CI
 gate waits for the run to settle because print mode stays alive
 while background tasks are pending. The four hook events
 TurnStarted, UserPromptQueued, TaskStarted, and SessionHeartbeat
-are configurable under `[[hooks]]` in `config.toml`, and the
-managed plugin wires each through a blocking check of its own.
-A check that fails stops the turn it gates. That blocking
-posture is the managed plugin's own contract, recorded here,
-not a platform behavior the primaries describe. The primaries
-describe the events as observation points. Plugins install per
+are configurable under `[[hooks]]` in `config.toml`, and each
+of them is observation only on the Kimi host. A hook script on
+any of them runs fire and forget, and its return value does not
+affect the main flow. Only PreToolUse, Stop, and
+UserPromptSubmit have return values that affect the main flow,
+so no check on the four events can stop a turn. The managed
+plugin wires each of the four events through an observation
+check of its own. A correction recorded on 2026-10-27 in the
+300 round program restates the hook posture in this record and
+in the brief, because the primary Kimi hooks page read that
+day lists the four events as observation only and names only
+the three events above as ones whose return values affect the
+main flow. Plugins install per
 user and apply to all projects, and the reference layout is the
 alibaba/open-code-review package with `.kimi-plugin/plugin.json`
 beside `.claude-plugin/`. The primary plugins page names exactly

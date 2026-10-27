@@ -219,14 +219,15 @@
       "test_a_server_start_directory_sentence_fails",
       "test_an_inflated_limit_added_sentence_fails",
       "test_an_inflated_limit_fails",
-      "test_each_hook_event_carries_a_blocking_check",
+      "test_each_hook_event_runs_an_observation_check",
       "test_the_user_agent_wins_the_collision_fixture"
     ],
     "Round 28": [
       "test_a_bare_decision_citation_fails",
       "test_a_bare_kimi_citation_fails",
       "test_a_bare_paragraph_rule_fails",
-      "test_a_failed_check_proceeds_sentence_fails",
+      "test_a_blocking_check_sentence_fails",
+      "test_a_blocking_fixture_fails_the_observation_probe",
       "test_a_gutted_decision_record_fails",
       "test_a_honoured_fields_sentence_fails",
       "test_a_hostile_fixture_fails",
@@ -239,9 +240,8 @@
       "test_a_replacement_qualified_rewording_fails",
       "test_a_replacement_workdir_rewording_fails",
       "test_a_resolves_to_plugin_sentence_fails",
+      "test_a_stops_the_turn_sentence_fails",
       "test_a_swapped_fixture_pair_fails",
-      "test_an_advisory_failure_sentence_fails",
-      "test_an_always_blocking_fixture_fails_the_pass_probe",
       "test_an_immediate_source_edit_sentence_fails",
       "test_an_unnumbered_rule_heading_fails",
       "test_dropped_secondary_sentences_fail"

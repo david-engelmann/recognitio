@@ -235,7 +235,8 @@ not a gate.
   14, the Kimi managed plugin. The agents manifest field with
   auto discovery, the explicit collision precedence, the
   qualified skill names, the hook working directory in both
-  scopes, the four hook events with a blocking check on each,
+  scopes, the four hook events with their observation only
+  posture,
   the 32KB per `systemPrompt` field and 64KB total limits, the
   unsupported runtime field diagnostics, and the print mode CI
   persona under `kimi -p --agent reviewer`. Every rule carries

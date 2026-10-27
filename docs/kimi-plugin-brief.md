@@ -125,18 +125,23 @@ Derives from the primary Kimi whats new page at
 www.kimi.com/code/docs/en/kimi-code/whats-new.html, which
 announces the four events.
 
-### R6. The hook blocking check
+### R6. The hook observation rule
 
-The managed plugin wires each of the four hook events through a
-blocking check of its own. A hook check that fails stops the turn
-it gates. This blocking posture is the managed plugin's own
-contract, recorded as decision 24, not a platform behavior the
-primaries describe. The primaries describe the events as
+The four hook events are observation only on the Kimi host. A
+hook script on any of them runs fire and forget, and its return
+value does not affect the main flow. Only PreToolUse, Stop, and
+UserPromptSubmit have return values that affect the main flow,
+so no check on the four events can stop a turn. The managed
+plugin wires each of the four events through an observation
+check of its own. The primaries describe the events as
 observation points.
 
-Derives from canonical skill, Trust and limits, which fails
-closed, so a failed hook check stops the turn. Decision 4 binds
-this build like every other build.
+Derives from the primary Kimi hooks page at
+www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html,
+which states that only PreToolUse, Stop, and UserPromptSubmit
+have return values that affect the main flow and that all
+other events are observation only. Decision 4 binds this build
+like every other build.
 
 ### R7. The size limits
 
@@ -211,8 +216,9 @@ The Build 14 decision record lives at decision 24 in
 `docs/decisions.md`. It names the manifest agents field with
 auto discovery, the collision precedence, the qualified names
 rule, the hook working directory in both scopes, the four hook
-events with the managed plugin's own blocking checks, the 32KB
-per field and 64KB total limits, the unsupported field
+events with the observation only posture the primaries
+state, the 32KB per field and 64KB total limits, the
+unsupported field
 diagnostics, the print mode CI persona with the stay alive
 behavior, and the per user install scope with the reference
 layout. Decision 4 binds this build like every other build.

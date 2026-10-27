@@ -9,7 +9,7 @@ section or gate it restates or the primary citation it
 reports. This script pins that discipline without a Kimi
 host. It requires every rule in the rules section to carry a
 checkable derivation note, and it pins the stated negatives
-and limits the round 27 lanes named. The hook blocking
+and limits the round 27 lanes named. The observation only
 posture for the four hook events, the collision precedence,
 the qualified names rule, the hook working directory in
 both scopes, the 32KB per systemPrompt field and 64KB total
@@ -20,14 +20,17 @@ with a decision 4 statement are all pinned as brief
 sentences. A later edit that drops any of them fails the
 gate instead of drifting in silence.
 
-The hook blocking posture is the managed plugin's own
-contract, not a platform behavior the primaries describe.
-The live probe in main() runs the fixture blocking check
-for each of the four events in both modes and proves a
-failed check stops the turn it gates while a passing check
-lets the turn proceed.
+The four hook events are observation only on the Kimi host,
+per the primary Kimi hooks page. Only PreToolUse, Stop, and
+UserPromptSubmit have return values that affect the main
+flow, so no check on the four events can block anything.
+The live probe in main() runs the fixture observation check
+the way the host runs a hook, with the event as JSON on
+stdin and no arguments, and proves the check runs for each
+of the four events and exits 0.
 """
 
+import json
 import re
 import subprocess
 import sys
@@ -39,7 +42,7 @@ DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The Kimi rules"
 
-# The four hook events the brief wires through blocking
+# The four hook events the brief wires through observation
 # checks, per the primary whats new page.
 HOOK_EVENTS = (
     "TurnStarted",
@@ -48,7 +51,7 @@ HOOK_EVENTS = (
     "SessionHeartbeat",
 )
 
-# Fixture blocking check and the collision fixture pair are read
+# Fixture observation check and the collision fixture pair are read
 # relative to the tree root under test, so the paths below are
 # built per root inside the functions that use them.
 
@@ -112,8 +115,13 @@ PINNED = (
      "working directory set to the plugin root"),
     ("the four hook events",
      "TurnStarted, UserPromptQueued, TaskStarted, and SessionHeartbeat"),
-    ("the hook blocking check",
-     "A hook check that fails stops the turn it gates"),
+    ("the hook observation posture",
+     "The four hook events are observation only on the Kimi host"),
+    ("the blocking events list",
+     "Only PreToolUse, Stop, and UserPromptSubmit have return "
+     "values that affect the main flow"),
+    ("the no blocking consequence",
+     "no check on the four events can stop a turn"),
     ("the 32KB field limit",
      "limited to 32 KB of UTF-8 bytes"),
     ("the 64KB total limit",
@@ -175,7 +183,11 @@ DECISION_PINNED = (
     ("the unsupported fields diagnostics",
      "appear as diagnostics and are ignored"),
     ("the print mode persona", "kimi -p --agent reviewer"),
-    ("the hook blocking posture", "stops the turn it gates"),
+    ("the hook observation posture",
+     "observation only on the Kimi host"),
+    ("the blocking events list",
+     "Only PreToolUse, Stop, and UserPromptSubmit have return "
+     "values that affect the main flow"),
     ("the per user install scope",
      "install per user and apply to all projects"),
     ("the reference layout", ".kimi-plugin/plugin.json"),
@@ -286,7 +298,7 @@ NOTE_CLAIMS = {
     "R3": ("bare name",),
     "R4": ("project directory",),
     "R5": ("four events",),
-    "R6": ("fails closed",),
+    "R6": ("observation", "return values"),
     "R7": ("32 kb", "64 kb"),
     "R8": ("diagnostics",),
     "R9": ("stay alive", "reviewer persona"),
@@ -304,7 +316,7 @@ RULE_CONTENT_SENTENCES = {
     "R3": 2,
     "R4": 3,
     "R5": 2,
-    "R6": 4,
+    "R6": 5,
     "R7": 4,
     "R8": 2,
     "R9": 5,
@@ -609,127 +621,88 @@ def numbering_problems(root=None):
 
 
 def hook_problems(root=None):
-    """R27-RT-01. No sentence may treat the four hook events as
-    notification only and never blocking.
+    """No sentence may claim blocking on the four hook events.
 
-    The brief states the managed plugin's own blocking
-    posture, that a hook check that fails stops the turn it
-    gates. A planted sentence that calls the events
-    notification only or says they never block must fail the
-    gate. The regexes are intentionally strict so a later
-    edit cannot soften the posture in passing.
+    The primary Kimi hooks page lists TurnStarted,
+    UserPromptQueued, TaskStarted, and SessionHeartbeat as
+    observation only, with the blocking column empty for every
+    one of them, and states that only PreToolUse, Stop, and
+    UserPromptSubmit have return values that affect the main
+    flow. A planted sentence that wires one of the four events
+    through a blocking check, or says a hook check on them
+    stops or blocks or gates a turn, states a contract the
+    host cannot honor and must fail the gate. A sentence that
+    negates the blocking verb states the true posture and is
+    skipped. Calling the events notification only also fails,
+    because Notification is a separate event on the same page
+    and the four are observation only, not notifications.
     """
     root = ROOT if root is None else root
     clauses = _brief_clauses(root)
     if clauses is None:
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
-    # R29-RT-01 and R29-RT-12. The posture is a meaning claim,
-    # not a verb list: a failed check described as
-    # non-blocking, tolerated, ignored, resumed, carried on,
-    # or proceeding in any word order states it, and a
-    # capitalised keyword states it too, because every clause
-    # is lowercased first. A clause that negates its own
-    # continuation verb is a correct restatement and is
-    # skipped, but a failure said not to prevent, stop, block,
-    # or halt a turn is itself the forbidden posture and is
-    # never skipped.
-    failure = re.compile(
-        r"\b(failed|failing|failure|failures)\b"
-        r"|\bcheck fails\b|\bhook fails\b"
+    blocking_problem = (
+        "a kimi rule claims blocking on one of the four "
+        "observation only hook events, which the primary "
+        "hooks page denies"
     )
-    continuation = re.compile(
-        r"\b(proceeds|proceed|proceeding|continues|continue"
-        r"|continuing|resumes|resume|resuming|carries on"
-        r"|carry on|goes on|goes ahead|passes through"
-        r"|pass through|allowed through|moves on"
-        r"|moves forward|keeps going|advances|advance"
-        r"|advancing)\b"
+    stop_verb = re.compile(
+        r"\b(stops?|blocks?|halts?|prevents?|gates?)\b"
+        r"\s+(the\s+|a\s+|each\s+|every\s+)?"
+        r"(turn|session|main flow|operation)\b"
     )
+    event_names = tuple(name.lower() for name in HOOK_EVENTS)
     for clause in clauses:
         if "notification only" in clause:
             problems.append(
                 "a kimi rule calls the four hook events "
-                "notification only, which the blocking "
-                "posture forbids"
+                "notification only, which mislabels the "
+                "observation only events the primary hooks "
+                "page lists"
             )
             break
-        if re.search(r"\bnever (block|stop|halt)\b", clause):
-            if "hook" in clause or "event" in clause or failure.search(clause):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
+        if "blocking check" in clause or "blocking posture" in clause:
+            problems.append(blocking_problem)
+            break
+        subject = (
+            "hook" in clause or "check" in clause
+            or "event" in clause or "four" in clause
+            or any(name in clause for name in event_names)
+        )
+        if re.search(r"\bblockable\b", clause) and subject:
+            problems.append(blocking_problem)
+            break
+        # The word blocking itself, used of a hook, a check,
+        # or one of the four events, claims the posture
+        # however the sentence is built, unless the clause
+        # negates it or names the blocking events list the
+        # brief pins for the three other events.
+        block_word = re.search(r"\bblocking\b", clause)
+        if block_word and subject:
+            before = clause[:block_word.start()]
+            if not re.search(
+                r"\b(no|not|never|cannot|can't|non)\b", before
+            ) and "pretooluse" not in clause:
+                problems.append(blocking_problem)
                 break
-        failed = failure.search(clause)
-        if failed:
-            if re.search(
-                r"\b(does not|do not|never)\s+(prevent|stop|block|halt)\b",
-                clause,
+        match = stop_verb.search(clause)
+        if match and subject:
+            before = clause[:match.start()]
+            if not re.search(
+                r"\b(no|not|never|cannot|can't)\b", before
             ):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
+                problems.append(blocking_problem)
                 break
-            match = continuation.search(clause)
-            if match and not _neg_before(clause, match.start()):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
-                break
-            if re.search(
-                r"\b(tolerated|ignored|dismissed|overlooked"
-                r"|advisory)\b",
-                clause,
-            ):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
-                break
-        if re.search(r"\bnon[-\s]?blocking\b", clause):
-            if "hook" in clause or "check" in clause:
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
-                break
-    # R31-RT-01. Clause splitting on but strips the hook subject
-    # from a do not stop clause, and a not gated claim carries
-    # no continuation verb at all, so both shapes are judged
-    # at sentence level too. A hook or check subject paired
-    # with a do not stop verb states the forbidden posture,
-    # and a failure paired with not gated states it without
-    # any verb.
-    raw = read_text(root / "docs" / "kimi-plugin-brief.md")
-    if raw is not None:
-        for sentence in _sentences(raw):
-            if ("hook" in sentence or "check" in sentence) and re.search(
-                r"\b(does not|do not|never)\s+(stop|block|halt|prevent)\b",
-                sentence,
-            ):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
-                break
-            if failure.search(sentence) and re.search(
-                r"\bnot gated\b", sentence
-            ):
-                problems.append(
-                    "a kimi rule lets a failed hook check pass "
-                    "the turn through, which the blocking "
-                    "posture forbids"
-                )
-                break
+        if re.search(
+            r"\bturn (is|was) (gated|blocked|stopped|halted)\b",
+            clause,
+        ) and subject:
+            problems.append(blocking_problem)
+            break
+        if re.search(r"\bgated by a (hook|check)\b", clause):
+            problems.append(blocking_problem)
+            break
     return problems
 
 
@@ -2306,64 +2279,67 @@ def decision_problems(root=None):
     return problems
 
 
-def hook_turn_verdict(event, mode, root=None):
-    """The verdict a hook check returns for one event.
+def hook_observation_verdict(event, root=None):
+    """The verdict an observation check returns for one event.
 
-    Runs the fixture blocking check for the event. The check
-    prints the event it ran and exits nonzero on a failed
-    check. A nonzero exit is a blocked turn, which the Build
-    14 blocking posture pins. Returns "blocked", "proceeds",
-    or "unverified" when the check did not prove it ran the
-    requested event and no other. A script that prints every
-    event name on every invocation proves nothing about any
-    single event, so its verdict is unverified.
+    Runs the fixture observation check the way the Kimi host
+    runs a hook, with the event details as JSON on stdin and
+    no arguments. The check prints the event it ran and exits
+    0. Returns "observed" only when the run proves it read
+    the requested event from stdin and no other, and exits 0
+    as an observation hook must. Any other outcome, a nonzero
+    exit, a crash, or output naming another event, returns
+    "unverified", because a script that prints every event
+    name on every invocation proves nothing about any single
+    event.
     """
     root = ROOT if root is None else root
-    script = root / "tests" / "fixtures" / "kimi-hooks" / "blocking_check.py"
+    script = root / "tests" / "fixtures" / "kimi-hooks" / "observation_check.py"
+    payload = json.dumps({
+        "hook_event_name": event,
+        "session_id": "session_probe",
+        "client_type": "kimi_code_cli",
+        "cwd": ".",
+    })
     try:
         proc = subprocess.run(
-            [sys.executable, str(script), event, mode],
+            [sys.executable, str(script)],
+            input=payload,
             capture_output=True,
             text=True,
             timeout=60,
         )
     except (OSError, subprocess.SubprocessError):
         return "unverified"
+    if proc.returncode != 0:
+        return "unverified"
     if event not in proc.stdout:
         return "unverified"
-    # R29-RT-14. The output must prove the requested event
-    # ran and no other event did, or an echo of every event
-    # name passes the probe for an event it never checked.
     for other in HOOK_EVENTS:
         if other != event and other in proc.stdout:
             return "unverified"
-    return "blocked" if proc.returncode != 0 else "proceeds"
+    return "observed"
 
 
 def live_hook_problems(root=None):
-    """The live blocking probe over the four hook events.
+    """The live observation probe over the four hook events.
 
-    R27-RT-01 and R28-RT-11. Each event runs the fixture
-    blocking check in fail mode, and every one must report
-    a blocked turn, and in pass mode, and every one must
-    report a turn that proceeds. A fixture that always
-    blocks passes the fail probe and fails the pass probe,
-    so fail mode alone proves nothing about a passing check.
+    Each event runs the fixture observation check the way
+    the host runs it, and every one must report an observed
+    verdict. A fixture that reads its event from arguments
+    crashes under this invocation, and a fixture that exits
+    nonzero claims an effect an observation only event
+    cannot have, so both fail here.
     """
     root = ROOT if root is None else root
     problems = []
     for event in HOOK_EVENTS:
-        verdict = hook_turn_verdict(event, "fail", root)
-        if verdict != "blocked":
+        verdict = hook_observation_verdict(event, root)
+        if verdict != "observed":
             problems.append(
-                "the %s hook check did not block the turn it "
-                "gates, verdict %s" % (event, verdict)
-            )
-        verdict = hook_turn_verdict(event, "pass", root)
-        if verdict != "proceeds":
-            problems.append(
-                "the %s hook check did not let a passing check "
-                "proceed, verdict %s" % (event, verdict)
+                "the %s hook observation check did not run "
+                "as the host runs it, verdict %s"
+                % (event, verdict)
             )
     return problems
 
@@ -2413,7 +2389,7 @@ def main(root=None):
         return 1
     print(
         "check_kimi: the Build 14 Kimi managed plugin contract "
-        "holds, with live blocking and pass checks on all four "
+        "holds, with live observation checks on all four "
         "hook events"
     )
     return 0

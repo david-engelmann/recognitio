@@ -4,7 +4,7 @@ The brief at docs/kimi-plugin-brief.md records the Kimi
 managed plugin surface as primary, the agents manifest field
 with auto discovery, the explicit collision precedence, the
 qualified names rule, the hook working directory in both
-scopes, the four hook events with a blocking check on each,
+scopes, the four hook events with an observation check on each,
 the 32KB per systemPrompt field and 64KB total limits, the
 unsupported runtime field diagnostics, and the print mode CI
 persona, all with derivation notes pinned by the gate at
@@ -15,8 +15,10 @@ collision sentence, a bare name invocation sentence, a server
 start directory sentence, an inflated size limit, a dropped
 persona, a dropped derivation note, a dropped pin, and a
 decision record without a decision 4 statement each fail the
-Kimi gate, and the live hook test proves a failed check
-stops the turn it gates for each of the four events.
+Kimi gate, and the live hook test runs the fixture
+observation check the way the host runs a hook, with the
+event as JSON on stdin and no arguments, for each of the
+four events.
 """
 
 import importlib.util
@@ -112,27 +114,50 @@ class TestCheckKimi(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
-    def test_each_hook_event_carries_a_blocking_check(self):
-        # R27-RT-01. The managed plugin wires every hook event
-        # through a blocking check. A check that fails must stop
-        # the turn it gates, for each of the four events. The
-        # fixture check runs live and echoes the event it ran.
+    def test_each_hook_event_runs_an_observation_check(self):
+        # R27-RT-01, restated in the 300 round program. The
+        # managed plugin wires every hook event through an
+        # observation check, because the four events are
+        # observation only on the host. The fixture check runs
+        # live the way the host runs it, with the event as
+        # JSON on stdin and no arguments, and echoes the event
+        # it ran.
         for event in self.mod.HOOK_EVENTS:
             self.assertEqual(
-                self.mod.hook_turn_verdict(event, "fail"),
-                "blocked",
-                event,
-            )
-            self.assertEqual(
-                self.mod.hook_turn_verdict(event, "pass"),
-                "proceeds",
+                self.mod.hook_observation_verdict(event),
+                "observed",
                 event,
             )
 
+    def test_the_fixture_reads_the_event_from_stdin(self):
+        # The host sends the event as JSON on stdin and no
+        # arguments. The shipped fixture must run under that
+        # exact invocation, print the event from the payload,
+        # and exit 0. The pre fix fixture read argv and
+        # crashed with an IndexError under this invocation.
+        import json
+        import subprocess
+        import sys
+        script = (
+            ROOT / "tests" / "fixtures" / "kimi-hooks"
+            / "observation_check.py"
+        )
+        for event in self.mod.HOOK_EVENTS:
+            proc = subprocess.run(
+                [sys.executable, str(script)],
+                input=json.dumps({"hook_event_name": event}),
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(proc.returncode, 0, event)
+            self.assertIn("hook event " + event, proc.stdout)
+
     def test_a_notification_only_sentence_fails(self):
-        # R27-RT-01. The four hook events are not notification
-        # only. A later edit that says they never block must
-        # fail the gate.
+        # R27-RT-01. The four hook events are observation
+        # only, not notification only, because Notification
+        # is a separate event on the primary page. A later
+        # edit that mislabels them must fail the gate.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             problems = self.plant_sentence(
@@ -288,10 +313,13 @@ class TestCheckKimi(unittest.TestCase):
             root = self.make_layout(tmp)
             problems = self.break_brief(
                 root,
-                "Derives from canonical skill, Trust and limits, "
-                "which fails closed, so a failed hook check stops "
-                "the turn. Decision 4 binds this build like every "
-                "other build.",
+                "Derives from the primary Kimi hooks page at "
+                "www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html, "
+                "which states that only PreToolUse, Stop, and "
+                "UserPromptSubmit have return values that affect "
+                "the main flow and that all other events are "
+                "observation only. Decision 4 binds this build "
+                "like every other build.",
                 "Derives from a passing mention of Trust and limits "
                 "and nothing at all.",
             )
@@ -344,38 +372,112 @@ class TestCheckKimi(unittest.TestCase):
             )
 
 
-    def test_a_failed_check_proceeds_sentence_fails(self):
-        # R28-RT-01. The blocking posture is defeated by saying
-        # a failed check lets the turn proceed, without saying
-        # notification only or never block.
+    def test_a_blocking_check_sentence_fails(self):
+        # R28-RT-01, restated in the 300 round program. The
+        # observation only posture is defeated by wiring the
+        # four events through a blocking check, the exact
+        # claim the shipped brief once made.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             problems = self.plant_sentence(
                 root,
                 "### R7. The size limits",
-                "A failed hook check logs a warning and the "
-                "turn proceeds.",
+                "The four hook events each carry a blocking "
+                "check of their own.",
             )
             self.assertTrue(
-                any("failed hook check" in p for p in problems),
+                any("claims blocking" in p for p in problems),
                 problems,
             )
 
-    def test_an_advisory_failure_sentence_fails(self):
-        # R28-RT-01. The second rewording plant, where hook
-        # failures are called advisory and never stop a turn.
+    def test_a_stops_the_turn_sentence_fails(self):
+        # R28-RT-01, restated in the 300 round program. The
+        # second rewording plant, where a failed hook check
+        # is said to stop the turn it gates, the exact
+        # sentence the shipped brief once carried.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             problems = self.plant_sentence(
                 root,
                 "### R7. The size limits",
-                "Hook failures are advisory and never stop a "
-                "turn.",
+                "A hook check that fails stops the turn it "
+                "gates.",
             )
             self.assertTrue(
-                any("failed hook check" in p for p in problems),
+                any("claims blocking" in p for p in problems),
                 problems,
             )
+
+    def test_a_dropped_observation_pin_fails(self):
+        # The gate pins the observation only sentence and
+        # the blocking events list, so a later edit that
+        # drops either states no posture at all and must
+        # fail instead of drifting in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "The four hook events are observation only "
+                "on the Kimi host.",
+                "The four hook events are listed somewhere.",
+            )
+            self.assertTrue(
+                any("hook observation posture" in p
+                    for p in problems),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "Only PreToolUse, Stop, and UserPromptSubmit "
+                "have return values that affect the main "
+                "flow, so no check on the four events can "
+                "stop a turn.",
+                "Some events have return values.",
+            )
+            self.assertTrue(
+                any("blocking events list" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_correct_observation_restatement_passes(self):
+        # A sentence that states the true posture in
+        # negative form, that a hook check on the four
+        # events does not stop the turn, is a restatement
+        # and must not fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.plant_intro(
+                root,
+                "A hook check on the four events does not "
+                "stop the turn.",
+            )
+            self.assertEqual(problems, [])
+
+    def test_redteam_blocking_claim_shapes_fail(self):
+        # Red team shapes from the 300 round fix lane. Each
+        # plant claims blocking for one of the four events
+        # in a shape the shipped claim never used, naming an
+        # event as the subject, a gates verb, the blockable
+        # adjective, or the blocking noun, and every one
+        # must fail the gate.
+        plants = (
+            "TurnStarted blocks the turn when its check fails.",
+            "UserPromptQueued can block a turn.",
+            "A hook on SessionHeartbeat gates the session.",
+            "The four events are blockable.",
+            "Blocking is what the four hooks do.",
+        )
+        for plant in plants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                problems = self.plant_intro(root, plant)
+                self.assertTrue(
+                    any("claims blocking" in p for p in problems),
+                    (plant, problems),
+                )
 
     def test_a_resolves_to_plugin_sentence_fails(self):
         # R28-RT-02. The precedence is defeated by saying the
@@ -686,30 +788,49 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
-    def test_an_always_blocking_fixture_fails_the_pass_probe(self):
-        # R28-RT-11. A fixture that always blocks passes the
-        # fail only live probe as landed, so the script must
-        # run pass mode too.
+    def test_a_blocking_fixture_fails_the_observation_probe(self):
+        # R28-RT-11, restated in the 300 round program. A
+        # fixture that exits 2 claims the intentional block
+        # code on an event that cannot block, and a fixture
+        # that reads argv crashes under the host invocation,
+        # so both shapes must fail the observation probe.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             script = (
                 root / "tests" / "fixtures" / "kimi-hooks"
-                / "blocking_check.py"
+                / "observation_check.py"
+            )
+            script.write_text(
+                "import sys\n"
+                "print('hook event TurnStarted')\n"
+                "sys.exit(2)\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                self.mod.hook_observation_verdict(
+                    "TurnStarted", root),
+                "unverified",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("verdict unverified" in p for p in problems),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            script = (
+                root / "tests" / "fixtures" / "kimi-hooks"
+                / "observation_check.py"
             )
             script.write_text(
                 "import sys\n"
                 "print('hook event ' + sys.argv[1])\n"
-                "sys.exit(1)\n",
+                "sys.exit(1 if sys.argv[2] == 'fail' else 0)\n",
                 encoding="utf-8",
-            )
-            self.assertEqual(
-                self.mod.hook_turn_verdict(
-                    "TurnStarted", "pass", root),
-                "blocked",
             )
             problems = self.mod.live_hook_problems(root)
             self.assertTrue(
-                any("passing check" in p for p in problems),
+                any("verdict unverified" in p for p in problems),
                 problems,
             )
 
@@ -1077,7 +1198,7 @@ class TestCheckKimi(unittest.TestCase):
             root = self.make_layout(tmp)
             script = (
                 root / "tests" / "fixtures" / "kimi-hooks"
-                / "blocking_check.py"
+                / "observation_check.py"
             )
             script.write_text(
                 "import sys\n"
@@ -1085,7 +1206,7 @@ class TestCheckKimi(unittest.TestCase):
                 "\"UserPromptQueued\", \"TaskStarted\", "
                 "\"SessionHeartbeat\"):\n"
                 "    print('hook event ' + event)\n"
-                "sys.exit(1 if sys.argv[2] == 'fail' else 0)\n",
+                "sys.exit(0)\n",
                 encoding="utf-8",
             )
             problems = self.problems(root)
@@ -1102,17 +1223,17 @@ class TestCheckKimi(unittest.TestCase):
             root = self.make_layout(tmp)
             script = (
                 root / "tests" / "fixtures" / "kimi-hooks"
-                / "blocking_check.py"
+                / "observation_check.py"
             )
             script.write_text(
                 "import sys\n"
                 "print('hook event ' + sys.argv[1])\n"
-                "sys.exit(1)\n",
+                "sys.exit(0)\n",
                 encoding="utf-8",
             )
             problems = self.mod.kimi_problems(root)
             self.assertTrue(
-                any("passing check" in p for p in problems),
+                any("verdict unverified" in p for p in problems),
                 problems,
             )
 
@@ -1123,12 +1244,12 @@ class TestCheckKimi(unittest.TestCase):
         # in R6, keeping every pin sentence untouched, and
         # must still fail the gate.
         cases = (
-            ("The session advances despite a failed hook check.",
-             "blocking posture"),
-            ("The turn is not gated by a hook failure.",
-             "blocking posture"),
-            ("Hook checks observe the turn but do not stop it.",
-             "blocking posture"),
+            ("A failed hook check stops the session.",
+             "claims blocking"),
+            ("The turn is gated by a hook failure.",
+             "claims blocking"),
+            ("Hook checks stop the turn they observe.",
+             "claims blocking"),
         )
         for plant, needle in cases:
             with tempfile.TemporaryDirectory() as tmp:

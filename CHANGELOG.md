@@ -372,13 +372,13 @@ This unreleased work carries version 1.3.0.
   the collision precedence is explicit, plugin skills are invoked
   under their qualified names, hooks run in the session project
   directory in the global scope and at the plugin root in the
-  plugin scope, the four hook events each carry a blocking check,
+  plugin scope, the four hook events are observation only,
   the limits are 32KB per `systemPrompt` field and 64KB total,
   unsupported runtime fields appear as diagnostics, and print
   mode CI runs under the reviewer persona. The gate at
   `scripts/check_kimi.py` pins every rule's derivation note and
   the six adversarial pins the round 27 red team proved, with a
-  live blocking test over the four hook events. Decision 24
+  live observation test over the four hook events. Decision 24
   records the build.
 - The Build 14 gate is hardened in round 28. Its negative checks
   now forbid each pinned claim in any phrasing, not only in the
@@ -1435,3 +1435,19 @@ This unreleased work carries version 1.3.0.
   unverified. A new gate pins the
   extension, the marketplace, and the skill folder file
   against the primary OpenAI documentation.
+- The Build 14 Kimi hook contract is restated to the
+  observation only truth the primary Kimi hooks page
+  states. The four hook events TurnStarted, UserPromptQueued,
+  TaskStarted and SessionHeartbeat carry the blocking column
+  empty on that page, and only PreToolUse, Stop and
+  UserPromptSubmit have return values that affect the main
+  flow, so the brief and decision 24 no longer claim a
+  blocking check on the four events and the gate no longer
+  certifies one. The gate now pins the observation only
+  posture and the blocking events list, forbids a blocking
+  claim on the four events, and runs its live probe the way
+  the host runs a hook. The fixture observation check reads
+  the event from JSON on stdin with no arguments and exits
+  0, where the shipped fixture read the event from argv and
+  exited 1 in its fail mode, a code the host reads as a
+  script error that defaults to allow.
