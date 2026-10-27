@@ -1356,3 +1356,19 @@ This unreleased work carries version 1.3.0.
   under the runner discovery patterns stand under the guard.
   The success line now names the limits recorded in the
   guard docstring instead of claiming more than it proves.
+- The discovery fields each manifest schema allows, filled on
+  the Claude and Cursor surfaces. The Claude manifest carries
+  a display name and a homepage and a repository and a keyword
+  set, its marketplace entry carries the category and the
+  search tags its schema names there, and the Cursor manifest
+  carries the same display name and homepage and repository
+  and keyword set beside its own category and tags. A new
+  discovery gate pins every value and the agreement of the
+  two surfaces.
+- Session screenshots for the packet output style and the
+  reviewer persona. Two real Cursor agent sessions over the
+  docs depth range were recorded under the capture discipline
+  of the demo record, and stills from them stand in the
+  packet output style section of the README and in the
+  reviewer persona brief, with the full record filed beside
+  the demo capture record.

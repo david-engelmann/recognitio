@@ -61,6 +61,20 @@ documenting usage. A multi plugin repo uses
 `.cursor-plugin/marketplace.json` at the repo root, and the whole
 marketplace manifest must stay at or under 10 MB.
 
+The manifest also carries the discovery fields the primary
+manifest schema names, read on 2026-10-26 in the schema the
+Cursor project ships for this manifest. That schema gives
+displayName as the human readable display name, homepage and
+repository as URIs, keywords for discovery and search,
+category for marketplace classification, and tags for
+filtering and discovery. The plugin sets displayName to
+Recognitio and homepage and repository to the repository
+page, and it sets the keyword set and the category and the
+tag set the discovery gate pins. The marketplace entry
+schema names no discovery field, so the listing entry
+carries none and every discovery field lives in the manifest
+itself.
+
 This plugin ships the manifest, the README, the skill as a real
 directory copy under `skills/recognitio/`, and one rule file
 under `rules/`. It ships no agents, no commands, no MCP servers,

@@ -46,7 +46,8 @@ check at `scripts/check_version.py`, the copy bar scan at
 build check at `scripts/check_devin.py`, the Qwen Code
 marketplace presence build check at `scripts/check_qwen.py`,
 the brand asset check at `scripts/check_brand.py`,
-the test vacuity guard at
+the discovery metadata check at
+`scripts/check_discovery.py`, the test vacuity guard at
 `scripts/check_test_vacuity.py`, and an end to end extractor smoke that must
 produce a verified manifest. The fan-out validator reads the shipped
 proof run at `workflows/proof-run/run-record.json` against the

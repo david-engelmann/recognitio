@@ -542,6 +542,67 @@ class TestCheckCursor(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_discovery_field_fails(self):
+        # Top 20 item 16. The discovery fields the primary
+        # manifest schema names join the manifest as pinned
+        # values, so dropping any one of them fails.
+        for field in (
+            "displayName", "homepage", "repository", "keywords",
+            "category", "tags",
+        ):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                del data[field]
+                self.write_manifest(root, data)
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(field in p for p in problems),
+                    (field, problems),
+                )
+
+    def test_a_changed_discovery_value_fails(self):
+        # A drifted display name or a keyword set that lost
+        # a term no longer matches the pinned values.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["displayName"] = "Recognitio Review"
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("displayName" in p for p in problems),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["keywords"] = data["keywords"][:-1]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("keywords" in p for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_discovery_brief_pin_fails(self):
+        # The brief states the discovery contract, and the
+        # gate pins the sentences so a later edit cannot
+        # quietly drop them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            text = text.replace(
+                "The manifest also carries the discovery fields",
+                "The manifest also carries the listing fields",
+            )
+            self.write_brief(root, text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("discovery fields" in p for p in problems),
+                problems,
+            )
+
     def test_a_dropped_security_review_pin_fails(self):
         # R31-EX-03. The Build 10 brief pins the Security
         # Review separation, scope, team rules, draft skip,

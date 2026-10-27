@@ -86,7 +86,28 @@ COMPONENT_KEYS = ("skills", "rules", "agents", "commands")
 MANIFEST_KEYS = (
     "name", "version", "description", "license", "author",
     "skills", "rules", "agents", "commands", "variables", "logo",
+    "displayName", "homepage", "repository", "keywords",
+    "category", "tags",
 )
+
+# The discovery field values the primary manifest schema
+# names and the top 20 program filled. The discovery gate
+# at scripts/check_discovery.py pins the agreement of these
+# values with the Claude surfaces.
+DISCOVERY_FIELDS = {
+    "displayName": "Recognitio",
+    "homepage": "https://github.com/david-engelmann/recognitio",
+    "repository": "https://github.com/david-engelmann/recognitio",
+    "category": "developer-tools",
+    "keywords": [
+        "agent-skills", "code-review", "diff", "git",
+        "pull-request", "review-packet",
+    ],
+    "tags": [
+        "agent-skills", "code-review", "diff", "git",
+        "pull-request", "review-packet",
+    ],
+}
 
 # The only repo bugbot.yaml fields the primary docs name. An
 # unknown field falls back silently down the precedence order,
@@ -169,6 +190,12 @@ PINNED = (
      "never declare `${CURSOR_PLUGIN_ROOT}` there"),
     ("the mcp omission",
      "The plugin carries no `mcp.json`"),
+    ("the discovery fields",
+     "The manifest also carries the discovery fields the "
+     "primary manifest schema names"),
+    ("the discovery values",
+     "The plugin sets displayName to Recognitio and homepage "
+     "and repository to the repository page"),
     ("the canvases mention",
      "Hex Canvas and Atlassian Canvas"),
     ("the duplicate skill guidance",
@@ -503,6 +530,13 @@ def manifest_problems(root=None):
         problems.append(
             ".cursor-plugin/plugin.json carries no description"
         )
+    for field, expected in DISCOVERY_FIELDS.items():
+        if data.get(field) != expected:
+            problems.append(
+                ".cursor-plugin/plugin.json carries %s %r and "
+                "the pinned discovery value is %r"
+                % (field, data.get(field), expected)
+            )
     plugin_dir = root / ".cursor-plugin"
     for key in COMPONENT_KEYS:
         entries = data.get(key, [])

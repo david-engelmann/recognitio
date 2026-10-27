@@ -3032,8 +3032,12 @@ class TestDemoAssets(unittest.TestCase):
     def test_every_readme_image_reference_resolves(self):
         # The page names the poster still as a link inside
         # the demo lead in and embeds the recording itself,
-        # and every reference it carries resolves. No retired
-        # asset name may return to the page.
+        # and every reference it carries resolves. The top 20
+        # program added the session stills of item 18 and the
+        # link to their capture record, and the list below is
+        # the page order the two finds return, links first
+        # and then embeds. No retired asset name may return
+        # to the page.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
         refs += re.findall(
@@ -3043,9 +3047,13 @@ class TestDemoAssets(unittest.TestCase):
             refs,
             [
                 "docs/images/recognitio-cursor-agent-poster.png",
+                "docs/images/capture-record.md",
                 "docs/images/recognitio-cursor-agent-verified-crop.png",
                 "docs/images/recognitio-cursor-agent-demo.gif",
                 "docs/images/eval-chart.svg",
+                "docs/images/recognitio-session-style-tiers.png",
+                "docs/images/recognitio-session-style-change.png",
+                "docs/images/recognitio-session-style-recount.png",
             ],
         )
         for ref in refs:
@@ -3118,6 +3126,120 @@ def _png_pixels_any(path):
     return width, height, rows
 
 
+class TestWp5SessionScreenshots(unittest.TestCase):
+    """Top 20 item 18, the session screenshot sets.
+
+    Two real Cursor agent sessions over the docs depth range
+    stand behind the six stills, one for the packet output
+    style and one for the reviewer persona, with the record
+    filed in the demo capture record. The pins hold the
+    geometry and the hashes and the byte sizes of every
+    still, the references from the README output style
+    section and the persona brief, the alt text guideline
+    the WP1 pass set, and the capture record naming every
+    file it stands behind.
+    """
+
+    IMAGES = ROOT / "docs" / "images"
+    STYLE = (
+        "recognitio-session-style-tiers.png",
+        "recognitio-session-style-change.png",
+        "recognitio-session-style-recount.png",
+    )
+    PERSONA = (
+        "recognitio-session-persona-opening.png",
+        "recognitio-session-persona-packet.png",
+        "recognitio-session-persona-refusal.png",
+    )
+    SIZES = {
+        "recognitio-session-style-tiers.png": 18961,
+        "recognitio-session-style-change.png": 29843,
+        "recognitio-session-style-recount.png": 22297,
+        "recognitio-session-persona-opening.png": 19044,
+        "recognitio-session-persona-packet.png": 25698,
+        "recognitio-session-persona-refusal.png": 22382,
+    }
+    SHA256 = {
+        "recognitio-session-style-tiers.png":
+            "9b224525bdd468d080cfed9914280708d47ad87afa0a15d2900dc08"
+            "ce4b4af60",
+        "recognitio-session-style-change.png":
+            "acada0103b69bfd5148ce3f154a1ef99c0cb7498bf3aadac8f815972"
+            "76d1b9ca",
+        "recognitio-session-style-recount.png":
+            "f1732118c3742a3e9f6420379a89d203afbba215ecfa348386c1a1564"
+            "e7322c3",
+        "recognitio-session-persona-opening.png":
+            "e503ce3e1ba7aef511bf49625781c276927dc97e11c8ee3003d65747d"
+            "52653b0",
+        "recognitio-session-persona-packet.png":
+            "81e08d6ae224777498423260dd171d1f69b75bc51eeb46d316ca55af"
+            "49a92b49",
+        "recognitio-session-persona-refusal.png":
+            "944b1f59392108d6954b8e85d1d4d0ed944c455a4980097b28844567"
+            "f88cccc1",
+    }
+
+    def test_the_stills_exist_at_the_pinned_geometry(self):
+        for name in self.STYLE + self.PERSONA:
+            path = self.IMAGES / name
+            self.assertTrue(path.is_file(), name)
+            raw = path.read_bytes()
+            self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n", name)
+            width, height = struct.unpack(">II", raw[16:24])
+            self.assertEqual((width, height), (792, 570), name)
+
+    def test_the_still_sizes_and_hashes_are_pinned(self):
+        for name, size in self.SIZES.items():
+            path = self.IMAGES / name
+            self.assertEqual(path.stat().st_size, size, name)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertEqual(digest, self.SHA256[name], name)
+
+    def test_the_docs_reference_their_sets(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        style_section = readme.split(
+            "### The packet output style", 1
+        )[1].split("### The reviewer persona", 1)[0]
+        for name in self.STYLE:
+            self.assertIn("docs/images/" + name, style_section)
+        persona = (
+            ROOT / "docs" / "reviewer-persona.md"
+        ).read_text(encoding="utf-8")
+        session_section = persona.split(
+            "## The persona in a session", 1
+        )[1].split("## Limits", 1)[0]
+        for name in self.PERSONA:
+            self.assertIn("images/" + name, session_section)
+
+    def test_the_alt_texts_meet_the_guideline(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        persona = (
+            ROOT / "docs" / "reviewer-persona.md"
+        ).read_text(encoding="utf-8")
+        for name in self.STYLE:
+            match = re.search(
+                r'<img alt="([^"]+)" src="docs/images/%s"' % name,
+                readme,
+            )
+            self.assertIsNotNone(match, name)
+            self.assertLessEqual(len(match.group(1)), 125, name)
+        for name in self.PERSONA:
+            match = re.search(
+                r'<img alt="([^"]+)" src="images/%s"' % name,
+                persona,
+            )
+            self.assertIsNotNone(match, name)
+            self.assertLessEqual(len(match.group(1)), 125, name)
+
+    def test_the_capture_record_names_every_still(self):
+        record = (
+            self.IMAGES / "capture-record.md"
+        ).read_text(encoding="utf-8")
+        for name in self.STYLE + self.PERSONA:
+            self.assertIn(name, record)
+
+
 class TestBrandAssets(unittest.TestCase):
     """The visual round 8 brand asset gate.
 
@@ -3177,7 +3299,13 @@ class TestBrandAssets(unittest.TestCase):
     # which moves the total to 674,434 in the open. The
     # ceiling does not move, because 700,000 still holds
     # the new ledger with 25,566 of headroom over it.
-    PAGE_CEILING = 700000
+    # WP5 adds the three output style session stills at
+    # 18,961 plus 29,843 plus 22,297, which moves the total
+    # to 745,535 in the open. The ceiling moves to 750,000
+    # to hold the new ledger with 4,465 of headroom over
+    # it, because the work order screenshot item puts real
+    # session stills on the page the ceiling guards.
+    PAGE_CEILING = 750000
 
     def test_the_brand_files_exist(self):
         for name in list(self.SHA256) + ["palette.json", "build_brand.py"]:
@@ -3345,7 +3473,7 @@ class TestBrandAssets(unittest.TestCase):
         unique = list(dict.fromkeys(refs))
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 674434)
+        self.assertEqual(total, 745535)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

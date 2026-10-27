@@ -71,6 +71,34 @@ the description only. The gate pins every field above by
 shape and fails any other field, so a persona can arrive or
 widen only through a gate failure.
 
+## The persona in a session
+
+The three frames below come from one real Cursor agent
+session that was asked to run as this persona. The session
+read the agent file first, built the packet for the range
+from `682a6e9` to `e2802176` with the skill, ran the packet
+check, and reported what the packet holds. A follow up then
+asked whether the change is good and whether it should
+merge, and the session refused the judgement in the
+persona's own terms and named the review skill downstream
+as its owner. The capture record filed at
+[the demo capture record](images/capture-record.md) states
+the session and its prompts and its subject in full.
+
+The persona is a Claude Code plugin agent, and no Claude
+Code session runs on the box these frames were captured on.
+The session therefore ran on the Cursor agent surface with
+the persona text read from the shipped agent file, and the
+frames show the persona's words at work in a session and
+claim nothing about the Claude Code host behaviour the
+sections above describe.
+
+<img alt="A Cursor agent session opens under the reviewer persona instruction and reads the shipped agent file first." src="images/recognitio-session-persona-opening.png" width="792">
+
+<img alt="The session reports what the packet holds, closing on the history tier and the verification recount." src="images/recognitio-session-persona-packet.png" width="792">
+
+<img alt="Asked whether the change should merge, the session refuses the judgement and names the review skill downstream." src="images/recognitio-session-persona-refusal.png" width="792">
+
 ## Limits
 
 The persona enforces nothing. Decision 4 binds this build

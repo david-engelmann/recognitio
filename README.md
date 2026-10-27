@@ -181,7 +181,7 @@ Before any route, know what installing means. Every route needs Python 3.10 or n
 
 ### Claude Code plugin
 
-The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting. The manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, and the marketplace entry carries no icon field.
+The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting. The manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, and the marketplace entry carries no icon field. The manifest carries the discovery fields its schema names, a display name and a homepage and a repository and a keyword set, and the entry carries the category and the search tags its schema names there, with every value pinned by the discovery gate.
 
 ```bash
 /plugin marketplace add david-engelmann/recognitio
@@ -190,7 +190,7 @@ The plugin route comes first. Register this repo as a marketplace in Claude Code
 
 ### Cursor
 
-The Cursor route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg`, and the brand assets and their builder and palette record live under `docs/brand/`. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
+The Cursor route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg`, and the brand assets and their builder and palette record live under `docs/brand/`. The Cursor manifest carries the discovery fields its schema names beside the logo, a display name and a homepage and a repository and keywords and a category and tags, and its marketplace entry schema names no discovery field, so the fields live in the manifest. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
 
 ```bash
 cp -r .cursor-plugin \
@@ -269,9 +269,17 @@ skills/recognitio \
 
 The plugin ships an output style that shapes the review packet as the tiered section document the extractor writes. It sets `force-for-plugin`, so it applies to every response in the session while the plugin is enabled, overrides the style chosen in your own settings, and reaches the main conversation and the forked extraction run, not other subagents. When another enabled plugin forces its own style and loads first, that style wins and the review falls back to the prose packet, which enforces every guarantee unchanged. The style is a format only. Every enforcement claim stays on the shipped scripts and the skill workflow.
 
+The three frames below come from one real Cursor agent session that read the style file first and then presented the packet it built for the range from `682a6e9` to `e2802176` in the section order the style defines. The first opens the presentation on the verified packet, the second stands inside the change tier, and the third closes on the verification recount. The capture record filed at [the demo capture record](docs/images/capture-record.md) states the session and its prompt and its subject in full.
+
+<img alt="A Cursor agent session opens the packet presentation with the range header, the verified line and the T0 heading." src="docs/images/recognitio-session-style-tiers.png" width="792">
+
+<img alt="Inside the change tier of the session presentation, one summary per changed file." src="docs/images/recognitio-session-style-change.png" width="792">
+
+<img alt="The session closes the presentation with the verification recount and the limit sentence." src="docs/images/recognitio-session-style-recount.png" width="792">
+
 ### The reviewer persona
 
-The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use, and a user's own `agent` setting overrides the plugin default. The brief at [the reviewer persona brief](docs/reviewer-persona.md) states the host rules and the persona bounds in full.
+The plugin ships a reviewer persona as a plugin agent. The agent file lives at `agents/reviewer.md`, the manifest declares it under the `agents` key, and the manifest `settings` key names it as the session agent, so the host runs the reviewer as the session's main thread. The persona changes how the session speaks and works, not which tools it may use, and a user's own `agent` setting overrides the plugin default. The brief at [the reviewer persona brief](docs/reviewer-persona.md) states the host rules and the persona bounds in full, and it carries stills from a real session run under the persona.
 
 ## Platform adaptations
 
