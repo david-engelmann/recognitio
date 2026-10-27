@@ -1171,3 +1171,30 @@ The prepared 17 topics list survives in the changelog
 entry that records this retirement, and decision 7
 keeps the tag rule standing as the governing process
 text in the meantime.
+
+## 31. The marketplace listing carries the mod as its own entry
+
+Recorded on 2026-10-27 in the marketplace polish pass.
+The Claude marketplace listing carried one entry from
+the round 6 pass on, and the gates pinned the count at
+one, because a second entry naming the same skill under
+another name is the identity family in its purest form.
+The polish pass adds a second entry that names no skill
+at all. The recognitio-mod entry installs the Build 7
+spawn gate on its own, sourced from the plugin folder at
+`plugins/recognitio-mod/`, whose manifest is its whole
+definition and whose hooks files are byte identical
+copies of the module under `hooks/`, pinned by the mod
+gate. The discovery gate now pins the entry set by name,
+and the mod entry by its source, in place of the bare
+count, which states the property the count guarded,
+that no entry may rename the skill plugin or stand in
+for it, and only the recognitio entry names components.
+Each entry carries the tags of its own manifest keyword
+set, so the mod is found under its own terms and never
+under the skill terms of a plugin it does not ship. The
+recognitio entry source and the strict values of both
+entries stand pinned in the submissions gate and the
+gate script suite. A setup installs one entry or the
+other and never both, because the recognitio plugin
+already includes the mod.

@@ -139,7 +139,10 @@ not a gate.
   corpus index and their recorded results.
 - `.claude-plugin/` holds the plugin manifest at
   `.claude-plugin/plugin.json` and the marketplace listing at
-  `.claude-plugin/marketplace.json` for the skill.
+  `.claude-plugin/marketplace.json`. The listing carries two
+  entries, the recognitio plugin at the repo root and the
+  recognitio-mod plugin under `plugins/`, each with its own
+  manifest as its definition under strict mode.
 - `agents/` holds the plugin agent files. The reviewer persona
   lives at `agents/reviewer.md`, declared under the `agents`
   key of the plugin manifest and named as the session agent
@@ -164,6 +167,17 @@ not a gate.
   `docs/mod-build7.md`. The mod is a home platform
   extension beside the portable core, not a change to the
   canonical skill text.
+- `plugins/recognitio-mod/` holds the recognitio-mod plugin,
+  the Build 7 mod packaged as its own entry in the Claude
+  marketplace listing for a setup that wants the spawn gate
+  without the skill bundle. Its manifest stands at
+  `plugins/recognitio-mod/.claude-plugin/plugin.json`, its
+  README stands in the folder, and its hooks folder carries
+  byte identical copies of every file under `hooks/` beside
+  a byte identical copy of the root LICENSE, pinned by the
+  gate at `scripts/check_mod.py`. The entry and the discovery fields
+  of both Claude manifests are pinned by the gate at
+  `scripts/check_discovery.py`.
 - `agent-plugins-package/` holds the Build 8 portable package,
   the closed schema manifest at
   `agent-plugins-package/plugin.json` and the skills tree at

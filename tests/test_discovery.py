@@ -9,6 +9,10 @@ category or tags key on the Claude manifest where its schema
 names none, a directory listing field or a duplicated
 display field on the marketplace entry, and a Cursor value
 that disagrees with the Claude surface each fail the gate.
+The marketplace polish pass added the recognitio-mod entry
+and its manifest to the pinned surfaces, and the entry set
+itself is pinned by name, so a dropped, renamed or added
+entry fails beside the field pins.
 """
 
 import importlib.util
@@ -23,12 +27,14 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = (
     ".claude-plugin/plugin.json",
     ".claude-plugin/marketplace.json",
+    "plugins/recognitio-mod/.claude-plugin/plugin.json",
     ".cursor-plugin/plugin.json",
     ".cursor-plugin/marketplace.json",
 )
 
 CLAUDE_PLUGIN = ".claude-plugin/plugin.json"
 CLAUDE_MARKET = ".claude-plugin/marketplace.json"
+MOD_PLUGIN = "plugins/recognitio-mod/.claude-plugin/plugin.json"
 CURSOR_PLUGIN = ".cursor-plugin/plugin.json"
 CURSOR_MARKET = ".cursor-plugin/marketplace.json"
 
@@ -176,7 +182,10 @@ class TestCheckDiscovery(unittest.TestCase):
         self.assertTrue(
             any("keywords" in p for p in problems), problems)
 
-    def test_a_second_claude_entry_fails(self):
+    def test_an_unlisted_claude_entry_fails(self):
+        # The entry set is pinned by name, so a third entry
+        # fails even when it copies a listed one, and the
+        # skill plugin can never stand under a second name.
         def change(d):
             extra = dict(d["plugins"][0])
             extra["name"] = "recognitio-copy"
@@ -184,6 +193,146 @@ class TestCheckDiscovery(unittest.TestCase):
         problems = self.mutate(CLAUDE_MARKET, change)
         self.assertTrue(
             any("plugin entries" in p for p in problems), problems)
+
+    def test_a_dropped_mod_entry_fails(self):
+        def change(d):
+            d["plugins"] = [
+                e for e in d["plugins"]
+                if e["name"] != "recognitio-mod"
+            ]
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("plugin entries" in p for p in problems), problems)
+
+    def test_a_renamed_mod_entry_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["name"] = "spawn-gate"
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("plugin entries" in p for p in problems), problems)
+
+    def test_a_drifted_mod_entry_source_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["source"] = "./plugins/other"
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("source" in p for p in problems), problems)
+
+    def test_a_component_on_the_mod_entry_fails(self):
+        # The mod manifest is the whole definition of the
+        # mod plugin, so its entry names no component, and
+        # a skills list there would shadow the manifest.
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["skills"] = ["./hooks/"]
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("skills" in p for p in problems), problems)
+
+    def test_a_deleted_mod_display_name_fails(self):
+        problems = self.mutate(
+            MOD_PLUGIN, lambda d: d.pop("displayName"))
+        self.assertTrue(
+            any("displayName" in p for p in problems), problems)
+
+    def test_a_drifted_mod_keyword_fails(self):
+        def change(d):
+            d["keywords"] = d["keywords"][:-1]
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("keywords" in p for p in problems), problems)
+
+    def test_a_category_on_the_mod_manifest_fails(self):
+        def change(d):
+            d["category"] = "developer-tools"
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("category" in p for p in problems), problems)
+
+    def test_a_drifted_mod_entry_tag_fails(self):
+        # Each entry carries the tags of its own manifest,
+        # so the mod entry is pinned to the mod keyword set
+        # and not to the skill plugin set.
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["tags"] = entry["tags"] + ["diff"]
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("tags" in p for p in problems), problems)
+
+    def test_a_drifted_mod_entry_description_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["description"] = "A spawn gate."
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("description" in p for p in problems), problems)
+
+    def test_a_drifted_mod_description_fails(self):
+        def change(d):
+            d["description"] = "A spawn gate."
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("description" in p for p in problems), problems)
+
+    def test_a_drifted_mod_homepage_fails(self):
+        def change(d):
+            d["homepage"] = "https://example.com/recognitio"
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("homepage" in p for p in problems), problems)
+
+    def test_a_drifted_mod_manifest_name_fails(self):
+        def change(d):
+            d["name"] = "spawn-gate"
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("name" in p for p in problems), problems)
+
+    def test_a_component_on_the_mod_manifest_fails(self):
+        # The mod plugin ships the hooks module alone, so a
+        # component field in its manifest would ship the
+        # skill under a second name, the hazard the entry
+        # set pin exists to close.
+        def change(d):
+            d["skills"] = ["./.agents/skills/recognitio/"]
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("skills" in p for p in problems), problems)
+
+    def test_a_server_on_the_mod_manifest_fails(self):
+        def change(d):
+            d["mcpServers"] = {"x": {"command": "x"}}
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("mcpServers" in p for p in problems), problems)
+
+    def test_a_component_under_experimental_on_the_mod_entry_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["experimental"] = {"skills": ["./x/"]}
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("skills" in p for p in problems), problems)
+
+    def test_a_wrong_typed_entry_name_fails(self):
+        # A wrong typed name is named as its own problem in
+        # the gate voice, never a crash on the sort.
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["name"] = 123
+        problems = self.mutate(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("not a string" in p for p in problems), problems)
 
     def test_a_discovery_field_on_the_cursor_entry_fails(self):
         def change(d):

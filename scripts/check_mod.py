@@ -14,6 +14,14 @@ must state the second layer fail open as a limit, the in session
 gating boundary, the deployment gate check, and the unset
 disable-model-invocation. At least one *.test.ts file must exist
 for the host side test story.
+
+The mod also ships as its own entry in the Claude marketplace
+listing, sourced from the plugin folder at
+plugins/recognitio-mod. That folder carries byte identical
+copies of every file under hooks/ and of the root LICENSE,
+and this gate pins the copies to the originals by directory
+listing and by bytes, so the installed mod can never drift
+from the module this gate certifies.
 """
 
 import json
@@ -24,6 +32,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HOOKS_JSON = ROOT / "hooks" / "hooks.json"
 BRIEF = ROOT / "docs" / "mod-build7.md"
+MOD_PLUGIN_DIR = ROOT / "plugins" / "recognitio-mod"
+MOD_PLUGIN_HOOKS = MOD_PLUGIN_DIR / "hooks"
 
 ALLOWED_API_CALLS = {"$.fs.read", "$.env.get"}
 
@@ -161,6 +171,11 @@ def brief_problems():
         (BOUNDARY_SENTENCE, "the in session gating boundary"),
         (GATE_CHECK, "the deployment gate check"),
         (FLAG_RECONCILIATION, "the disable-model-invocation reconciliation"),
+        (
+            "offers the mod as its own marketplace entry, "
+            "named recognitio-mod",
+            "the marketplace entry",
+        ),
     ):
         if sentence not in text:
             problems.append(
@@ -185,6 +200,56 @@ def test_story_problems():
     return []
 
 
+def plugin_copy_problems():
+    """Problems with the marketplace entry copy of the mod.
+
+    The recognitio-mod plugin folder ships the mod on its own.
+    Its hooks folder must hold exactly the files the hooks
+    folder at the root holds, each a byte identical copy of
+    the original, and its LICENSE must be a byte identical
+    copy of the root LICENSE, so the entry can never install
+    a module this gate has not certified or stand in a
+    folder under different terms.
+    """
+    problems = []
+    hooks_dir = ROOT / "hooks"
+    if not hooks_dir.is_dir():
+        return ["hooks/ is missing, so the mod has no original"]
+    originals = sorted(
+        path.name for path in hooks_dir.iterdir() if path.is_file())
+    copies = []
+    if MOD_PLUGIN_HOOKS.is_dir():
+        copies = sorted(
+            path.name for path in MOD_PLUGIN_HOOKS.iterdir()
+            if path.is_file())
+    if copies != originals:
+        problems.append(
+            "plugins/recognitio-mod/hooks holds %s and hooks "
+            "holds %s, so the marketplace copy of the mod does "
+            "not mirror the certified module"
+            % (copies, originals))
+    for name in sorted(set(originals) & set(copies)):
+        if (MOD_PLUGIN_HOOKS / name).read_bytes() != \
+                (hooks_dir / name).read_bytes():
+            problems.append(
+                "plugins/recognitio-mod/hooks/%s differs from "
+                "hooks/%s, so the marketplace copy of the mod "
+                "has drifted from the certified module"
+                % (name, name))
+    license_copy = MOD_PLUGIN_DIR / "LICENSE"
+    if not license_copy.is_file():
+        problems.append(
+            "plugins/recognitio-mod/LICENSE is missing, so "
+            "the mod plugin folder carries no licence of its "
+            "own")
+    elif license_copy.read_bytes() != (ROOT / "LICENSE").read_bytes():
+        problems.append(
+            "plugins/recognitio-mod/LICENSE differs from the "
+            "root LICENSE, so the mod plugin folder stands "
+            "under different terms")
+    return problems
+
+
 def mod_problems(root=None):
     """Every Build 7 mod problem."""
     problems = []
@@ -194,6 +259,7 @@ def mod_problems(root=None):
     problems.extend(module_problems(path))
     problems.extend(brief_problems())
     problems.extend(test_story_problems())
+    problems.extend(plugin_copy_problems())
     return problems
 
 

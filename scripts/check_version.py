@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Check that every version string in the repo agrees.
 
-The extractor stamps each manifest with its version, the plugin
+The extractor stamps each manifest with its version, each plugin
 manifest carries a version, the marketplace listing carries one in
-its metadata and one on its plugin entry, and the changelog names
+its metadata and one on each plugin entry, and the changelog names
 the version its unreleased work carries or the newest released
 version it records. A reader who installs through any surface
 should meet the same version on every one, so the gate fails when
-any of them drifts from the others.
+any of them drifts from the others. The recognitio-mod plugin
+manifest under plugins/recognitio-mod is one of the plugin
+manifests here, because under strict mode the manifest is the
+definition the host loads for that entry.
 
 The README carries no version badge. The badge retired in the
 visual round 2 storefront rebuild because a static badge states a
@@ -26,6 +29,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
+MOD_PLUGIN_JSON = (
+    ROOT / "plugins" / "recognitio-mod" / ".claude-plugin"
+    / "plugin.json"
+)
 MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
 EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
@@ -296,6 +303,21 @@ def main():
             problems.append("plugin.json does not parse: %s" % exc)
             versions["plugin.json"] = None
 
+    text = read(MOD_PLUGIN_JSON)
+    if text is None:
+        problems.append(
+            "missing mod plugin manifest at "
+            "plugins/recognitio-mod/.claude-plugin/plugin.json"
+        )
+        versions["recognitio-mod plugin.json"] = None
+    else:
+        try:
+            versions["recognitio-mod plugin.json"] = plugin_version(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append(
+                "recognitio-mod plugin.json does not parse: %s" % exc)
+            versions["recognitio-mod plugin.json"] = None
+
     text = read(MARKETPLACE_JSON)
     if text is None:
         problems.append(
@@ -329,8 +351,9 @@ def main():
             print("check_version: %s" % problem, file=sys.stderr)
         return 1
     print(
-        "check_version: version %s agrees across the plugin manifest, "
-        "the marketplace listing, the extractor and the changelog"
+        "check_version: version %s agrees across the plugin "
+        "manifests, the marketplace listing, the extractor and "
+        "the changelog"
         % versions["EXTRACTOR_VERSION"]
     )
     return 0

@@ -343,6 +343,7 @@ class TestCheckCopy(unittest.TestCase):
             manifests,
             {".claude-plugin/plugin.json",
              ".claude-plugin/marketplace.json",
+             "plugins/recognitio-mod/.claude-plugin/plugin.json",
              ".cursor-plugin/plugin.json",
              ".cursor-plugin/marketplace.json",
              ".antigravity/plugin.json",
@@ -1306,13 +1307,18 @@ class TestCheckVersion(unittest.TestCase):
         self.assertEqual(self.mod.changelog_version(text), "1.3.0")
 
     def run_main_on_texts(self, plugin_text, marketplace_text,
-                          changelog_text, readme_text=None):
+                          changelog_text, readme_text=None,
+                          mod_text=None):
         if readme_text is None:
             readme_text = "# Recognitio\n"
+        if mod_text is None:
+            mod_text = plugin_text
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
             plugin.write_text(plugin_text, encoding="utf-8")
+            mod_plugin = root / "mod-plugin.json"
+            mod_plugin.write_text(mod_text, encoding="utf-8")
             market = root / "marketplace.json"
             market.write_text(marketplace_text, encoding="utf-8")
             extract = root / "extract.py"
@@ -1324,10 +1330,12 @@ class TestCheckVersion(unittest.TestCase):
             readme = root / "README.md"
             readme.write_text(readme_text, encoding="utf-8")
             original = (
-                self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
+                self.mod.PLUGIN_JSON, self.mod.MOD_PLUGIN_JSON,
+                self.mod.MARKETPLACE_JSON,
                 self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
             )
             self.mod.PLUGIN_JSON = plugin
+            self.mod.MOD_PLUGIN_JSON = mod_plugin
             self.mod.MARKETPLACE_JSON = market
             self.mod.EXTRACT_PY = extract
             self.mod.CHANGELOG_MD = log
@@ -1336,10 +1344,31 @@ class TestCheckVersion(unittest.TestCase):
                     code = self.mod.main()
             finally:
                 (
-                    self.mod.PLUGIN_JSON, self.mod.MARKETPLACE_JSON,
+                    self.mod.PLUGIN_JSON, self.mod.MOD_PLUGIN_JSON,
+                    self.mod.MARKETPLACE_JSON,
                     self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
                 ) = original
             return code, captured.getvalue()
+
+    def test_a_drifted_mod_manifest_version_fails(self):
+        # The recognitio-mod manifest is a version surface like
+        # the root manifest, because under strict mode it is
+        # the definition the host loads for its entry. A bump
+        # that moved every other surface and left it behind
+        # must fail here.
+        good_log = (
+            "# Changelog\n\n## [Unreleased]\n\n"
+            "This work carries version 1.3.0.\n"
+        )
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            '{"metadata": {"version": "1.3.0"}, "plugins": '
+            '[{"version": "1.3.0"}, {"version": "1.3.0"}]}',
+            good_log,
+            mod_text='{"version": "9.9.9"}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("recognitio-mod", err)
 
     def test_main_no_longer_reads_a_readme_version_badge(self):
         # The README version badge retired in the visual round 2
@@ -1601,11 +1630,18 @@ class TestPluginPackaging(unittest.TestCase):
 
     def test_marketplace_lists_the_plugin_with_its_skill_path(self):
         data = self.load_manifest("marketplace.json")
-        # The listing carries exactly one plugin entry. A second
-        # entry naming the same skill under another name is the
-        # identity family in its purest form, so the gate pins
-        # the count, not just the recognitio entry.
-        self.assertEqual(len(data["plugins"]), 1, data["plugins"])
+        # The listing carries exactly two plugin entries, the
+        # recognitio plugin and the recognitio-mod plugin, and
+        # the gate pins the set by name. A further entry naming
+        # the same skill under another name is the identity
+        # family in its purest form, so the pin holds the set,
+        # not just the recognitio entry, and only the
+        # recognitio entry may name the skill.
+        self.assertEqual(
+            sorted(p["name"] for p in data["plugins"]),
+            ["recognitio", "recognitio-mod"],
+            data["plugins"],
+        )
         entries = [p for p in data["plugins"] if p["name"] == "recognitio"]
         self.assertEqual(len(entries), 1, data["plugins"])
         self.assertEqual(entries[0]["source"], "./")
@@ -1629,6 +1665,20 @@ class TestPluginPackaging(unittest.TestCase):
         self.assertEqual(entries[0]["skills"], ["./.agents/skills/recognitio/"])
         plugin = self.load_manifest("plugin.json")
         self.assertEqual(entries[0]["skills"], plugin["skills"])
+        # The mod entry names the mod plugin folder as its
+        # source and sets strict to true as a real boolean for
+        # the same reason the recognitio entry does. It names
+        # no component, because the mod manifest in that
+        # folder is the whole definition of the plugin.
+        mod_entries = [
+            p for p in data["plugins"] if p["name"] == "recognitio-mod"
+        ]
+        self.assertEqual(len(mod_entries), 1, data["plugins"])
+        self.assertEqual(
+            mod_entries[0]["source"], "./plugins/recognitio-mod")
+        self.assertIsInstance(mod_entries[0]["strict"], bool)
+        self.assertTrue(mod_entries[0]["strict"])
+        self.assertNotIn("skills", mod_entries[0])
 
     def test_a_repeated_key_in_plugin_json_fails(self):
         text = (

@@ -273,6 +273,20 @@ class ModContractTestCase(unittest.TestCase):
     def test_the_shipped_mod_holds_its_contract(self):
         self.assertEqual(self.mod.mod_problems(), [])
 
+    def test_the_marketplace_entry_sentence_stands_in_the_brief(self):
+        # The gate requires the brief to state the marketplace
+        # entry, and this test holds the same sentence the way
+        # the limit sentence is held, so a brief that drops the
+        # entry fails here in words, not only in the gate.
+        import re
+
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        self.assertIn(
+            "offers the mod as its own marketplace entry, named "
+            "recognitio-mod",
+            text,
+        )
+
     def test_a_hook_without_catch_fails_the_pin(self):
         text = MODULE.read_text(encoding="utf-8")
         broken = text.replace(".catch(catchSpawnFailure)", "")
@@ -298,6 +312,96 @@ class ModContractTestCase(unittest.TestCase):
             problems = self.mod.module_problems(module)
         self.assertTrue(
             any("$.model.complete" in p for p in problems), problems
+        )
+
+    def make_copy_layout(self, tmp):
+        root = Path(tmp) / "root"
+        hooks = root / "hooks"
+        plugin_dir = root / "plugins" / "recognitio-mod"
+        copy_hooks = plugin_dir / "hooks"
+        hooks.mkdir(parents=True)
+        copy_hooks.mkdir(parents=True)
+        for name in ("hooks.json", "register.js", "register.test.ts"):
+            text = (HOOKS_DIR / name).read_text(encoding="utf-8")
+            (hooks / name).write_text(text, encoding="utf-8")
+            (copy_hooks / name).write_text(text, encoding="utf-8")
+        license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+        (root / "LICENSE").write_text(license_text, encoding="utf-8")
+        (plugin_dir / "LICENSE").write_text(
+            license_text, encoding="utf-8")
+        self.mod.ROOT = root
+        self.mod.MOD_PLUGIN_DIR = plugin_dir
+        self.mod.MOD_PLUGIN_HOOKS = copy_hooks
+        return copy_hooks
+
+    def test_the_marketplace_copy_holds_byte_identical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.make_copy_layout(tmp)
+            self.assertEqual(self.mod.plugin_copy_problems(), [])
+
+    def test_a_drifted_marketplace_copy_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            target = copy_hooks / "register.js"
+            target.write_text(
+                target.read_text(encoding="utf-8") + "\n// drift\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("drifted" in p for p in problems), problems
+        )
+
+    def test_a_missing_marketplace_copy_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            (copy_hooks / "hooks.json").unlink()
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("does not mirror" in p for p in problems), problems
+        )
+
+    def test_an_extra_file_in_the_copy_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            (copy_hooks / "extra.js").write_text(
+                "// uncertified\n", encoding="utf-8")
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("does not mirror" in p for p in problems), problems
+        )
+
+    def test_an_uncopied_hooks_file_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            originals = copy_hooks.parent.parent.parent / "hooks"
+            (originals / "second.js").write_text(
+                "// new module\n", encoding="utf-8")
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("does not mirror" in p for p in problems), problems
+        )
+
+    def test_a_missing_mod_license_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            (copy_hooks.parent / "LICENSE").unlink()
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("missing" in p for p in problems), problems
+        )
+
+    def test_a_drifted_mod_license_fails_the_pin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            copy_hooks = self.make_copy_layout(tmp)
+            target = copy_hooks.parent / "LICENSE"
+            target.write_text(
+                target.read_text(encoding="utf-8") + "\nExtra.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.plugin_copy_problems()
+        self.assertTrue(
+            any("different terms" in p for p in problems), problems
         )
 
     def test_the_struck_onfailure_language_fails_the_pin(self):

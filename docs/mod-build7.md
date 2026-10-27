@@ -6,7 +6,7 @@
 
 **What ships**
 
-The hooks module under `hooks/` with its host side tests, registering one agent.spawn hook that gates a reviewer spawn on the packet manifest verified flag.
+The hooks module under `hooks/` with its host side tests, registering one agent.spawn hook that gates a reviewer spawn on the packet manifest verified flag, and the recognitio-mod marketplace entry under `plugins/recognitio-mod/` carrying byte identical copies of the module.
 
 **What was proven**
 
@@ -35,6 +35,19 @@ the `agent.spawn` handler gating the reviewer fan out and
 the `.catch` handler returning a deny shape as the fail
 closed mechanism. Decision 4 binds this build like every
 other build.
+
+The marketplace listing at `.claude-plugin/marketplace.json`
+offers the mod as its own marketplace entry, named
+recognitio-mod and sourced from `plugins/recognitio-mod/`.
+That folder carries its own manifest and byte identical
+copies of the hooks module, its host side tests and the
+root LICENSE, so a setup can install the spawn gate
+without the skill bundle. The gate pins the copies to
+the originals, so the two can never drift apart. The main recognitio
+plugin already includes the mod, because the hooks folder
+at the repo root loads with that plugin, and the install
+prose tells the reader to install one shape or the other
+and never both.
 
 ## What the mod does
 

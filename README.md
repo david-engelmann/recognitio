@@ -177,16 +177,48 @@ Verified proves the packet is complete and nothing more. A separate recount of t
 
 Take one install route only. Installing through two routes installs the skill twice.
 
-Before any route, know what installing means. Every route needs Python 3.10 or newer and git, pull request mode also needs the GitHub CLI, and there are no third party dependencies. The plugin route changes the session it runs in. Its output style applies to every response in the session while the plugin is enabled and overrides the style chosen in your own settings, and its reviewer persona runs as the session main thread. Both effects are stated in full in their subsections below. Pin the install to a commit SHA before running any route, as the pin block below sets out.
+Before any route, know what installing means. Every route needs Python 3.10 or newer and git, pull request mode also needs the GitHub CLI, and there are no third party dependencies. The full plugin route changes the session it runs in. Its output style applies to every response in the session while the plugin is enabled and overrides the style chosen in your own settings, and its reviewer persona runs as the session main thread. Both effects are stated in full in their subsections below. The mod entry on its own brings neither effect, and brings the spawn gate the Claude Code plugin subsection describes instead. Pin the install to a commit SHA before running any route, as the pin block below sets out.
 
 ### Claude Code plugin
 
-The plugin route comes first. Register this repo as a marketplace in Claude Code and install the recognitio plugin the listing offers. The marketplace entry sets strict to true, so the plugin manifest under `.claude-plugin/` is the definition the host loads and the listing and the manifest may both name the skill without conflicting. The manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, and the marketplace entry carries no icon field. The manifest carries the discovery fields its schema names, a display name and a homepage and a repository and a keyword set, and the entry carries the category and the search tags its schema names there, with every value pinned by the discovery gate.
+The plugin route comes first. Register this repo as a marketplace in Claude Code, at the prompt of a session or from a shell, and install the plugin you want from the listing it offers.
 
 ```bash
 /plugin marketplace add david-engelmann/recognitio
+```
+
+```bash
+claude plugin \
+  marketplace add \
+  david-engelmann/recognitio
+```
+
+The listing offers two plugins, and each installs on its own.
+
+| Plugin | What it does |
+| --- | --- |
+| recognitio | The full plugin. The skill, the packet output style and the reviewer persona, with the spawn gate mod included. |
+| recognitio-mod | The spawn gate on its own, for a setup that takes the skill another way. The recognitio plugin already includes the mod, so install one entry or the other and never both. |
+
+Install the full plugin with this command.
+
+```bash
 /plugin install recognitio@recognitio-marketplace
 ```
+
+Or install the mod on its own with this one.
+
+```bash
+/plugin install recognitio-mod@recognitio-marketplace
+```
+
+Each entry sets strict to true, so the manifest in each plugin folder is the definition the host loads, and the recognitio listing and its manifest may both name the skill without conflicting. The recognitio manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, and the marketplace entries carry no icon field. Each manifest carries the discovery fields its schema names, a display name and a homepage and a repository and a keyword set, and each entry carries the category and the search tags its schema names there, with every value pinned by the discovery gate.
+
+Installing the recognitio plugin also loads the hooks module under `hooks/`. While the plugin is enabled, the mod checks every agent spawn in the session against the review packet manifest and denies any spawn whose packet is missing or unverified, and it does nothing when no packet directory is configured. The brief at [the mod brief](docs/mod-build7.md) states the mod contract and its limits in full.
+
+### Layout
+
+The marketplace listing stands at `.claude-plugin/marketplace.json` and names the two plugins above. The recognitio plugin is the repo root itself, with its manifest at `.claude-plugin/plugin.json`, its skill under `.agents/skills/` and its other parts in the folders the manifest names. The recognitio-mod plugin lives in its own folder at `plugins/recognitio-mod/`, with its own manifest and byte identical copies of the hooks module, pinned by the repo gate so the copies can never drift from the originals under `hooks/`.
 
 ### Cursor
 

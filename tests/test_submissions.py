@@ -110,6 +110,44 @@ class TestCheckSubmissions(unittest.TestCase):
     def test_the_shipped_tree_holds(self):
         self.assertEqual(self.mod.submissions_problems(ROOT), [])
 
+    def test_a_dropped_mod_entry_fails(self):
+        def change(d):
+            d["plugins"] = [
+                e for e in d["plugins"]
+                if e["name"] != "recognitio-mod"]
+        problems = self.mutate_json(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("exactly two" in p for p in problems), problems)
+
+    def test_a_renamed_mod_entry_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["name"] = "spawn-gate"
+        problems = self.mutate_json(CLAUDE_MARKET, change)
+        self.assertTrue(
+            any("recognitio-mod" in p for p in problems), problems)
+
+    def test_a_drifted_mod_entry_source_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["source"] = "./plugins/other"
+        problems = self.mutate_json(CLAUDE_MARKET, change)
+        self.assertTrue(any(
+            "recognitio-mod" in p and "source" in p
+            for p in problems), problems)
+
+    def test_a_non_strict_mod_entry_fails(self):
+        def change(d):
+            for entry in d["plugins"]:
+                if entry["name"] == "recognitio-mod":
+                    entry["strict"] = False
+        problems = self.mutate_json(CLAUDE_MARKET, change)
+        self.assertTrue(any(
+            "recognitio-mod" in p and "strict" in p
+            for p in problems), problems)
+
     def test_the_scratch_layout_holds(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

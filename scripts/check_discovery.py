@@ -34,10 +34,27 @@ keyword set and the category a searcher meets are the same
 on both.
 
 Two listing shapes carry the filled fields and are pinned
-with them. The Claude listing holds exactly one plugin
-entry, and the Cursor marketplace entry carries no
-discovery field, since its entry schema names none and a
-field placed there would contradict the manifest only fill.
+with them. The Claude listing holds exactly two plugin
+entries, the recognitio plugin at the repo root and the
+recognitio-mod plugin under plugins/recognitio-mod, and
+this gate pins the entry set by name, and the mod entry
+by its source, rather than a bare count. The recognitio
+entry source and the strict values of both entries stand
+pinned in the submissions gate and the gate script suite.
+The bare count was the earlier pin,
+and the set pin states the property the count guarded,
+that no second entry may rename the skill plugin or stand
+in for it. Only the recognitio entry names components, and
+the mod entry names none, because the mod manifest under
+its folder is the whole definition of that plugin. Each
+entry carries the tags of its own manifest keyword set,
+so the mod entry is found under its own terms and never
+under the skill terms of the plugin it does not ship. The mod
+manifest carries its own display fields, pinned here to
+their own values beside the shared homepage and repository.
+The Cursor marketplace entry carries no discovery field,
+since its entry schema names none and a field placed there
+would contradict the manifest only fill.
 
 Exits nonzero with one line per problem when anything fails.
 """
@@ -49,10 +66,32 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLAUDE_PLUGIN = ".claude-plugin/plugin.json"
 CLAUDE_MARKET = ".claude-plugin/marketplace.json"
+MOD_PLUGIN = "plugins/recognitio-mod/.claude-plugin/plugin.json"
 CURSOR_PLUGIN = ".cursor-plugin/plugin.json"
 CURSOR_MARKET = ".cursor-plugin/marketplace.json"
 
 DISPLAY_NAME = "Recognitio"
+MOD_DISPLAY_NAME = "Recognitio Mod"
+MOD_KEYWORDS = [
+    "agent-hooks",
+    "code-review",
+    "hooks",
+    "review-packet",
+]
+MOD_SOURCE = "./plugins/recognitio-mod"
+MOD_DESCRIPTION = (
+    "Gates reviewer spawns in Claude Code on the verified "
+    "review packet manifest, and denies a spawn whose packet "
+    "is missing, unreadable or unverified."
+)
+
+# The component fields a marketplace entry may name. Only
+# the recognitio entry names any, because the mod manifest
+# is the whole definition of the mod plugin.
+COMPONENT_KEYS = (
+    "skills", "commands", "agents", "hooks", "outputStyles",
+    "themes",
+)
 HOMEPAGE = "https://github.com/david-engelmann/recognitio"
 REPOSITORY = "https://github.com/david-engelmann/recognitio"
 KEYWORDS = [
@@ -162,11 +201,27 @@ def discovery_problems(root=None):
             problems.append(
                 "%s lists no plugin entry" % CLAUDE_MARKET)
             entries = []
-        elif len(entries) != 1:
-            problems.append(
-                "%s lists %d plugin entries and the listing "
-                "holds one plugin entry"
-                % (CLAUDE_MARKET, len(entries)))
+        else:
+            names = []
+            names_ok = True
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = entry.get("name")
+                if not isinstance(name, str):
+                    problems.append(
+                        "%s carries a plugin entry whose name "
+                        "is not a string" % CLAUDE_MARKET)
+                    names_ok = False
+                else:
+                    names.append(name)
+            if names_ok and sorted(names) != [
+                    "recognitio", "recognitio-mod"]:
+                problems.append(
+                    "%s lists plugin entries %s and the listing "
+                    "holds exactly the recognitio and "
+                    "recognitio-mod entries"
+                    % (CLAUDE_MARKET, sorted(names)))
         for entry in entries:
             if not isinstance(entry, dict):
                 problems.append(
@@ -176,9 +231,13 @@ def discovery_problems(root=None):
             value_problems(
                 CLAUDE_MARKET + " entry", entry, "category",
                 CATEGORY, problems)
+            expected_tags = (
+                MOD_KEYWORDS
+                if entry.get("name") == "recognitio-mod"
+                else KEYWORDS)
             value_problems(
                 CLAUDE_MARKET + " entry", entry, "tags",
-                KEYWORDS, problems)
+                expected_tags, problems)
             for field in DIRECTORY_FIELDS:
                 if field in entry:
                     problems.append(
@@ -193,6 +252,63 @@ def discovery_problems(root=None):
                         "fields live in plugin.json as the single "
                         "source" % (CLAUDE_MARKET, field)
                     )
+            if entry.get("name") == "recognitio-mod":
+                if entry.get("source") != MOD_SOURCE:
+                    problems.append(
+                        "%s recognitio-mod entry carries source "
+                        "%r and the pinned source is %r"
+                        % (CLAUDE_MARKET, entry.get("source"),
+                           MOD_SOURCE)
+                    )
+                value_problems(
+                    CLAUDE_MARKET + " recognitio-mod entry",
+                    entry, "description", MOD_DESCRIPTION,
+                    problems)
+                experimental = entry.get("experimental")
+                if not isinstance(experimental, dict):
+                    experimental = {}
+                for key in COMPONENT_KEYS + ("mcpServers",):
+                    if key in entry or key in experimental:
+                        problems.append(
+                            "%s recognitio-mod entry names %s "
+                            "and the mod manifest is the whole "
+                            "definition of the mod plugin"
+                            % (CLAUDE_MARKET, key)
+                        )
+
+    mod = load_manifest(root, MOD_PLUGIN, problems)
+    if mod is not None:
+        value_problems(
+            MOD_PLUGIN, mod, "name", "recognitio-mod", problems)
+        value_problems(
+            MOD_PLUGIN, mod, "displayName", MOD_DISPLAY_NAME,
+            problems)
+        value_problems(
+            MOD_PLUGIN, mod, "homepage", HOMEPAGE, problems)
+        value_problems(
+            MOD_PLUGIN, mod, "repository", REPOSITORY, problems)
+        value_problems(
+            MOD_PLUGIN, mod, "keywords", MOD_KEYWORDS, problems)
+        value_problems(
+            MOD_PLUGIN, mod, "description", MOD_DESCRIPTION,
+            problems)
+        experimental = mod.get("experimental")
+        if not isinstance(experimental, dict):
+            experimental = {}
+        for key in COMPONENT_KEYS + ("mcpServers",):
+            if key in mod or key in experimental:
+                problems.append(
+                    "%s names %s and the mod plugin ships the "
+                    "hooks module alone, with no component of "
+                    "its own to name" % (MOD_PLUGIN, key)
+                )
+        for field in ("category", "tags"):
+            if field in mod:
+                problems.append(
+                    "%s carries %s and the manifest reference "
+                    "names no such plugin.json field, so the "
+                    "host strips it at load" % (MOD_PLUGIN, field)
+                )
 
     if cursor is not None:
         for field, expected in (
@@ -240,9 +356,9 @@ def main():
         return 1
     print(
         "check_discovery: the discovery fields agree across the "
-        "Claude manifest, the Claude marketplace entry and the "
-        "Cursor manifest, and no discovery field stands on the "
-        "Cursor marketplace entry"
+        "Claude manifests, the Claude marketplace entries and "
+        "the Cursor manifest, and no discovery field stands on "
+        "the Cursor marketplace entry"
     )
     return 0
 

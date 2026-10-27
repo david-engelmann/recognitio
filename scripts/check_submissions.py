@@ -25,8 +25,10 @@ with the logo, skill, and rule paths resolving in the tree.
 The Claude manifest carries the fields its evidence check
 names, with its component paths resolving inside the folder,
 its marketplace file carries the required name and owner,
-and its one entry matches the manifest in name, source, and
-strict mode. The portable manifest stays inside the closed
+and its recognitio entry matches the manifest in name,
+source, and strict mode, beside the recognitio-mod entry
+the same pack names with its own folder source and strict
+mode. The portable manifest stays inside the closed
 ten field set of the Agent Plugins specification and carries
 the exact values the host listing would read from it. A
 license file stands at the root the Claude pack names as
@@ -233,6 +235,64 @@ def entry_problems(rel, market, plugin, problems):
     return entry
 
 
+def claude_entry_problems(rel, market, plugin, problems):
+    """The Claude listing holds the recognitio and mod entries.
+
+    The recognitio entry comes back for the source and strict
+    checks the caller runs, and the recognitio-mod entry is
+    named here so a listing that lost it, or renamed it, or
+    grew a third entry fails in this gate as well.
+    """
+    entries = market.get("plugins")
+    if not isinstance(entries, list) or len(entries) != 2:
+        problems.append(
+            "%s must list exactly two plugin entries, the "
+            "recognitio plugin and the recognitio-mod plugin"
+            % rel)
+        return None
+    by_name = {}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            problems.append(
+                "%s carries an entry that is not an object" % rel)
+            return None
+        by_name[entry.get("name")] = entry
+    entry = by_name.get("recognitio")
+    if entry is None:
+        if plugin is not None:
+            problems.append(
+                "%s entry name %r does not match the manifest "
+                "name %r"
+                % (rel, entries[0].get("name"),
+                   plugin.get("name")))
+        else:
+            problems.append(
+                "%s lists no recognitio entry" % rel)
+        return None
+    if plugin is not None and entry.get("name") != plugin.get("name"):
+        problems.append(
+            "%s entry name %r does not match the manifest "
+            "name %r" % (rel, entry.get("name"), plugin.get("name")))
+    mod = by_name.get("recognitio-mod")
+    if mod is None:
+        problems.append(
+            "%s lists no recognitio-mod entry, and the Claude "
+            "pack names the mod entry beside the plugin entry"
+            % rel)
+    else:
+        if mod.get("source") != "./plugins/recognitio-mod":
+            problems.append(
+                "%s recognitio-mod entry carries source %r and "
+                "the pack states the mod plugin folder"
+                % (rel, mod.get("source")))
+        if mod.get("strict") is not True:
+            problems.append(
+                "%s recognitio-mod entry carries strict %r and "
+                "the pack states strict mode on"
+                % (rel, mod.get("strict")))
+    return entry
+
+
 def shipped_path(root, value):
     """Resolve a manifest path, refusing the forbidden shapes.
 
@@ -392,7 +452,8 @@ def claude_problems(root, problems):
         owner_problems(
             CLAUDE_MARKET, market, problems,
             "and the marketplace reference marks it required")
-        entry = entry_problems(CLAUDE_MARKET, market, plugin, problems)
+        entry = claude_entry_problems(
+            CLAUDE_MARKET, market, plugin, problems)
         if entry is not None:
             if entry.get("source") != "./":
                 problems.append(

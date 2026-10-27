@@ -133,10 +133,13 @@ the file at the root, and absence in both forms at once is
 what blocks.
 
 **Met, the marketplace file.** The shipped file carries the
-required name, owner, and plugins fields, with one entry
-whose name matches the manifest name exactly, the root as
-its source, and strict mode on. That file already publishes
-the self hosted route today.
+required name, owner, and plugins fields, with two entries.
+The recognitio entry matches the manifest name exactly,
+takes the root as its source, and sets strict mode on. The
+recognitio-mod entry names the spawn gate mod on its own,
+takes the plugin folder under plugins as its source, and
+sets strict mode on. That file already publishes the self
+hosted route today.
 
 **Met, the license and the README.** A LICENSE file stands
 at the repo root, which is the plugin folder this submission
@@ -158,19 +161,21 @@ directory would show. Adding two more worked examples to the
 README is a small pre-filing task, and this pack records it
 as open rather than rounding the quickstart up to an example.
 
-**Open, the hooks disclosure.** The hooks folder stands at
+**Met, the hooks disclosure.** The hooks folder stands at
 the repo root beside the manifest, and its wiring loads with
 the plugin even though the manifest names no hooks field.
 The checklist treats that omission as a warning. The sharper
-point is disclosure. The checklist asks the README to
-describe everything the plugin runs, sends, or fetches, and
-the README the directory would show does not mention the
-hooks or the mod at all. That description stands in the
-headless runbook and the mod brief instead, which are not
-the page a listing shows. Adding a short disclosure of the
-hooks to the README is a pre-filing fix in this repo, and
-until it lands the security scan may hold the version for
-behaviour the listing never disclosed.
+point is disclosure, and it is met. The checklist asks the
+README to describe everything the plugin runs, sends, or
+fetches, and the README the directory would show names the
+hooks module in its install section and states what the mod
+does while the plugin is enabled, that it checks every
+agent spawn in the session against the review packet
+manifest and denies any spawn whose packet is missing or
+unverified, and that it does nothing when no packet
+directory is configured. The full contract stands in the mod brief, and
+the marketplace listing offers the mod as its own entry
+beside the plugin entry.
 
 **Named, the symlink in the folder.** A symlink stands at
 .claude/skills/recognitio and points at the canonical skill.
