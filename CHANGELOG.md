@@ -1318,3 +1318,17 @@ This unreleased work carries version 1.3.0.
   clickable relative links, and the description
   pins and the storefront pins in the gate tests
   moved with the wording.
+- A typechange no longer shifts every later file onto the
+  wrong diff body and a typechange with content on both
+  sides can verify again. Git emits a typechange as two diff
+  sections under one header while the name status output
+  holds one entry for it, and the extractor paired sections
+  with entries by position, so one extra section moved every
+  later pairing by one and a verified packet could show one
+  file's creation under another file's name while dropping
+  a third file's diff entirely. Sections are now grouped
+  by header identity before pairing and the two halves of a
+  typechange stand merged under their own file, the line
+  counter restarts at the second section header, and a diff
+  whose grouped sections still cannot be paired with the
+  name status entries fails closed instead of guessing.

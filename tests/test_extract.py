@@ -3180,5 +3180,169 @@ class TestRound4PacketFace(Fixture):
 
 
 
+class TestTypechangePairing(unittest.TestCase):
+    """A typechange emits two diff sections for one file entry.
+
+    Git deletes the old form and creates the new form under the
+    same path, so a range holding a typechange carries one more
+    diff section than it carries files. Pairing sections with
+    entries by position hands every later file the diff body of
+    its neighbour and drops the last file's diff entirely, and
+    pairing a content bearing typechange with only its deletion
+    half makes its own recount disagree with numstat forever.
+    These tests build both shapes from real histories.
+    """
+
+    def packet_section(self, packet, path):
+        marker = "### %s\n" % path
+        start = packet.index(marker)
+        rest = packet[start + len(marker):]
+        end = rest.find("\n### ")
+        return rest if end == -1 else rest[:end]
+
+    def test_pure_typechange_does_not_shift_later_files(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {
+                "target.txt": "target\n",
+                "mid.py": "def m():\n    return 1\n",
+                "zlast.sh": "#!/bin/sh\necho hi\n",
+            })
+            os.symlink("target.txt", repo / "alink.txt")
+            commit_all(repo, "base")
+            (repo / "alink.txt").unlink()
+            (repo / "alink.txt").write_text("")
+            (repo / "mid.py").chmod(0o755)
+            (repo / "zlast.sh").chmod(0o755)
+            commit_all(repo, "typechange and mode changes")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            self.assertEqual(
+                [entry["path"] for entry in manifest["files"]],
+                ["alink.txt", "mid.py", "zlast.sh"],
+            )
+            by_path = {
+                entry["path"]: entry for entry in manifest["files"]
+            }
+            self.assertEqual(by_path["alink.txt"]["status"], "typechange")
+            self.assertEqual(
+                (by_path["alink.txt"]["additions"],
+                 by_path["alink.txt"]["deletions"],
+                 by_path["alink.txt"]["hunks"]),
+                (0, 1, 1),
+            )
+            packet = (out / "packet.md").read_text()
+            alink = self.packet_section(packet, "alink.txt")
+            self.assertIn("deleted file mode 120000", alink)
+            self.assertIn("new file mode 100644", alink)
+            mid = self.packet_section(packet, "mid.py")
+            self.assertIn("diff --git a/mid.py b/mid.py", mid)
+            self.assertIn("new mode 100755", mid)
+            self.assertNotIn("alink.txt", mid)
+            zlast = self.packet_section(packet, "zlast.sh")
+            self.assertIn("diff --git a/zlast.sh b/zlast.sh", zlast)
+            self.assertIn("new mode 100755", zlast)
+
+    def test_file_to_symlink_typechange_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {
+                "root.txt": "root\n",
+                "swap.txt": "plain text\n",
+            })
+            commit_all(repo, "base")
+            (repo / "swap.txt").unlink()
+            os.symlink("root.txt", repo / "swap.txt")
+            commit_all(repo, "file to symlink")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            swap = [
+                entry for entry in manifest["files"]
+                if entry["path"] == "swap.txt"
+            ][0]
+            self.assertEqual(swap["status"], "typechange")
+            self.assertEqual(
+                (swap["additions"], swap["deletions"], swap["hunks"]),
+                (1, 1, 2),
+            )
+            section = self.packet_section(
+                (out / "packet.md").read_text(), "swap.txt"
+            )
+            self.assertIn("deleted file mode 100644", section)
+            self.assertIn("-plain text", section)
+            self.assertIn("new file mode 120000", section)
+            self.assertIn("+root.txt", section)
+
+    def test_symlink_to_file_typechange_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"root.txt": "root\n"})
+            os.symlink("root.txt", repo / "swap.txt")
+            commit_all(repo, "base")
+            (repo / "swap.txt").unlink()
+            (repo / "swap.txt").write_text("plain text\n")
+            commit_all(repo, "symlink to file")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            swap = [
+                entry for entry in manifest["files"]
+                if entry["path"] == "swap.txt"
+            ][0]
+            self.assertEqual(swap["status"], "typechange")
+            self.assertEqual(
+                (swap["additions"], swap["deletions"], swap["hunks"]),
+                (1, 1, 2),
+            )
+            section = self.packet_section(
+                (out / "packet.md").read_text(), "swap.txt"
+            )
+            self.assertIn("deleted file mode 120000", section)
+            self.assertIn("-root.txt", section)
+            self.assertIn("new file mode 100644", section)
+            self.assertIn("+plain text", section)
+
+    def test_merged_typechange_chunk_counts_both_sections(self):
+        deletion = (
+            "diff --git a/swap.txt b/swap.txt\n"
+            "deleted file mode 100644\n"
+            "--- a/swap.txt\n"
+            "+++ /dev/null\n"
+            "@@ -1 +0,0 @@\n"
+            "-plain text\n"
+        )
+        creation = (
+            "diff --git a/swap.txt b/swap.txt\n"
+            "new file mode 120000\n"
+            "--- /dev/null\n"
+            "+++ b/swap.txt\n"
+            "@@ -0,0 +1 @@\n"
+            "+root.txt\n"
+        )
+        grouped = extract_mod.group_diff_chunks([deletion, creation])
+        self.assertEqual(grouped, [deletion + creation])
+        self.assertEqual(
+            extract_mod.count_chunk_lines(grouped[0]), (1, 1)
+        )
+        self.assertEqual(extract_mod.count_hunks(grouped[0]), 2)
+
+    def test_pairing_fails_closed_when_counts_cannot_reconcile(self):
+        files = [{"path": "a.py"}, {"path": "b.py"}]
+        chunks = ["diff --git a/a.py b/a.py\n@@ -1 +1 @@\n-x\n+y\n"]
+        with self.assertRaises(extract_mod.GitError):
+            extract_mod.pair_diff_chunks(files, chunks)
+
+
 if __name__ == "__main__":
     unittest.main()

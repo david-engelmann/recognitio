@@ -575,12 +575,16 @@ def parse_numstat_z(text):
 
 
 def split_diff(text):
-    """Split a full diff into per file chunks, in emission order.
+    """Split a full diff into its emitted sections, in emission order.
 
-    The chunk order of a git diff matches the order of the matching
-    name-status output, so callers pair chunks with file entries by
-    position. No path is ever parsed out of a diff header, which keeps
-    paths containing spaces or the text b/ intact.
+    One file entry can own more than one section. A typechange is
+    emitted as two sections under one header, the old form deleted
+    and the new form created, so a section list is not a file list
+    and no caller may pair the two by position. Grouping by header
+    identity, in group_diff_chunks below, is how sections are
+    reunited with the entry that owns them. No path is ever parsed
+    out of a diff header, which keeps paths containing spaces or
+    the text b/ intact.
     """
     chunks = []
     current = None
@@ -594,6 +598,56 @@ def split_diff(text):
     if current is not None:
         chunks.append("".join(current))
     return chunks
+
+
+def group_diff_chunks(chunks):
+    """Group emitted diff sections by header identity.
+
+    Consecutive sections that carry the exact same header line are
+    the two halves of one typechange entry, the deletion of the old
+    form and the creation of the new form under the same path. They
+    merge, in emission order, into the one chunk that entry owns.
+    Every other entry emits exactly one section, so grouping leaves
+    it untouched. The header line is compared whole and never
+    parsed, so a path carrying spaces, quotes or the text b/ groups
+    exactly as safely as a plain path.
+    """
+    grouped = []
+    headers = []
+    for chunk in chunks:
+        header = chunk.split("\n", 1)[0] if chunk else ""
+        if grouped and header and headers[-1] == header:
+            grouped[-1] += chunk
+        else:
+            grouped.append(chunk)
+            headers.append(header)
+    return grouped
+
+
+def pair_diff_chunks(files, raw_chunks):
+    """Pair diff chunks with file entries by identity, never position.
+
+    The grouped chunks stand in the same order as the name status
+    entries, and grouping has already reunited the two sections a
+    typechange emits, so the pairing is one grouped chunk per entry
+    in that shared order, each chunk carrying the header of the file
+    it is paired with. A count that still disagrees after grouping
+    means the diff and the name status output describe different
+    changes, and the run fails closed instead of handing any file
+    a neighbouring file's diff body.
+    """
+    grouped = group_diff_chunks(raw_chunks)
+    if len(grouped) != len(files):
+        raise GitError(
+            "the diff holds %d file chunks against %d name status "
+            "entries, so no chunk can be paired with its file by "
+            "identity and no packet can be built from it"
+            % (len(grouped), len(files))
+        )
+    return {
+        entry["path"]: grouped[position]
+        for position, entry in enumerate(files)
+    }
 
 
 def count_hunks(chunk):
@@ -613,6 +667,14 @@ def count_chunk_lines(chunk):
     dels = 0
     in_hunks = False
     for line in chunk.splitlines():
+        if line.startswith("diff --git "):
+            # A merged typechange chunk holds two sections. The
+            # second section opens a fresh file header, so the
+            # hunk state resets here or its --- and +++ header
+            # lines would count as content lines of the first
+            # section.
+            in_hunks = False
+            continue
         if line.startswith("@@ "):
             in_hunks = True
             continue
@@ -718,8 +780,10 @@ def fetch_change(repo, diff_base, head):
     """Fetch the change channels between a diff base and a head.
 
     Path data comes back NUL delimited. The returned file entries are
-    in git's emission order, and the chunk lists pair with them by
-    position.
+    in git's emission order, and the chunks pair with them by header
+    identity through pair_diff_chunks, so the two sections a
+    typechange emits land on the typechanged file itself and never
+    shift a later file onto the wrong diff body.
     """
     status_text = run_git(
         repo, ["diff", "--name-status", "-z", "-M", "-C"] + DIFF_FLAGS
@@ -744,17 +808,8 @@ def fetch_change(repo, diff_base, head):
     ).stdout
     files = parse_name_status_z(status_text)
     stats, binary_paths = parse_numstat_z(numstat_text)
-    full_chunks = split_diff(full_diff)
-    precise_chunks = split_diff(precise_diff)
-    chunks = {}
-    precise = {}
-    for position, entry in enumerate(files):
-        chunks[entry["path"]] = (
-            full_chunks[position] if position < len(full_chunks) else ""
-        )
-        precise[entry["path"]] = (
-            precise_chunks[position] if position < len(precise_chunks) else ""
-        )
+    chunks = pair_diff_chunks(files, split_diff(full_diff))
+    precise = pair_diff_chunks(files, split_diff(precise_diff))
     return {
         "files": files,
         "stats": stats,
@@ -788,8 +843,11 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
          "--find-copies", context_flag] + DIFF_FLAGS
         + [diff_base, head, "--"] + entry_paths(entry),
     )
-    chunks = split_diff(result.stdout)
-    return chunks[0] if chunks else ""
+    # The pathspec scopes this diff to the one entry, and a
+    # typechange entry still emits its two sections inside it.
+    # Grouping reunites them, so the entry is measured and shown
+    # whole instead of by its deletion half alone.
+    return "".join(group_diff_chunks(split_diff(result.stdout)))
 
 
 def per_file_text_numstat(repo, diff_base, head, entry):
@@ -2261,10 +2319,10 @@ def rereview_ranges(repo, since, head):
         for field in since_text.split("\0") if field
     }
     since_files = parse_name_status_z(status_text)
-    chunks = split_diff(precise)
+    chunks = pair_diff_chunks(since_files, split_diff(precise))
     ranges_by_path = {}
     moved_to = {}
-    for position, entry in enumerate(since_files):
+    for entry in since_files:
         if entry["status"] == "copied":
             # A copied entry carries its source as its old path and
             # its chunk describes the delta between the source at
@@ -2274,7 +2332,7 @@ def rereview_ranges(repo, since, head):
             # overwrites the ranges the source file its own
             # modification wrote there.
             continue
-        chunk = chunks[position] if position < len(chunks) else ""
+        chunk = chunks.get(entry["path"], "")
         since_path = normalize_finding_path(
             entry["old_path"] or entry["path"]
         )
