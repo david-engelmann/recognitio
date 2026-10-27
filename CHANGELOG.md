@@ -1471,3 +1471,22 @@ This unreleased work carries version 1.3.0.
   and the smoke script now scrubs the git location environment
   like its siblings, so a stray GIT_DIR can no longer plant
   its fixture commits on another repository.
+- The packet check now verifies the framing of a packet and
+  not only the change inside it. The re-review section and the
+  pull request preamble are rebuilt from the repository and
+  from the records they stand on, the header and the contents
+  block and the closing recount are compared whole against
+  their rebuilds, and the range label is pinned against the
+  recorded range spelling. The recorded command is read at the
+  last value of every flag and its budget and tiers and
+  findings values are pinned against the manifest, the cap
+  notes list and the size of a dropped tier are recounted in
+  the rebuild, and the budget account is checked against its
+  own rules. The creation time must be a timestamp that does
+  not name a moment after the check, a shallow clone refuses
+  the stamp in its own words, a rebase in progress is named,
+  and a packet or a manifest standing as a hard link fails
+  for the reason a symbolic link fails. Display paths in the
+  extractor and the check now escape bidirectional controls
+  and zero width marks, so a crafted filename can no longer
+  display as a different filename in a packet heading.

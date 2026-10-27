@@ -33,7 +33,23 @@ packet is decoded as strict UTF-8, because a packet holding bytes
 no UTF-8 reader can open is not the document its consumers are
 handed. The recorded extractor command is also read back, so its
 mode flag must name the mode the manifest records and any full
-hash it carries must name the refs the manifest records.
+hash it carries must name the refs the manifest records. The
+second pass over this verifier widened that reading. The recorded
+command is now read at the last value of every flag, the way the
+extractor parser reads it, and its budget and tiers and findings
+values are pinned against the manifest. The range label is pinned
+against the recorded range spelling. The re-review section and
+the pull request preamble are rebuilt from the repository and
+from the records they stand on and compared whole, as the header
+and the contents block and the closing recount now are. The
+manifest cap notes list and the size of a dropped tier are
+recounted in the rebuild, the budget account is checked against
+its own rules, and the creation time must be a timestamp that
+does not name a moment after the check. The repository itself is
+read for state, so a shallow clone refuses the stamp in its own
+words and a rebase in progress is named. A packet or a manifest
+standing as a hard link fails for the reason a symbolic link
+fails.
 
 Exits nonzero and lists every problem when the packet cannot be used.
 """
@@ -45,6 +61,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # The same discipline the extractor runs under. Git location
@@ -164,6 +181,23 @@ _SCHEMA_TYPES = {
 }
 
 
+def _pattern_matches(pattern, value):
+    """Match one schema pattern against one manifest string.
+
+    A pattern the schema anchors at both ends is a claim about the
+    whole value, so it is matched against the whole value. The end
+    anchor alone accepts a trailing newline, because it also
+    matches just before one, and a hash or a status code carrying
+    a newline is not the shape the schema describes. A pattern
+    anchored only at the start is a prefix claim and keeps the
+    search reading the schema gives it.
+    """
+    if len(pattern) > 1 and pattern.startswith("^") \
+            and pattern.endswith("$"):
+        return re.fullmatch(pattern[1:-1], value) is not None
+    return re.search(pattern, value) is not None
+
+
 def _type_matches(value, name):
     if name == "integer":
         return isinstance(value, int) and not isinstance(value, bool)
@@ -198,7 +232,8 @@ def schema_problems_at(value, schema, root_schema, where):
         ):
             problems.append(
                 "the manifest value at %s matches none of the shapes "
-                "its schema allows" % where
+                "its schema allows, and the value is %s"
+                % (where, ascii(value)[:80])
             )
         return problems
     if "const" in schema and value != schema["const"]:
@@ -224,7 +259,9 @@ def schema_problems_at(value, schema, root_schema, where):
                 "the manifest text at %s is shorter than its schema "
                 "allows" % where
             )
-        if "pattern" in schema and not re.search(schema["pattern"], value):
+        if "pattern" in schema and not _pattern_matches(
+            schema["pattern"], value
+        ):
             problems.append(
                 "the manifest text at %s does not match the shape its "
                 "schema requires" % where
@@ -297,6 +334,102 @@ def manifest_schema_problems(manifest):
             "manifest can be validated against it (%s)" % exc
         ]
     return schema_problems_at(manifest, schema, schema, "the manifest")
+
+
+def created_problems(manifest):
+    """Check the recorded creation time is a time at all.
+
+    The true creation time cannot be verified against a
+    repository, and the schema only types the field. The shapes
+    a stamp must still refuse are the ones no clock reading can
+    take. A value that is not an ISO timestamp, a value no UTF-8
+    reader can encode, a value with no offset, and a value that
+    names a moment well after the check itself runs are none of
+    them times a run could have recorded.
+    """
+    problems = []
+    value = manifest.get("created_utc")
+    if not isinstance(value, str):
+        return problems
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        problems.append(
+            "the manifest creation time cannot be encoded as "
+            "UTF-8, so it is not a timestamp any consumer can read"
+        )
+        return problems
+    parsed = None
+    if "T" in value:
+        try:
+            parsed = datetime.fromisoformat(
+                value[:-1] + "+00:00" if value.endswith("Z") else value
+            )
+        except ValueError:
+            parsed = None
+    if parsed is None:
+        problems.append(
+            "the manifest creation time %s is not an ISO timestamp, "
+            "so the field records no time at all" % ascii(value)[:60]
+        )
+        return problems
+    if parsed.tzinfo is None:
+        problems.append(
+            "the manifest creation time carries no offset, so it "
+            "does not name one moment"
+        )
+        return problems
+    now = datetime.now(timezone.utc)
+    if (parsed - now).total_seconds() > 24 * 3600:
+        problems.append(
+            "the manifest creation time %s names a moment after "
+            "this check runs, so the packet claims a creation "
+            "that has not happened" % ascii(value)[:60]
+        )
+    return problems
+
+
+def repo_state_problems(repo):
+    """Read the state of the repository the stamp is asked against.
+
+    Returns the problem list and whether the state is fatal to
+    the deep checks. A path that is not a readable repository and
+    a shallow clone are fatal, because every recount from them
+    would blame the packet for the environment. A repository in
+    the middle of a rebase is named without stopping the other
+    checks, because its head is a transient position an abort
+    will abandon and a continuation will move, and a stamp that
+    says nothing about it invites a reviewer to treat that head
+    as settled.
+    """
+    problems = []
+    git_dir = run_git(repo, ["rev-parse", "--absolute-git-dir"])
+    if git_dir is None:
+        problems.append(
+            "the path %s is not a readable git repository, so the "
+            "recorded refs cannot be checked against it" % repo
+        )
+        return problems, True
+    shallow = run_git(repo, ["rev-parse", "--is-shallow-repository"])
+    if shallow is not None and shallow.strip() == "true":
+        problems.append(
+            "the repository at %s is a shallow clone, so its "
+            "history is truncated and no packet can be verified "
+            "against it. Fetch the full history first, for "
+            "example with git fetch --unshallow, then run the "
+            "check again" % repo
+        )
+        return problems, True
+    git_dir_path = Path(git_dir.strip())
+    if (git_dir_path / "rebase-merge").is_dir() or \
+            (git_dir_path / "rebase-apply").is_dir():
+        problems.append(
+            "the repository at %s is in the middle of a rebase, "
+            "so its head is a transient rebase position and the "
+            "packet cannot be stamped as settled at that head "
+            "until the rebase finishes or is aborted" % repo
+        )
+    return problems, False
 
 
 # ---------------------------------------------------------------------
@@ -545,6 +678,13 @@ def display_path(path):
         elif ord(char) < 32 or ord(char) == 127:
             out.append("\\x%02x" % ord(char))
         elif char in ("\u0085", "\u2028", "\u2029"):
+            out.append("\\u%04x" % ord(char))
+        elif char in (
+            "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
+            "\u2066", "\u2067", "\u2068", "\u2069",
+            "\u200b", "\u200c", "\u200d", "\u200e", "\u200f",
+            "\u2060", "\ufeff",
+        ):
             out.append("\\u%04x" % ord(char))
         else:
             out.append(char)
@@ -1257,10 +1397,69 @@ def tier_span_problems(packet_text, manifest, extractor):
     return problems
 
 
+def budget_problems(manifest):
+    """Check the budget account against itself and its own rules.
+
+    The receipt lines in the packet are printed from this
+    account, so comparing the account only against those lines
+    proves nothing about the account. What can be proven from
+    the manifest alone is the account shape the extractor
+    writes. A drop is recorded at most once per tier, the drops
+    stand in the order the budget sheds them, T3 before T2, a
+    drop with no budget is impossible, and every drop reason is
+    the one wording the extractor writes, naming the budget the
+    account itself records. The size of a dropped tier is
+    recounted in the rebuild pass, which is the only place the
+    tier text can be measured again.
+    """
+    problems = []
+    budget = manifest["budget"]
+    dropped = budget["dropped"]
+    names = [item["tier"] for item in dropped]
+    if len(set(names)) != len(names):
+        problems.append(
+            "the manifest budget account records the same tier "
+            "drop more than once, and one receipt line in the "
+            "packet cannot receipt two drops"
+        )
+    shed_order = [tier for tier in ("T3", "T2") if tier in names]
+    if names != shed_order:
+        problems.append(
+            "the manifest budget account records its drops in "
+            "the order %s, but the budget sheds T3 before T2"
+            % ", ".join(names)
+        )
+    budget_tokens = budget["budget_tokens"]
+    if dropped and budget_tokens is None:
+        problems.append(
+            "the manifest budget account records dropped tiers "
+            "but no budget, and a tier drops only under a budget"
+        )
+    if budget_tokens is not None:
+        wanted_reason = "budget of %d tokens" % budget_tokens
+        for item in dropped:
+            if item["reason"] != wanted_reason:
+                problems.append(
+                    "the manifest budget account records the drop "
+                    "of %s with the reason %s, but the only reason "
+                    "a run records is %s, naming the budget the "
+                    "account itself records"
+                    % (item["tier"], ascii(item["reason"])[:60],
+                       wanted_reason)
+                )
+    return problems
+
+
 def tier_receipt_problems(manifest):
     problems = []
     tiers = manifest["tiers"]
     selected = manifest["selected_tiers"]
+    if selected != sorted(selected):
+        problems.append(
+            "the manifest records its selected tiers in the "
+            "order %s, but a run writes that list in sorted order"
+            % ", ".join(selected)
+        )
     dropped = manifest["budget"]["dropped"]
     dropped_names = [item["tier"] for item in dropped]
     total = len(manifest["files"])
@@ -1468,26 +1667,20 @@ HEX_REF = re.compile(r"^[0-9a-f]{7,40}$")
 HEX40_REF = re.compile(r"^[0-9a-f]{40}$")
 
 
-def command_problems(manifest, repo):
-    """Read the recorded extractor command back against the manifest.
+def parse_command_flags(manifest):
+    """Split the recorded command into its flags and their values.
 
-    The command is the record of how the packet claims it was
-    built, and a forged record must not wear a genuine manifest.
-    The mode flag in the command must be the flag for the mode the
-    manifest records, and the pull request flag must name the pull
-    request the manifest records. A range or commit or since value
-    written as a full hash names an immutable commit, so a hash
-    that names a different commit than the manifest records, or
-    no commit at all, fails. A symbolic spelling names whatever
-    it resolves to when the check runs and can honestly have
-    moved since the run, so symbolic values are left to the ref
-    checks that read the manifest fields themselves.
+    The extractor argument parser keeps the last value of a
+    repeated flag, so every reading in this script takes the
+    last value too. A check that read the first value would
+    stamp a command the extractor itself would have run
+    differently.
     """
     problems = []
     command = manifest.get("command")
     if not isinstance(command, list) or not command or \
-            Path(str(command[0])).name != "extract.py":
-        return [
+            str(command[0]) != "extract.py":
+        return None, [
             "the manifest command does not name the extractor "
             "that builds a packet"
         ]
@@ -1515,7 +1708,52 @@ def command_problems(manifest, repo):
             value = tokens[index]
         flags.setdefault(name, []).append(value)
         index += 1
-    if problems:
+    return flags, problems
+
+
+def last_flag(flags, name):
+    values = flags.get(name)
+    return values[-1] if values else None
+
+
+def resolve_ref(repo, value):
+    if repo is None or value is None:
+        return None
+    out = run_git(repo, ["rev-parse", "--verify", value + "^{commit}"])
+    return out.strip() if out is not None else None
+
+
+def command_problems(manifest, repo, packet_text=None, extractor=None):
+    """Read the recorded extractor command back against the manifest.
+
+    The command is the record of how the packet claims it was
+    built, and a forged record must not wear a genuine manifest.
+    Every value the manifest also records is read back. The mode
+    flag must be the flag for the mode the manifest records, the
+    pull request flag must name the recorded pull request, the
+    budget flag must name the recorded budget, the tiers flag
+    must select the tiers the manifest records, and the findings
+    flag must stand where the packet carries a findings
+    accounting. A range or commit or since value written as a
+    full hash names an immutable commit, so a hash that names a
+    different commit than the manifest records, or no commit at
+    all, fails. A symbolic since spelling is resolved in the
+    checking repository, because the since anchor is the ref
+    the re-review section stands on and the manifest records
+    the hash it resolved to. A symbolic range spelling is left
+    to the warnings, because the range hashes are pinned in the
+    manifest fields themselves and a branch spelling can
+    honestly have moved since the run. The output flag the
+    extractor requires must stand in the command. The output
+    and repository values themselves name paths on the machine
+    that ran the extraction, and a packet is portable across
+    copies and clones, so those two values are read for
+    presence and nothing more.
+    """
+    problems = []
+    flags, parse_problems = parse_command_flags(manifest)
+    problems.extend(parse_problems)
+    if flags is None:
         return problems
     mode_flags = [
         flag for flag in COMMAND_MODE_FLAGS.values() if flag in flags
@@ -1527,25 +1765,22 @@ def command_problems(manifest, repo):
             "for the mode the manifest records"
         )
     if "--pr" in flags and isinstance(manifest.get("pr"), dict):
-        if flags["--pr"][0] != str(manifest["pr"].get("number")):
+        if last_flag(flags, "--pr") != str(manifest["pr"].get("number")):
             problems.append(
                 "the manifest command names a different pull "
                 "request than the manifest records"
             )
     if "--commit" in flags:
-        value = flags["--commit"][0]
+        value = last_flag(flags, "--commit")
         if HEX_REF.match(value) and repo is not None:
-            resolved = run_git(
-                repo, ["rev-parse", "--verify", value + "^{commit}"]
-            )
-            if resolved is None or \
-                    resolved.strip() != manifest.get("head"):
+            resolved = resolve_ref(repo, value)
+            if resolved is None or resolved != manifest.get("head"):
                 problems.append(
                     "the manifest command names a commit other "
                     "than the head the manifest records"
                 )
     if "--range" in flags:
-        value = flags["--range"][0]
+        value = last_flag(flags, "--range")
         if "..." in value:
             left, _, right = value.partition("...")
         elif ".." in value:
@@ -1573,23 +1808,171 @@ def command_problems(manifest, repo):
             "not carry"
         )
     if "--since" in flags:
+        value = last_flag(flags, "--since")
         if manifest.get("since") is None:
             problems.append(
                 "the manifest command carries a since flag the "
                 "manifest does not record"
             )
-        elif HEX40_REF.match(flags["--since"][0]) and \
-                flags["--since"][0] != manifest["since"]:
+        elif HEX40_REF.match(value):
+            if value != manifest["since"]:
+                problems.append(
+                    "the manifest command names a different since "
+                    "ref than the manifest records"
+                )
+        elif repo is not None:
+            resolved = resolve_ref(repo, value)
+            if resolved is not None and resolved != manifest["since"]:
+                problems.append(
+                    "the manifest command since spelling %s "
+                    "resolves to %s in this repository, but the "
+                    "manifest records since %s, so the re-review "
+                    "anchor the command names is not the anchor "
+                    "the manifest records"
+                    % (value, resolved, manifest["since"])
+                )
+    budget = manifest.get("budget")
+    recorded_budget = budget.get("budget_tokens") \
+        if isinstance(budget, dict) else None
+    if "--budget" in flags:
+        raw = last_flag(flags, "--budget")
+        try:
+            named_budget = int(raw)
+        except (TypeError, ValueError):
+            named_budget = None
+        if named_budget is None or named_budget != recorded_budget:
             problems.append(
-                "the manifest command names a different since ref "
-                "than the manifest records"
+                "the manifest command names budget %s but the "
+                "manifest budget account records %s"
+                % (raw, recorded_budget)
             )
+    elif recorded_budget is not None:
+        problems.append(
+            "the manifest budget account records a budget of %s "
+            "tokens but its command carries no budget flag"
+            % recorded_budget
+        )
+    if "--tiers" in flags:
+        if extractor is not None:
+            try:
+                selected = extractor.parse_tier_selection(
+                    last_flag(flags, "--tiers")
+                )
+            except ValueError:
+                problems.append(
+                    "the manifest command tiers value %s is not a "
+                    "tier selection the extractor accepts"
+                    % last_flag(flags, "--tiers")
+                )
+            else:
+                if sorted(selected) != manifest.get("selected_tiers"):
+                    problems.append(
+                        "the manifest command selects tiers %s but "
+                        "the manifest records the selected tiers %s"
+                        % (
+                            ", ".join(sorted(selected)),
+                            ", ".join(manifest.get("selected_tiers") or []),
+                        )
+                    )
+    elif manifest.get("selected_tiers") not in (None, ["T0", "T1", "T2", "T3"]):
+        problems.append(
+            "the manifest records the selected tiers %s but its "
+            "command carries no tiers flag, and a run with no "
+            "tiers flag selects all four tiers"
+            % ", ".join(manifest.get("selected_tiers") or [])
+        )
+    if "--findings" in flags and "--since" not in flags:
+        problems.append(
+            "the manifest command carries a findings flag with "
+            "no since flag, and the extractor refuses that pairing"
+        )
+    if packet_text is not None and manifest.get("since") is not None:
+        body = section_body(packet_text, "## Re-review")
+        accounted = body is not None and any(
+            line == "### Prior findings accounting" for line in body
+        )
+        if accounted and "--findings" not in flags:
+            problems.append(
+                "the packet carries a prior findings accounting "
+                "but the manifest command carries no findings "
+                "flag, so the command of record denies the input "
+                "that produced the accounting"
+            )
+    if "--out" not in flags:
+        problems.append(
+            "the manifest command carries no output flag, and "
+            "the extractor requires one on every run"
+        )
+    elif not last_flag(flags, "--out"):
+        problems.append(
+            "the manifest command output flag carries an empty "
+            "value"
+        )
+    if "--repo" in flags and not last_flag(flags, "--repo"):
+        problems.append(
+            "the manifest command repository flag carries an "
+            "empty value"
+        )
     return problems
 
 
-def identity_problems(manifest, extractor, repo=None):
+def command_warnings(manifest, repo):
+    """The recorded spellings that moved and are worth a warning.
+
+    A symbolic range spelling names whatever it resolves to in
+    the checking repository, and it can honestly have moved
+    since the run, so a moved spelling warns rather than
+    refuses. The stamp covers the recorded hashes, and the
+    warning tells the reader the names in the packet were not
+    the names those hashes now travel under.
+    """
+    warnings = []
+    flags, parse_problems = parse_command_flags(manifest)
+    if flags is None or parse_problems or repo is None:
+        return warnings
+    if "--range" in flags:
+        value = last_flag(flags, "--range")
+        if "..." in value:
+            left, _, right = value.partition("...")
+        elif ".." in value:
+            left, _, right = value.partition("..")
+        else:
+            left = right = ""
+        for spelling, recorded, field in (
+            (left, manifest.get("base"), "base"),
+            (right, manifest.get("head"), "head"),
+        ):
+            if not spelling or HEX40_REF.match(spelling):
+                continue
+            resolved = resolve_ref(repo, spelling)
+            if resolved is not None and recorded is not None \
+                    and resolved != recorded:
+                warnings.append(
+                    "the recorded range spelling %s now resolves "
+                    "to %s in this repository, while the packet "
+                    "records %s %s, so the stamp covers the "
+                    "recorded hashes and not the spelling as it "
+                    "now reads"
+                    % (spelling, resolved, field, recorded)
+                )
+    if "--since" in flags and manifest.get("since") is not None:
+        value = last_flag(flags, "--since")
+        if not HEX40_REF.match(value) \
+                and resolve_ref(repo, value) is None:
+            warnings.append(
+                "the recorded since spelling %s cannot be "
+                "resolved in this repository, so the re-review "
+                "anchor was checked against the recorded hash "
+                "alone" % value
+            )
+    return warnings
+
+
+def identity_problems(manifest, extractor, repo=None, packet_text=None):
     problems = []
-    problems.extend(command_problems(manifest, repo))
+    problems.extend(
+        command_problems(manifest, repo, packet_text, extractor)
+    )
     if extractor is not None and \
             manifest["version"] != extractor.EXTRACTOR_VERSION:
         problems.append(
@@ -1620,6 +2003,15 @@ def identity_problems(manifest, extractor, repo=None):
                 "the manifest label does not name the commit its "
                 "head records"
             )
+    if manifest["mode"] == "range":
+        flags, _parse = parse_command_flags(manifest)
+        spec = last_flag(flags, "--range") if flags else None
+        if spec is not None and manifest["label"] != "range %s" % spec:
+            problems.append(
+                "the manifest label %s does not name the range "
+                "its command records, which is range %s"
+                % (ascii(manifest["label"])[:60], spec)
+            )
     return problems
 
 
@@ -1646,6 +2038,400 @@ def mask_prior_prs(text):
     return text[:start] + "<prior pull requests passage>" + text[end:]
 
 
+FINDING_VERDICTS = (
+    "unaddressed, the file never existed at the previous "
+    "reviewed revision or at the head",
+    "unaddressed, the file did not exist at the previous "
+    "reviewed revision, so no anchored line was reviewed then",
+    "addressed, the file is gone at the head",
+    "addressed, the anchored lines changed",
+    "unaddressed, the anchored lines are unchanged",
+)
+
+NO_FINDINGS_LINE = (
+    "A findings file was given for this run and it contained "
+    "no findings, so there is nothing to account for."
+)
+
+
+def unescape_display_path(text):
+    """Reverse the display path escaping the extractor prints."""
+    out = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "\\" and index + 1 < len(text):
+            kind = text[index + 1]
+            if kind == "\\":
+                out.append("\\")
+                index += 2
+                continue
+            if kind == "n":
+                out.append("\n")
+                index += 2
+                continue
+            if kind == "r":
+                out.append("\r")
+                index += 2
+                continue
+            if kind == "t":
+                out.append("\t")
+                index += 2
+                continue
+            if kind == "x":
+                try:
+                    out.append(chr(int(text[index + 2:index + 4], 16)))
+                except ValueError:
+                    out.append(char)
+                    index += 1
+                    continue
+                index += 4
+                continue
+            if kind == "u":
+                try:
+                    out.append(chr(int(text[index + 2:index + 6], 16)))
+                except ValueError:
+                    out.append(char)
+                    index += 1
+                    continue
+                index += 6
+                continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def parse_packet_findings(span):
+    """Read the findings a re-review section accounts for.
+
+    Returns the findings list, whether a findings file was
+    given, and the padding the rebuild needs. The packet lines
+    are the only record of the findings file the checker is
+    handed, so the findings are read back out of the lines
+    themselves and the rebuild then recomputes every verdict
+    from the repository. The duplicate and cap lines are read
+    back as counts, and the rebuild input is padded with copies
+    and with entries past the cap so those counts are recomputed
+    rather than trusted.
+    """
+    lines = span.split("\n")
+    if "### Prior findings accounting" not in lines:
+        return [], False, []
+    if NO_FINDINGS_LINE in lines:
+        return [], True, []
+    findings = []
+    duplicates = 0
+    capped_total = None
+    in_accounting = False
+    bad_lines = []
+    for line in lines:
+        if line == "### Prior findings accounting":
+            in_accounting = True
+            continue
+        if not in_accounting:
+            continue
+        dup = re.match(
+            r"^([0-9]+) duplicate finding entries were removed "
+            r"before accounting",
+            line,
+        )
+        if dup:
+            duplicates = int(dup.group(1))
+            continue
+        cap = re.match(
+            r"^Findings capped at ([0-9]+) of ([0-9]+)\.", line
+        )
+        if cap:
+            capped_total = int(cap.group(2))
+            continue
+        if line.startswith("- "):
+            verdict = None
+            for candidate in FINDING_VERDICTS:
+                if line.endswith(". " + candidate):
+                    verdict = candidate
+                    break
+            if verdict is None:
+                bad_lines.append(line)
+                continue
+            core = line[2:-(len(verdict) + 2)]
+            match = re.match(r"^(.*?):([0-9]+) (.*)$", core)
+            if not match:
+                bad_lines.append(line)
+                continue
+            findings.append({
+                "path": unescape_display_path(match.group(1)),
+                "line": int(match.group(2)),
+                "text": match.group(3),
+            })
+    padding = []
+    if duplicates and findings:
+        padding.extend([dict(findings[0])] * duplicates)
+    if capped_total is not None and capped_total > len(findings):
+        for index in range(capped_total - len(findings)):
+            padding.append({
+                "path": "cap padding %d.py" % index,
+                "line": 1,
+                "text": "padding past the accounting cap",
+            })
+    return findings, True, padding + bad_lines
+
+
+def rereview_problems(packet_text, manifest, repo, extractor):
+    """Rebuild the re-review section and compare it whole.
+
+    The section rests on the since anchor and on a findings
+    file. When the file the recorded command names is still
+    where the run left it, its findings are read directly and
+    the rebuild stands on them alone. When it is not, the
+    anchor, the commit list and the range diff are still
+    readings of the repository, and the findings are read back
+    out of the packet lines, so the whole section can be
+    rebuilt and every verdict in it recomputed. A forged
+    verdict, an invented accounting and a body written for a
+    different anchor all disagree with the rebuild. In the
+    fallback reading a finding invented whole, whose path and
+    text no findings file ever carried, cannot be told from a
+    real one, and that limit is recorded in the fix report
+    rather than hidden.
+    """
+    problems = []
+    span = span_text(packet_text, "## Re-review")
+    if span is None:
+        return [
+            "the manifest records a since ref but the packet "
+            "carries no re-review section"
+        ]
+    flags, _parse = parse_command_flags(manifest)
+    findings_path = last_flag(flags, "--findings") if flags else None
+    if findings_path and Path(findings_path).is_file():
+        # The findings file the command records is still where
+        # the run left it, so its findings are the ground truth
+        # and no reading of the packet lines is needed at all.
+        try:
+            findings_text = Path(findings_path).read_bytes().decode(
+                "utf-8", "surrogateescape"
+            )
+            recorded_findings = extractor.parse_findings(findings_text)
+        except Exception as exc:
+            return [
+                "the findings file the manifest command records "
+                "cannot be read back, so the re-review accounting "
+                "cannot be verified (%s)" % exc
+            ]
+        diff_base = manifest["merge_base"] or EMPTY_TREE
+        try:
+            expected = extractor.build_rereview(
+                repo, diff_base, manifest["head"], manifest["since"],
+                recorded_findings, findings_given=True,
+            )
+        except Exception as exc:
+            return [
+                "the re-review rebuild could not run (%s)" % exc
+            ]
+        if span != expected:
+            problems.append(
+                "the re-review section disagrees with the "
+                "re-review the recount rebuilds from the "
+                "repository, its since anchor and the findings "
+                "file the command records"
+            )
+        return problems
+    findings, given, extra = parse_packet_findings(span)
+    bad_lines = [item for item in extra if isinstance(item, str)]
+    rebuild_input = findings + [
+        item for item in extra if isinstance(item, dict)
+    ]
+    if bad_lines:
+        problems.append(
+            "a finding line in the re-review section carries no "
+            "verdict the extractor writes, so the accounting "
+            "cannot be read back"
+        )
+        return problems
+    diff_base = manifest["merge_base"] or EMPTY_TREE
+    try:
+        expected = extractor.build_rereview(
+            repo, diff_base, manifest["head"], manifest["since"],
+            rebuild_input, findings_given=given,
+        )
+    except Exception as exc:
+        problems.append(
+            "the re-review rebuild could not run (%s)" % exc
+        )
+        return problems
+    if span != expected:
+        problems.append(
+            "the re-review section disagrees with the re-review "
+            "the recount rebuilds from the repository, its since "
+            "anchor and the findings the section itself carries"
+        )
+    return problems
+
+
+def fetch_pr_view(repo, number):
+    """Read the pull request record from the GitHub CLI, or None.
+
+    The extractor reads the same record the same way when it
+    builds a pull request packet. A checker environment without
+    a working CLI cannot reach that record, and the caller then
+    falls back to the readings the packet itself carries.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "gh", "pr", "view", str(number), "--json",
+                "baseRefOid,headRefOid,baseRefName,headRefName,"
+                "title,body",
+            ],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            env=scrubbed_child_env(),
+            timeout=PROCESS_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def parse_pr_body(packet_text):
+    """Read the pull request body back out of the triage tier.
+
+    Returns the body text, an empty string for a packet that
+    records no body, and None when the body was capped in the
+    packet, because a capped body cannot be read back whole.
+    """
+    body = section_body(packet_text, "## T0 Triage")
+    if body is None:
+        return None
+    try:
+        at = body.index("### Pull request body")
+    except ValueError:
+        return None
+    rest = [line for line in body[at + 1:] if line.strip()]
+    if not rest:
+        return None
+    if rest[0] == "The pull request has no body.":
+        return ""
+    fence = rest[0]
+    ticks = len(fence) - len(fence.lstrip("`"))
+    if ticks < 3 or fence.strip("`"):
+        return None
+    inner = []
+    for line in body[at + 1:]:
+        if not inner and line != fence:
+            continue
+        if inner and line == fence:
+            tail = [
+                item for item in body[at + 1:] if item.strip()
+            ]
+            capped = any(
+                item.startswith("The body was capped at ")
+                for item in tail
+            )
+            return None if capped else "\n".join(inner[1:])
+        inner.append(line)
+    return None
+
+
+def pr_triage_problems(packet_text, manifest, repo, fresh_change,
+                       extractor):
+    """Rebuild the pull request triage tier and compare it whole.
+
+    A pull request packet skips the deterministic rebuild the
+    other modes get, because its preamble rests on the pull
+    request record. That record is read back here. When the
+    GitHub CLI in the checking environment answers, its title
+    and body are the ground truth, the spec references are
+    recomputed from that body, and the manifest record must
+    equal all three. When the CLI does not answer, the body is
+    read back out of the packet and the spec references are
+    recomputed from it, which pins the manifest record and the
+    preamble against each other and against the body the packet
+    carries. A title forged in the manifest and the packet
+    together, in an environment with no CLI, is the shape that
+    still stands, and it is recorded in the fix report.
+    """
+    problems = []
+    recorded = manifest["pr"]
+    data = fetch_pr_view(repo, recorded["number"])
+    if data is not None:
+        title = data.get("title") or ""
+        body_text = data.get("body") or ""
+        spec = extractor.find_spec_references(body_text)
+        if recorded["title"] != title:
+            problems.append(
+                "the manifest pull request title %s disagrees "
+                "with the title the GitHub CLI reports, %s"
+                % (ascii(recorded["title"])[:60], ascii(title)[:60])
+            )
+        if recorded["spec_references"] != spec:
+            problems.append(
+                "the manifest pull request spec references "
+                "disagree with the references in the body the "
+                "GitHub CLI reports"
+            )
+        pr_info = {
+            "number": recorded["number"], "title": title,
+            "body": body_text, "spec_references": spec,
+        }
+    else:
+        body_text = parse_pr_body(packet_text)
+        if body_text is None:
+            line = "Pull request #%d: %s" % (
+                recorded["number"], recorded["title"]
+            )
+            body = section_body(packet_text, "## T0 Triage") or []
+            if line not in body:
+                problems.append(
+                    "the triage tier does not carry the pull "
+                    "request title line its manifest records"
+                )
+            if recorded["spec_references"]:
+                wanted = (
+                    "Spec references found in the body: %s"
+                    % ", ".join(recorded["spec_references"])
+                )
+            else:
+                wanted = (
+                    "No spec reference was found in the pull "
+                    "request body."
+                )
+            if wanted not in body:
+                problems.append(
+                    "the triage tier does not carry the spec "
+                    "reference line its manifest records"
+                )
+            return problems
+        spec = extractor.find_spec_references(body_text)
+        if recorded["spec_references"] != spec:
+            problems.append(
+                "the manifest pull request spec references "
+                "disagree with the references in the body the "
+                "packet itself carries"
+            )
+        pr_info = {
+            "number": recorded["number"],
+            "title": recorded["title"], "body": body_text,
+            "spec_references": recorded["spec_references"],
+        }
+    expected = extractor.build_t0(
+        fresh_change["files"], fresh_change["commit_log"], pr_info
+    )
+    if span_text(packet_text, "## T0 Triage") != expected:
+        problems.append(
+            "the triage tier disagrees with the tier the recount "
+            "rebuilds from the pull request record"
+        )
+    return problems
+
+
 def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
     """Rebuild the deterministic tiers and compare them whole.
 
@@ -1654,10 +2440,14 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
     The triage, companion and history tiers are deterministic
     readings of the repository, so the checker rebuilds them
     with the extractor's own builders and compares the text,
-    which catches an edit of any size. The pull request tier
-    text of a pull request packet and the re-review section
-    are not rebuilt, because both rest on inputs the checker
-    is not handed, the pull request body and the findings file.
+    which catches an edit of any size. The builders also hand
+    back the cap notes and the tier sizes, and those readings
+    pin the manifest cap notes list and the recorded size of a
+    dropped tier, two accounts the packet receipt lines alone
+    cannot pin because they are printed from the accounts
+    themselves. The re-review section and the pull request
+    preamble are rebuilt by their own passes above, from the
+    repository and from the records those sections stand on.
     """
     problems = []
     if fresh_change is None or extractor is None:
@@ -1672,8 +2462,13 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
     }
     head = manifest["head"]
     tiers = manifest["tiers"]
+    notes = []
     try:
-        if manifest["mode"] != "pr":
+        if manifest["mode"] == "pr":
+            problems.extend(pr_triage_problems(
+                packet_text, manifest, repo, fresh_change, extractor
+            ))
+        else:
             expected = extractor.build_t0(
                 files, fresh_change["commit_log"], None
             )
@@ -1682,37 +2477,86 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
                     "the triage tier disagrees with the tier the "
                     "recount rebuilds from the repository"
                 )
-        if tiers["T2"]["state"] == "included":
-            expected = extractor.build_t2(repo, head, files, functions)[0]
-            if span_text(packet_text, "## T2 Companions") != expected:
-                problems.append(
-                    "the companion tier disagrees with the tier "
-                    "the recount rebuilds from the repository"
-                )
-        if tiers["T3"]["state"] == "included":
+        if tiers["T2"]["state"] != "not selected":
+            text2, notes2, count2 = extractor.build_t2(
+                repo, head, files, functions
+            )
+            notes.extend(notes2)
+            if tiers["T2"]["state"] == "included":
+                if span_text(packet_text, "## T2 Companions") != text2:
+                    problems.append(
+                        "the companion tier disagrees with the "
+                        "tier the recount rebuilds from the "
+                        "repository"
+                    )
+            else:
+                if tiers["T2"]["estimated_tokens"] != len(text2) // 4:
+                    problems.append(
+                        "the manifest records the dropped T2 tier "
+                        "at %d tokens, but the recount rebuilds "
+                        "that tier at %d tokens"
+                        % (tiers["T2"]["estimated_tokens"],
+                           len(text2) // 4)
+                    )
+                if tiers["T2"]["files"] != count2:
+                    problems.append(
+                        "the manifest tier receipt for T2 names "
+                        "%d files, but the recount finds %d "
+                        "changed source files"
+                        % (tiers["T2"]["files"], count2)
+                    )
+        if tiers["T3"]["state"] != "not selected":
             ranges = {
                 entry["path"]: extractor.changed_ranges(
                     fresh_change["precise_chunks"].get(entry["path"], "")
                 )
                 for entry in files
             }
-            expected = extractor.build_t3(
+            text3, notes3, count3 = extractor.build_t3(
                 repo, head, files, fresh_change["stats"], ranges,
                 functions,
-            )[0]
-            actual = span_text(packet_text, "## T3 History")
-            if actual is None or \
-                    mask_prior_prs(actual) != mask_prior_prs(expected):
-                problems.append(
-                    "the history tier disagrees with the tier "
-                    "the recount rebuilds from the repository"
-                )
+            )
+            notes.extend(notes3)
+            if tiers["T3"]["state"] == "included":
+                actual = span_text(packet_text, "## T3 History")
+                if actual is None or \
+                        mask_prior_prs(actual) != mask_prior_prs(text3):
+                    problems.append(
+                        "the history tier disagrees with the tier "
+                        "the recount rebuilds from the repository"
+                    )
+            else:
+                if tiers["T3"]["estimated_tokens"] != len(text3) // 4:
+                    problems.append(
+                        "the manifest records the dropped T3 tier "
+                        "at %d tokens, but the recount rebuilds "
+                        "that tier at %d tokens"
+                        % (tiers["T3"]["estimated_tokens"],
+                           len(text3) // 4)
+                    )
+                if tiers["T3"]["files"] != count3:
+                    problems.append(
+                        "the manifest tier receipt for T3 names "
+                        "%d files, but the recount finds %d files "
+                        "with history"
+                        % (tiers["T3"]["files"], count3)
+                    )
     except Exception as exc:
         problems.append(
             "the tier rebuild could not run (%s)" % exc
         )
         return problems
-    if tiers["T2"]["state"] != "not selected":
+    if manifest.get("cap_notes") != notes:
+        problems.append(
+            "the manifest cap notes list %s disagrees with the "
+            "cap notes the recount rebuilds from the repository, "
+            "%s"
+            % (
+                ascii(manifest.get("cap_notes"))[:80],
+                ascii(notes)[:80],
+            )
+        )
+    if tiers["T2"]["state"] == "included":
         sources = len(extractor.source_entries(files))
         if tiers["T2"]["files"] != sources:
             problems.append(
@@ -1720,7 +2564,7 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
                 "files, but the recount finds %d changed source "
                 "files" % (tiers["T2"]["files"], sources)
             )
-    if tiers["T3"]["state"] != "not selected":
+    if tiers["T3"]["state"] == "included":
         top = len(extractor.top_history_files(
             files, fresh_change["stats"]
         ))
@@ -1730,6 +2574,94 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor):
                 "files, but the recount finds %d files with "
                 "history" % (tiers["T3"]["files"], top)
             )
+    if manifest.get("since") is not None:
+        problems.extend(rereview_problems(
+            packet_text, manifest, repo, extractor
+        ))
+    return problems
+
+
+def whole_section_problems(packet_text, manifest, extractor):
+    """Compare the framing sections whole against their rebuilds.
+
+    The header, the contents block and the closing recount are
+    generated from the manifest data and nothing else, so each
+    can be rebuilt with the extractor builders and compared as
+    a whole. The line by line readings elsewhere in this pass
+    name the field that disagrees, and this reading catches
+    what a presence reading cannot, a line inserted into a
+    section, a sentence swapped inside a line nobody lists, and
+    the descriptive sentence no other check reads back.
+    """
+    problems = []
+    if extractor is None:
+        return problems
+    totals = manifest_totals(manifest)
+    counts = {
+        "files": totals["files"], "hunks": totals["hunks"],
+        "additions": totals["additions"],
+        "deletions": totals["deletions"],
+    }
+    diff_base = manifest["merge_base"] or EMPTY_TREE
+    resolved = {
+        "label": manifest["label"], "mode": manifest["mode"],
+        "base": manifest["base"], "head": manifest["head"],
+        "merge_base": manifest["merge_base"],
+        "since": manifest["since"],
+    }
+    try:
+        expected_header = extractor.build_header(
+            resolved, diff_base, True, manifest["exclusions"]
+        )
+        lines = packet_text.split("\n")
+        if "Contents" in lines:
+            actual_header = "\n".join(lines[:lines.index("Contents")])
+            if actual_header.rstrip("\n") != \
+                    expected_header.rstrip("\n"):
+                problems.append(
+                    "the packet header disagrees with the header "
+                    "the recount rebuilds from the manifest"
+                )
+        expected_contents = extractor.build_contents(
+            counts, manifest["tiers"], manifest["since"]
+        )
+        if "Contents" in lines:
+            start = lines.index("Contents")
+            block = []
+            for line in lines[start:]:
+                if line.startswith("## "):
+                    break
+                block.append(line)
+            if "\n".join(block).rstrip("\n") != \
+                    expected_contents.rstrip("\n"):
+                problems.append(
+                    "the packet contents block disagrees with "
+                    "the contents the recount rebuilds from the "
+                    "manifest"
+                )
+        expected_receipt = extractor.render_receipt(
+            manifest["budget"]["budget_tokens"],
+            manifest["budget"]["estimated_tokens"],
+            manifest["tiers"],
+            manifest["budget"]["dropped"],
+            True, [], counts,
+        )
+        actual_receipt = span_text(
+            packet_text, "## Verification recount"
+        )
+        if actual_receipt is None or \
+                actual_receipt.rstrip("\n") != \
+                expected_receipt.rstrip("\n"):
+            problems.append(
+                "the closing recount section disagrees with "
+                "the recount the checker rebuilds from the "
+                "manifest, so a line in it was inserted, removed "
+                "or rewritten after the run"
+            )
+    except Exception as exc:
+        problems.append(
+            "the framing section rebuild could not run (%s)" % exc
+        )
     return problems
 
 
@@ -1752,6 +2684,9 @@ def body_problems(packet_text, manifest, fresh_change, extractor,
     )
     problems.extend(tier_span_problems(packet_text, manifest, extractor))
     problems.extend(receipt_problems(packet_text, manifest, totals))
+    problems.extend(
+        whole_section_problems(packet_text, manifest, extractor)
+    )
     return problems
 
 
@@ -1790,11 +2725,25 @@ def packet_dir_problems(packet_dir):
                 "pair the stamp covers" % name
             )
     for name in ("packet.md", "manifest.json"):
-        if (packet_dir / name).is_symlink():
+        target = packet_dir / name
+        if target.is_symlink():
             problems.append(
                 "%s in the packet directory is a symbolic link, "
                 "so the bytes the check reads do not live in the "
                 "directory it was handed" % name
+            )
+            continue
+        try:
+            link_count = target.stat().st_nlink
+        except OSError:
+            continue
+        if link_count > 1:
+            problems.append(
+                "%s in the packet directory is a hard link with "
+                "%d links, so the bytes the check reads can be "
+                "rewritten through a name outside the directory "
+                "it was handed, and the seal the symbolic link "
+                "rule states covers that shape too" % (name, link_count)
             )
     return problems
 
@@ -1903,6 +2852,7 @@ def main(argv=None):
     if manifest is not None:
         schema_problem_list = manifest_schema_problems(manifest)
         problems.extend(schema_problem_list)
+        problems.extend(created_problems(manifest))
         if manifest.get("verified") is not True:
             problems.append(
                 "the manifest does not report verified. A packet "
@@ -1917,28 +2867,52 @@ def main(argv=None):
                 "built it recorded a recount that failed"
             )
         recorded = manifest.get("head")
-        head = current_head(args.repo)
-        if head is None:
-            problems.append(
-                "cannot read the current head of %s" % args.repo
-            )
-        elif recorded != head:
-            problems.append(
-                "the manifest records head %s but the repository "
-                "head is %s. The packet is stale" % (recorded, head)
-            )
+        state_problems, state_fatal = repo_state_problems(args.repo)
+        problems.extend(state_problems)
+        head = None
+        if not state_fatal:
+            head = current_head(args.repo)
+            if head is None:
+                problems.append(
+                    "the repository at %s has no readable head "
+                    "commit, so the recorded head cannot be "
+                    "checked against it" % args.repo
+                )
+            elif recorded != head:
+                problems.append(
+                    "the manifest records head %s but the "
+                    "repository head is %s. The packet is stale"
+                    % (recorded, head)
+                )
         extractor = load_extractor()
         # The deep checks need a schema sound manifest, because
         # they index the record fields directly. A manifest that
         # fails its schema has already failed the stamp, and
         # running the recount against a stripped record would only
-        # add noise, or worse, an exception.
-        if schema_sound and manifest.get("verified") is True \
-                and isinstance(recorded, str):
+        # add noise, or worse, an exception. When the deep checks
+        # are skipped the output says so and says why, because a
+        # reader who sees one fault named can otherwise take the
+        # silence about the rest as a reading of the rest.
+        skip_reason = None
+        if not schema_sound:
+            skip_reason = "the manifest failed its schema"
+        elif manifest.get("verified") is not True:
+            skip_reason = "the manifest does not report verified"
+        elif state_fatal:
+            skip_reason = "the repository cannot be recounted from"
+        elif head is None:
+            skip_reason = "the repository head cannot be read"
+        elif not isinstance(recorded, str):
+            skip_reason = "the manifest records no head"
+        if skip_reason is None:
             problems.extend(
-                identity_problems(manifest, extractor, args.repo)
+                identity_problems(
+                    manifest, extractor, args.repo,
+                    packet_text=packet_text,
+                )
             )
             problems.extend(tier_receipt_problems(manifest))
+            problems.extend(budget_problems(manifest))
             repo_problems = ref_problems(
                 args.repo, manifest,
                 args.expect_base, args.expect_merge_base,
@@ -1974,14 +2948,37 @@ def main(argv=None):
                             repo=args.repo,
                         )
                     )
+        else:
+            problems.append(
+                "the identity, reference, recount and body checks "
+                "were skipped because %s, so faults those checks "
+                "would have caught are not named in this output"
+                % skip_reason
+            )
 
     if problems:
         for problem in problems:
             print("check_packet: %s" % problem, file=sys.stderr)
         return 1
+    for warning in command_warnings(manifest, args.repo):
+        print("check_packet: warning: %s" % warning, file=sys.stderr)
+    if args.expect_base is None and args.expect_merge_base is None:
+        expectation = (
+            "the review named no expected range, so the stamp "
+            "covers the range the packet records"
+        )
+    else:
+        expectation = (
+            "the stamp covers the range the review named with "
+            "its expect flags"
+        )
     print(
-        "check_packet: packet in %s is verified for the current head"
-        % packet_dir
+        "check_packet: packet in %s is verified for the current "
+        "head %s, covering base %s and merge base %s, and %s"
+        % (
+            packet_dir, manifest["head"], manifest["base"],
+            manifest["merge_base"], expectation,
+        )
     )
     return 0
 

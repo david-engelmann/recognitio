@@ -228,6 +228,18 @@ def display_path(path):
             # name carrying one would print a second line that
             # looks like packet structure to those readers.
             out.append("\\u%04x" % ord(char))
+        elif char in (
+            "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
+            "\u2066", "\u2067", "\u2068", "\u2069",
+            "\u200b", "\u200c", "\u200d", "\u200e", "\u200f",
+            "\u2060", "\ufeff",
+        ):
+            # Bidirectional controls reorder the text that follows
+            # them in any ordinary renderer, and zero width marks
+            # hide inside a name, so a name carrying one would
+            # display as a different name than the file the packet
+            # names. They are escaped like the separators above.
+            out.append("\\u%04x" % ord(char))
         else:
             out.append(char)
     return "".join(out)
