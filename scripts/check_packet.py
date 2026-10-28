@@ -1968,10 +1968,14 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
     budget flag must name the recorded budget, the tiers flag
     must select the tiers the manifest records, and the findings
     flag must stand where the packet carries a findings
-    accounting. A range or commit or since value written as a
-    full hash names an immutable commit, so a hash that names a
-    different commit than the manifest records, or no commit at
-    all, fails. A symbolic since spelling is resolved in the
+    accounting. A findings hash must stand only where the
+    recorded command carries a findings flag, because the hash
+    is the digest of the file that flag named and a run that
+    named no such file used no findings file to digest.
+    A range or commit or since value written as a full hash
+    names an immutable commit, so a hash that names a different
+    commit than the manifest records, or no commit at all,
+    fails. A symbolic since spelling is resolved in the
     checking repository, because the since anchor is the ref
     the re-review section stands on and the manifest records
     the hash it resolved to. A symbolic range spelling is left
@@ -2119,6 +2123,14 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
         problems.append(
             "the manifest command carries a findings flag with "
             "no since flag, and the extractor refuses that pairing"
+        )
+    if "--findings" not in flags and \
+            manifest.get("findings_sha256") is not None:
+        problems.append(
+            "the manifest records a findings hash but its "
+            "command carries no findings flag, so the hash "
+            "claims a findings file the run of record never "
+            "used"
         )
     if packet_text is not None and manifest.get("since") is not None:
         body = section_body(packet_text, "## Re-review")

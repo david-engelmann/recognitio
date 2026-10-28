@@ -26,6 +26,10 @@ When no CLI answers, the body is read back out of the packet and the triage tier
 
 A relative findings path in the recorded command resolves beside the packet directory, in the directory that holds the packet directory, and never against the working directory the check was launched from. The packet directory is a sealed pair and a findings file cannot lawfully stand inside it, so a relative spelling names a file beside the pair. The same packet and the same findings file give the same verdict from every directory, and a file that merely shares the spelling in the launch directory is never read.
 
+## The findings hash
+
+The manifest records a hash of the findings file a run used, or no hash where the run used no findings file. The check refuses a packet whose manifest records a findings hash while its recorded command carries no findings flag. A hash standing on a run that named no findings file claims a digest of an input the run never saw, and no accounting in such a packet can earn that claim back, in the same way an estimated size for a tier that was never built is refused.
+
 ## The creation time
 
 The manifest creation time is read against the repository the check runs against. A creation time naming a moment more than one hour before the recorded head commit was committed is refused, because a packet cannot have been extracted from a commit before that commit existed. A creation time naming a moment more than one hour after the check runs is refused on the same terms. The one hour each way is the stated allowance for clock skew between the machine that committed the head, the machine that ran the extraction, and the machine that runs the check, and it replaces the earlier one day of silent grace. A creation time inside the allowance is accepted as a clock reading and is not presented as proved to the minute.

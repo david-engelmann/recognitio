@@ -13,6 +13,7 @@ pass. The fabrication tests fail against the pre fix checker,
 which is the proof they test the fix and not the fixture.
 """
 
+import hashlib
 import importlib.util
 import io
 import json
@@ -26,6 +27,7 @@ import time
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_PATH = (
@@ -757,6 +759,76 @@ class TestGenuineShapes(VerifierFixture):
         )
         self.assertEqual(self.manifest(out)["mode"], "pr")
         self.assertEqual(self.check_repo_packet(repo, out), 0)
+
+
+class TestFindingsHashBinding(VerifierFixture):
+    """A findings hash stands only on a run that used a findings file.
+
+    Round 98 finding 1 built a genuine range packet with no
+    findings file, whose manifest honestly records no hash,
+    and then replaced that record with an invented hex string
+    of the right shape. The packet stamped verified, because
+    no reading compared the field against anything where no
+    findings path stands in the recorded command. The tests
+    below hold the correct forms on both sides of the rule and
+    fail against the pre fix checker on the invented hash.
+    """
+
+    def run_check_capture(self, out):
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            code = check_mod.main(
+                [str(out), "--repo", str(self.repo)]
+            )
+        return code, stream.getvalue()
+
+    def test_a_genuine_packet_with_no_findings_file_passes_with_a_null_hash(self):
+        manifest = self.manifest(self.genuine)
+        self.assertIsNone(manifest["findings_sha256"])
+        self.assertNotIn("--findings", manifest["command"])
+        self.assertEqual(self.run_check(self.clone("nohash")), 0)
+
+    def test_an_invented_findings_hash_on_a_packet_with_no_findings_file_fails(self):
+        out = self.clone("inventedhash")
+        manifest = self.manifest(out)
+        self.assertIsNone(manifest["findings_sha256"])
+        manifest["findings_sha256"] = "0123456789abcdef" * 4
+        self.save_manifest(out, manifest)
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but its "
+            "command carries no findings flag",
+            output,
+        )
+
+    def test_a_genuine_rereview_packet_with_a_real_findings_hash_passes(self):
+        findings = Path(self.tmp.name) / "real-findings.txt"
+        findings.write_text(
+            findings_text_for(
+                self.repo, "HEAD~2", "b.py:2: the value changed\n"
+            ),
+            encoding="utf-8",
+        )
+        out = extract_packet(
+            self.repo, Path(self.tmp.name) / "realhash",
+            "--range", "HEAD~1..HEAD", "--since", "HEAD~2",
+            "--findings", str(findings),
+        )
+        manifest = self.manifest(out)
+        self.assertIn("--findings", manifest["command"])
+        self.assertEqual(
+            manifest["findings_sha256"],
+            hashlib.sha256(findings.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_the_extractor_clears_a_stale_hash_when_no_findings_file_is_named(self):
+        args = SimpleNamespace(
+            findings=None, findings_sha256="a" * 64
+        )
+        self.assertEqual(extract_mod.load_findings(args), [])
+        self.assertIsNone(args.findings_sha256)
 
 
 class TestSizedDiffFence(VerifierFixture):

@@ -3842,6 +3842,10 @@ def load_findings(args, resolved=None):
     the file the run actually used.
     """
     if not args.findings:
+        # A run with no findings file records no findings hash,
+        # even where a reused args object still carries the hash
+        # an earlier findings run set on it.
+        args.findings_sha256 = None
         return []
     try:
         findings_bytes = Path(args.findings).read_bytes()

@@ -1751,6 +1751,13 @@ This unreleased work carries version 1.3.0.
   fan out runbook now names the screen as a listed phrase
   screen, so the contract states the control that stands
   behind it and no wider one.
+- The packet check now refuses a findings hash on a packet whose
+  recorded command carries no findings flag. A run with no
+  findings file records no hash, so an invented hash on such a
+  packet claimed a digest of an input the run never saw while
+  the packet still stamped. The extractor now also clears any
+  findings hash a reused run object might carry when a run names
+  no findings file, so it cannot write such a manifest.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
