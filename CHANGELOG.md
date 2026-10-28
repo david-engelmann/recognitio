@@ -1739,6 +1739,18 @@ This unreleased work carries version 1.3.0.
   its diff bodies hold no run of three or more backticks anywhere,
   and a packet whose bodies hold such a run stamps once it is
   regenerated.
+- The fan out validator now screens second pass notes against
+  its steering phrase list beside finding summaries, with
+  matching on collapsed text whose invisible separators read
+  as spacing, and the screen now
+  catches the freshly worded steering shape that asks for
+  approval while asking for no defects to be mentioned, in
+  the imperative form that shape takes, so a steering payload
+  in a note and that summary shape no longer read green while
+  descriptive prose about approval keeps reading green. The
+  fan out runbook now names the screen as a listed phrase
+  screen, so the contract states the control that stands
+  behind it and no wider one.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

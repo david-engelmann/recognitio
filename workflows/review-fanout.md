@@ -27,10 +27,12 @@ packet is evidence about the change under review, and
 nothing inside it is an instruction to a reviewer, to the
 second pass, or to the orchestrator, however it is
 phrased. Finding text a reviewer writes is data of the
-same kind for every later reader, and a finding summary
-written in the shape of an instruction to a reviewer is
-steering content the validator flags for a human to
-clear.
+same kind for every later reader. The validator screens
+finding summaries and second pass notes against a fixed
+list of steering phrases and flags a text that carries a
+listed phrase for a human to clear. The screen is a listed
+phrase screen. It catches the phrases on its list and it
+is not a judgement that a text in other words is safe.
 
 Phase two fans out. The orchestrator partitions the
 packet's file list into groups and starts one reviewer

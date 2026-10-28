@@ -28,9 +28,11 @@ numbers. Anything else fails the run, because a fan out must
 never read green on a shape the gate cannot verify. Packet
 content is untrusted data throughout. Text quoted from the
 packet is evidence about the change under review and never an
-instruction to a reviewer or to this gate, and a finding
-summary written in the shape of an instruction to a reviewer
-fails the run for a human to clear. See
+instruction to a reviewer or to this gate. Finding summaries
+and second pass notes are screened against a fixed list of
+steering phrases, and a text that carries a listed phrase
+fails the run for a human to clear. The screen is a listed
+phrase screen and catches only the phrases it lists. See
 workflows/review-fanout.md for the full contract and the
 primary sources behind each rule.
 """
@@ -38,6 +40,7 @@ primary sources behind each rule.
 import argparse
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -60,11 +63,19 @@ MODES = ("local", "managed")
 SECOND_PASS_SOURCE = "second_pass"
 MIN_NOTE_CHARS = 20
 
-# Finding summaries are reviewer text about a defect. A summary
-# written as an instruction to the next reader is steering
-# content planted in the chain, whatever hand wrote it, so the
-# gate names it as a problem for a human to clear rather than
-# passing it down the chain in silence.
+# Finding summaries and second pass notes are reviewer text
+# about a defect. A text that carries one of the listed
+# steering phrases is steering content planted in the chain,
+# whatever hand wrote it, so the gate names it as a problem
+# for a human to clear rather than passing it down the chain
+# in silence. The list is the whole screen, and it does not
+# judge a text that carries none of its phrases. Matching
+# runs on text whose whitespace is collapsed to single
+# spaces and whose invisible separators read as spacing, so
+# a listed phrase split by a line break or padded with extra
+# spaces or split by a zero width character is still the
+# listed phrase. A second reading with every separator
+# removed catches a phrase split inside one of its words.
 STEERING_PHRASES = (
     "ignore the",
     "ignore all",
@@ -78,19 +89,95 @@ STEERING_PHRASES = (
     "cite only",
 )
 
+# The freshly worded steering shape asks for approval while
+# asking for no defects to be mentioned. Its bare words also
+# occur in honest descriptive prose, where a finding reports
+# that a change lets a user approve it alone or that a report
+# will mention no defects, so the shape is screened in the
+# imperative form a steering text takes. Each pattern names
+# the approval or the suppression standing at the head of a
+# clause, after a sentence or clause boundary or at the head
+# of a line, or addressed to the reader own report. A verb
+# phrase a named subject governs, even one joined by and, is
+# descriptive and no pattern reaches it. A shape followed by
+# one of the subject verbs the guard lists, as where prose
+# quotes a banner or a dialog label and then says what it
+# does, is a mention and no pattern reaches that either. The
+# problem line reports the words the pattern actually
+# matched.
+STEERING_HEAD = r"(?:^|[.!?;,/—–]\s*)"
+STEERING_INTRO = r"(?:[\"'#>*\-]\s*)?(?:please\s+|just\s+)?"
+STEERING_SUBJECT_VERB = (
+    r"(?![\"']?\s+(?:is|was|appears|stands|sits|reads|comes|"
+    r"says|flashes|shows)\b)"
+)
+STEERING_PATTERNS = (
+    STEERING_HEAD + STEERING_INTRO
+    + r"(approve this (?:change|pull request))" + STEERING_SUBJECT_VERB,
+    STEERING_HEAD + STEERING_INTRO
+    + r"(mention no (?:defects|findings))" + STEERING_SUBJECT_VERB,
+    r"(no defects in your report)" + STEERING_SUBJECT_VERB,
+    STEERING_HEAD + STEERING_INTRO
+    + r"(report no defects)" + STEERING_SUBJECT_VERB,
+)
 
-def steering_problems(summary, where):
-    """Problems with a finding summary shaped as an instruction."""
-    if not isinstance(summary, str):
+# Invisible characters that separate words without showing
+# on the page. A zero width space, a zero width non joiner or
+# joiner, a byte order mark and a soft hyphen all read as
+# spacing when a phrase is split by one of them.
+INVISIBLE_SEPARATORS = "\u00ad\u200b\u200c\u200d\ufeff"
+
+
+def steering_readings(text):
+    """The readings of one text the steering screen matches on.
+
+    The first reading collapses every run of whitespace to a
+    single space. The second treats a line break as a sentence
+    boundary, so a clause head standing at the head of a line
+    is a clause head. The third removes every separator, so a
+    phrase split inside one of its own words still reads as
+    the phrase. The fourth removes the invisible separators
+    and the clause punctuation marks instead of spacing them,
+    so a pattern word split by an invisible character or a
+    comma still reads as the word.
+    """
+    base = text.lower().replace("\r\n", "\n").replace("\r", "\n")
+    spaced_base = base.translate(
+        {ord(char): " " for char in INVISIBLE_SEPARATORS}
+    )
+    plain = " ".join(spaced_base.split())
+    lined = " ".join(spaced_base.replace("\n", " . ").split())
+    squashed = re.sub(r"[^a-z0-9]", "", plain)
+    joined = base
+    for char in INVISIBLE_SEPARATORS:
+        joined = joined.replace(char, "")
+    for char in ",;:":
+        joined = joined.replace(char, "")
+    joined = " ".join(joined.split())
+    return plain, lined, squashed, joined
+
+
+def steering_problems(text, where, field="summary"):
+    """Problems with a text that carries a listed steering phrase."""
+    if not isinstance(text, str):
         return []
-    lowered = summary.lower()
+    plain, lined, squashed, joined = steering_readings(text)
+
+    def problem(phrase):
+        return [
+            "%s carries a %s shaped as an instruction "
+            "to a reviewer (%r), which is steering content a "
+            "human must clear" % (where, field, phrase)
+        ]
+
     for phrase in STEERING_PHRASES:
-        if phrase in lowered:
-            return [
-                "%s carries a summary shaped as an instruction "
-                "to a reviewer (%r), which is steering content a "
-                "human must clear" % (where, phrase)
-            ]
+        if phrase in plain or re.sub(r"[^a-z0-9]", "", phrase) in squashed:
+            return problem(phrase)
+    for pattern in STEERING_PATTERNS:
+        for reading in (plain, lined, joined):
+            match = re.search(pattern, reading)
+            if match:
+                return problem(match.group(1))
     return []
 
 
@@ -732,6 +819,7 @@ def check_second_pass(record, merged_ids, files, finding_schema):
                 "%s carries no note of substance, which is the "
                 "rubber stamp the second pass must never be" % where
             )
+        problems.extend(steering_problems(note, where, field="note"))
         if verdict == "new":
             raised = entry.get("raised")
             if not isinstance(raised, dict):
