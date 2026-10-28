@@ -64,7 +64,6 @@ CLASSIFIED = {
     "scripts/merge_to_headless.py": "carries validated values only",
     "AGENTS.md": "chronicle record",
     "CHANGELOG.md": "chronicle record",
-    "docs/images/capture.json": "capture record",
     "docs/reviews/round11-fix-review.md": "report record",
     "docs/reviews/round12-fix-review.md": "report record",
     "docs/reviews/round13-fix-review.md": "report record",

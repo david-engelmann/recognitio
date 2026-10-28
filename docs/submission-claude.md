@@ -149,8 +149,8 @@ how it is installed, and how a review runs from a packet.
 
 **Met, the size limits.** The repo holds under two hundred
 files and a few megabytes in total. Its largest file is the
-demo capture record at about three quarters of a megabyte,
-well under the 5 MiB file limit.
+demo recording at 646,314 bytes, well under the 5 MiB file
+limit.
 
 **Open, the worked examples.** The directory policy asks for
 at least three working examples that show the core
@@ -186,13 +186,6 @@ standing in for a file the plugin loads blocks, and a
 symlink elsewhere warns. This one loads nothing, so the
 expected outcome is a warning, and the portal run is where
 it would be recorded.
-
-**Named, one file a reviewer will hold.** The demo capture
-record at docs/images/capture.json is a data file of about
-three quarters of a megabyte. A file of its kind and size in
-the plugin folder is held for a reviewer under the checklist.
-A hold is not a block, and the filing should expect it
-rather than discover it.
 
 **Open by choice, the listing URLs.** The documentation and
 support URL fields stand unset in the manifest. Neither is

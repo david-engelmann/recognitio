@@ -4,18 +4,18 @@
   "command": [
     "extract.py",
     "--repo",
-    "/home/hatch/workspace/recognitio-eval-scratch/task-01/repo",
+    "/tmp/tmp8_8u1h5x/repo",
     "--range",
-    "29770e45af0a5efaafb3e137e0c5838c00da8356..1af217a2cd63627221e0d42d165c13728f530bb1",
+    "4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4..46b418895ebd14a4bfe863d20154bbca0cb25e6d",
     "--out",
-    "/home/hatch/workspace/recognitio-eval-scratch/task-01/packet"
+    "/tmp/tmp8_8u1h5x/out"
   ],
-  "created_utc": "2026-10-23T08:04:50.002958+00:00",
+  "created_utc": "2026-10-28T00:07:19.900862+00:00",
   "mode": "range",
-  "label": "range 29770e45af0a5efaafb3e137e0c5838c00da8356..1af217a2cd63627221e0d42d165c13728f530bb1",
-  "base": "29770e45af0a5efaafb3e137e0c5838c00da8356",
-  "head": "1af217a2cd63627221e0d42d165c13728f530bb1",
-  "merge_base": "29770e45af0a5efaafb3e137e0c5838c00da8356",
+  "label": "range 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4..46b418895ebd14a4bfe863d20154bbca0cb25e6d",
+  "base": "4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4",
+  "head": "46b418895ebd14a4bfe863d20154bbca0cb25e6d",
+  "merge_base": "4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4",
   "since": null,
   "pr": null,
   "files": [
@@ -30,7 +30,8 @@
       "binary": false,
       "attribute_text": false,
       "binary_transition": false,
-      "placeholder": null
+      "placeholder": null,
+      "instruction_file": false
     }
   ],
   "exclusions": [],
@@ -44,29 +45,29 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 37,
-      "emitted_tokens": 37,
+      "estimated_tokens": 65,
+      "emitted_tokens": 65,
       "files": 1
     },
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 85,
-      "emitted_tokens": 85,
+      "estimated_tokens": 137,
+      "emitted_tokens": 137,
       "files": 1
     },
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 186,
-      "emitted_tokens": 186,
+      "estimated_tokens": 249,
+      "emitted_tokens": 249,
       "files": 1
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 234,
-      "emitted_tokens": 234,
+      "estimated_tokens": 358,
+      "emitted_tokens": 358,
       "files": 1
     }
   },
@@ -75,14 +76,16 @@
     "## T1 The change",
     "## T2 Companions",
     "## T3 History",
-    "## Budget and completeness"
+    "## Verification recount"
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 745,
+    "estimated_tokens": 1284,
     "dropped": []
   },
   "cap_notes": [],
   "verified": true,
-  "discrepancies": []
+  "discrepancies": [],
+  "findings_sha256": null,
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
 }

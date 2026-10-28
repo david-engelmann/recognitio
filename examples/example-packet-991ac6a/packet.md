@@ -581,6 +581,8 @@ diff --git a/scripts/check_devin.py b/scripts/check_devin.py
 
 Scope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.
 
+The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
+
 Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
 
 ### Cap notes
@@ -593,15 +595,15 @@ Cap note: history for semantic_problems capped.
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 5281
+Packet estimate in tokens: 5947
 
-T0 included at about 78 tokens across 2 files
+T0 included at about 114 tokens across 2 files
 
-T1 included at about 3040 tokens across 2 files
+T1 included at about 3285 tokens across 2 files
 
-T2 included at about 249 tokens across 2 files
+T2 included at about 323 tokens across 2 files
 
-T3 included at about 1573 tokens across 2 files
+T3 included at about 1789 tokens across 2 files
 
 No tier was dropped.
 

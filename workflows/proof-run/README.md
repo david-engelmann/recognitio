@@ -15,7 +15,11 @@ pins.
 The fixture repository holds `src/a.py`, `src/b.py`,
 `src/c.py`, and `src/d.py`. The change under review
 touches all four. The fixture carries one planted defect,
-a hardcoded live API key at `src/c.py` line 5.
+a hardcoded live API key at `src/c.py` line 5. The fixture
+provenance stands in `sources.json` beside this readme,
+holding both revisions of every file and the author and
+subjects and dates of both commits, so the fixture
+rebuilds from this repo alone.
 
 ## The groups
 

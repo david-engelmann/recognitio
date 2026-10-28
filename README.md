@@ -129,7 +129,7 @@ index 0327324..522392d 100644
 
 The packet excerpt above is trimmed, chosen around the ten added lines, and the rest of the function is elided where the bracketed lines stand. The fence lines inside the packet itself are dropped so the excerpt can sit inside the fence of this file. Both excerpts show the same edit inside semantic_problems, and the packet header names naming_problems because git labels a hunk with the nearest function line above its opening line, and this hunk opens on the def line of semantic_problems itself.
 
-The same packet names the test files that mention the changed code, `tests/test_antigravity.py` at line 47 and `tests/test_devin.py` at lines 20 and 50, and closes with a verification recount. The recount records 2 files with their statuses and old paths, 2 hunks, and 24 added lines and 0 deleted lines, matches the manifest on every count, and passes with every tier included. The full packet for this commit runs 622 lines. The complete packet stands in [the examples folder](examples/README.md) for any visitor who wants to read one whole before installing anything.
+The same packet names the test files that mention the changed code, `tests/test_antigravity.py` at line 47 and `tests/test_devin.py` at lines 20 and 50, and closes with a verification recount. The recount records 2 files with their statuses and old paths, 2 hunks, and 24 added lines and 0 deleted lines, matches the manifest on every count, and passes with every tier included. The full packet for this commit runs 624 lines. The complete packet stands in [the examples folder](examples/README.md) for any visitor who wants to read one whole before installing anything.
 
 ## How it works
 

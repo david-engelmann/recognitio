@@ -2410,7 +2410,7 @@ class TestReadmeWp2(unittest.TestCase):
     def test_the_example_packet_is_complete_and_verified(self):
         folder = ROOT / "examples" / "example-packet-991ac6a"
         packet = (folder / "packet.md").read_text(encoding="utf-8")
-        self.assertEqual(len(packet.splitlines()), 622)
+        self.assertEqual(len(packet.splitlines()), 624)
         manifest = json.loads(
             (folder / "manifest.json").read_text(encoding="utf-8")
         )

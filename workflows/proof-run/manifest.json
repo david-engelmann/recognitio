@@ -3,19 +3,19 @@
   "version": "1.3.0",
   "command": [
     "extract.py",
-    "--range",
-    "bc6e67513b383f4c25b38bda4fbfc68035fa40f0..dbe5978fb89b0c135947b3d9487d126ec13890fd",
     "--repo",
-    "/home/hatch/workspace/chain-fix-scratch/proof/repo",
+    "/tmp/tmpvza2xr34/repo",
+    "--range",
+    "b74940218e451965eb8184877f4e809e15c8e55e..1ac8881520a1bb1d68ef68abd7455852b02a9014",
     "--out",
-    "/home/hatch/workspace/chain-fix-scratch/proof/packet"
+    "/tmp/tmpvza2xr34/out"
   ],
-  "created_utc": "2026-10-27T12:06:57.824517+00:00",
+  "created_utc": "2026-10-28T00:07:26.480489+00:00",
   "mode": "range",
-  "label": "range bc6e67513b383f4c25b38bda4fbfc68035fa40f0..dbe5978fb89b0c135947b3d9487d126ec13890fd",
-  "base": "bc6e67513b383f4c25b38bda4fbfc68035fa40f0",
-  "head": "dbe5978fb89b0c135947b3d9487d126ec13890fd",
-  "merge_base": "bc6e67513b383f4c25b38bda4fbfc68035fa40f0",
+  "label": "range b74940218e451965eb8184877f4e809e15c8e55e..1ac8881520a1bb1d68ef68abd7455852b02a9014",
+  "base": "b74940218e451965eb8184877f4e809e15c8e55e",
+  "head": "1ac8881520a1bb1d68ef68abd7455852b02a9014",
+  "merge_base": "b74940218e451965eb8184877f4e809e15c8e55e",
   "since": null,
   "pr": null,
   "files": [
@@ -87,29 +87,29 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 62,
-      "emitted_tokens": 62,
+      "estimated_tokens": 119,
+      "emitted_tokens": 119,
       "files": 4
     },
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 271,
-      "emitted_tokens": 271,
+      "estimated_tokens": 489,
+      "emitted_tokens": 489,
       "files": 4
     },
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 212,
-      "emitted_tokens": 212,
+      "estimated_tokens": 256,
+      "emitted_tokens": 256,
       "files": 4
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 453,
-      "emitted_tokens": 453,
+      "estimated_tokens": 777,
+      "emitted_tokens": 777,
       "files": 3
     }
   },
@@ -122,10 +122,12 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1355,
+    "estimated_tokens": 2118,
     "dropped": []
   },
   "cap_notes": [],
   "verified": true,
-  "discrepancies": []
+  "discrepancies": [],
+  "findings_sha256": null,
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
 }

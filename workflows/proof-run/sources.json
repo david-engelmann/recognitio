@@ -1,0 +1,20 @@
+{
+  "author_email": "proof@example.com",
+  "author_name": "Proof Fixture",
+  "base": {
+    "src/a.py": "import sys\n\ndef main():\n    return 0\n",
+    "src/b.py": "def helper():\n    return 1\n",
+    "src/c.py": "def fetch(url):\n    return open(url).read()\n",
+    "src/d.py": "def util():\n    return 2\n"
+  },
+  "base_date": "2026-10-27T12:05:00+00:00",
+  "base_subject": "base",
+  "head": {
+    "src/a.py": "import os\nimport sys\n\ndef main():\n    return 0\n",
+    "src/b.py": "def helper():\n    return 10\n",
+    "src/c.py": "def fetch(url):\n    try:\n        return open(url).read()\n    except ValueError:\n        API_KEY = 'fake-live-key-123'\n        raise\ndef load(url):\n    try:\n        return open(url).read()\n    except Exception:\n        pass\n",
+    "src/d.py": "def util():\n    return 20\n"
+  },
+  "head_date": "2026-10-27T12:06:00+00:00",
+  "head_subject": "head change"
+}

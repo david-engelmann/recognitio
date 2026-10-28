@@ -5,12 +5,12 @@
     "extract.py",
     "--commit",
     "991ac6a",
-    "--out",
-    "/home/hatch/workspace/wp2-groundwork/example-packet-991ac6a",
     "--repo",
-    "/home/hatch/workspace/recognitio-wp1"
+    "/home/hatch/workspace/round085-scratch/landed-tree",
+    "--out",
+    "/home/hatch/workspace/round085-scratch/landed-tree/examples/example-packet-991ac6a"
   ],
-  "created_utc": "2026-10-26T22:49:08.275142+00:00",
+  "created_utc": "2026-10-28T00:07:19.091263+00:00",
   "mode": "commit",
   "label": "commit 991ac6ae80d3",
   "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
@@ -59,29 +59,29 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 78,
-      "emitted_tokens": 78,
+      "estimated_tokens": 114,
+      "emitted_tokens": 114,
       "files": 2
     },
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 3040,
-      "emitted_tokens": 3040,
+      "estimated_tokens": 3285,
+      "emitted_tokens": 3285,
       "files": 2
     },
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 249,
-      "emitted_tokens": 249,
+      "estimated_tokens": 323,
+      "emitted_tokens": 323,
       "files": 2
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 1573,
-      "emitted_tokens": 1573,
+      "estimated_tokens": 1789,
+      "emitted_tokens": 1789,
       "files": 2
     }
   },
@@ -94,12 +94,14 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 5281,
+    "estimated_tokens": 5947,
     "dropped": []
   },
   "cap_notes": [
     "history for semantic_problems capped"
   ],
   "verified": true,
-  "discrepancies": []
+  "discrepancies": [],
+  "findings_sha256": null,
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
 }

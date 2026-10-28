@@ -3,19 +3,19 @@
   "version": "1.3.0",
   "command": [
     "extract.py",
-    "--out",
-    "/home/hatch/workspace/task05-build/out",
     "--repo",
-    "/home/hatch/workspace/task05-build/repo",
+    "/tmp/tmpywsih5gx/repo",
     "--range",
-    "HEAD~1..HEAD"
+    "0f20f931365b5c95fad8c58a66a66480f7ee0d5d..89aa079ea476007460912101d86d92d911a18bae",
+    "--out",
+    "/tmp/tmpywsih5gx/out"
   ],
-  "created_utc": "2026-10-23T08:05:00.819528+00:00",
+  "created_utc": "2026-10-28T00:07:25.105780+00:00",
   "mode": "range",
-  "label": "range HEAD~1..HEAD",
-  "base": "8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672",
-  "head": "02fad663e902bb34aed684684c4897fd42aaa34d",
-  "merge_base": "8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672",
+  "label": "range 0f20f931365b5c95fad8c58a66a66480f7ee0d5d..89aa079ea476007460912101d86d92d911a18bae",
+  "base": "0f20f931365b5c95fad8c58a66a66480f7ee0d5d",
+  "head": "89aa079ea476007460912101d86d92d911a18bae",
+  "merge_base": "0f20f931365b5c95fad8c58a66a66480f7ee0d5d",
   "since": null,
   "pr": null,
   "files": [
@@ -30,7 +30,8 @@
       "binary": false,
       "attribute_text": false,
       "binary_transition": false,
-      "placeholder": null
+      "placeholder": null,
+      "instruction_file": false
     },
     {
       "path": "util.py",
@@ -43,7 +44,8 @@
       "binary": false,
       "attribute_text": false,
       "binary_transition": false,
-      "placeholder": null
+      "placeholder": null,
+      "instruction_file": false
     }
   ],
   "exclusions": [],
@@ -57,29 +59,29 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 42,
-      "emitted_tokens": 42,
+      "estimated_tokens": 79,
+      "emitted_tokens": 79,
       "files": 2
     },
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 153,
-      "emitted_tokens": 153,
+      "estimated_tokens": 261,
+      "emitted_tokens": 261,
       "files": 2
     },
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 223,
-      "emitted_tokens": 223,
+      "estimated_tokens": 315,
+      "emitted_tokens": 315,
       "files": 2
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 365,
-      "emitted_tokens": 365,
+      "estimated_tokens": 619,
+      "emitted_tokens": 619,
       "files": 2
     }
   },
@@ -88,14 +90,16 @@
     "## T1 The change",
     "## T2 Companions",
     "## T3 History",
-    "## Budget and completeness"
+    "## Verification recount"
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 969,
+    "estimated_tokens": 1749,
     "dropped": []
   },
   "cap_notes": [],
   "verified": true,
-  "discrepancies": []
+  "discrepancies": [],
+  "findings_sha256": null,
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
 }

@@ -1,12 +1,33 @@
-# The pericope for range 29770e45af0a5efaafb3e137e0c5838c00da8356..1af217a2cd63627221e0d42d165c13728f530bb1
+# The pericope for range 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4..46b418895ebd14a4bfe863d20154bbca0cb25e6d
 
-A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
+A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
-Base: 29770e45af0a5efaafb3e137e0c5838c00da8356
-Head: 1af217a2cd63627221e0d42d165c13728f530bb1
-Merge base: 29770e45af0a5efaafb3e137e0c5838c00da8356
-Verified: yes
+
+Base: 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4
+
+Head: 46b418895ebd14a4bfe863d20154bbca0cb25e6d
+
+Merge base: 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4
+
+Verified: yes. The recount at the close of this packet carries the proof.
+
+Contents
+
+This packet holds 1 file, 1 hunk, 2 added lines and 2 deleted lines
+
+All four tiers stand in full
+
+The tiers, in order
+
+- T0 Triage
+- T1 The change
+- T2 Companions
+- T3 History
+
+The close
+
+- Verification recount
 
 ## T0 Triage
 
@@ -25,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-1af217a change under review
+46b4188 head
 ```
 
 ## T1 The change
@@ -93,7 +114,7 @@ No definitions of the changed names were found outside the changed files.
 #### calc.py
 
 ```
-Eval Fixture 1af217a2 lines 2
+Eval Fixture 46b41889 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -101,7 +122,7 @@ Eval Fixture 1af217a2 lines 2
 #### price in calc.py
 
 ```
-commit 1af217a change under review
+commit 46b4188 head
 
 diff --git a/calc.py b/calc.py
 --- a/calc.py
@@ -111,7 +132,7 @@ diff --git a/calc.py b/calc.py
 -    return qty * rate
 +def price(qty, rate, tax):
 +    return qty * rate + tax + tax
-commit 29770e4 base
+commit 4bb4094 base
 
 diff --git a/calc.py b/calc.py
 --- /dev/null
@@ -125,16 +146,40 @@ diff --git a/calc.py b/calc.py
 
 Scope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.
 
+The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
+
 Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
 
-## Budget and completeness
+## Verification recount
+
+### Budget
 
 Budget in tokens: none set
-Packet estimate in tokens: 745
-T0 included at about 37 tokens across 1 files
-T1 included at about 85 tokens across 1 files
-T2 included at about 186 tokens across 1 files
-T3 included at about 234 tokens across 1 files
+
+Packet estimate in tokens: 1284
+
+T0 included at about 65 tokens across 1 files
+
+T1 included at about 137 tokens across 1 files
+
+T2 included at about 249 tokens across 1 files
+
+T3 included at about 358 tokens across 1 files
+
 No tier was dropped.
 
-Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
+### Recount
+
+Recount passed
+
+A separate recount counted the change a second time
+
+The recount covered 1 file with their statuses and old paths, 1 hunk, and 2 added lines and 2 deleted lines
+
+The recount matches the manifest on every count
+
+Every tier is included
+
+Verified means this packet holds the whole change it names
+
+Verified does not mean the change is correct or safe

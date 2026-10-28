@@ -1,12 +1,33 @@
-# The pericope for range 1d77e053cbd730f894316a9b00e9861c24a8979a..716b17bdd5ea6ebf399e741a8a64be5f92ae8f5b
+# The pericope for range 3dfd713c1966fb31dd9d586e3070db40d2827428..78056389dabb27131d1aad1343ce8258f0b5aaa9
 
-A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
+A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
-Base: 1d77e053cbd730f894316a9b00e9861c24a8979a
-Head: 716b17bdd5ea6ebf399e741a8a64be5f92ae8f5b
-Merge base: 1d77e053cbd730f894316a9b00e9861c24a8979a
-Verified: yes
+
+Base: 3dfd713c1966fb31dd9d586e3070db40d2827428
+
+Head: 78056389dabb27131d1aad1343ce8258f0b5aaa9
+
+Merge base: 3dfd713c1966fb31dd9d586e3070db40d2827428
+
+Verified: yes. The recount at the close of this packet carries the proof.
+
+Contents
+
+This packet holds 2 files, 2 hunks, 4 added lines and 4 deleted lines
+
+All four tiers stand in full
+
+The tiers, in order
+
+- T0 Triage
+- T1 The change
+- T2 Companions
+- T3 History
+
+The close
+
+- Verification recount
 
 ## T0 Triage
 
@@ -27,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-716b17b change under review
+7805638 head
 ```
 
 ## T1 The change
@@ -123,13 +144,13 @@ No test files mention the changed modules or functions.
 #### page.py
 
 ```
-Eval Fixture 716b17bd lines 2
+Eval Fixture 78056389 lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 716b17bd lines 2
+Eval Fixture 78056389 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -137,7 +158,7 @@ Eval Fixture 716b17bd lines 2
 #### heading in page.py
 
 ```
-commit 716b17b change under review
+commit 7805638 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -146,7 +167,7 @@ diff --git a/page.py b/page.py
  def heading(text):
 -    return slugify(text)
 +    return make_slug(text)
-commit 1d77e05 base
+commit 3dfd713 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -159,7 +180,7 @@ diff --git a/page.py b/page.py
 #### make_slug in util.py
 
 ```
-commit 716b17b change under review
+commit 7805638 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -169,7 +190,7 @@ diff --git a/util.py b/util.py
 -    return text.lower().replace(" ", "-")
 +def make_slug(text):
 +    return text.lower().replace(" ", "")
-commit 1d77e05 base
+commit 3dfd713 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -183,16 +204,40 @@ diff --git a/util.py b/util.py
 
 Scope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.
 
+The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
+
 Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
 
-## Budget and completeness
+## Verification recount
+
+### Budget
 
 Budget in tokens: none set
-Packet estimate in tokens: 955
-T0 included at about 45 tokens across 2 files
-T1 included at about 159 tokens across 2 files
-T2 included at about 199 tokens across 2 files
-T3 included at about 347 tokens across 2 files
+
+Packet estimate in tokens: 1657
+
+T0 included at about 79 tokens across 2 files
+
+T1 included at about 265 tokens across 2 files
+
+T2 included at about 279 tokens across 2 files
+
+T3 included at about 559 tokens across 2 files
+
 No tier was dropped.
 
-Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
+### Recount
+
+Recount passed
+
+A separate recount counted the change a second time
+
+The recount covered 2 files with their statuses and old paths, 2 hunks, and 4 added lines and 4 deleted lines
+
+The recount matches the manifest on every count
+
+Every tier is included
+
+Verified means this packet holds the whole change it names
+
+Verified does not mean the change is correct or safe

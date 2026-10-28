@@ -1,14 +1,14 @@
-# The pericope for range bc6e67513b383f4c25b38bda4fbfc68035fa40f0..dbe5978fb89b0c135947b3d9487d126ec13890fd
+# The pericope for range b74940218e451965eb8184877f4e809e15c8e55e..1ac8881520a1bb1d68ef68abd7455852b02a9014
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: bc6e67513b383f4c25b38bda4fbfc68035fa40f0
+Base: b74940218e451965eb8184877f4e809e15c8e55e
 
-Head: dbe5978fb89b0c135947b3d9487d126ec13890fd
+Head: 1ac8881520a1bb1d68ef68abd7455852b02a9014
 
-Merge base: bc6e67513b383f4c25b38bda4fbfc68035fa40f0
+Merge base: b74940218e451965eb8184877f4e809e15c8e55e
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -52,7 +52,7 @@ Files changed: 4
 ### Commits
 
 ```
-dbe5978 head change
+1ac8881 head change
 ```
 
 ## T1 The change
@@ -65,7 +65,7 @@ Status: modified
 
 ```diff
 diff --git a/src/a.py b/src/a.py
-index 9f2c28e..2d6a930 100644
+index ff0118c..778f5a5 100644
 --- a/src/a.py
 +++ b/src/a.py
 @@ -1,3 +1,4 @@
@@ -177,19 +177,19 @@ No test files mention the changed modules or functions.
 #### src/c.py
 
 ```
-Proof Fixture dbe5978f lines 10
+Proof Fixture 1ac88815 lines 10
 ```
 
 #### src/b.py
 
 ```
-Proof Fixture dbe5978f lines 1
+Proof Fixture 1ac88815 lines 1
 ```
 
 #### src/d.py
 
 ```
-Proof Fixture dbe5978f lines 1
+Proof Fixture 1ac88815 lines 1
 ```
 
 ### Recent evolution of changed functions
@@ -197,7 +197,7 @@ Proof Fixture dbe5978f lines 1
 #### fetch in src/c.py
 
 ```
-commit dbe5978 head change
+commit 1ac8881 head change
 
 diff --git a/src/c.py b/src/c.py
 --- a/src/c.py
@@ -210,7 +210,7 @@ diff --git a/src/c.py b/src/c.py
 +    except ValueError:
 +        API_KEY = 'fake-live-key-123'
 +        raise
-commit bc6e675 base
+commit b749402 base
 
 diff --git a/src/c.py b/src/c.py
 --- /dev/null
@@ -223,7 +223,7 @@ diff --git a/src/c.py b/src/c.py
 #### load in src/c.py
 
 ```
-commit dbe5978 head change
+commit 1ac8881 head change
 
 diff --git a/src/c.py b/src/c.py
 --- a/src/c.py
@@ -235,7 +235,7 @@ diff --git a/src/c.py b/src/c.py
 +        return open(url).read()
 +    except Exception:
 +        pass
-commit bc6e675 base
+commit b749402 base
 
 diff --git a/src/c.py b/src/c.py
 --- /dev/null
@@ -247,7 +247,7 @@ diff --git a/src/c.py b/src/c.py
 #### helper in src/b.py
 
 ```
-commit dbe5978 head change
+commit 1ac8881 head change
 
 diff --git a/src/b.py b/src/b.py
 --- a/src/b.py
@@ -256,7 +256,7 @@ diff --git a/src/b.py b/src/b.py
  def helper():
 -    return 1
 +    return 10
-commit bc6e675 base
+commit b749402 base
 
 diff --git a/src/b.py b/src/b.py
 --- /dev/null
@@ -270,6 +270,8 @@ diff --git a/src/b.py b/src/b.py
 
 Scope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.
 
+The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
+
 Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
 
 ## Verification recount
@@ -278,15 +280,15 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1355
+Packet estimate in tokens: 2118
 
-T0 included at about 62 tokens across 4 files
+T0 included at about 119 tokens across 4 files
 
-T1 included at about 271 tokens across 4 files
+T1 included at about 489 tokens across 4 files
 
-T2 included at about 212 tokens across 4 files
+T2 included at about 256 tokens across 4 files
 
-T3 included at about 453 tokens across 3 files
+T3 included at about 777 tokens across 3 files
 
 No tier was dropped.
 

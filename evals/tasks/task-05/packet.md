@@ -1,12 +1,33 @@
-# The pericope for range HEAD~1..HEAD
+# The pericope for range 0f20f931365b5c95fad8c58a66a66480f7ee0d5d..89aa079ea476007460912101d86d92d911a18bae
 
-A recognitio review packet. It holds the change and the context appointed to be read with it, and nothing else.
+A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
-Base: 8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672
-Head: 02fad663e902bb34aed684684c4897fd42aaa34d
-Merge base: 8a00e5bb44bb850ca0a994f9c3f20f8ea7cb3672
-Verified: yes
+
+Base: 0f20f931365b5c95fad8c58a66a66480f7ee0d5d
+
+Head: 89aa079ea476007460912101d86d92d911a18bae
+
+Merge base: 0f20f931365b5c95fad8c58a66a66480f7ee0d5d
+
+Verified: yes. The recount at the close of this packet carries the proof.
+
+Contents
+
+This packet holds 2 files, 2 hunks, 6 added lines and 2 deleted lines
+
+All four tiers stand in full
+
+The tiers, in order
+
+- T0 Triage
+- T1 The change
+- T2 Companions
+- T3 History
+
+The close
+
+- Verification recount
 
 ## T0 Triage
 
@@ -27,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-02fad66 commit
+89aa079 head
 ```
 
 ## T1 The change
@@ -129,13 +150,13 @@ No definitions of the changed names were found outside the changed files.
 #### page.py
 
 ```
-Test User 02fad663 lines 2
+Eval Fixture 89aa079e lines 2
 ```
 
 #### util.py
 
 ```
-Test User 02fad663 lines 4
+Eval Fixture 89aa079e lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -143,7 +164,7 @@ Test User 02fad663 lines 4
 #### heading_total in page.py
 
 ```
-commit 02fad66 commit
+commit 89aa079 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -152,7 +173,7 @@ diff --git a/page.py b/page.py
  def heading_total(qty, rate):
 -    return add(qty, rate)
 +    return add_tax(qty, rate)
-commit 8a00e5b commit
+commit 0f20f93 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -165,7 +186,7 @@ diff --git a/page.py b/page.py
 #### add in util.py
 
 ```
-commit 02fad66 commit
+commit 89aa079 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -175,7 +196,7 @@ diff --git a/util.py b/util.py
      return a + b
 +
 +
-commit 8a00e5b commit
+commit 0f20f93 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -188,7 +209,7 @@ diff --git a/util.py b/util.py
 #### add_tax in util.py
 
 ```
-commit 02fad66 commit
+commit 89aa079 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -202,16 +223,40 @@ diff --git a/util.py b/util.py
 
 Scope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.
 
+The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
+
 Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
 
-## Budget and completeness
+## Verification recount
+
+### Budget
 
 Budget in tokens: none set
-Packet estimate in tokens: 969
-T0 included at about 42 tokens across 2 files
-T1 included at about 153 tokens across 2 files
-T2 included at about 223 tokens across 2 files
-T3 included at about 365 tokens across 2 files
+
+Packet estimate in tokens: 1749
+
+T0 included at about 79 tokens across 2 files
+
+T1 included at about 261 tokens across 2 files
+
+T2 included at about 315 tokens across 2 files
+
+T3 included at about 619 tokens across 2 files
+
 No tier was dropped.
 
-Completeness check passed. A separate recount of files, statuses, old paths, hunks and lines matches the manifest.
+### Recount
+
+Recount passed
+
+A separate recount counted the change a second time
+
+The recount covered 2 files with their statuses and old paths, 2 hunks, and 6 added lines and 2 deleted lines
+
+The recount matches the manifest on every count
+
+Every tier is included
+
+Verified means this packet holds the whole change it names
+
+Verified does not mean the change is correct or safe
