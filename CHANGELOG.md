@@ -821,6 +821,14 @@ This unreleased work carries version 1.3.0.
   gate re-pins the crop geometry and hash and the page
   weight exact total, and the hero picture test pins
   the shared alt.
+- A symlink census pin in the test suite. The new test
+  derives every entry at symlink mode from the committed
+  tree through git and holds the census to exactly one
+  entry, the Claude skills spelling of the skill with its
+  recorded target at the canonical skill, so a symlink
+  planted anywhere else in the tree and a retarget of the
+  legitimate link both fail in the discover step the gate
+  already runs first.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
