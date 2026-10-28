@@ -69,7 +69,10 @@ second is the change under review. A packet only counts when
 its manifest reports verified. The regeneration gate at
 `scripts/check_regeneration.py` runs this rebuild on every
 check and fails when a shipped packet or manifest has drifted
-from what the rebuild produces.
+from what the rebuild produces, apart from the fields the
+rebuild sets aside for the eval class, being hashes in full
+and in short form and token numbers and the label of an eval
+manifest.
 
 Run the three passes in a fixed order. The raw pass reads only
 the diff and writes its findings down. The fair raw pass then

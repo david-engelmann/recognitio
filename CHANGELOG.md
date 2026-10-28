@@ -1727,18 +1727,18 @@ This unreleased work carries version 1.3.0.
   the set and classifies every file in the tree that
   names a severity, so a new surface cannot join in
   silence and a drift on a listed surface fails the gate.
-- The change tier now sizes each per file diff fence one
-  backtick longer than the longest backtick run inside the
-  diff it fences, and the packet check reads that sized
-  fence back under the same rule. A diff body holding a
-  bare fence line as context, as a Markdown file holding a
-  code block gives, closed the old fixed three backtick
-  fence early and desynchronised the packet check, which
-  then reported whole files as missing from a packet that
-  held them and refused its stamp. A packet written under
-  the old fixed fence still stamps wherever its diff
-  bodies hold no run that could break that fence, and a
-  packet in the broken class stamps once it is regenerated.
+- The change tier now sizes each per file diff fence one backtick
+  longer than the longest backtick run inside the diff it fences
+  with a floor of three, and the packet check reads that sized
+  fence back under the same rule. A diff body holding a bare fence
+  line as context, as a Markdown file holding a code block gives,
+  closed the old fixed three backtick fence early and
+  desynchronised the packet check, which then reported whole files
+  as missing from a packet that held them and refused its stamp. A
+  packet written under the old fixed fence still stamps wherever
+  its diff bodies hold no run of three or more backticks anywhere,
+  and a packet whose bodies hold such a run stamps once it is
+  regenerated.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

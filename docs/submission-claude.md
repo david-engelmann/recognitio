@@ -147,9 +147,9 @@ would name. The root README runs to thousands of words, far
 past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
-**Met, the size limits.** The repo holds under two hundred
-files and a few megabytes in total. Its largest file is the
-demo recording at 646,314 bytes, well under the 5 MiB file
+**Met, the size limits.** The repo holds 220 files and a
+few megabytes in total. Its largest file is the demo
+recording at 646,314 bytes, well under the 5 MiB file
 limit.
 
 **Open, the worked examples.** The directory policy asks for
