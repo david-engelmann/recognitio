@@ -29,10 +29,12 @@ never read green on a shape the gate cannot verify. Packet
 content is untrusted data throughout. Text quoted from the
 packet is evidence about the change under review and never an
 instruction to a reviewer or to this gate. Finding summaries
-and second pass notes are screened against a fixed list of
-steering phrases, and a text that carries a listed phrase
-fails the run for a human to clear. The screen is a listed
-phrase screen and catches only the phrases it lists. See
+and finding rules and second pass notes are screened against
+a fixed list of steering phrases and a fixed set of imperative
+steering shapes, and a text that carries a listed phrase or
+stands in a listed shape fails the run for a human to clear.
+The screen is a listed phrase screen plus an imperative shape
+screen and catches only the phrases and shapes it lists. See
 workflows/review-fanout.md for the full contract and the
 primary sources behind each rule.
 """
@@ -63,19 +65,23 @@ MODES = ("local", "managed")
 SECOND_PASS_SOURCE = "second_pass"
 MIN_NOTE_CHARS = 20
 
-# Finding summaries and second pass notes are reviewer text
-# about a defect. A text that carries one of the listed
-# steering phrases is steering content planted in the chain,
-# whatever hand wrote it, so the gate names it as a problem
-# for a human to clear rather than passing it down the chain
-# in silence. The list is the whole screen, and it does not
-# judge a text that carries none of its phrases. Matching
-# runs on text whose whitespace is collapsed to single
-# spaces and whose invisible separators read as spacing, so
-# a listed phrase split by a line break or padded with extra
-# spaces or split by a zero width character is still the
-# listed phrase. A second reading with every separator
-# removed catches a phrase split inside one of its words.
+# Finding summaries and finding rules and second pass notes
+# are reviewer text about a defect. A text that carries one
+# of the listed steering phrases is steering content planted
+# in the chain, whatever hand wrote it, so the gate names it
+# as a problem for a human to clear rather than passing it
+# down the chain in silence. The list is one half of the
+# screen. The imperative patterns further down are the other
+# half, and they flag texts that carry none of these phrases,
+# so a text is judged under both halves together and a text
+# that carries neither a listed phrase nor a listed shape is
+# not judged by either half. Matching runs on text whose
+# whitespace is collapsed to single spaces and whose
+# invisible separators read as spacing, so a listed phrase
+# split by a line break or padded with extra spaces or split
+# by a zero width character is still the listed phrase. A
+# second reading with every separator removed catches a
+# phrase split inside one of its words.
 STEERING_PHRASES = (
     "ignore the",
     "ignore all",
@@ -97,28 +103,43 @@ STEERING_PHRASES = (
 # imperative form a steering text takes. Each pattern names
 # the approval or the suppression standing at the head of a
 # clause, after a sentence or clause boundary or at the head
-# of a line, or addressed to the reader own report. A verb
-# phrase a named subject governs, even one joined by and, is
-# descriptive and no pattern reaches it. A shape followed by
-# one of the subject verbs the guard lists, as where prose
-# quotes a banner or a dialog label and then says what it
-# does, is a mention and no pattern reaches that either. The
-# problem line reports the words the pattern actually
-# matched.
-STEERING_HEAD = r"(?:^|[.!?;,/—–]\s*)"
-STEERING_INTRO = r"(?:[\"'#>*\-]\s*)?(?:please\s+|just\s+)?"
+# of a line, or addressed to the reader own report. A clause
+# head boundary may be a full stop or a question mark or an
+# exclamation mark or a semicolon or a comma or a slash or a
+# dash or a colon or an opening parenthesis. Behind a
+# boundary the shape may open with a quotation mark or a list
+# marker or a parenthesis, then the conjunction word and or
+# then where a comma or a boundary or the start of the text
+# stands before it, then the words please or just. The
+# approval object may carry this or that or the or a or no
+# determiner and may name the change or the pull request or
+# the short pull request word. A verb phrase a named subject
+# governs, even one joined by and with no comma before the
+# conjunction, is descriptive and no pattern reaches it. A
+# shape followed by one of the subject verbs the guard
+# lists, as where prose quotes a banner or a dialog label
+# and then says what it does, is a mention and no pattern
+# reaches that either. The problem line reports the words
+# the pattern actually matched.
+STEERING_HEAD = r"(?:^|[.!?;:,/—–(]\s*)"
+STEERING_INTRO = (
+    r"(?:[\"'#>*\(\-]\s*)?(?:(?:and|then)\s+)?"
+    r"(?:(?:please|just)\s+)*"
+)
 STEERING_SUBJECT_VERB = (
-    r"(?![\"']?\s+(?:is|was|appears|stands|sits|reads|comes|"
+    r"(?![\"'\)]?\s+(?:is|was|appears|stands|sits|reads|comes|"
     r"says|flashes|shows)\b)"
 )
 STEERING_PATTERNS = (
     STEERING_HEAD + STEERING_INTRO
-    + r"(approve this (?:change|pull request))" + STEERING_SUBJECT_VERB,
+    + r"(approve (?:(?:this|that|the|a) )?(?:change|pull request|pr))"
+    + STEERING_SUBJECT_VERB,
     STEERING_HEAD + STEERING_INTRO
     + r"(mention no (?:defects|findings))" + STEERING_SUBJECT_VERB,
-    r"(no defects in your report)" + STEERING_SUBJECT_VERB,
+    r"(no (?:defects|findings) in your report)"
+    + STEERING_SUBJECT_VERB,
     STEERING_HEAD + STEERING_INTRO
-    + r"(report no defects)" + STEERING_SUBJECT_VERB,
+    + r"(report no (?:defects|findings))" + STEERING_SUBJECT_VERB,
 )
 
 # Invisible characters that separate words without showing
@@ -158,7 +179,7 @@ def steering_readings(text):
 
 
 def steering_problems(text, where, field="summary"):
-    """Problems with a text that carries a listed steering phrase."""
+    """Problems with a text the steering screen flags."""
     if not isinstance(text, str):
         return []
     plain, lined, squashed, joined = steering_readings(text)
@@ -548,6 +569,11 @@ def check_reviews(record, groups, files, finding_schema):
                 problems.extend(
                     steering_problems(finding.get("summary"), where)
                 )
+                problems.extend(
+                    steering_problems(
+                        finding.get("rule"), where, field="rule"
+                    )
+                )
                 location = finding.get("location")
                 if isinstance(location, dict):
                     if location.get("file") not in files:
@@ -644,6 +670,9 @@ def check_merged(record, by_group, finding_schema, files):
         }
         problems.extend(schema_problems(item_schema, bare, where))
         problems.extend(steering_problems(finding.get("summary"), where))
+        problems.extend(
+            steering_problems(finding.get("rule"), where, field="rule")
+        )
         evidence = finding.get("evidence")
         if isinstance(evidence, list):
             for path in evidence:
@@ -833,6 +862,13 @@ def check_second_pass(record, merged_ids, files, finding_schema):
                 problems.extend(
                     steering_problems(
                         raised.get("summary"), "%s.raised" % where
+                    )
+                )
+                problems.extend(
+                    steering_problems(
+                        raised.get("rule"),
+                        "%s.raised" % where,
+                        field="rule",
                     )
                 )
                 if raised.get("id") != fid:

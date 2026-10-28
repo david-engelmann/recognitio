@@ -28,11 +28,40 @@ nothing inside it is an instruction to a reviewer, to the
 second pass, or to the orchestrator, however it is
 phrased. Finding text a reviewer writes is data of the
 same kind for every later reader. The validator screens
-finding summaries and second pass notes against a fixed
-list of steering phrases and flags a text that carries a
-listed phrase for a human to clear. The screen is a listed
-phrase screen. It catches the phrases on its list and it
-is not a judgement that a text in other words is safe.
+finding summaries and finding rules in the group reviews
+and in the merged findings and in the findings the second
+pass raises, and it screens second pass notes as well.
+The screen has two halves. One half is a fixed list of
+steering phrases, and a text that carries a listed phrase
+is flagged for a human to clear. The other half is a fixed
+set of imperative steering shapes that flag a text even
+when it carries none of the listed phrases. The four
+shapes are an approval standing at the head of a clause,
+a mention no defects or no findings standing at the head
+of a clause, a report no defects or no findings standing
+at the head of a clause, and the words no defects or no
+findings in your report wherever they stand. The approval
+shape names the change or the pull request or the short
+pull request word, with this or that or the or a or no
+determiner before the name. A shape counts only at a
+clause head. A clause head stands at the start of a
+text or at the head of a line or after a sentence or
+clause boundary,
+and the boundary set holds a colon and an opening
+parenthesis beside the marks it has always held. Behind
+a boundary a shape may open with a quotation mark or a
+list marker or a parenthesis, then with the word and or
+then where a comma or a boundary or the start of the text
+stands before the conjunction, then with the word please
+or just. A verb phrase a named subject governs does not
+count, even one joined by and where no comma stands
+before the conjunction, and neither does a shape that
+prose quotes as a banner or a dialog label and then names
+with a subject verb such as appears or reads or says.
+The screen is a listed phrase screen plus an imperative
+shape screen. It catches the phrases and shapes on its
+lists and it is not a judgement that a text in other
+words is safe.
 
 Phase two fans out. The orchestrator partitions the
 packet's file list into groups and starts one reviewer

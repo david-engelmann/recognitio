@@ -1753,8 +1753,8 @@ This unreleased work carries version 1.3.0.
   in a note and that summary shape no longer read green while
   descriptive prose about approval keeps reading green. The
   fan out runbook now names the screen as a listed phrase
-  screen, so the contract states the control that stands
-  behind it and no wider one.
+  screen plus an imperative shape screen, so the contract
+  states the control that stands behind it and no wider one.
 - The packet check now refuses a findings hash on a packet whose
   recorded command carries no findings flag. A run with no
   findings file records no hash, so an invented hash on such a
@@ -1772,6 +1772,26 @@ This unreleased work carries version 1.3.0.
   a fail call outside every conditional branch still
   counts and a conditional fail beside a real assertion
   still passes.
+- The fan out steering screen now reads the rule field of a
+  finding beside its summary, in the group reviews and the
+  merged findings and the findings the second pass raises,
+  so a listed phrase or an imperative shape carried in a
+  rule no longer reads green while the same text in a
+  summary is refused. The clause head shapes now admit the
+  determiner forms of their approval object, naming the
+  change or the pull request or the short pull request word
+  with this or that or the or a or no determiner, and they
+  now stand
+  after a colon or an opening parenthesis and behind a
+  comma with the word and or then, beside the heads they
+  already admitted, while descriptive prose about approval
+  done by a named subject and prose quoting a label as data
+  keep reading green. The runbook passage and the validator
+  docstring and the comment over the phrase list now name
+  the screen as a listed phrase screen plus an imperative
+  shape screen and state the four shapes and their clause
+  head limit in words, so the contract states the control
+  that stands behind it and no wider one.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
