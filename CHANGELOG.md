@@ -1830,6 +1830,18 @@ This unreleased work carries version 1.3.0.
   alias bound to anything but a pure builtin and a
   comprehension over an iterable the reading cannot
   settle.
+- The package gate now fails closed when the native
+  plugin manifest stands in the tree but yields no
+  version it can check the portable version against.
+  A native manifest that cannot be read or does not
+  parse or is not an object or carries no version or
+  carries a version that is not a string now draws a
+  named problem from the package gate itself, where
+  the version agreement reading once skipped in
+  silence and the gate printed its holds line over a
+  manifest it never read. A genuinely absent native
+  manifest keeps the single extension path problem it
+  has always carried.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

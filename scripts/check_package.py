@@ -139,18 +139,46 @@ def load_manifest(root):
 
 
 def native_version(root):
-    """The version the native plugin manifest carries, or None."""
+    """The native plugin manifest version and any problem reading it.
+
+    A manifest that stands in the tree but cannot be read or
+    does not parse or is not an object or carries no version or
+    carries a version that is not a string yields a problem
+    beside no version, so the agreement reading fails closed
+    instead of skipping in silence over a manifest it never
+    read. A manifest that does not stand in the tree yields
+    neither a version nor a problem, because the extension path
+    reading already names that absence in its own terms.
+    """
+    path = root / ".claude-plugin" / "plugin.json"
+    if not path.exists():
+        return None, None
     try:
-        data = strict_json_loads(
-            (root / ".claude-plugin" / "plugin.json").read_text(
-                encoding="utf-8"
-            )
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return None, "the native manifest at %s cannot be read, %s" % (
+            describe(path, root),
+            exc,
         )
-    except (OSError, json.JSONDecodeError, DuplicateKeyError):
-        return None
+    try:
+        data = strict_json_loads(text)
+    except (json.JSONDecodeError, DuplicateKeyError) as exc:
+        return None, "the native manifest does not parse, %s" % exc
     if not isinstance(data, dict):
-        return None
-    return data.get("version")
+        return None, "the native manifest is not a JSON object"
+    version = data.get("version")
+    if version is None:
+        return None, (
+            "the native manifest carries no version, so the "
+            "portable manifest version cannot be checked against it"
+        )
+    if not isinstance(version, str):
+        return None, (
+            "the native manifest carries version %r, which is not "
+            "a string, so the portable manifest version cannot be "
+            "checked against it" % (version,)
+        )
+    return version, None
 
 
 def extension_paths(data):
@@ -214,8 +242,10 @@ def manifest_problems(data, root):
             "a version of the form major.minor.patch" % (version,)
         )
     else:
-        expected = native_version(root)
-        if expected is not None and version != expected:
+        expected, native_problem = native_version(root)
+        if native_problem is not None:
+            problems.append(native_problem)
+        elif expected is not None and version != expected:
             problems.append(
                 "the portable manifest version %r disagrees with the "
                 "native manifest version %r" % (version, expected)

@@ -15,7 +15,11 @@ gate. A second extensions namespace with a dangling shape path
 fails the generalized path resolution, a dangling Antigravity
 shape path fails the same way, and a native platform file
 placed inside the portable core fails the package root tree
-pin.
+pin. A native manifest that cannot be read or does not parse
+or is not an object or carries no version or carries a
+version that is not a string fails the gate by name, while a
+genuinely absent native manifest keeps the single extension
+path problem it has always carried.
 """
 
 import importlib.util
@@ -90,6 +94,14 @@ class TestCheckPackage(unittest.TestCase):
     def read_manifest(self, root):
         path = root / "agent-plugins-package" / "plugin.json"
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def read_native(self, root):
+        path = root / ".claude-plugin" / "plugin.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def write_native(self, root, data):
+        path = root / ".claude-plugin" / "plugin.json"
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def write_manifest(self, root, data):
         path = root / "agent-plugins-package" / "plugin.json"
@@ -175,6 +187,113 @@ class TestCheckPackage(unittest.TestCase):
                 any("disagrees" in problem for problem in problems),
                 problems,
             )
+
+    def test_a_corrupt_native_manifest_fails(self):
+        # Round 115 Finding 1. The version agreement reading
+        # once skipped in silence when the native manifest did
+        # not parse, so the gate printed its holds line over a
+        # manifest it never read. The parse failure must surface
+        # as a named problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.write_text("{not json\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "native manifest does not parse" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_native_manifest_without_a_version_fails(self):
+        # Round 115 Finding 1. A native manifest carrying no
+        # version leaves nothing for the portable version to
+        # agree with, and that absence must fail the gate instead
+        # of skipping the agreement reading in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_native(root)
+            del data["version"]
+            self.write_native(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "native manifest carries no version" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_native_manifest_that_is_a_directory_fails(self):
+        # Round 115 Finding 1. A directory standing where the
+        # native manifest stands cannot be read, and the gate
+        # must name that instead of skipping the agreement
+        # reading in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.unlink()
+            path.mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "native manifest" in problem
+                    and "cannot be read" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_native_manifest_that_is_not_an_object_fails(self):
+        # Round 115 Finding 1. A native manifest that parses to
+        # something other than an object carries no version the
+        # agreement reading can use, so it must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.write_text('["recognitio"]\n', encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "native manifest is not a JSON object" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_native_manifest_with_a_non_string_version_fails(self):
+        # Round 115 Finding 1. A version of the wrong type is
+        # not a version the portable manifest can be checked
+        # against, so the gate names the type instead of
+        # comparing across types.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_native(root)
+            data["version"] = 130
+            self.write_native(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "which is not a string" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_missing_native_manifest_reads_as_before(self):
+        # A genuinely absent native manifest keeps the verdict
+        # the extension path reading already gives it, with no
+        # added version problem, because that reading names the
+        # absence in its own terms.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".claude-plugin" / "plugin.json").unlink()
+            problems = self.problems(root)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn(".claude-plugin/plugin.json", problems[0])
+            self.assertIn("does not resolve", problems[0])
 
     def test_a_missing_namespace_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
