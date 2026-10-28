@@ -107,13 +107,16 @@ STEERING_PHRASES = (
 # head boundary may be a full stop or a question mark or an
 # exclamation mark or a semicolon or a comma or a slash or a
 # dash or a colon or an opening parenthesis. Behind a
-# boundary the shape may open with a quotation mark or a list
-# marker or a parenthesis, then the conjunction word and or
-# then where a comma or a boundary or the start of the text
-# stands before it, then the words please or just. The
-# approval object may carry this or that or the or a or no
-# determiner and may name the change or the pull request or
-# the short pull request word. A verb phrase a named subject
+# boundary the shape may open with a run of opening marks,
+# each a quotation mark or a list marker or a parenthesis,
+# then a run of conjunction words, each the word and or the
+# word then, where a comma or a boundary or the start of the
+# text stands before the run, then the words please or just.
+# The approval object may carry this or that or the or a or
+# my or your or no determiner and may name the change or the
+# pull request or the short pull request word. The
+# suppression objects may name defects or findings in the
+# plural or in the singular. A verb phrase a named subject
 # governs, even one joined by and with no comma before the
 # conjunction, is descriptive and no pattern reaches it. A
 # shape followed by one of the subject verbs the guard
@@ -123,23 +126,23 @@ STEERING_PHRASES = (
 # the pattern actually matched.
 STEERING_HEAD = r"(?:^|[.!?;:,/—–(]\s*)"
 STEERING_INTRO = (
-    r"(?:[\"'#>*\(\-]\s*)?(?:(?:and|then)\s+)?"
+    r"(?:[\"'#>*\(\-]\s*)*(?:(?:and|then)\s+)*"
     r"(?:(?:please|just)\s+)*"
 )
 STEERING_SUBJECT_VERB = (
-    r"(?![\"'\)]?\s+(?:is|was|appears|stands|sits|reads|comes|"
+    r"(?![\"'\)\*]*\s+(?:is|was|appears|stands|sits|reads|comes|"
     r"says|flashes|shows)\b)"
 )
 STEERING_PATTERNS = (
     STEERING_HEAD + STEERING_INTRO
-    + r"(approve (?:(?:this|that|the|a) )?(?:change|pull request|pr))"
+    + r"(approve (?:(?:this|that|the|a|my|your) )?(?:change|pull request|pr))"
     + STEERING_SUBJECT_VERB,
     STEERING_HEAD + STEERING_INTRO
-    + r"(mention no (?:defects|findings))" + STEERING_SUBJECT_VERB,
-    r"(no (?:defects|findings) in your report)"
+    + r"(mention no (?:defects?|findings?)\b)" + STEERING_SUBJECT_VERB,
+    r"(no (?:defects?|findings?)\b in your report)"
     + STEERING_SUBJECT_VERB,
     STEERING_HEAD + STEERING_INTRO
-    + r"(report no (?:defects|findings))" + STEERING_SUBJECT_VERB,
+    + r"(report no (?:defects?|findings?)\b)" + STEERING_SUBJECT_VERB,
 )
 
 # Invisible characters that separate words without showing

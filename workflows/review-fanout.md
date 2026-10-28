@@ -40,21 +40,24 @@ shapes are an approval standing at the head of a clause,
 a mention no defects or no findings standing at the head
 of a clause, a report no defects or no findings standing
 at the head of a clause, and the words no defects or no
-findings in your report wherever they stand. The approval
+findings in your report wherever they stand. The
+suppression shapes name their object in the singular as
+well, as no defect and no finding. The approval
 shape names the change or the pull request or the short
-pull request word, with this or that or the or a or no
-determiner before the name. A shape counts only at a
-clause head. A clause head stands at the start of a
-text or at the head of a line or after a sentence or
+pull request word, with this or that or the or a or my
+or your or no determiner before the name. A shape counts
+only at a clause head. A clause head stands at the start
+of a text or at the head of a line or after a sentence or
 clause boundary,
 and the boundary set holds a colon and an opening
 parenthesis beside the marks it has always held. Behind
-a boundary a shape may open with a quotation mark or a
-list marker or a parenthesis, then with the word and or
-then where a comma or a boundary or the start of the text
-stands before the conjunction, then with the word please
-or just. A verb phrase a named subject governs does not
-count, even one joined by and where no comma stands
+a boundary a shape may open with a run of opening marks,
+each a quotation mark or a list marker or a parenthesis,
+then with a run of conjunction words, each the word and
+or the word then, where a comma or a boundary or the
+start of the text stands before the run, then with the
+word please or just. A verb phrase a named subject governs
+does not count, even one joined by and where no comma stands
 before the conjunction, and neither does a shape that
 prose quotes as a banner or a dialog label and then names
 with a subject verb such as appears or reads or says.

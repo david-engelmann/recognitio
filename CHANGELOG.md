@@ -1792,6 +1792,20 @@ This unreleased work carries version 1.3.0.
   shape screen and state the four shapes and their clause
   head limit in words, so the contract states the control
   that stands behind it and no wider one.
+- The fan out steering screen now admits a run of
+  introducers at a clause head where it admitted one of
+  each, so a shape opening with the words and then
+  together or with two list markers or with the double
+  asterisks of Markdown bold is refused in the positions
+  where its single forms already were, and a doubled
+  marker stacks with the conjunction run as well. Its
+  suppression objects now stand in the singular beside
+  the plural and its approval object now takes my or your
+  beside the determiners it already took. Descriptive
+  prose keeps reading green, including a label set in
+  bold that a sentence names with a subject verb. The
+  runbook passage and the comment over the patterns now
+  state the runs and the added object forms in words.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
