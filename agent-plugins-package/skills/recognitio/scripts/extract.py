@@ -1893,13 +1893,24 @@ def build_t1(files, chunks):
         if entry.get("old_path"):
             lines.append(source_line(entry))
         lines.append("")
-        lines.append("```diff")
         if entry["placeholder"] is not None:
-            lines.append(entry["placeholder"])
+            shown = entry["placeholder"]
         else:
             chunk = chunks.get(path, "")
-            lines.append(chunk.rstrip() if chunk.strip() else "(no textual diff)")
-        lines.append("```")
+            shown = chunk.rstrip() if chunk.strip() else "(no textual diff)"
+        # The fence is sized by fence_for over the exact text it
+        # fences, the same rule the triage tier fences stand
+        # under. A diff body can itself hold a bare fence line,
+        # as a context line of a Markdown file that holds a code
+        # block, and a fixed three backtick fence would close
+        # early on that line and desynchronise every reader that
+        # tracks fence state, the packet check above all. A fence
+        # one backtick longer than the longest run inside the
+        # body cannot be closed from inside the body.
+        fence = fence_for(shown)
+        lines.append(fence + "diff")
+        lines.append(shown)
+        lines.append(fence)
         lines.append("")
     return "\n".join(lines)
 

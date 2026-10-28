@@ -1379,6 +1379,23 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
     return problems
 
 
+def diff_fence_for(text):
+    """The diff fence the sizing rule gives for one diff body.
+
+    A fence one backtick longer than the longest run of
+    backticks inside the text, with a floor of three, which is
+    the rule the extractor sizes every change tier fence
+    under. This copy and the extractor copy are held to one
+    behaviour by the diff fence agreement test in the test
+    suite, which runs both over a battery of bodies, so the
+    two sides cannot diverge again without a test failing.
+    """
+    longest = 0
+    for match in re.finditer(r"`+", text):
+        longest = max(longest, len(match.group(0)))
+    return "`" * max(3, longest + 1)
+
+
 def change_tier_problems(packet_text, manifest, fresh_change, extractor):
     problems = []
     span = section_span(packet_text, "## T1 The change")
@@ -1432,19 +1449,56 @@ def change_tier_problems(packet_text, manifest, fresh_change, extractor):
                 "the change tier section for %s carries a source "
                 "its manifest record does not" % entry["path"]
             )
-        if "```diff" not in body_lines:
+        # The diff block opens on a run of three or more
+        # backticks followed by the word diff and closes on the
+        # same run standing alone. The extractor sizes the run
+        # one backtick longer than the longest run inside the
+        # diff body, so a bare fence line the body itself holds
+        # as context cannot close the block early here either.
+        # A packet written under the old fixed three backtick
+        # fence reads under the same rule wherever its body
+        # holds no run that could break that fence. The run is
+        # also compared against the size the body requires, so
+        # this reading on its own refuses a fence the extractor
+        # would never write, at either end of the canonical
+        # size, and never leans on the whole tier rebuild to
+        # catch a non canonical fence for it.
+        fence = None
+        start = None
+        for index, line in enumerate(body_lines):
+            match = re.fullmatch(r"(`{3,})diff", line)
+            if match:
+                fence = match.group(1)
+                start = index + 1
+                break
+        if fence is None:
             problems.append(
                 "the change tier section for %s carries no diff "
                 "block" % entry["path"]
             )
             continue
-        start = body_lines.index("```diff") + 1
         inner = []
+        closed = False
         for line in body_lines[start:]:
-            if line == "```":
+            if line == fence:
+                closed = True
                 break
             inner.append(line)
+        if not closed:
+            problems.append(
+                "the change tier section for %s carries a diff "
+                "block with no closing fence" % entry["path"]
+            )
+            continue
         inner_text = "\n".join(inner)
+        required = diff_fence_for(inner_text)
+        if fence != required:
+            problems.append(
+                "the change tier section for %s carries its "
+                "diff block inside a %d backtick fence, but "
+                "the body it fences requires %d backticks"
+                % (entry["path"], len(fence), len(required))
+            )
         if entry["placeholder"] is not None:
             if inner_text != entry["placeholder"]:
                 problems.append(

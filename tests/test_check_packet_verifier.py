@@ -759,6 +759,143 @@ class TestGenuineShapes(VerifierFixture):
         self.assertEqual(self.check_repo_packet(repo, out), 0)
 
 
+class TestSizedDiffFence(VerifierFixture):
+    """A diff body holding a bare fence line must not desync the check.
+
+    Round 91 of the audit program built this fixture against the
+    shipped pair and the shipped check refused the packet the
+    extractor had just stamped verified, naming the second file
+    as missing from a change tier that plainly held it. The
+    hunk in the first file carries one bare fence line as
+    context, and under the old fixed three backtick fence that
+    line closed the diff block early for every reader tracking
+    fence state. The tests below stamp the shape end to end and
+    then attack the stamped packet in the old shapes, and the
+    stamping test fails against the pre fix pair for that real
+    reason.
+    """
+
+    def build_fence_repo(self):
+        repo = Path(self.tmp.name) / "fencerepo"
+        init_repo(repo)
+        (repo / "a.md").write_text(
+            "# Doc\n\n```\ncode line\n```\n\n"
+            "tail line one\ntail line two\n",
+            encoding="utf-8",
+        )
+        (repo / "b.md").write_text(
+            "bravo one\nbravo two\n", encoding="utf-8"
+        )
+        (repo / "c.md").write_text(
+            "charlie one\ncharlie two\n", encoding="utf-8"
+        )
+        commit_all(repo, "base")
+        (repo / "a.md").write_text(
+            "# Doc\n\n```\ncode line\n```\n\n"
+            "tail line one EDITED\ntail line two\n",
+            encoding="utf-8",
+        )
+        (repo / "b.md").write_text(
+            "bravo one EDITED\nbravo two\n", encoding="utf-8"
+        )
+        (repo / "c.md").write_text(
+            "charlie one EDITED\ncharlie two\n", encoding="utf-8"
+        )
+        commit_all(repo, "change")
+        return repo
+
+    def fence_packet(self):
+        repo = self.build_fence_repo()
+        out = extract_packet(
+            repo, Path(self.tmp.name) / "fencepkt", "--commit", "HEAD"
+        )
+        return repo, out
+
+    def check_against(self, repo, out):
+        with redirect_stderr(io.StringIO()):
+            return check_mod.main([str(out), "--repo", str(repo)])
+
+    def test_a_markdown_fence_packet_stamps_end_to_end(self):
+        repo, out = self.fence_packet()
+        text = self.packet_text(out)
+        self.assertIn("### b.md", text)
+        self.assertEqual(self.check_against(repo, out), 0)
+        self.assertIn("````diff", text)
+
+    def test_a_hand_edit_inside_a_sized_fence_fails(self):
+        repo, out = self.fence_packet()
+        clone = self.clone("fenceedit", out)
+        text = self.packet_text(clone)
+        self.assertIn("+tail line one EDITED", text)
+        self.save_packet(
+            clone,
+            text.replace(
+                "+tail line one EDITED", "+tail line one FORGED"
+            ),
+        )
+        self.assertEqual(self.check_against(repo, clone), 1)
+
+    def test_a_removed_file_section_fails(self):
+        repo, out = self.fence_packet()
+        clone = self.clone("fenceremoved", out)
+        text = self.packet_text(clone)
+        start = text.index("### b.md")
+        end = text.index("### c.md")
+        self.save_packet(clone, text[:start] + text[end:])
+        self.assertEqual(self.check_against(repo, clone), 1)
+
+    def test_a_fence_shrunk_back_to_three_backticks_fails(self):
+        repo, out = self.fence_packet()
+        clone = self.clone("fenceshrunk", out)
+        text = self.packet_text(clone)
+        opened = text.replace("````diff", "```diff", 1)
+        self.assertNotEqual(opened, text)
+        shrunk = opened.replace("\n````\n", "\n```\n", 1)
+        self.assertNotEqual(shrunk, opened)
+        self.save_packet(clone, shrunk)
+        self.assertEqual(self.check_against(repo, clone), 1)
+
+    def test_a_fence_enlarged_at_both_ends_fails_on_the_change_tier(self):
+        repo, out = self.fence_packet()
+        clone = self.clone("fenceenlarged", out)
+        text = self.packet_text(clone)
+        opened = text.replace("````diff", "`````diff", 1)
+        self.assertNotEqual(opened, text)
+        enlarged = opened.replace("\n````\n", "\n`````\n", 1)
+        self.assertNotEqual(enlarged, opened)
+        self.save_packet(clone, enlarged)
+        captured = io.StringIO()
+        with redirect_stderr(captured):
+            code = check_mod.main(
+                [str(clone), "--repo", str(repo)]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "carries its diff block inside a 5 backtick fence, "
+            "but the body it fences requires 4 backticks",
+            captured.getvalue(),
+        )
+
+    def test_a_plain_packet_keeps_the_fixed_fence_and_passes(self):
+        repo = Path(self.tmp.name) / "plainrepo"
+        init_repo(repo)
+        (repo / "plain.md").write_text(
+            "alpha one\nalpha two\n", encoding="utf-8"
+        )
+        commit_all(repo, "base")
+        (repo / "plain.md").write_text(
+            "alpha one EDITED\nalpha two\n", encoding="utf-8"
+        )
+        commit_all(repo, "change")
+        out = extract_packet(
+            repo, Path(self.tmp.name) / "plainpkt", "--commit", "HEAD"
+        )
+        text = self.packet_text(out)
+        self.assertIn("```diff", text)
+        self.assertNotIn("````diff", text)
+        self.assertEqual(self.check_against(repo, out), 0)
+
+
 class TestDisplayPathAgreement(unittest.TestCase):
     """The two display path copies must agree on every name.
 
@@ -809,6 +946,46 @@ class TestDisplayPathAgreement(unittest.TestCase):
         )
         self.assertEqual(
             check_mod.display_path("a\u2029b"), "a\\u2029b"
+        )
+
+
+class TestDiffFenceAgreement(unittest.TestCase):
+    """The two diff fence sizing copies must agree on every body.
+
+    The extractor sizes each change tier fence with its copy
+    and the checker judges the size it finds with its own, so
+    a body the two size differently can never be stamped, or
+    worse, can be stamped wrongly. This battery is the single
+    behaviour the two copies are held to.
+    """
+
+    BODIES = (
+        "",
+        "no backticks at all",
+        "(no textual diff)",
+        "`",
+        "``",
+        "```",
+        "a ``` b",
+        "````diff",
+        "code line\n ```\n\ntail line",
+        "+" + "`" * 7 + " added run",
+        "mixed ` and ```` and `` runs",
+    )
+
+    def test_the_two_copies_agree_on_the_battery(self):
+        for body in self.BODIES:
+            with self.subTest(body=body):
+                self.assertEqual(
+                    check_mod.diff_fence_for(body),
+                    extract_mod.fence_for(body),
+                )
+
+    def test_the_floor_and_the_step_are_the_stated_sizes(self):
+        self.assertEqual(check_mod.diff_fence_for("plain"), "```")
+        self.assertEqual(check_mod.diff_fence_for("a ``` b"), "````")
+        self.assertEqual(
+            check_mod.diff_fence_for("`" * 7), "`" * 8
         )
 
 
