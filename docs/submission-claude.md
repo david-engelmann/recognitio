@@ -15,7 +15,9 @@ ahead on the decision of the owner without further research.
 **What was proven**
 
 Every requirement the primary pages state was checked against
-the shipped manifests and files on 2026-10-27. The gate at
+the shipped manifests and files on 2026-10-27, apart from the
+size limits item, which was restated on 2026-10-28 against the
+tree that then held 220 files. The gate at
 scripts/check_submissions.py pins the facts the check rests
 on, so drift in a manifest or in this pack fails the gate.
 The check is a tree check against the primary text. The one
@@ -148,8 +150,9 @@ past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
 **Met, the size limits.** The repo holds 220 files and a
-few megabytes in total. Its largest file is the demo
-recording at 646,314 bytes, well under the 5 MiB file
+few megabytes in total, as restated on 2026-10-28 against
+the tree that then held that count. Its largest file is the
+demo recording at 646,314 bytes, well under the 5 MiB file
 limit.
 
 **Open, the worked examples.** The directory policy asks for

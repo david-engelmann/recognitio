@@ -1,12 +1,13 @@
 """The symlink census pin.
 
-Round 89 settled the repo wide symlink question with a
-census of the committed tree. Exactly one symlink stands
-in the tree and it is legitimate by design. The home
-platform spelling of the skill at the Claude skills path
-points at the canonical skill under the agents folder.
-No shipped check before this one enumerated the tree, so
-a link planted outside a guarded surface stood unnamed.
+The repo wide symlink question is whether any link stands
+in the tree besides the one legitimate link, and a census
+of the committed tree answers it. Exactly one symlink
+stands in the tree and it is legitimate by design. The
+link at .claude/skills/recognitio points at
+../../.agents/skills/recognitio. No shipped check before
+this one enumerated the tree, so a link planted outside
+a guarded surface stood unnamed.
 
 This test derives the census from git itself so it audits
 the real committed tree and not a hardcoded file list. It
