@@ -1706,19 +1706,6 @@ def dropped_problem(name, rel_builder):
     )
 
 
-def dropped_output_problems(before, after, reads, writes,
-                            builder, rel_builder, rel_folder,
-                            other_folders=()):
-    """Name shipped files in a builder subtree it never refreshes."""
-    return [
-        dropped_problem(name, rel_builder)
-        for name in dropped_output_candidates(
-            before, after, reads, writes, builder, rel_folder,
-            other_folders,
-        )
-    ]
-
-
 MARKER_BYTES = b"\x00recognitio dropped output marker\x00\n"
 
 

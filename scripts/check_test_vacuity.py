@@ -29,7 +29,32 @@ a name against the literal it was bound to, argues about
 nothing. A name bound to a computed value, a call result or
 a fixture read counts as a value, so the common shape of a
 literal expectation compared against a fixture result still
-counts in full. A helper is judged at each call site, so a
+counts in full.
+
+Pure calls over constants count as constants on the same
+reading. A call to a builtin whose result depends only on
+its arguments, such as a length or a conversion or an
+ordering, and a pure method call on a constant receiver,
+such as a case form or a join, are constant expressions
+when every argument is one, and a name that names a
+builtin counts as a constant as well, so an assertion
+whose operands are built only in those ways argues about
+nothing in the same way a bare literal does. A call over
+a value counts as a value, and a call to any other
+function counts as a value, so a length or a conversion
+or a sort of a fixture read keeps its credit in full. A
+pure call over a name bound to a mutable container keeps
+its credit as well, because the container can gain
+contents through a nested function or a callback the
+guard cannot see into, and the call then argues about
+what the container holds at run time. A
+constant binding stops standing where a mutating method
+call is made on the name, because the value after such a
+call is the value the call leaves behind and not the
+value the binding wrote, so a container filled from a
+fixture keeps the credit its contents earn.
+
+A helper is judged at each call site, so a
 parameter bound to a literal at the call, or left at a
 literal default, counts as a constant inside the helper for
 that call, while a parameter passed a fixture value counts
@@ -83,6 +108,7 @@ stays the guard for those shapes.
 """
 
 import ast
+import builtins
 import sys
 from pathlib import Path
 
@@ -173,13 +199,240 @@ CALLABLE_CONTEXT_NAMES = {
 
 SWALLOW_NAMES = {"AssertionError", "Exception", "BaseException"}
 
+# Names that name a builtin value on the constant reading,
+# so a builtin name standing as an assertion operand counts
+# beside the literal operands it is compared with.
+BUILTIN_NAMES = {
+    "abs",
+    "all",
+    "any",
+    "bool",
+    "bytearray",
+    "bytes",
+    "complex",
+    "dict",
+    "float",
+    "frozenset",
+    "int",
+    "isinstance",
+    "len",
+    "list",
+    "max",
+    "min",
+    "object",
+    "repr",
+    "reversed",
+    "round",
+    "set",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "type",
+}
+
+# Builtin calls whose result depends only on their arguments.
+PURE_CALL_NAMES = {
+    "abs",
+    "all",
+    "any",
+    "bool",
+    "bytearray",
+    "bytes",
+    "complex",
+    "dict",
+    "float",
+    "frozenset",
+    "int",
+    "isinstance",
+    "len",
+    "list",
+    "max",
+    "min",
+    "repr",
+    "reversed",
+    "round",
+    "set",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "type",
+}
+
+# Method calls on a constant receiver whose result depends
+# only on the receiver and their arguments.
+PURE_METHOD_NAMES = {
+    "capitalize",
+    "casefold",
+    "center",
+    "count",
+    "index",
+    "join",
+    "ljust",
+    "lower",
+    "lstrip",
+    "removeprefix",
+    "removesuffix",
+    "replace",
+    "rjust",
+    "rsplit",
+    "rstrip",
+    "split",
+    "strip",
+    "swapcase",
+    "title",
+    "upper",
+    "zfill",
+}
+
+BUILTIN_VALUES = {
+    name: getattr(builtins, name)
+    for name in BUILTIN_NAMES
+    if hasattr(builtins, name)
+}
+
+# Method calls that change the object they are called on, so
+# a constant binding stops standing at such a call in the
+# same way it stops standing at a rebinding. A set built by
+# a constructor call and then filled by update calls holds
+# what the update calls put in it and not the empty set the
+# constructor returned, so the binding is dropped there.
+MUTATING_METHOD_NAMES = {
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "insert",
+    "pop",
+    "remove",
+    "reverse",
+    "setdefault",
+    "sort",
+    "update",
+}
+
+
+def is_stable_value(value):
+    """Whether a tracked value cannot change under its name.
+
+    A name bound to a mutable container can gain new
+    contents through a nested function or a callback the
+    guard cannot see into, so a pure call over such a name
+    may well argue about the contents the container holds
+    at run time. A name bound to a value built only from
+    stable parts cannot change without a rebinding, and
+    every rebinding is tracked, so a pure call over it is
+    a constant in full.
+    """
+    if value is UNKNOWN:
+        return False
+    if isinstance(value, (str, bytes, int, float, bool, type)):
+        return True
+    if value is None:
+        return True
+    if isinstance(value, (tuple, frozenset)):
+        return all(is_stable_value(part) for part in value)
+    return False
+
+
+def is_constant_call_argument(node, values):
+    """Whether a call argument is a constant in full.
+
+    The expression must be a constant expression, and every
+    name inside it must be a builtin name or a name bound to
+    a stable value, for the reason is_stable_value records.
+    """
+    if not is_constant_expression(node, values):
+        return False
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name):
+            if child.id in BUILTIN_NAMES:
+                continue
+            if child.id in values and not is_stable_value(
+                values[child.id]
+            ):
+                return False
+    return True
+
+
+def eval_pure_call(node, values):
+    """The value of a pure call over constants, or UNKNOWN."""
+    args = []
+    for arg in node.args:
+        if isinstance(arg, ast.Starred):
+            return UNKNOWN
+        value = eval_constant(arg, values)
+        if value is UNKNOWN:
+            return UNKNOWN
+        args.append(value)
+    keywords = {}
+    for keyword in node.keywords:
+        if keyword.arg is None:
+            return UNKNOWN
+        value = eval_constant(keyword.value, values)
+        if value is UNKNOWN:
+            return UNKNOWN
+        keywords[keyword.arg] = value
+    func = node.func
+    if isinstance(func, ast.Name):
+        if func.id not in PURE_CALL_NAMES:
+            return UNKNOWN
+        target = BUILTIN_VALUES.get(func.id, UNKNOWN)
+        if target is UNKNOWN:
+            return UNKNOWN
+        try:
+            return target(*args, **keywords)
+        except Exception:
+            return UNKNOWN
+    if isinstance(func, ast.Attribute):
+        if func.attr not in PURE_METHOD_NAMES:
+            return UNKNOWN
+        receiver = eval_constant(func.value, values)
+        if receiver is UNKNOWN:
+            return UNKNOWN
+        try:
+            return getattr(receiver, func.attr)(*args, **keywords)
+        except Exception:
+            return UNKNOWN
+    return UNKNOWN
+
 
 def eval_constant(node, values):
     """The value of a pure constant expression, or UNKNOWN."""
     if isinstance(node, ast.Constant):
         return node.value
     if isinstance(node, ast.Name):
-        return values.get(node.id, UNKNOWN)
+        if node.id in values:
+            return values[node.id]
+        return BUILTIN_VALUES.get(node.id, UNKNOWN)
+    if isinstance(node, ast.Call):
+        return eval_pure_call(node, values)
+    if isinstance(node, ast.Attribute):
+        if node.attr.startswith("_"):
+            return UNKNOWN
+        receiver = eval_constant(node.value, values)
+        if receiver is UNKNOWN or not isinstance(
+            receiver,
+            (
+                str,
+                bytes,
+                int,
+                float,
+                bool,
+                tuple,
+                list,
+                dict,
+                frozenset,
+                type,
+            ),
+        ):
+            return UNKNOWN
+        try:
+            return getattr(receiver, node.attr)
+        except Exception:
+            return UNKNOWN
     if isinstance(node, ast.UnaryOp):
         operand = eval_constant(node.operand, values)
         if operand is UNKNOWN:
@@ -319,7 +572,28 @@ def is_constant_expression(node, values):
     if isinstance(node, ast.Constant):
         return True
     if isinstance(node, ast.Name):
-        return node.id in values
+        return node.id in values or node.id in BUILTIN_NAMES
+    if isinstance(node, ast.Call):
+        if not all(
+            is_constant_call_argument(arg, values)
+            for arg in node.args
+        ):
+            return False
+        if not all(
+            is_constant_call_argument(keyword.value, values)
+            for keyword in node.keywords
+        ):
+            return False
+        func = node.func
+        if isinstance(func, ast.Name):
+            return func.id in PURE_CALL_NAMES
+        if isinstance(func, ast.Attribute):
+            return func.attr in PURE_METHOD_NAMES and (
+                is_constant_call_argument(func.value, values)
+            )
+        return False
+    if isinstance(node, ast.Attribute):
+        return is_constant_expression(node.value, values)
     if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
         return all(
             is_constant_expression(elt, values) for elt in node.elts
@@ -955,6 +1229,16 @@ class Collector:
                 self.walk_expr(
                     keyword.value, values, result, swallowed
                 )
+            if isinstance(func, ast.Attribute) and (
+                func.attr in MUTATING_METHOD_NAMES
+            ):
+                base = func.value
+                while isinstance(
+                    base, (ast.Attribute, ast.Subscript)
+                ):
+                    base = base.value
+                if isinstance(base, ast.Name):
+                    values.pop(base.id, None)
             return
         if isinstance(node, ast.NamedExpr):
             self.walk_expr(node.value, values, result, swallowed)
@@ -1185,6 +1469,25 @@ def vacuity_problems(root=None):
                 ):
                     if default is not None:
                         defaults[arg.arg] = default
+                # A helper reached through an attribute call is
+                # a method, and the call arguments carry no
+                # receiver, so the first declared parameter is
+                # the receiver and not a call argument. Binding
+                # the first literal to the receiver left the
+                # real first parameter unbound, which is the
+                # shape the round 107 helper plant used.
+                decorator_names = set()
+                for decorator in func.decorator_list:
+                    if isinstance(decorator, ast.Name):
+                        decorator_names.add(decorator.id)
+                    elif isinstance(decorator, ast.Attribute):
+                        decorator_names.add(decorator.attr)
+                if (
+                    positional
+                    and isinstance(node.func, ast.Attribute)
+                    and "staticmethod" not in decorator_names
+                ):
+                    positional = positional[1:]
                 keywords = {
                     keyword.arg: keyword.value
                     for keyword in node.keywords

@@ -42,6 +42,20 @@ class TestSomething(unittest.TestCase):
 '''
 
 
+def quieted_body(assertion):
+    return (
+        "import unittest\n"
+        "from pathlib import Path\n"
+        "ROOT = Path('.')\n"
+        "\n"
+        "\n"
+        "class TestSomething(unittest.TestCase):\n"
+        "    def test_a_quieted_case(self):\n"
+        "        " + assertion + "\n"
+        "        touched = ROOT.name\n"
+    )
+
+
 class TestCheckTestVacuity(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_test_vacuity")
@@ -56,6 +70,21 @@ class TestCheckTestVacuity(unittest.TestCase):
 
     def problems(self, root):
         return self.mod.vacuity_problems(root)
+
+    def guard_problems(self, body):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            return self.problems(root)
+
+    def assert_vacuous(self, body):
+        problems = self.guard_problems(body)
+        self.assertTrue(
+            any("no real assertion" in p for p in problems),
+            problems,
+        )
+
+    def assert_clean(self, body):
+        self.assertEqual(self.guard_problems(body), [])
 
     def test_the_shipped_suite_holds(self):
         self.assertEqual(self.mod.vacuity_problems(ROOT), [])
@@ -545,6 +574,235 @@ class TestCheckTestVacuity(unittest.TestCase):
                 any("no real assertion" in p for p in problems),
                 problems,
             )
+
+    def test_a_length_of_a_constant_string_fails(self):
+        # The round 107 battery. A pure call over constants
+        # argued about nothing under the old reading, because
+        # a call was never a constant expression there.
+        self.assert_vacuous(
+            quieted_body('self.assertEqual(len("abcd"), 4)')
+        )
+
+    def test_an_integer_of_a_constant_string_fails(self):
+        self.assert_vacuous(
+            quieted_body('self.assertEqual(int("42"), 42)')
+        )
+
+    def test_a_sorted_constant_list_fails(self):
+        self.assert_vacuous(
+            quieted_body(
+                "self.assertEqual(sorted([3, 1, 2]), [1, 2, 3])"
+            )
+        )
+
+    def test_an_upper_case_of_a_constant_string_fails(self):
+        self.assert_vacuous(
+            quieted_body('self.assertEqual("abc".upper(), "ABC")')
+        )
+
+    def test_a_boolean_of_a_constant_fails(self):
+        self.assert_vacuous(quieted_body("self.assertTrue(bool(1))"))
+
+    def test_an_instance_check_against_a_builtin_name_fails(self):
+        self.assert_vacuous(
+            quieted_body('self.assertIsInstance("x", str)')
+        )
+
+    def test_a_type_of_a_constant_against_a_builtin_name_fails(self):
+        self.assert_vacuous(
+            quieted_body("self.assertEqual(type(1), int)")
+        )
+
+    def test_a_string_of_a_constant_number_fails(self):
+        self.assert_vacuous(
+            quieted_body('self.assertEqual(str(42), "42")')
+        )
+
+    def test_a_maximum_of_two_constants_fails(self):
+        self.assert_vacuous(
+            quieted_body("self.assertEqual(max(1, 9), 9)")
+        )
+
+    def test_an_absolute_value_of_a_constant_fails(self):
+        self.assert_vacuous(
+            quieted_body("self.assertEqual(abs(-3), 3)")
+        )
+
+    def test_a_join_of_a_constant_list_fails(self):
+        self.assert_vacuous(
+            quieted_body(
+                'self.assertEqual(",".join(["a", "b"]), "a,b")'
+            )
+        )
+
+    def test_a_pure_call_through_a_helper_with_a_literal_fails(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def _check(self, value):\n"
+            "        self.assertEqual(len(value), 4)\n"
+            "\n"
+            "    def test_a_quieted_case(self):\n"
+            "        self._check('abcd')\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_pure_call_laundered_through_a_name_fails(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            '        count = len("abcd")\n'
+            "        self.assertEqual(count, 4)\n"
+            "        touched = ROOT.name\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_plain_assert_over_a_pure_call_fails(self):
+        self.assert_vacuous(
+            quieted_body('assert len("abcd") == 4')
+        )
+
+    def test_a_length_of_a_fixture_read_still_counts(self):
+        # The same call over a value is a real assertion, so
+        # the pure call reading must not take its credit.
+        self.assert_clean(
+            quieted_body(
+                "self.assertEqual(len(ROOT.read_text()), 4)"
+            )
+        )
+
+    def test_a_conversion_of_a_fixture_read_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        data = ROOT.read_text()\n"
+            "        self.assertEqual(int(data), 42)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_sort_of_a_computed_value_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        result = self.mod.pin(ROOT)\n"
+            "        self.assertEqual(sorted(result), [1, 2])\n"
+        )
+        self.assert_clean(body)
+
+    def test_an_instance_check_on_a_value_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        data = ROOT.read_text()\n"
+            "        self.assertIsInstance(data, str)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_type_check_on_a_value_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        data = ROOT.read_text()\n"
+            "        self.assertEqual(type(data), str)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_case_form_of_a_value_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        data = ROOT.read_text()\n"
+            '        self.assertEqual(data.upper(), "ABC")\n'
+        )
+        self.assert_clean(body)
+
+    def test_a_pure_call_through_a_helper_on_a_value_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def _check(self, value):\n"
+            "        self.assertEqual(len(value), 4)\n"
+            "\n"
+            "    def test_a_real_case(self):\n"
+            "        self._check(ROOT.read_text())\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_length_of_a_callback_filled_list_still_counts(self):
+        # A list filled by a nested function holds what the
+        # callback put in it at run time, so a length over
+        # the name argues about that filling and not about
+        # the empty list the binding wrote.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        calls = []\n"
+            "\n"
+            "        def counting(item):\n"
+            "            calls.append(item)\n"
+            "\n"
+            "        counting(ROOT.name)\n"
+            "        self.assertEqual(len(calls), 1, calls)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_set_filled_from_a_fixture_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        found = set()\n"
+            "        found.update([ROOT.name])\n"
+            "        self.assertEqual(found, {'.'})\n"
+        )
+        self.assert_clean(body)
 
     def test_the_success_line_names_the_limits_it_keeps(self):
         out = io.StringIO()

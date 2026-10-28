@@ -1772,6 +1772,18 @@ This unreleased work carries version 1.3.0.
   a fail call outside every conditional branch still
   counts and a conditional fail beside a real assertion
   still passes.
+- The test vacuity guard now reads a pure call over
+  constants as a constant, so a test softened into a
+  length or a conversion or a sort or a case form of
+  literal values no longer passes the guard in silence.
+  A builtin name standing as an operand counts as a
+  constant beside the literal operands, and the same
+  reading reaches a helper called with a literal, where
+  the first literal once bound to the receiver and left
+  the real first parameter unbound. A call over a value
+  keeps its credit in full, and so does a pure call over
+  a name bound to a mutable container, because the
+  container can gain contents the guard cannot see.
 - The fan out steering screen now reads the rule field of a
   finding beside its summary, in the group reviews and the
   merged findings and the findings the second pass raises,
@@ -1831,3 +1843,8 @@ This unreleased work carries version 1.3.0.
   capture file at `docs/images/capture.json`. The builder
   wrote only retired asset names, and the landing that
   retired its assets removes the builder with them.
+- The dropped output problems wrapper in the regeneration
+  gate. No gate run or test could reach it, and the live
+  builder reading performs the same work inline at its
+  own site, so the gate now holds one spelling of the
+  reading and no dead one beside it.
