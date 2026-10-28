@@ -20,8 +20,10 @@ One recorded run in full. A session in the Cursor agent uses the recognitio skil
 
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-cursor-agent-verified-crop.png">
-  <img alt="A Cursor agent session using recognitio on a 28 file change, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792">
+  <img alt="A Cursor agent session using recognitio on a 28 file change, its packet verified in full, ending on a verdict of Approve." src="docs/images/recognitio-cursor-agent-demo.gif" width="792">
 </picture>
+
+On a narrow screen the hero shows two moments from the same recorded run as two stacked panels, the verified packet check above and the closing verdict below.
 
 <img alt="Paired eval chart. The packet pass found 8 of 8 planted defects and the raw diff pass found 4 of 8." src="docs/images/eval-chart.svg" width="720">
 

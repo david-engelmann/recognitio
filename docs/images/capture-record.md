@@ -48,6 +48,9 @@ The GIF is an edit for pace, and the edit is disclosed here in full. The timelin
 
 - recognitio-cursor-agent-demo.gif, 792 by 570 pixels, 86 frames, 28.8 seconds of play, 1274392 bytes.
 - recognitio-cursor-agent-poster.png, 792 by 570 pixels, 60150 bytes, the cast frame at 200 seconds, which shows the packet check card reporting the packet verified for the current head in full and the manifest read reporting the merge base and the count of 28 files, complete and uncropped.
+- recognitio-cursor-agent-verified-crop.png, 544 by 143 pixels, 12857 bytes, a composition of two moments from the same recorded session, as the paragraph below states in full.
+
+The phone file recognitio-cursor-agent-verified-crop.png is a composition of two moments from this same recorded session, the frame at 230 seconds cut to the merge base line and the verified sentence, and the frame at 433.5 seconds cut to the Verdict heading and the opening of the verdict paragraph, stacked with an outline around each moment. No pixel inside either panel was redrawn, and the desktop recording in the hero slot is unchanged.
 
 On weight, the GIF is larger than the first take at 1115604 bytes by about a seventh and smaller than the terminal recording the README carried earlier at 1822894 bytes. A live terminal stream carries a full screen of new text on every scroll, and that is the honest cost of this asset class at this width and length.
 

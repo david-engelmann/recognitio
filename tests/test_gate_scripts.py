@@ -2139,6 +2139,20 @@ class TestReadmePhoneWidth(unittest.TestCase):
             'width="792">',
             block,
         )
+        # The shared alt names the verified packet as well as
+        # the verdict, because the phone composition shows
+        # both moments and the desktop recording shows the
+        # verified packet during its play and ends on the
+        # verdict. The alt stood unpinned before this pin,
+        # and a tree with the alt reverted to its earlier
+        # wording passed every gate test, so the pin stands
+        # here beside the source and fallback pins.
+        self.assertIn(
+            'alt="A Cursor agent session using recognitio on a '
+            "28 file change, its packet verified in full, "
+            'ending on a verdict of Approve."',
+            block,
+        )
         # The hero image declares its width and no height.
         # GitHub honours a height attribute as a fixed CSS
         # height, and the WP1 rendered pass caught it
@@ -2991,12 +3005,12 @@ class TestDemoAssets(unittest.TestCase):
         )
         self.assertTrue(path.is_file())
         width, height, _rows = _png_pixels_any(path)
-        self.assertEqual((width, height), (400, 307))
+        self.assertEqual((width, height), (544, 143))
         found = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(
             found,
-            "dc267178f1240b240c81a69f90080ac026f85685f5f5d"
-            "9775b6c3ce5a58981b1",
+            "af31a648f57571a2d4f16ede4130ad60"
+            "ef76b6ad156af80e0f3059d6f488754f",
         )
 
     def test_the_poster_exists_as_a_png_frame(self):
@@ -3460,7 +3474,7 @@ class TestBrandAssets(unittest.TestCase):
         unique = list(dict.fromkeys(refs))
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 745535)
+        self.assertEqual(total, 740298)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

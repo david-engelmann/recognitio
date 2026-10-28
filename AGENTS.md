@@ -821,3 +821,14 @@ its own gate, the historical chronicle sentences stand
 unedited as record, and a single pin in the test suite
 classifies every file that names a severity so a new
 surface cannot join in silence.
+
+The phone hero composition landing on 2026-10-28 then
+replaced the shipped phone hero crop with a two panel
+composition of two moments from the same recorded
+session in RGB form, with the shared alt naming the
+verified packet as well as the verdict, the narrow
+screen disclosure sentence under the hero picture
+element, the composition paragraph and the shipped
+figures in the capture record, and the crop geometry
+and hash pins and the page weight exact total and the
+hero alt pin moved in the same change.

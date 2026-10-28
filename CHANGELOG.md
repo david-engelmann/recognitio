@@ -803,6 +803,24 @@ This unreleased work carries version 1.3.0.
   and the proof run sources file at
   `workflows/proof-run/sources.json`, which together rerun
   every gated provenance claim in the tree on every check.
+- The phone hero composition in place of the shipped
+  phone crop. The file at
+  docs/images/recognitio-cursor-agent-verified-crop.png
+  now stacks two moments from the same recorded session
+  as two outlined panels, the merge base line and the
+  verified sentence from the frame at 230 seconds above
+  and the Verdict heading and the opening of the verdict
+  paragraph from the frame at 433.5 seconds below, so a
+  phone reader sees the hash whole and the verified
+  clause whole and the verdict whole at a legible scale.
+  The shared hero alt names the verified packet as well
+  as the verdict, a disclosure sentence stands under
+  the hero picture element on the README, and the
+  capture record names the file as a composition beside
+  its asset list and states its figures. The demo asset
+  gate re-pins the crop geometry and hash and the page
+  weight exact total, and the hero picture test pins
+  the shared alt.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
