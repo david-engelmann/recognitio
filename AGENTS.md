@@ -31,7 +31,8 @@ to use while working. The gate runs the extractor test suite, the
 skill validator at `scripts/check_skill.py`, the version coherence
 check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
-`scripts/check_evals.py`, the persona pin check at
+`scripts/check_evals.py`, the regeneration check at
+`scripts/check_regeneration.py`, the persona pin check at
 `scripts/check_persona.py`, the fan-out run record validator at
 `scripts/check_fanout.py`, the mod contract check at
 `scripts/check_mod.py`, the portable package check at

@@ -13,6 +13,7 @@ check:
 	$(PYTHON) scripts/check_version.py
 	$(PYTHON) scripts/check_copy.py
 	$(PYTHON) scripts/check_evals.py
+	$(PYTHON) scripts/check_regeneration.py
 	$(PYTHON) scripts/check_persona.py
 	$(PYTHON) scripts/check_fanout.py
 	$(PYTHON) scripts/check_mod.py

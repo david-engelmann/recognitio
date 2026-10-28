@@ -799,6 +799,10 @@ This unreleased work carries version 1.3.0.
   per plugin the listing offers, a layout subsection and
   the hooks disclosure the Claude submission pack had
   recorded as open.
+- The regeneration gate at `scripts/check_regeneration.py`
+  and the proof run sources file at
+  `workflows/proof-run/sources.json`, which together rerun
+  every gated provenance claim in the tree on every check.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
@@ -1718,3 +1722,7 @@ This unreleased work carries version 1.3.0.
   repository today, namely the first seven in that list,
   and `python` stands among the ten additions rather
   than among the kept topics.
+- The demo builder at `docs/images/build_demo.py` and its
+  capture file at `docs/images/capture.json`. The builder
+  wrote only retired asset names, and the landing that
+  retired its assets removes the builder with them.

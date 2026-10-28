@@ -66,7 +66,10 @@ because commit metadata differs, and the file contents and the
 diff and the packet sections are what must match. Each task is
 a two-commit git history. The first commit is the base and the
 second is the change under review. A packet only counts when
-its manifest reports verified.
+its manifest reports verified. The regeneration gate at
+`scripts/check_regeneration.py` runs this rebuild on every
+check and fails when a shipped packet or manifest has drifted
+from what the rebuild produces.
 
 Run the three passes in a fixed order. The raw pass reads only
 the diff and writes its findings down. The fair raw pass then
