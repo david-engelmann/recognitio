@@ -54,6 +54,24 @@ call is the value the call leaves behind and not the
 value the binding wrote, so a container filled from a
 fixture keeps the credit its contents earn.
 
+The same reading reaches four spellings that settle a
+call in the text of the same body. A name bound in the
+body to a pure builtin stands for that builtin when it
+is called, and a pure builtin reached as an attribute
+of the builtins module counts in the same way, whether
+the module stands under its own name or under an import
+alias and whether the builtin came in through a from
+import under another name. A comprehension counts as a
+constant when its iterable is constant on this reading
+and its element expression is constant for every item
+the iterable holds, and a lambda called where it is
+written counts by its body with its parameters bound
+to the call arguments. A lambda held in a name and
+called at a later point is not followed to that call,
+and an alias bound to anything but a pure builtin is
+not a pure call, so both shapes keep the credit a call
+over a value keeps.
+
 A helper is judged at each call site, so a
 parameter bound to a literal at the call, or left at a
 literal default, counts as a constant inside the helper for
@@ -328,6 +346,10 @@ def is_stable_value(value):
     """
     if value is UNKNOWN:
         return False
+    if value is builtins:
+        return True
+    if any(value is known for known in BUILTIN_VALUES.values()):
+        return True
     if isinstance(value, (str, bytes, int, float, bool, type)):
         return True
     if value is None:
@@ -335,6 +357,86 @@ def is_stable_value(value):
     if isinstance(value, (tuple, frozenset)):
         return all(is_stable_value(part) for part in value)
     return False
+
+
+def is_pure_builtin_value(value):
+    """Whether a tracked value is one of the pure builtins."""
+    return any(
+        value is BUILTIN_VALUES[name]
+        for name in PURE_CALL_NAMES
+        if name in BUILTIN_VALUES
+    )
+
+
+def names_builtins_module(node, values):
+    """Whether an expression names the builtins module.
+
+    The module stands under its own name unless a binding
+    in the body shadows it, and under an import alias the
+    binding itself carries the module, so both spellings
+    resolve here while a name bound to anything else does
+    not.
+    """
+    if not isinstance(node, ast.Name):
+        return False
+    if node.id in values:
+        return values[node.id] is builtins
+    return node.id == "builtins"
+
+
+def resolve_pure_callable(func, values):
+    """The pure builtin a call target stands for, or None.
+
+    A bare name stands for a pure builtin when its spelling
+    is one or when the name is bound in the body to one,
+    and an attribute of the builtins module stands for the
+    builtin it names. A name bound to anything else stands
+    for that thing and not for the builtin its spelling
+    would otherwise name.
+    """
+    if isinstance(func, ast.Name):
+        if func.id in values:
+            value = values[func.id]
+            if is_pure_builtin_value(value):
+                return value
+            return None
+        if func.id in PURE_CALL_NAMES:
+            return BUILTIN_VALUES.get(func.id)
+        return None
+    if isinstance(func, ast.Attribute):
+        if names_builtins_module(func.value, values) and (
+            func.attr in PURE_CALL_NAMES
+        ):
+            return BUILTIN_VALUES.get(func.attr)
+    return None
+
+
+def locally_bound_names(node):
+    """Names bound inside an expression by its own parts.
+
+    A comprehension binds its target names and a lambda
+    binds its parameter names, so a use of such a name
+    inside the expression reads the binding the expression
+    itself makes and not a name the enclosing body holds.
+    """
+    names = set()
+    for child in ast.walk(node):
+        if isinstance(child, ast.comprehension):
+            names.update(bound_names(child.target))
+        elif isinstance(child, ast.Lambda):
+            arguments = child.args
+            for group in (
+                arguments.posonlyargs,
+                arguments.args,
+                arguments.kwonlyargs,
+            ):
+                for arg in group:
+                    names.add(arg.arg)
+            if arguments.vararg is not None:
+                names.add(arguments.vararg.arg)
+            if arguments.kwarg is not None:
+                names.add(arguments.kwarg.arg)
+    return names
 
 
 def is_constant_call_argument(node, values):
@@ -346,8 +448,11 @@ def is_constant_call_argument(node, values):
     """
     if not is_constant_expression(node, values):
         return False
+    bound = locally_bound_names(node)
     for child in ast.walk(node):
         if isinstance(child, ast.Name):
+            if child.id in bound:
+                continue
             if child.id in BUILTIN_NAMES:
                 continue
             if child.id in values and not is_stable_value(
@@ -355,6 +460,213 @@ def is_constant_call_argument(node, values):
             ):
                 return False
     return True
+
+
+def lambda_scope(func, node, values):
+    """The values inside a lambda called where it is written.
+
+    The parameters stand bound to the call arguments that
+    settle as constants, or to their defaults where the
+    call passes nothing, and every other parameter stands
+    unbound, so a body that reads it is not a constant.
+    The shape of the call must match the shape of the
+    lambda, so a starred argument, a double starred
+    keyword or a call with more arguments than the lambda
+    takes settles nothing and returns None.
+    """
+    if any(isinstance(arg, ast.Starred) for arg in node.args):
+        return None
+    if any(keyword.arg is None for keyword in node.keywords):
+        return None
+    arguments = func.args
+    positional = [
+        arg.arg
+        for arg in list(arguments.posonlyargs)
+        + list(arguments.args)
+    ]
+    scope = dict(values)
+    params = list(positional)
+    params.extend(arg.arg for arg in arguments.kwonlyargs)
+    if arguments.vararg is not None:
+        params.append(arguments.vararg.arg)
+    if arguments.kwarg is not None:
+        params.append(arguments.kwarg.arg)
+    for param in params:
+        scope.pop(param, None)
+    if len(node.args) > len(positional) and (
+        arguments.vararg is None
+    ):
+        return None
+    keywords = {
+        keyword.arg: keyword.value for keyword in node.keywords
+    }
+    extra = set(keywords) - set(params)
+    if extra and arguments.kwarg is None:
+        return None
+    defaults = {}
+    offset = len(positional) - len(arguments.defaults)
+    for index, default in enumerate(arguments.defaults):
+        defaults[positional[offset + index]] = default
+    for index, param in enumerate(positional):
+        if index < len(node.args):
+            value = eval_constant(node.args[index], values)
+        elif param in keywords:
+            value = eval_constant(keywords[param], values)
+        elif param in defaults:
+            value = eval_constant(defaults[param], values)
+        else:
+            continue
+        if value is not UNKNOWN:
+            scope[param] = value
+    kw_defaults = {
+        arg.arg: default
+        for arg, default in zip(
+            arguments.kwonlyargs, arguments.kw_defaults
+        )
+    }
+    for arg in arguments.kwonlyargs:
+        param = arg.arg
+        if param in keywords:
+            value = eval_constant(keywords[param], values)
+        elif kw_defaults.get(param) is not None:
+            value = eval_constant(kw_defaults[param], values)
+        else:
+            continue
+        if value is not UNKNOWN:
+            scope[param] = value
+    return scope
+
+
+def bind_comprehension_target(target, item, scope):
+    """Bind one comprehension item to its target names."""
+    if isinstance(target, ast.Name):
+        scope[target.id] = item
+        return True
+    if isinstance(target, (ast.Tuple, ast.List)):
+        try:
+            parts = list(item)
+        except Exception:
+            return False
+        if len(parts) != len(target.elts):
+            return False
+        return all(
+            bind_comprehension_target(elt, part, scope)
+            for elt, part in zip(target.elts, parts)
+        )
+    return False
+
+
+def eval_comprehension(node, values):
+    """The value of a comprehension over constants, or UNKNOWN."""
+    results = []
+
+    def step(index, scope):
+        if index == len(node.generators):
+            if isinstance(node, ast.DictComp):
+                key = eval_constant(node.key, scope)
+                value = eval_constant(node.value, scope)
+                if key is UNKNOWN or value is UNKNOWN:
+                    return False
+                results.append((key, value))
+                return True
+            element = eval_constant(node.elt, scope)
+            if element is UNKNOWN:
+                return False
+            results.append(element)
+            return True
+        generator = node.generators[index]
+        iterable = eval_constant(generator.iter, scope)
+        if iterable is UNKNOWN:
+            return False
+        try:
+            items = list(iterable)
+        except Exception:
+            return False
+        for item in items:
+            inner = dict(scope)
+            if not bind_comprehension_target(
+                generator.target, item, inner
+            ):
+                return False
+            settled = True
+            for condition in generator.ifs:
+                outcome = eval_constant(condition, inner)
+                if outcome is UNKNOWN:
+                    return False
+                if not outcome:
+                    settled = False
+                    break
+            if not settled:
+                continue
+            if not step(index + 1, inner):
+                return False
+        return True
+
+    if not step(0, dict(values)):
+        return UNKNOWN
+    if isinstance(node, ast.SetComp):
+        try:
+            return frozenset(results)
+        except Exception:
+            return UNKNOWN
+    if isinstance(node, ast.GeneratorExp):
+        return tuple(results)
+    if isinstance(node, ast.DictComp):
+        return tuple(results)
+    return results
+
+
+def is_constant_comprehension(node, values):
+    """Whether a comprehension is built only from constants.
+
+    The iterable of each generator must be a constant call
+    argument on the enclosing reading, so an iterable held
+    in a name bound to a mutable container keeps the
+    credit the mutable container reading keeps, and the
+    element expression must be constant for every item
+    the iterable holds with the target names bound to
+    that item.
+    """
+    def step(index, scope):
+        if index == len(node.generators):
+            if isinstance(node, ast.DictComp):
+                return is_constant_expression(
+                    node.key, scope
+                ) and is_constant_expression(node.value, scope)
+            return is_constant_expression(node.elt, scope)
+        generator = node.generators[index]
+        if not is_constant_call_argument(generator.iter, scope):
+            return False
+        iterable = eval_constant(generator.iter, scope)
+        if iterable is UNKNOWN:
+            return False
+        try:
+            items = list(iterable)
+        except Exception:
+            return False
+        for item in items:
+            inner = dict(scope)
+            if not bind_comprehension_target(
+                generator.target, item, inner
+            ):
+                return False
+            settled = True
+            for condition in generator.ifs:
+                if not is_constant_expression(condition, inner):
+                    return False
+                outcome = eval_constant(condition, inner)
+                if outcome is UNKNOWN:
+                    return False
+                if not outcome:
+                    settled = False
+                    break
+            if not settled:
+                continue
+            if not step(index + 1, inner):
+                return False
+        return True
+
+    return step(0, dict(values))
 
 
 def eval_pure_call(node, values):
@@ -376,16 +688,17 @@ def eval_pure_call(node, values):
             return UNKNOWN
         keywords[keyword.arg] = value
     func = node.func
-    if isinstance(func, ast.Name):
-        if func.id not in PURE_CALL_NAMES:
-            return UNKNOWN
-        target = BUILTIN_VALUES.get(func.id, UNKNOWN)
-        if target is UNKNOWN:
-            return UNKNOWN
+    target = resolve_pure_callable(func, values)
+    if target is not None:
         try:
             return target(*args, **keywords)
         except Exception:
             return UNKNOWN
+    if isinstance(func, ast.Lambda):
+        scope = lambda_scope(func, node, values)
+        if scope is None:
+            return UNKNOWN
+        return eval_constant(func.body, scope)
     if isinstance(func, ast.Attribute):
         if func.attr not in PURE_METHOD_NAMES:
             return UNKNOWN
@@ -409,7 +722,14 @@ def eval_constant(node, values):
         return BUILTIN_VALUES.get(node.id, UNKNOWN)
     if isinstance(node, ast.Call):
         return eval_pure_call(node, values)
+    if isinstance(
+        node,
+        (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp),
+    ):
+        return eval_comprehension(node, values)
     if isinstance(node, ast.Attribute):
+        if names_builtins_module(node.value, values):
+            return BUILTIN_VALUES.get(node.attr, UNKNOWN)
         if node.attr.startswith("_"):
             return UNKNOWN
         receiver = eval_constant(node.value, values)
@@ -585,14 +905,28 @@ def is_constant_expression(node, values):
         ):
             return False
         func = node.func
-        if isinstance(func, ast.Name):
-            return func.id in PURE_CALL_NAMES
-        if isinstance(func, ast.Attribute):
-            return func.attr in PURE_METHOD_NAMES and (
-                is_constant_call_argument(func.value, values)
-            )
+        if isinstance(func, (ast.Name, ast.Attribute)):
+            if resolve_pure_callable(func, values) is not None:
+                return True
+            if isinstance(func, ast.Attribute):
+                return func.attr in PURE_METHOD_NAMES and (
+                    is_constant_call_argument(func.value, values)
+                )
+            return False
+        if isinstance(func, ast.Lambda):
+            scope = lambda_scope(func, node, values)
+            if scope is None:
+                return False
+            return is_constant_expression(func.body, scope)
         return False
+    if isinstance(
+        node,
+        (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp),
+    ):
+        return is_constant_comprehension(node, values)
     if isinstance(node, ast.Attribute):
+        if names_builtins_module(node.value, values):
+            return node.attr in BUILTIN_NAMES
         return is_constant_expression(node.value, values)
     if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
         return all(
@@ -1099,10 +1433,25 @@ class Collector:
             self.walk_block(stmt.body, body_values, result, swallowed)
             values.pop(stmt.name, None)
             return False
-        if isinstance(stmt, (ast.Import, ast.ImportFrom)):
+        if isinstance(stmt, ast.Import):
             for alias in stmt.names:
-                name = (alias.asname or alias.name).split(".")[0]
-                values.pop(name, None)
+                if alias.name == "builtins":
+                    values[alias.asname or "builtins"] = builtins
+                else:
+                    name = (alias.asname or alias.name).split(".")[0]
+                    values.pop(name, None)
+            return False
+        if isinstance(stmt, ast.ImportFrom):
+            for alias in stmt.names:
+                bound = alias.asname or alias.name
+                if (
+                    stmt.level == 0
+                    and stmt.module == "builtins"
+                    and alias.name in BUILTIN_VALUES
+                ):
+                    values[bound] = BUILTIN_VALUES[alias.name]
+                else:
+                    values.pop(bound.split(".")[0], None)
             return False
         if isinstance(stmt, ast.Delete):
             for target in stmt.targets:
@@ -1379,6 +1728,24 @@ def module_global_values(tree):
         ):
             for name in bound_names(stmt.target):
                 values.pop(name, None)
+        elif isinstance(stmt, ast.Import):
+            for alias in stmt.names:
+                if alias.name == "builtins":
+                    values[alias.asname or "builtins"] = builtins
+                else:
+                    name = (alias.asname or alias.name).split(".")[0]
+                    values.pop(name, None)
+        elif isinstance(stmt, ast.ImportFrom):
+            for alias in stmt.names:
+                bound = alias.asname or alias.name
+                if (
+                    stmt.level == 0
+                    and stmt.module == "builtins"
+                    and alias.name in BUILTIN_VALUES
+                ):
+                    values[bound] = BUILTIN_VALUES[alias.name]
+                else:
+                    values.pop(bound, None)
     return values
 
 

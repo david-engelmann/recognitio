@@ -671,6 +671,85 @@ class TestCheckTestVacuity(unittest.TestCase):
             quieted_body('assert len("abcd") == 4')
         )
 
+    def test_a_pure_builtin_aliased_through_a_name_fails(self):
+        # The round 131 battery. A name bound in the same
+        # body to a pure builtin stands for that builtin, so
+        # calling the name over constants argues about
+        # nothing in the same way calling the builtin does.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        measure = len\n"
+            '        self.assertEqual(measure("abcd"), 4)\n'
+            "        touched = ROOT.name\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_pure_builtin_through_the_builtins_module_fails(
+        self,
+    ):
+        body = (
+            "import builtins\n"
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            '        self.assertEqual(builtins.len("abcd"), 4)\n'
+            "        touched = ROOT.name\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_pure_builtin_through_an_import_alias_fails(self):
+        body = (
+            "import builtins as b\n"
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            '        self.assertEqual(b.len("abcd"), 4)\n'
+            "        touched = ROOT.name\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_pure_call_in_a_comprehension_over_constants_fails(
+        self,
+    ):
+        self.assert_vacuous(
+            quieted_body(
+                "self.assertEqual("
+                '[len(w) for w in ["a", "bb"]], [1, 2])'
+            )
+        )
+
+    def test_a_pure_call_in_a_generator_expression_fails(self):
+        self.assert_vacuous(
+            quieted_body(
+                "self.assertEqual("
+                'sum(len(w) for w in ["a", "bb"]), 3)'
+            )
+        )
+
+    def test_an_immediately_called_lambda_over_constants_fails(
+        self,
+    ):
+        self.assert_vacuous(
+            quieted_body(
+                "self.assertEqual("
+                '(lambda text: len(text))("abcd"), 4)'
+            )
+        )
+
     def test_a_length_of_a_fixture_read_still_counts(self):
         # The same call over a value is a real assertion, so
         # the pure call reading must not take its credit.
@@ -801,6 +880,65 @@ class TestCheckTestVacuity(unittest.TestCase):
             "        found = set()\n"
             "        found.update([ROOT.name])\n"
             "        self.assertEqual(found, {'.'})\n"
+        )
+        self.assert_clean(body)
+
+    def test_an_alias_to_another_function_still_counts(self):
+        # An alias bound to a function outside the pure
+        # builtin set keeps its credit, because a static
+        # reading cannot settle what that function does.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def measure(text):\n"
+            "    return len(text) + len(ROOT.name)\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        alias = measure\n"
+            '        self.assertEqual(alias("abcd"), 5)\n'
+        )
+        self.assert_clean(body)
+
+    def test_a_comprehension_over_a_computed_iterable_counts(
+        self,
+    ):
+        # A comprehension over an iterable the reading
+        # cannot settle argues about what the iterable
+        # holds at run time, so it keeps its credit.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        words = ROOT.name.split()\n"
+            "        self.assertEqual("
+            "[len(w) for w in words], [1])\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_stored_lambda_still_counts(self):
+        # A lambda held in a name and called at a later
+        # point is not followed to that call, so the call
+        # keeps the credit a call over a value keeps.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        func = lambda text: len(text)\n"
+            '        self.assertEqual(func("abcd"), 4)\n'
+            "        touched = ROOT.name\n"
         )
         self.assert_clean(body)
 

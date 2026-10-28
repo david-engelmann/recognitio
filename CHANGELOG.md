@@ -1818,6 +1818,18 @@ This unreleased work carries version 1.3.0.
   bold that a sentence names with a subject verb. The
   runbook passage and the comment over the patterns now
   state the runs and the added object forms in words.
+- The test vacuity guard now reads a pure call over
+  constants as a constant under four further spellings
+  that settle the call in the text of the same body. A
+  pure builtin called through a name the body bound to
+  it or through the builtins module, a pure call inside
+  a comprehension over a constant iterable, and a lambda
+  called where it is written with constant arguments no
+  longer pass the guard in silence. A lambda held in a
+  name and called later keeps its credit, and so do an
+  alias bound to anything but a pure builtin and a
+  comprehension over an iterable the reading cannot
+  settle.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
