@@ -821,14 +821,18 @@ This unreleased work carries version 1.3.0.
   gate re-pins the crop geometry and hash and the page
   weight exact total, and the hero picture test pins
   the shared alt.
-- A symlink census pin in the test suite. The new test
-  derives every entry at symlink mode from the committed
-  tree through git and holds the census to exactly one
-  entry, .claude/skills/recognitio with its recorded
-  target ../../.agents/skills/recognitio, so a symlink
-  planted anywhere else in the tree and a retarget of the
-  legitimate link both fail in the discover step the gate
-  already runs first.
+- A symlink census pin in the test suite. The test
+  derives every entry at symlink mode through git from
+  two listings, the committed tree at HEAD and the index
+  in the form its entries stand staged, and holds each
+  census to exactly one entry, .claude/skills/recognitio
+  with its recorded target
+  ../../.agents/skills/recognitio, so a symlink planted
+  anywhere else and a retarget of the legitimate link
+  both fail in the discover step the gate already runs
+  first once the plant or the retarget stands committed
+  or staged. A link standing in the working tree alone,
+  neither staged nor committed, stands outside the pin.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
@@ -1758,6 +1762,16 @@ This unreleased work carries version 1.3.0.
   the packet still stamped. The extractor now also clears any
   findings hash a reused run object might carry when a run names
   no findings file, so it cannot write such a manifest.
+- The test vacuity guard no longer credits a fail call
+  inside a conditional branch as a live assertion on its
+  own. A test whose only other assertion was trivial and
+  whose listing guard carried a conditional fail once
+  read as live to the guard, so softening its real
+  assertion to an always true one passed the guard in
+  silence. Such a test now fails the guard by name, while
+  a fail call outside every conditional branch still
+  counts and a conditional fail beside a real assertion
+  still passes.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

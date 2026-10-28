@@ -51,6 +51,19 @@ test*.py pattern the unittest loader uses and with the
 methods whose names start with test are inspected, inside
 classes and at module level.
 
+A fail call inside a conditional branch or a
+conditional expression does not count as a real
+assertion on its own. Such a call guards an earlier
+step, as a listing failure guard does, and it runs only
+when its branch runs, so a test whose other
+assertions are trivial and whose only credited call is a
+conditional fail carries no live assertion about the
+values it was written to pin. A branch the guard can
+prove from constants is not conditional in this sense,
+because its body runs whenever the enclosing body runs.
+A fail call outside every conditional branch still
+counts, because it runs whenever the test runs.
+
 The honest limits are recorded here and the printed success
 line is narrowed to them. This guard catches vacuous bodies,
 dead assertions, swallowed assertions and constant
@@ -464,8 +477,27 @@ class Collector:
 
     def __init__(self, global_values):
         self.global_values = global_values
+        self.conditional_depth = 0
+
+    def walk_conditional_block(self, stmts, values, result, swallowed):
+        self.conditional_depth += 1
+        try:
+            return self.walk_block(stmts, values, result, swallowed)
+        finally:
+            self.conditional_depth -= 1
 
     def collect(self, func, seed=None, param_values=None):
+        # A fresh body starts outside every conditional branch
+        # of the body that defined or called it, because its
+        # own branches are the ones that judge its calls.
+        outer_depth = self.conditional_depth
+        self.conditional_depth = 0
+        try:
+            return self.collect_body(func, seed, param_values)
+        finally:
+            self.conditional_depth = outer_depth
+
+    def collect_body(self, func, seed=None, param_values=None):
         result = ScopeResult()
         values = dict(self.global_values if seed is None else seed)
         arguments = func.args
@@ -633,7 +665,15 @@ class Collector:
             return True
         if isinstance(stmt, ast.Assert):
             result.assertions.append(
-                ("assert", stmt, None, dict(values), False, swallowed)
+                (
+                    "assert",
+                    stmt,
+                    None,
+                    dict(values),
+                    False,
+                    swallowed,
+                    self.conditional_depth > 0,
+                )
             )
             self.walk_expr(stmt.test, values, result, swallowed)
             if stmt.msg is not None:
@@ -652,13 +692,13 @@ class Collector:
                     branch, values, result, swallowed
                 )
             body_values = dict(values)
-            body_always = self.walk_block(
+            body_always = self.walk_conditional_block(
                 stmt.body, body_values, result, swallowed
             )
             else_values = dict(values)
             else_always = False
             if stmt.orelse:
-                else_always = self.walk_block(
+                else_always = self.walk_conditional_block(
                     stmt.orelse, else_values, result, swallowed
                 )
             self.merge_outcomes(values, [body_values, else_values])
@@ -674,11 +714,18 @@ class Collector:
                 self.walk_block(stmt.orelse, values, result, swallowed)
                 return False
             body_values = dict(values)
-            self.walk_block(stmt.body, body_values, result, swallowed)
+            if known is not UNKNOWN:
+                self.walk_block(
+                    stmt.body, body_values, result, swallowed
+                )
+            else:
+                self.walk_conditional_block(
+                    stmt.body, body_values, result, swallowed
+                )
             self.merge_outcomes(values, [values, body_values])
             if stmt.orelse:
                 else_values = dict(values)
-                self.walk_block(
+                self.walk_conditional_block(
                     stmt.orelse, else_values, result, swallowed
                 )
                 self.merge_outcomes(values, [values, else_values])
@@ -689,11 +736,13 @@ class Collector:
             for name in bound_names(stmt.target):
                 body_values.pop(name, None)
             self.walk_expr(stmt.target, body_values, result, swallowed)
-            self.walk_block(stmt.body, body_values, result, swallowed)
+            self.walk_conditional_block(
+                stmt.body, body_values, result, swallowed
+            )
             self.merge_outcomes(values, [values, body_values])
             if stmt.orelse:
                 else_values = dict(values)
-                self.walk_block(
+                self.walk_conditional_block(
                     stmt.orelse, else_values, result, swallowed
                 )
                 self.merge_outcomes(values, [values, else_values])
@@ -743,13 +792,13 @@ class Collector:
                 handler_values = dict(values)
                 if handler.name:
                     handler_values.pop(handler.name, None)
-                self.walk_block(
+                self.walk_conditional_block(
                     handler.body, handler_values, result, swallowed
                 )
                 outcomes.append(handler_values)
             if stmt.orelse:
                 else_values = dict(values)
-                self.walk_block(
+                self.walk_conditional_block(
                     stmt.orelse, else_values, result, swallowed
                 )
                 outcomes.append(else_values)
@@ -800,7 +849,7 @@ class Collector:
                     self.walk_expr(
                         case.guard, case_values, result, swallowed
                     )
-                self.walk_block(
+                self.walk_conditional_block(
                     case.body, case_values, result, swallowed
                 )
                 outcomes.append(case_values)
@@ -814,7 +863,39 @@ class Collector:
                 self.walk_stmt(child, values, result, swallowed)
         return False
 
+    def walk_conditional_expr(self, node, values, result, swallowed):
+        self.conditional_depth += 1
+        try:
+            self.walk_expr(node, values, result, swallowed)
+        finally:
+            self.conditional_depth -= 1
+
     def walk_expr(self, node, values, result, swallowed):
+        if isinstance(node, ast.BoolOp):
+            self.walk_expr(node.values[0], values, result, swallowed)
+            for value in node.values[1:]:
+                self.walk_conditional_expr(
+                    value, values, result, swallowed
+                )
+            return
+        if isinstance(node, ast.IfExp):
+            self.walk_expr(node.test, values, result, swallowed)
+            known = (
+                eval_constant(node.test, values)
+                if is_constant_expression(node.test, values)
+                else UNKNOWN
+            )
+            if known is not UNKNOWN:
+                branch = node.body if known else node.orelse
+                self.walk_expr(branch, values, result, swallowed)
+                return
+            self.walk_conditional_expr(
+                node.body, values, result, swallowed
+            )
+            self.walk_conditional_expr(
+                node.orelse, values, result, swallowed
+            )
+            return
         if isinstance(node, ast.Lambda):
             for default in list(
                 node.args.defaults
@@ -848,6 +929,7 @@ class Collector:
                             dict(values),
                             id(node) in result.context_call_ids,
                             swallowed,
+                            self.conditional_depth > 0,
                         )
                     )
             if isinstance(func, ast.Lambda):
@@ -911,7 +993,9 @@ class Collector:
 
 
 def assertion_record_is_real(record):
-    kind, node, name, values, in_context, swallowed = record
+    kind, node, name, values, in_context, swallowed, conditional = (
+        record
+    )
     if swallowed:
         return False
     if kind == "assert":
@@ -929,7 +1013,7 @@ def assertion_record_is_real(record):
                 return False
         return True
     if name == "fail":
-        return True
+        return not conditional
     if name in CONTEXT_NAMES:
         if in_context:
             return True

@@ -420,6 +420,132 @@ class TestCheckTestVacuity(unittest.TestCase):
                 problems,
             )
 
+    def test_a_conditional_fail_beside_a_trivial_assertion_fails(self):
+        # The round 99 census shape. A fail call that guards
+        # a listing step runs only on its branch, so it
+        # cannot stand in for the assertion it guards, and
+        # an always true assertion beside it argues nothing.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        result = ROOT.read_text()\n"
+            "        if result is None:\n"
+            "            self.fail('the listing failed')\n"
+            "        self.assertTrue(True)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_conditional_fail_beside_a_real_assertion_passes(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        result = ROOT.read_text()\n"
+            "        if result is None:\n"
+            "            self.fail('the listing failed')\n"
+            '        self.assertEqual(result, "nope")\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            self.assertEqual(self.problems(root), [])
+
+    def test_an_unconditional_fail_still_counts(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        result = ROOT.read_text()\n"
+            "        self.fail('the listing failed')\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_fail_in_a_loop_else_beside_a_trivial_assertion_fails(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        for name in ROOT.iterdir():\n"
+            "            break\n"
+            "        else:\n"
+            "            self.fail('the accounting never settled')\n"
+            "        self.assertTrue(True)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_short_circuited_fail_beside_a_trivial_assertion_fails(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        result = ROOT.read_text()\n"
+            "        result or self.fail('the listing failed')\n"
+            "        self.assertTrue(True)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_ternary_fail_beside_a_trivial_assertion_fails(self):
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        result = ROOT.read_text()\n"
+            "        self.fail('the listing failed') "
+            "if result is None else None\n"
+            "        self.assertTrue(True)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
     def test_the_success_line_names_the_limits_it_keeps(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
