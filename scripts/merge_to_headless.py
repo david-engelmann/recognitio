@@ -29,14 +29,34 @@ from pathlib import Path
 
 
 def load_fanout():
-    """The shipped fan-out validator, loaded as a sibling."""
+    """The shipped fan-out validator, loaded as a sibling.
+
+    Returns a pair of the module and its problems, in the
+    shape the fan-out gate gives its own sibling load. A
+    validator path that stands in the tree but is not a
+    regular file is never opened, and a load that fails
+    for any other reason draws the same cannot read
+    problem with the load error as its detail, so an
+    absent validator keeps the error it has always
+    carried.
+    """
     path = Path(__file__).resolve().parent / "check_fanout.py"
-    spec = importlib.util.spec_from_file_location(
-        "merge_check_fanout", path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    if path.exists() and not path.is_file():
+        return None, [
+            "cannot read the fan-out validator: "
+            "it is not a regular file"
+        ]
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "merge_check_fanout", path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        return None, [
+            "cannot read the fan-out validator: %s" % exc
+        ]
+    return module, []
 
 
 def headless_structured(record, manifest):
@@ -80,7 +100,9 @@ def build_stream(record_path, repo=None):
     because a seam that translates an unproved run would
     launder it.
     """
-    fanout = load_fanout()
+    fanout, fanout_problems = load_fanout()
+    if fanout_problems:
+        return [], fanout_problems
     problems = fanout.run_problems(record_path, repo=repo)
     if problems:
         return [], problems

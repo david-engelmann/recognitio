@@ -62,14 +62,31 @@ def strict_json_loads(text):
 
 
 def load_packet_checker():
-    """The shipped packet check, loaded as a sibling module."""
+    """The shipped packet check, loaded as a sibling module.
+
+    Returns a pair of the module and its problems, in the
+    shape the fan-out gate gives the same load. A checker
+    path that stands in the tree but is not a regular file
+    is never opened, and a load that fails for any other
+    reason draws the same cannot read problem with the
+    load error as its detail, so an absent checker keeps
+    the error it has always carried.
+    """
     path = Path(__file__).resolve().parent / "check_packet.py"
-    spec = importlib.util.spec_from_file_location(
-        "headless_check_packet", path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    if path.exists() and not path.is_file():
+        return None, [
+            "cannot read the packet checker: "
+            "it is not a regular file"
+        ]
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "headless_check_packet", path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        return None, ["cannot read the packet checker: %s" % exc]
+    return module, []
 
 
 def parse_location(location):
@@ -287,7 +304,9 @@ def manifest_problems(manifest, manifest_path):
     does not stand beside it, anchors nothing.
     """
     problems = []
-    checker = load_packet_checker()
+    checker, checker_problems = load_packet_checker()
+    if checker_problems:
+        return checker_problems
     schema_problems = checker.manifest_schema_problems(manifest)
     for problem in schema_problems:
         problems.append("the packet manifest fails its schema: %s" % problem)

@@ -2135,6 +2135,20 @@ This unreleased work carries version 1.3.0.
   of passing in silence, and regression tests cover
   each planted change from the audit that found the
   gap.
+- The fan-out gate now refuses a packet checker that
+  is not a regular file instead of hanging or crashing.
+  Its sibling loader stands behind a regular file test
+  that turns a FIFO and a link to a FIFO and a directory
+  and a socket at the checker path into a named cannot
+  read problem with no load attempted, and a load that
+  fails for any other reason draws the same problem
+  with the load error as its detail, so an absent
+  checker keeps the error it has always carried and a
+  checker reached through a link to a regular file
+  still loads. The same guard stands at the identical
+  sibling loaders in the headless gate and the merge
+  bridge and at the packet checker recount the fan-out
+  gate runs as a subprocess.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

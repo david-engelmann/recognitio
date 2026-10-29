@@ -323,5 +323,177 @@ class FifoDoorTestCase(unittest.TestCase):
         self.assert_cannot_read("check_mod", "mod_module")
 
 
+LOADER_DRIVER = r"""
+import importlib.util
+import os
+import shutil
+import socket
+import sys
+from pathlib import Path
+
+script = Path(sys.argv[1])
+target_name = sys.argv[2]
+mode = sys.argv[3]
+work = Path(sys.argv[4])
+repo = Path(sys.argv[5])
+loader_name = sys.argv[6]
+attr = sys.argv[7]
+scripts_dir = work / "scripts"
+scripts_dir.mkdir(parents=True)
+shutil.copyfile(repo / "scripts" / script.name, scripts_dir / script.name)
+target = scripts_dir / target_name
+real_target = repo / "scripts" / target_name
+sock = None
+if mode == "fifo":
+    os.mkfifo(target)
+elif mode == "linkfifo":
+    os.mkfifo(work / "target_fifo")
+    target.symlink_to(work / "target_fifo")
+elif mode == "directory":
+    target.mkdir()
+elif mode == "socket":
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(str(target))
+elif mode == "regular":
+    shutil.copyfile(real_target, target)
+elif mode == "linkregular":
+    shutil.copyfile(real_target, work / "target_regular.py")
+    target.symlink_to(work / "target_regular.py")
+elif mode == "absent":
+    pass
+else:
+    raise SystemExit("unknown mode " + mode)
+spec = importlib.util.spec_from_file_location(
+    "loader_door_under_test", scripts_dir / script.name)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+result = getattr(mod, loader_name)()
+if isinstance(result, tuple):
+    module, problems = result
+    for problem in problems:
+        print(problem)
+    if module is not None:
+        print("LOADED " + str(hasattr(module, attr)))
+else:
+    print("LOADED " + str(hasattr(result, attr)))
+if sock is not None:
+    sock.close()
+"""
+
+
+@unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+class LoaderDoorTestCase(unittest.TestCase):
+    """One bounded subprocess per planted sibling loader shape."""
+
+    def run_loader(self, script, target, loader, attr, mode):
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        LOADER_DRIVER,
+                        str(ROOT / "scripts" / script),
+                        target,
+                        mode,
+                        tmp,
+                        str(ROOT),
+                        loader,
+                        attr,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+            except subprocess.TimeoutExpired:
+                self.fail(
+                    "the %s loader door in mode %s did not finish "
+                    "within ten seconds" % (script, mode)
+                )
+            return result.stdout + result.stderr
+
+    def run_fanout_loader(self, mode):
+        return self.run_loader(
+            "check_fanout.py", "check_packet.py",
+            "load_packet_checker", "manifest_schema_problems", mode,
+        )
+
+    def assert_named_refusal(self, output, expected):
+        self.assertIn(expected, output, output)
+        self.assertIn("not a regular file", output, output)
+        self.assertNotIn("Traceback", output, output)
+
+    def test_the_fanout_loader_refuses_a_fifo(self):
+        self.assert_named_refusal(
+            self.run_fanout_loader("fifo"),
+            "cannot read the packet checker",
+        )
+
+    def test_the_fanout_loader_refuses_a_link_to_a_fifo(self):
+        self.assert_named_refusal(
+            self.run_fanout_loader("linkfifo"),
+            "cannot read the packet checker",
+        )
+
+    def test_the_fanout_loader_refuses_a_directory(self):
+        self.assert_named_refusal(
+            self.run_fanout_loader("directory"),
+            "cannot read the packet checker",
+        )
+
+    def test_the_fanout_loader_refuses_a_socket(self):
+        self.assert_named_refusal(
+            self.run_fanout_loader("socket"),
+            "cannot read the packet checker",
+        )
+
+    def test_the_fanout_loader_loads_a_regular_checker(self):
+        output = self.run_fanout_loader("regular")
+        self.assertIn("LOADED True", output, output)
+
+    def test_the_fanout_loader_loads_through_a_link(self):
+        output = self.run_fanout_loader("linkregular")
+        self.assertIn("LOADED True", output, output)
+
+    def test_the_fanout_loader_absent_checker_keeps_its_error(self):
+        output = self.run_fanout_loader("absent")
+        self.assertIn("cannot read the packet checker", output, output)
+        self.assertIn("No such file", output, output)
+        self.assertNotIn("not a regular file", output, output)
+        self.assertNotIn("Traceback", output, output)
+
+    def test_the_headless_loader_refuses_a_fifo(self):
+        output = self.run_loader(
+            "check_headless.py", "check_packet.py",
+            "load_packet_checker", "manifest_schema_problems", "fifo",
+        )
+        self.assert_named_refusal(
+            output, "cannot read the packet checker")
+
+    def test_the_headless_loader_refuses_a_directory(self):
+        output = self.run_loader(
+            "check_headless.py", "check_packet.py",
+            "load_packet_checker", "manifest_schema_problems",
+            "directory",
+        )
+        self.assert_named_refusal(
+            output, "cannot read the packet checker")
+
+    def test_the_merge_loader_refuses_a_fifo(self):
+        output = self.run_loader(
+            "merge_to_headless.py", "check_fanout.py",
+            "load_fanout", "run_problems", "fifo",
+        )
+        self.assert_named_refusal(
+            output, "cannot read the fan-out validator")
+
+    def test_the_merge_loader_loads_a_regular_validator(self):
+        output = self.run_loader(
+            "merge_to_headless.py", "check_fanout.py",
+            "load_fanout", "run_problems", "regular",
+        )
+        self.assertIn("LOADED True", output, output)
+
+
 if __name__ == "__main__":
     unittest.main()

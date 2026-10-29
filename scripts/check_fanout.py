@@ -208,14 +208,34 @@ def steering_problems(text, where, field="summary"):
 
 
 def load_packet_checker():
-    """The shipped packet check, loaded as a sibling module."""
+    """The shipped packet check, loaded as a sibling module.
+
+    Returns a pair of the module and its problems. A checker
+    path that stands in the tree but is not a regular file
+    is never opened, because opening a FIFO there would
+    stall the gate in silence and opening a directory or a
+    socket would escape as a raw error. A load that fails
+    for any other reason, including a checker that does not
+    stand in the tree at all, draws the same cannot read
+    problem with the load error as its detail, so an absent
+    checker keeps the error it has always carried while
+    every standing shape refuses with a named problem.
+    """
     path = Path(__file__).resolve().parent / "check_packet.py"
-    spec = importlib.util.spec_from_file_location(
-        "fanout_check_packet", path
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    if path.exists() and not path.is_file():
+        return None, [
+            "cannot read the packet checker: "
+            "it is not a regular file"
+        ]
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "fanout_check_packet", path
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        return None, ["cannot read the packet checker: %s" % exc]
+    return module, []
 RUN_KEYS = (
     "packet_manifest",
     "groups",
@@ -366,7 +386,9 @@ def packet_binding_problems(manifest, manifest_path):
         return ["the packet file cannot be read as UTF-8: %s" % exc]
     if not packet_text.strip():
         return ["the packet file beside the manifest is empty"]
-    checker = load_packet_checker()
+    checker, checker_problems = load_packet_checker()
+    if checker_problems:
+        return checker_problems
     problems = []
     for problem in checker.header_problems(packet_text, manifest):
         problems.append("the packet file disagrees with its manifest: %s"
@@ -401,7 +423,10 @@ def check_manifest(record, base):
         return ["the packet manifest is not an object"], set(), None
     if manifest.get("verified") is not True:
         problems.append("the packet manifest is not verified")
-    checker = load_packet_checker()
+    checker, checker_problems = load_packet_checker()
+    if checker_problems:
+        problems.extend(checker_problems)
+        return problems, set(), None
     schema_problems = checker.manifest_schema_problems(manifest)
     for problem in schema_problems:
         problems.append("the packet manifest fails its schema: %s" % problem)
@@ -485,6 +510,11 @@ def repo_packet_problems(manifest_path, manifest, repo):
     packet and that range and no other.
     """
     checker = Path(__file__).resolve().parent / "check_packet.py"
+    if checker.exists() and not checker.is_file():
+        return [
+            "cannot read the packet checker: "
+            "it is not a regular file"
+        ]
     command = [
         sys.executable, str(checker), str(manifest_path.parent),
         "--repo", str(repo),
