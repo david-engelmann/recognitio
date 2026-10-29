@@ -1161,6 +1161,22 @@ class TestRegenerationConservation(unittest.TestCase):
                     self.assert_pair_intact(out, before)
             self.assert_checker_stamps(repo, out)
 
+    def test_failure_publish_default_preserves_the_verified_pair(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            target = extract_mod.OutputTarget(out.resolve())
+            try:
+                published = target.publish_failure(
+                    ["--range", "HEAD~1..HEAD"],
+                    "a failure with no preservation argument",
+                )
+            finally:
+                target.close()
+            self.assertFalse(published)
+            self.assert_pair_intact(out, before)
+            self.assert_checker_stamps(repo, out)
+
 
 class TestFailClosedEndToEnd(Fixture):
     def test_failed_verification_exits_3_with_unverified_manifest(self):

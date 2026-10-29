@@ -1969,6 +1969,12 @@ This unreleased work carries version 1.3.0.
   and reports its failure in its exit code and its
   message, and the two earlier wordings that a failed
   run leaves no packet standing are gone.
+- The preserve default of the extractor failure publish
+  now stands pinned by a test of its own. The test calls
+  the failure publish on a standing verified pair without
+  passing the preservation argument and asserts the pair
+  stands untouched, so reversing the default fails the
+  suite instead of passing in silence.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
@@ -1999,3 +2005,9 @@ This unreleased work carries version 1.3.0.
   builder reading performs the same work inline at its
   own site, so the gate now holds one spelling of the
   reading and no dead one beside it.
+- The five dead path constants at the head of the package
+  gate and the package root constant they hung from. No
+  code in the gate loaded any of them, and every function
+  in the gate builds the paths it needs from the root
+  argument it is handed, so the gate now holds one
+  spelling of each path and no dead one beside it.

@@ -36,12 +36,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "agent-plugins-package"
-MANIFEST = PACKAGE / "plugin.json"
-SKILLS = PACKAGE / "skills"
-CANONICAL_SKILL = ROOT / ".agents" / "skills" / "recognitio"
-NATIVE_MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
-BRIEF = ROOT / "docs" / "agent-plugins-brief.md"
 
 SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json"
 PERMITTED_FIELDS = {
