@@ -10,7 +10,12 @@ should meet the same version on every one, so the gate fails when
 any of them drifts from the others. The recognitio-mod plugin
 manifest under plugins/recognitio-mod is one of the plugin
 manifests here, because under strict mode the manifest is the
-definition the host loads for that entry.
+definition the host loads for that entry. The Antigravity plugin
+manifest under .antigravity is one of the plugin manifests here
+as well, and the gate reads its version through a guarded
+reading, so a path that is not a regular file draws a named
+problem and is never read, and an absent manifest draws a named
+problem rather than passing in silence.
 
 The README carries no version badge. The badge retired in the
 visual round 2 storefront rebuild because a static badge states a
@@ -33,6 +38,7 @@ MOD_PLUGIN_JSON = (
     ROOT / "plugins" / "recognitio-mod" / ".claude-plugin"
     / "plugin.json"
 )
+ANTIGRAVITY_PLUGIN_JSON = ROOT / ".antigravity" / "plugin.json"
 MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
 EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
@@ -284,6 +290,39 @@ def read(path):
         return None
 
 
+def read_antigravity(path):
+    """The Antigravity manifest text and any problem reading it.
+
+    Returns a pair of the text and the problem, with exactly
+    one of the two standing. The reading tests existence
+    first and the regular file shape second and only then
+    reads, in the guarded shape the persona and CodeRabbit
+    gates use, so a FIFO or a link to a FIFO or a directory
+    at the manifest path draws the named not a regular file
+    problem and is never opened. The manifest ships in the
+    tree, so an absent path draws the named missing problem
+    rather than passing in silence. A dangling link stands
+    at the path but names no regular file, so it draws the
+    same not a regular file problem.
+    """
+    if path.is_symlink() or path.exists():
+        if not path.is_file():
+            return None, (
+                "Antigravity plugin manifest at "
+                ".antigravity/plugin.json is not a regular file"
+            )
+        try:
+            return path.read_text(encoding="utf-8"), None
+        except (OSError, UnicodeDecodeError) as exc:
+            return None, (
+                "Antigravity plugin.json does not parse: %s" % exc
+            )
+    return None, (
+        "missing Antigravity plugin manifest at "
+        ".antigravity/plugin.json"
+    )
+
+
 def main():
     versions = {}
     problems = []
@@ -319,6 +358,20 @@ def main():
             problems.append(
                 "recognitio-mod plugin.json does not parse: %s" % exc)
             versions["recognitio-mod plugin.json"] = None
+
+    text, antigravity_problem = read_antigravity(
+        ANTIGRAVITY_PLUGIN_JSON
+    )
+    if antigravity_problem is not None:
+        problems.append(antigravity_problem)
+        versions["Antigravity plugin.json"] = None
+    else:
+        try:
+            versions["Antigravity plugin.json"] = plugin_version(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append(
+                "Antigravity plugin.json does not parse: %s" % exc)
+            versions["Antigravity plugin.json"] = None
 
     text = read(MARKETPLACE_JSON)
     if text is None:

@@ -1308,17 +1308,24 @@ class TestCheckVersion(unittest.TestCase):
 
     def run_main_on_texts(self, plugin_text, marketplace_text,
                           changelog_text, readme_text=None,
-                          mod_text=None):
+                          mod_text=None, antigravity_text="default"):
         if readme_text is None:
             readme_text = "# Recognitio\n"
         if mod_text is None:
             mod_text = plugin_text
+        if antigravity_text == "default":
+            antigravity_text = '{"version": "1.3.0"}'
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
             plugin.write_text(plugin_text, encoding="utf-8")
             mod_plugin = root / "mod-plugin.json"
             mod_plugin.write_text(mod_text, encoding="utf-8")
+            antigravity_plugin = root / "antigravity-plugin.json"
+            if antigravity_text is not None:
+                antigravity_plugin.write_text(
+                    antigravity_text, encoding="utf-8"
+                )
             market = root / "marketplace.json"
             market.write_text(marketplace_text, encoding="utf-8")
             extract = root / "extract.py"
@@ -1333,12 +1340,14 @@ class TestCheckVersion(unittest.TestCase):
                 self.mod.PLUGIN_JSON, self.mod.MOD_PLUGIN_JSON,
                 self.mod.MARKETPLACE_JSON,
                 self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+                getattr(self.mod, "ANTIGRAVITY_PLUGIN_JSON", None),
             )
             self.mod.PLUGIN_JSON = plugin
             self.mod.MOD_PLUGIN_JSON = mod_plugin
             self.mod.MARKETPLACE_JSON = market
             self.mod.EXTRACT_PY = extract
             self.mod.CHANGELOG_MD = log
+            self.mod.ANTIGRAVITY_PLUGIN_JSON = antigravity_plugin
             try:
                 with redirect_stderr(io.StringIO()) as captured:
                     code = self.mod.main()
@@ -1347,6 +1356,7 @@ class TestCheckVersion(unittest.TestCase):
                     self.mod.PLUGIN_JSON, self.mod.MOD_PLUGIN_JSON,
                     self.mod.MARKETPLACE_JSON,
                     self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
+                    self.mod.ANTIGRAVITY_PLUGIN_JSON,
                 ) = original
             return code, captured.getvalue()
 
@@ -1369,6 +1379,188 @@ class TestCheckVersion(unittest.TestCase):
         )
         self.assertEqual(code, 1, err)
         self.assertIn("recognitio-mod", err)
+
+    GOOD_LOG = (
+        "# Changelog\n\n## [Unreleased]\n\n"
+        "This work carries version 1.3.0.\n"
+    )
+    GOOD_MARKET = (
+        '{"metadata": {"version": "1.3.0"}, "plugins": '
+        '[{"version": "1.3.0"}, {"version": "1.3.0"}]}'
+    )
+
+    def test_a_drifted_antigravity_manifest_version_fails(self):
+        # The Antigravity plugin manifest is a version surface
+        # the printed agreement line covers under the plugin
+        # manifests, so a drift there must fail here by name
+        # rather than passing while the gate prints agreement.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text='{"version": "9.9.9"}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+
+    def test_a_missing_antigravity_manifest_fails_by_name(self):
+        # The manifest ships in the tree, so an absent one is
+        # a named problem and not a silent pass.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text=None,
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("missing", err)
+
+    def test_a_non_string_antigravity_version_is_a_problem(self):
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text='{"version": 130}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+
+    def test_an_unparsable_antigravity_manifest_fails_by_name(self):
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text="{ not json",
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("does not parse", err)
+
+    def test_an_antigravity_manifest_directory_fails_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            code, err = self.run_main_with_antigravity_shape(
+                root, "directory"
+            )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("not a regular file", err)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_an_antigravity_manifest_fifo_refuses_promptly_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            code, err = self.run_main_with_antigravity_shape(
+                root, "fifo"
+            )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("not a regular file", err)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_an_antigravity_link_to_a_fifo_refuses_promptly(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            code, err = self.run_main_with_antigravity_shape(
+                root, "link-to-fifo"
+            )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("not a regular file", err)
+
+    def test_an_agreeing_antigravity_manifest_passes(self):
+        # Control. This test also passed against the gate
+        # before the fix by design, because an agreeing
+        # manifest is the shape that must keep passing.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text='{"version": "1.3.0"}',
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_a_reformatted_antigravity_manifest_passes(self):
+        # Control. A whitespace and key order rewrite that
+        # keeps the version agreeing must keep passing, in
+        # both the fixed state and the state before the fix.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text=(
+                '{\n  "name": "recognitio",\n'
+                '  "version": "1.3.0"\n}\n'
+            ),
+        )
+        self.assertEqual(code, 0, err)
+
+    def run_main_with_antigravity_shape(self, root, shape):
+        # Build a whole gate tree in root with the Antigravity
+        # path standing in the named shape, then run the gate
+        # main in a subprocess bounded at ten seconds, so a
+        # door that read its FIFO would fail at the bound
+        # instead of hanging the suite.
+        (root / "plugin.json").write_text(
+            '{"version": "1.3.0"}', encoding="utf-8"
+        )
+        (root / "mod-plugin.json").write_text(
+            '{"version": "1.3.0"}', encoding="utf-8"
+        )
+        (root / "marketplace.json").write_text(
+            self.GOOD_MARKET, encoding="utf-8"
+        )
+        (root / "extract.py").write_text(
+            'EXTRACTOR_VERSION = "1.3.0"\n', encoding="utf-8"
+        )
+        (root / "CHANGELOG.md").write_text(
+            self.GOOD_LOG, encoding="utf-8"
+        )
+        antigravity = root / "antigravity-plugin.json"
+        if shape == "directory":
+            antigravity.mkdir()
+        elif shape == "fifo":
+            os.mkfifo(antigravity)
+        elif shape == "link-to-fifo":
+            os.mkfifo(root / "antigravity-target")
+            antigravity.symlink_to(root / "antigravity-target")
+        else:  # pragma: no cover, a test authoring error
+            raise AssertionError("unknown shape %r" % shape)
+        driver = (
+            "import importlib.util, sys\n"
+            "spec = importlib.util.spec_from_file_location("
+            "'gate_under_test', sys.argv[1])\n"
+            "mod = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(mod)\n"
+            "from pathlib import Path\n"
+            "root = Path(sys.argv[2])\n"
+            "mod.PLUGIN_JSON = root / 'plugin.json'\n"
+            "mod.MOD_PLUGIN_JSON = root / 'mod-plugin.json'\n"
+            "mod.MARKETPLACE_JSON = root / 'marketplace.json'\n"
+            "mod.EXTRACT_PY = root / 'extract.py'\n"
+            "mod.CHANGELOG_MD = root / 'CHANGELOG.md'\n"
+            "if hasattr(mod, 'ANTIGRAVITY_PLUGIN_JSON'):\n"
+            "    mod.ANTIGRAVITY_PLUGIN_JSON = (\n"
+            "        root / 'antigravity-plugin.json')\n"
+            "sys.exit(mod.main())\n"
+        )
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    driver,
+                    str(ROOT / "scripts" / "check_version.py"),
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail("the version gate did not finish within ten seconds")
+        return result.returncode, result.stdout + result.stderr
 
     def test_main_no_longer_reads_a_readme_version_badge(self):
         # The README version badge retired in the visual round 2

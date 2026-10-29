@@ -2202,6 +2202,19 @@ This unreleased work carries version 1.3.0.
   dangling link keep the absent reading they have
   always carried and the shipped tree keeps its
   pinned verdict.
+- The version gate now reads the Antigravity plugin
+  manifest and pins its version beside the other plugin
+  manifests it names in its agreement line. A drift in
+  that manifest or a missing or unparsable one now
+  fails the gate by name instead of passing in silence
+  while the gate printed that the version agrees across
+  the plugin manifests. The reading tests existence
+  first and the regular file shape second and only
+  then reads, so a FIFO or a link to a FIFO or a
+  directory at that path draws a named problem stating
+  the path is not a regular file without hanging, and
+  regression tests cover each planted change from the
+  audit that found the gap.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
