@@ -16,7 +16,7 @@ ahead on the decision of the owner without further research.
 
 Every requirement the primary pages state was checked against
 the shipped manifests and files on 2026-10-27, apart from the
-size limits item, which was restated on 2026-10-28 against the
+size limits item, which was restated on 2026-10-29 against the
 tree that then held 220 files. The gate at
 scripts/check_submissions.py pins the facts the check rests
 on, so drift in a manifest or in this pack fails the gate.
@@ -150,13 +150,13 @@ past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
 **Met, the size limits.** The repo holds 220 files and a
-few megabytes in total, as restated on 2026-10-28 against
+few megabytes in total, as restated on 2026-10-29 against
 the tree that then held that count. Its largest file is the
 demo recording at 646,314 bytes, well under the 5 MiB file
 limit. The file count also holds under the cap the
 checklist holds for a reviewer, at 220 files against a cap
 of 512 files. Its largest file that is not an image or a
-font is tests/test_gate_scripts.py at 238,788 bytes, under
+font is tests/test_gate_scripts.py at 238,810 bytes, under
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files. Its tracked extensions run to .gif and .js
 and .json and .md and .mdc and .patch and .png and .py and
