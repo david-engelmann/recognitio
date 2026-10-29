@@ -233,6 +233,10 @@ def read_stream(path):
     """The stream-json events, failing closed on a corrupt line."""
     events = []
     problems = []
+    if Path(path).exists() and not Path(path).is_file():
+        return [], [
+            "cannot read the stream: it is not a regular file"
+        ]
     try:
         text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
@@ -253,6 +257,11 @@ def read_stream(path):
 
 def read_manifest(path):
     """The packet manifest, read strictly, or None with problems."""
+    if Path(path).exists() and not Path(path).is_file():
+        return None, [
+            "cannot read the packet manifest: "
+            "it is not a regular file"
+        ]
     try:
         text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
@@ -344,6 +353,8 @@ def read_manifest_files(path):
 
 def read_exit_file(path):
     """The recorded exit code in an exit file, or None."""
+    if Path(path).exists() and not Path(path).is_file():
+        return None
     try:
         text = Path(path).read_text(encoding="utf-8").strip()
     except OSError:

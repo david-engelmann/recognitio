@@ -64,6 +64,11 @@ def strict_json_loads(text):
 
 def module_path():
     """The hooks module hooks/hooks.json names, or a problem."""
+    if HOOKS_JSON.exists() and not HOOKS_JSON.is_file():
+        return None, (
+            "cannot read hooks/hooks.json: "
+            "it is not a regular file"
+        )
     try:
         data = strict_json_loads(HOOKS_JSON.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -110,6 +115,11 @@ def catch_body(source):
 def module_problems(path):
     """Problems with the hooks module source."""
     problems = []
+    if path.exists() and not path.is_file():
+        return [
+            "the hooks module at %s cannot be read, "
+            "it is not a regular file" % path
+        ]
     source = path.read_text(encoding="utf-8")
     if "on('agent.spawn'" not in source \
             and 'on("agent.spawn"' not in source:
@@ -161,6 +171,11 @@ def module_problems(path):
 def brief_problems():
     """Problems with the mod brief's stated contract."""
     problems = []
+    if BRIEF.exists() and not BRIEF.is_file():
+        return [
+            "cannot read docs/mod-build7.md: "
+            "it is not a regular file"
+        ]
     try:
         raw = BRIEF.read_text(encoding="utf-8")
     except OSError as exc:

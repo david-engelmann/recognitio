@@ -159,6 +159,8 @@ DECISION_STATEMENT = "Decision 4 binds"
 
 
 def read_text(path):
+    if path.exists() and not path.is_file():
+        return None
     try:
         return path.read_text(encoding="utf-8")
     except OSError:

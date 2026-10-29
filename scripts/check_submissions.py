@@ -176,6 +176,10 @@ def strict_json_loads(text):
 
 def load_manifest(root, rel, problems):
     path = root / rel
+    if path.exists() and not path.is_file():
+        problems.append(
+            "%s cannot be read, it is not a regular file" % rel)
+        return None
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError:
@@ -317,6 +321,10 @@ def shipped_path(root, value):
 def pack_problems(root, version, problems):
     for rel, routes in PACK_ROUTES.items():
         path = root / rel
+        if path.exists() and not path.is_file():
+            problems.append(
+                "%s cannot be read, it is not a regular file" % rel)
+            continue
         try:
             raw = path.read_text(encoding="utf-8")
         except OSError:

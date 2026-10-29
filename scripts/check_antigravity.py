@@ -181,6 +181,8 @@ HOOK_DECISIONS = ("deny", "force_ask", "auto_approve")
 
 
 def read_text(path):
+    if path.exists() and not path.is_file():
+        return None
     try:
         return path.read_text(encoding="utf-8")
     except OSError:

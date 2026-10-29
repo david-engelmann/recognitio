@@ -167,6 +167,11 @@ def brief_problems(root=None):
     """Problems with the Build 9 brief's stated contract."""
     root = ROOT if root is None else root
     path = root / "docs" / "codex-review-brief.md"
+    if path.exists() and not path.is_file():
+        return [
+            "cannot read docs/codex-review-brief.md, "
+            "it is not a regular file"
+        ]
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -198,6 +203,11 @@ def decision_problems(root=None):
     """Problems with the Build 9 decision record."""
     root = ROOT if root is None else root
     path = root / "docs" / "decisions.md"
+    if path.exists() and not path.is_file():
+        return [
+            "cannot read docs/decisions.md, "
+            "it is not a regular file"
+        ]
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:

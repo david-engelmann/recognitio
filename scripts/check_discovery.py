@@ -144,6 +144,10 @@ def strict_json_loads(text):
 
 def load_manifest(root, rel, problems):
     path = root / rel
+    if path.exists() and not path.is_file():
+        problems.append(
+            "%s cannot be read, it is not a regular file" % rel)
+        return None
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError:

@@ -386,6 +386,11 @@ def check_manifest(record, base):
     if not isinstance(rel, str) or not rel:
         return ["the run names no packet manifest"], set(), None
     path = (base / rel).resolve()
+    if path.exists() and not path.is_file():
+        return [
+            "cannot read the packet manifest: "
+            "it is not a regular file"
+        ], set(), None
     try:
         manifest = strict_json_loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
@@ -980,6 +985,11 @@ def run_problems(record_path, repo=None):
     stamp covers a packet a repository recount verifies.
     """
     problems = []
+    if record_path.exists() and not record_path.is_file():
+        return [
+            "cannot read the run record: "
+            "it is not a regular file"
+        ]
     try:
         text = record_path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -998,6 +1008,11 @@ def run_problems(record_path, repo=None):
             problems.append("the run record is missing %r" % key)
     if problems:
         return problems
+    if SCHEMA_PATH.exists() and not SCHEMA_PATH.is_file():
+        return [
+            "cannot read the findings schema: "
+            "it is not a regular file"
+        ]
     try:
         schema = strict_json_loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, DuplicateKeyError) as exc:

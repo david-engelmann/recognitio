@@ -355,6 +355,81 @@ class TestCheckPackage(unittest.TestCase):
             self.assertIn("portable manifest", result.stderr)
             self.assertIn("cannot be read", result.stderr)
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_brief_standing_as_a_fifo_fails_promptly(self):
+        # Round 183 New Minor 3. The brief reading kept the
+        # plain read the manifest fix did not cover, so a
+        # FIFO at the brief path blocks the gate in silence
+        # after its earlier readings have passed. The gate
+        # must refuse it by name without reading it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            path.unlink()
+            os.mkfifo(path)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn(
+                "cannot read docs/agent-plugins-brief.md",
+                result.stderr,
+            )
+            self.assertIn("not a regular file", result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_brief_linking_to_a_fifo_fails_promptly(self):
+        # Round 183 New Minor 3. The regular file test
+        # follows links, so a brief linking to a FIFO refuses
+        # exactly as a FIFO standing at the path itself does.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            target = Path(tmp) / "brief-fifo"
+            os.mkfifo(target)
+            path = root / "docs" / "agent-plugins-brief.md"
+            path.unlink()
+            path.symlink_to(target)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn(
+                "cannot read docs/agent-plugins-brief.md",
+                result.stderr,
+            )
+            self.assertIn("not a regular file", result.stderr)
+
+    def test_a_brief_linking_to_a_regular_file_reads_through(self):
+        # Round 183 New Minor 3. A brief that is a link to a
+        # regular file still reads through, so the scratch
+        # layout holds exactly as it does with a plain brief.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            target = Path(tmp) / "brief-regular.md"
+            shutil.copyfile(
+                ROOT / "docs" / "agent-plugins-brief.md", target)
+            path = root / "docs" / "agent-plugins-brief.md"
+            path.unlink()
+            path.symlink_to(target)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_brief_standing_as_a_directory_fails(self):
+        # Round 183 New Minor 3. A directory is not a
+        # regular file either, so the brief path draws the
+        # cannot be read problem instead of the operating
+        # system error text its plain read produced.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            path.unlink()
+            path.mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "cannot read docs/agent-plugins-brief.md"
+                    in problem
+                    and "not a regular file" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
     def test_a_portable_manifest_that_is_a_directory_fails(self):
         # Round 159 Finding 1. A directory is not a regular
         # file either, so the portable path draws the cannot

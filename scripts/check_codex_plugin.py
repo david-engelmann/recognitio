@@ -211,6 +211,11 @@ def strict_json_loads(text):
 def load_json(root, rel, problems, label):
     """Parse one strict JSON file, recording any problem."""
     path = root / rel
+    if path.exists() and not path.is_file():
+        problems.append(
+            "the %s at %s cannot be read, "
+            "it is not a regular file" % (label, rel))
+        return None
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -320,12 +325,23 @@ def asset_problems(root, problems):
         )
         return
     brand = root / "docs" / "brand" / "recognitio-icon-512.png"
+    if brand.exists() and not brand.is_file():
+        problems.append(
+            "the brand icon master cannot be read, "
+            "it is not a regular file")
+        return
     try:
         brand_bytes = brand.read_bytes()
     except OSError:
         problems.append("the brand icon master is missing")
         return
-    if (assets / "icon-512.png").read_bytes() != brand_bytes:
+    icon = assets / "icon-512.png"
+    if not icon.is_file():
+        problems.append(
+            "agent-plugins-package/assets/icon-512.png cannot "
+            "be read, it is not a regular file"
+        )
+    elif icon.read_bytes() != brand_bytes:
         problems.append(
             "agent-plugins-package/assets/icon-512.png is not byte "
             "identical to the brand master at "
@@ -483,6 +499,11 @@ def parse_openai_yaml(text):
 def openai_yaml_problems(root, accent, problems):
     """Problems with the agents/openai.yaml skill folder file."""
     canonical = root / SKILL_TREES[0] / "agents" / "openai.yaml"
+    if canonical.exists() and not canonical.is_file():
+        problems.append(
+            "the canonical agents/openai.yaml cannot be read, "
+            "it is not a regular file")
+        return
     try:
         canonical_bytes = canonical.read_bytes()
     except OSError:
@@ -494,6 +515,11 @@ def openai_yaml_problems(root, accent, problems):
         return
     for tree in SKILL_TREES[1:]:
         copy = root / tree / "agents" / "openai.yaml"
+        if copy.exists() and not copy.is_file():
+            problems.append(
+                "%s carries an agents/openai.yaml that cannot "
+                "be read, it is not a regular file" % tree)
+            continue
         try:
             copy_bytes = copy.read_bytes()
         except OSError:
@@ -673,6 +699,11 @@ def symlink_problems(root, rel, problems):
 def brief_problems(root, problems):
     """Problems with the Build 19 brief and its records."""
     path = root / "docs" / "codex-plugin-brief.md"
+    if path.exists() and not path.is_file():
+        problems.append(
+            "docs/codex-plugin-brief.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError:
@@ -698,6 +729,11 @@ def brief_problems(root, problems):
                 % label
             )
     decisions = root / "docs" / "decisions.md"
+    if decisions.exists() and not decisions.is_file():
+        problems.append(
+            "docs/decisions.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         record = decisions.read_text(encoding="utf-8")
     except OSError:
@@ -723,6 +759,11 @@ def brief_problems(root, problems):
             )
         )
     changelog = root / "CHANGELOG.md"
+    if changelog.exists() and not changelog.is_file():
+        problems.append(
+            "CHANGELOG.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         changelog_text = changelog.read_text(encoding="utf-8")
     except OSError:
@@ -750,6 +791,11 @@ def brief_problems(root, problems):
             )
         )
     index = root / "docs" / "README.md"
+    if index.exists() and not index.is_file():
+        problems.append(
+            "docs/README.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         index_text = index.read_text(encoding="utf-8")
     except OSError:
@@ -760,6 +806,11 @@ def brief_problems(root, problems):
             "docs/README.md does not list the Codex plugin brief"
         )
     readme = root / "README.md"
+    if readme.exists() and not readme.is_file():
+        problems.append(
+            "README.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         readme_text = readme.read_text(encoding="utf-8")
     except OSError:
@@ -823,6 +874,11 @@ def brief_problems(root, problems):
                 "proved is not the route the README prints"
             )
     agents = root / "AGENTS.md"
+    if agents.exists() and not agents.is_file():
+        problems.append(
+            "AGENTS.md cannot be read, "
+            "it is not a regular file")
+        return
     try:
         agents_text = agents.read_text(encoding="utf-8")
     except OSError:

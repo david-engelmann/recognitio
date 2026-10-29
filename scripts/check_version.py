@@ -276,6 +276,8 @@ def coherence_problems(versions):
 
 
 def read(path):
+    if path.exists() and not path.is_file():
+        return None
     try:
         return path.read_text(encoding="utf-8")
     except OSError:

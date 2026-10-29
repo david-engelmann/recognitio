@@ -1759,6 +1759,12 @@ def vacuity_problems(root=None):
         paths.update(tests_dir.glob("test*.py"))
         paths.update(tests_dir.glob("*_test.py"))
     for path in sorted(paths):
+        if not path.is_file():
+            problems.append(
+                "%s does not parse, it is not a regular file"
+                % path.name
+            )
+            continue
         try:
             tree = ast.parse(
                 path.read_text(encoding="utf-8"), filename=str(path)

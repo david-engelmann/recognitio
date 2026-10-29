@@ -210,6 +210,11 @@ def manifest_problems(root):
     """The `agents` and `settings` manifest key pins."""
     problems = []
     path = root / ".claude-plugin" / "plugin.json"
+    if path.exists() and not path.is_file():
+        return [
+            "cannot read the plugin manifest: "
+            "it is not a regular file"
+        ]
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -292,6 +297,12 @@ def persona_problems(root):
         "agent dir: %s" % problem for problem in agent_dir_problems(root)
     )
     agent = root / "agents" / "reviewer.md"
+    if agent.exists() and not agent.is_file():
+        problems.append(
+            "agent file: cannot read it: "
+            "it is not a regular file"
+        )
+        return problems
     try:
         text = agent.read_text(encoding="utf-8")
     except OSError as exc:

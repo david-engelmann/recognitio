@@ -306,6 +306,8 @@ def spelled_sarif_problem(low):
 
 
 def read_text(path):
+    if path.exists() and not path.is_file():
+        return None
     try:
         return path.read_text(encoding="utf-8")
     except OSError:

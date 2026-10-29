@@ -2013,6 +2013,23 @@ This unreleased work carries version 1.3.0.
   entry no manifest receipts, naming the entry and
   refusing the publish before any rename and leaving
   the standing verified pair byte for byte untouched.
+- The gate scripts now refuse a file that is not a
+  regular file at every remaining reading door instead
+  of hanging when a FIFO stands there. The fan-out
+  validator and the bridge refuse a non regular run
+  record and a non regular manifest the record names,
+  the headless gate refuses a non regular stream and
+  manifest and exit file, and the package gate refuses
+  a non regular brief, each with a named cannot be
+  read problem and no read attempted. The same regular
+  file test now stands in the shared reading helpers
+  and the fixed path readings of the sibling gates,
+  covering the brief and manifest and record readings
+  of the Codex, Codex plugin, discovery, submissions,
+  persona, mod, version and vacuity gates, while a
+  link to a regular file still reads through
+  everywhere and an absent path keeps the behaviour
+  it has always carried.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -11,7 +11,10 @@ classes close the round 17 findings with regression tests.
 import copy
 import importlib.util
 import json
+import os
+import socket
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -1063,6 +1066,177 @@ class IsolationQuoteTestCase(unittest.TestCase):
         self.assertTrue(
             any("empty list" in p for p in problems), problems
         )
+
+
+class FanoutFifoTestCase(unittest.TestCase):
+    """Round 183 New Minor 1, the fan-out FIFO doors.
+
+    Opening a FIFO for reading blocks until a writer opens
+    the other end, so a plain read of a run record or of the
+    manifest its record names hangs the validator in silence
+    when either stands as a FIFO. Every shape runs the
+    validator in a subprocess with a ten second bound, so a
+    validator that still reads the FIFO fails one test at
+    the bound instead of hanging the suite.
+    """
+
+    DRIVER = (
+        "import importlib.util, sys\n"
+        "from pathlib import Path\n"
+        "spec = importlib.util.spec_from_file_location(\n"
+        "    'gate_under_test', sys.argv[1])\n"
+        "module = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(module)\n"
+        "problems = module.run_problems(Path(sys.argv[2]))\n"
+        "for problem in problems:\n"
+        "    print(problem)\n"
+        "sys.exit(1 if problems else 0)\n"
+    )
+
+    def run_validator(self, record_path):
+        try:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    self.DRIVER,
+                    str(ROOT / "scripts" / "check_fanout.py"),
+                    str(record_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the fan-out validator did not finish within "
+                "ten seconds"
+            )
+
+    def stage(self, tmp):
+        """A regular record beside its regular manifest."""
+        record = json.loads(
+            PROOF_RECORD.read_text(encoding="utf-8"))
+        path = Path(tmp) / "run-record.json"
+        path.write_text(json.dumps(record), encoding="utf-8")
+        for name in ("manifest.json", "packet.md"):
+            (Path(tmp) / name).write_text(
+                (PROOF_RECORD.parent / name).read_text(
+                    encoding="utf-8"),
+                encoding="utf-8",
+            )
+        return path
+
+    def assert_refused(self, result, wording):
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(wording, result.stdout)
+        self.assertIn("not a regular file", result.stdout)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_run_record_standing_as_a_fifo_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = Path(tmp) / "run-record.json"
+            os.mkfifo(record)
+            self.assert_refused(
+                self.run_validator(record),
+                "cannot read the run record",
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_run_record_linking_to_a_fifo_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            target = Path(tmp) / "record-fifo"
+            os.mkfifo(target)
+            record = Path(tmp) / "run-record.json"
+            record.symlink_to(target)
+            self.assert_refused(
+                self.run_validator(record),
+                "cannot read the run record",
+            )
+
+    def test_a_run_record_standing_as_a_socket_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = Path(tmp) / "run-record.json"
+            sock = socket.socket(socket.AF_UNIX)
+            sock.bind(str(record))
+            try:
+                self.assert_refused(
+                    self.run_validator(record),
+                    "cannot read the run record",
+                )
+            finally:
+                sock.close()
+
+    def test_a_run_record_standing_as_a_directory_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = Path(tmp) / "run-record.json"
+            record.mkdir()
+            self.assert_refused(
+                self.run_validator(record),
+                "cannot read the run record",
+            )
+
+    def test_a_missing_run_record_keeps_its_problem(self):
+        with RetryingTemporaryDirectory() as tmp:
+            result = self.run_validator(
+                Path(tmp) / "run-record.json")
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(
+                "cannot read the run record", result.stdout)
+
+    def test_a_run_record_linking_to_a_regular_file_reads(self):
+        with RetryingTemporaryDirectory() as tmp:
+            staged = self.stage(tmp)
+            record = Path(tmp) / "linked-record.json"
+            record.symlink_to(staged)
+            result = self.run_validator(record)
+            self.assertEqual(
+                result.returncode, 0, result.stdout)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_named_manifest_standing_as_a_fifo_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = self.stage(tmp)
+            manifest = Path(tmp) / "manifest.json"
+            manifest.unlink()
+            os.mkfifo(manifest)
+            self.assert_refused(
+                self.run_validator(record),
+                "cannot read the packet manifest",
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_named_manifest_linking_to_a_fifo_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = self.stage(tmp)
+            target = Path(tmp) / "manifest-fifo"
+            os.mkfifo(target)
+            manifest = Path(tmp) / "manifest.json"
+            manifest.unlink()
+            manifest.symlink_to(target)
+            self.assert_refused(
+                self.run_validator(record),
+                "cannot read the packet manifest",
+            )
+
+    def test_a_named_manifest_standing_as_a_socket_is_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            record = self.stage(tmp)
+            manifest = Path(tmp) / "manifest.json"
+            manifest.unlink()
+            sock = socket.socket(socket.AF_UNIX)
+            sock.bind(str(manifest))
+            try:
+                self.assert_refused(
+                    self.run_validator(record),
+                    "cannot read the packet manifest",
+                )
+            finally:
+                sock.close()
 
 
 if __name__ == "__main__":

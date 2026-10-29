@@ -84,10 +84,20 @@ def build_stream(record_path, repo=None):
     problems = fanout.run_problems(record_path, repo=repo)
     if problems:
         return [], problems
+    if not record_path.is_file():
+        return [], [
+            "cannot read the run record: "
+            "it is not a regular file"
+        ]
     record = fanout.strict_json_loads(
         record_path.read_text(encoding="utf-8")
     )
     manifest_path = (record_path.parent / record["packet_manifest"]).resolve()
+    if not manifest_path.is_file():
+        return [], [
+            "cannot read the packet manifest: "
+            "it is not a regular file"
+        ]
     manifest = fanout.strict_json_loads(
         manifest_path.read_text(encoding="utf-8")
     )

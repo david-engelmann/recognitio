@@ -569,6 +569,81 @@ class TestHeadlessChain(ChainFixture):
             self.check(events), [],
         )
 
+    BRIDGE_DRIVER = (
+        "import importlib.util, sys\n"
+        "from pathlib import Path\n"
+        "spec = importlib.util.spec_from_file_location(\n"
+        "    'bridge_under_test', sys.argv[1])\n"
+        "module = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(module)\n"
+        "events, problems = module.build_stream(Path(sys.argv[2]))\n"
+        "for problem in problems:\n"
+        "    print(problem)\n"
+        "sys.exit(1 if problems else 0)\n"
+    )
+
+    def run_bridge(self, record_path):
+        # Round 183 New Minor 1. The bridge validates the
+        # record through the fan-out validator first, so a
+        # FIFO record hangs the bridge behind the validator.
+        # The bridge runs in a subprocess with a ten second
+        # bound, so a bridge that still reads the FIFO fails
+        # one test at the bound instead of hanging the suite.
+        try:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    self.BRIDGE_DRIVER,
+                    str(ROOT / "scripts" / "merge_to_headless.py"),
+                    str(record_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the bridge did not finish within ten seconds")
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_the_bridge_refuses_a_fifo_run_record_promptly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            record = Path(tmp) / "run-record.json"
+            os.mkfifo(record)
+            result = self.run_bridge(record)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(
+                "cannot read the run record", result.stdout)
+            self.assertIn("not a regular file", result.stdout)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_the_bridge_refuses_a_fifo_named_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            run_dir.mkdir()
+            packet_dir = Path(tmp) / "packet"
+            packet_dir.mkdir()
+            for name in ("manifest.json", "packet.md"):
+                (packet_dir / name).write_text(
+                    (self.dir / "packet" / name).read_text(
+                        encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            manifest = packet_dir / "manifest.json"
+            manifest.unlink()
+            os.mkfifo(manifest)
+            record = run_dir / "run-record.json"
+            record.write_text(
+                json.dumps(honest_record()), encoding="utf-8")
+            result = self.run_bridge(record)
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(
+                "cannot read the packet manifest", result.stdout)
+            self.assertIn("not a regular file", result.stdout)
+
     def test_an_error_result_with_a_pass_verdict_fails(self):
         # Finding F7. The envelope says the run errored and the
         # structured output says pass with no findings. The

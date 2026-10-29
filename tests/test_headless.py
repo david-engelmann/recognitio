@@ -8,7 +8,9 @@ the gate names it, and the clean run reads green.
 
 import importlib.util
 import json
+import os
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -386,6 +388,168 @@ class TestHeadlessCheck(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
+
+
+class TestHeadlessFifoDoors(unittest.TestCase):
+    """Round 183 New Minor 2, the headless FIFO doors.
+
+    The gate reads its stream and its manifest and its exit
+    file with plain reads, so a FIFO at any of the three
+    blocks the read and the gate never returns. Every shape
+    runs the shipped CLI in a subprocess with a ten second
+    bound, so a gate that still reads the FIFO fails one
+    test at the bound instead of hanging the suite.
+    """
+
+    def run_cli(self, *args):
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "check_headless.py"),
+                    *args,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the headless gate did not finish within "
+                "ten seconds"
+            )
+        return result.returncode, result.stdout + result.stderr
+
+    def write_stream(self, tmp):
+        stream = Path(tmp) / "run.jsonl"
+        stream.write_text(
+            json.dumps(
+                result_event(
+                    permission_denials=[],
+                    structured_output={
+                        "verdict": "pass",
+                        "findings": [],
+                    },
+                )
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return stream
+
+    def assert_refused(self, outcome, wording):
+        code, output = outcome
+        self.assertNotEqual(code, 0, output)
+        self.assertIn(wording, output)
+        self.assertIn("not a regular file", output)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_stream_standing_as_a_fifo_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_packet(tmp)
+            stream = Path(tmp) / "run.jsonl"
+            os.mkfifo(stream)
+            self.assert_refused(
+                self.run_cli(
+                    "--stream", str(stream),
+                    "--manifest", str(Path(tmp) / "manifest.json"),
+                    "--exit-code", "0",
+                ),
+                "cannot read the stream",
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_stream_linking_to_a_fifo_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_packet(tmp)
+            target = Path(tmp) / "stream-fifo"
+            os.mkfifo(target)
+            stream = Path(tmp) / "run.jsonl"
+            stream.symlink_to(target)
+            self.assert_refused(
+                self.run_cli(
+                    "--stream", str(stream),
+                    "--manifest", str(Path(tmp) / "manifest.json"),
+                    "--exit-code", "0",
+                ),
+                "cannot read the stream",
+            )
+
+    def test_a_stream_standing_as_a_socket_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_packet(tmp)
+            stream = Path(tmp) / "run.jsonl"
+            sock = socket.socket(socket.AF_UNIX)
+            sock.bind(str(stream))
+            try:
+                self.assert_refused(
+                    self.run_cli(
+                        "--stream", str(stream),
+                        "--manifest",
+                        str(Path(tmp) / "manifest.json"),
+                        "--exit-code", "0",
+                    ),
+                    "cannot read the stream",
+                )
+            finally:
+                sock.close()
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_manifest_standing_as_a_fifo_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stream = self.write_stream(tmp)
+            write_packet(tmp)
+            manifest = Path(tmp) / "manifest.json"
+            manifest.unlink()
+            os.mkfifo(manifest)
+            self.assert_refused(
+                self.run_cli(
+                    "--stream", str(stream),
+                    "--manifest", str(manifest),
+                    "--exit-code", "0",
+                ),
+                "cannot read the packet manifest",
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_a_manifest_linking_to_a_fifo_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stream = self.write_stream(tmp)
+            write_packet(tmp)
+            target = Path(tmp) / "manifest-fifo"
+            os.mkfifo(target)
+            manifest = Path(tmp) / "manifest.json"
+            manifest.unlink()
+            manifest.symlink_to(target)
+            self.assert_refused(
+                self.run_cli(
+                    "--stream", str(stream),
+                    "--manifest", str(manifest),
+                    "--exit-code", "0",
+                ),
+                "cannot read the packet manifest",
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"),
+                         "no mkfifo on this host")
+    def test_an_exit_file_standing_as_a_fifo_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stream = self.write_stream(tmp)
+            write_packet(tmp)
+            exit_file = Path(tmp) / "exit.txt"
+            os.mkfifo(exit_file)
+            code, output = self.run_cli(
+                "--stream", str(stream),
+                "--manifest", str(Path(tmp) / "manifest.json"),
+                "--exit-file", str(exit_file),
+            )
+            self.assertNotEqual(code, 0, output)
+            self.assertIn(
+                "the recorded exit file cannot be read", output)
 
 
 if __name__ == "__main__":

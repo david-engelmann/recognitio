@@ -411,6 +411,11 @@ def brief_problems(root):
     """Problems with the Build 8 brief's stated contract."""
     problems = []
     path = root / "docs" / "agent-plugins-brief.md"
+    if path.exists() and not path.is_file():
+        return [
+            "cannot read docs/agent-plugins-brief.md, "
+            "it is not a regular file"
+        ]
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:
