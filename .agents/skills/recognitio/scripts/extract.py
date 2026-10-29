@@ -1438,6 +1438,34 @@ def generated_placeholder(repo, diff_base, head, entry, adds, dels):
     }
 
 
+def identical_blob_typechange_counts(repo, diff_base, head, entry,
+                                       precise_chunk):
+    """The body counts for a typechange whose blob never changed.
+
+    Plain numstat reports no added and no deleted lines for such
+    an entry because the bytes on the two sides are the same
+    bytes. The diff body still shows the change as a deletion
+    of the old form and a creation of the new form, so the
+    lines that body carries are the count a reader of the
+    packet can recount for themselves. A mode only change
+    carries no such body lines and keeps its zero counts, and
+    a gitlink carries its pointer as its one body line in the
+    same way. This helper returns the body count for the one
+    shape whose blob is identical on both sides and returns
+    None for every other entry, so a typechange whose bytes
+    differ in any way at all keeps the count numstat gave it.
+    """
+    if entry["status"] != "typechange":
+        return None
+    base_data = file_bytes(
+        repo, diff_base, entry["old_path"] or entry["path"]
+    )
+    head_data = file_bytes(repo, head, entry["path"])
+    if base_data is None or head_data != base_data:
+        return None
+    return count_chunk_lines(precise_chunk)
+
+
 def enrich_files(repo, diff_base, head, change):
     """Fill in counts and placeholder state for every file entry.
 
@@ -1469,6 +1497,16 @@ def enrich_files(repo, diff_base, head, change):
             )
             if counts is not None:
                 adds, dels = counts
+        if not entry["binary"]:
+            body_counts = identical_blob_typechange_counts(
+                repo, diff_base, head, entry, precise.get(path, "")
+            )
+            if body_counts is not None and body_counts != (adds, dels):
+                # The corrected count is the measure every later
+                # reading of this change must stand on, so the
+                # stats reading moves with the entry it names.
+                adds, dels = body_counts
+                stats[path] = body_counts
         entry["additions"] = adds
         entry["deletions"] = dels
         entry["hunks"] = count_hunks(chunks.get(path, ""))

@@ -3535,6 +3535,146 @@ class TestTypechangePairing(unittest.TestCase):
             self.assertIn("new file mode 100644", section)
             self.assertIn("+plain text", section)
 
+    def assert_packet_stamps(self, repo, out):
+        check = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "check_packet.py"),
+                str(out), "--repo", str(repo),
+            ],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+
+    def build_identical_blob_repo(self, tmp, direction):
+        repo = Path(tmp) / "repo"
+        init_repo(repo)
+        write_tree(repo, {"target.txt": "target line\n"})
+        if direction == "file_to_symlink":
+            (repo / "swap.py").write_bytes(b"target.txt")
+        else:
+            os.symlink("target.txt", repo / "swap.py")
+        commit_all(repo, "base")
+        (repo / "swap.py").unlink()
+        if direction == "file_to_symlink":
+            os.symlink("target.txt", repo / "swap.py")
+        else:
+            (repo / "swap.py").write_bytes(b"target.txt")
+        commit_all(repo, "swap the type over the same blob")
+        return repo
+
+    def assert_identical_blob_packet(self, tmp, direction,
+                                       deleted_mode, new_mode):
+        repo = self.build_identical_blob_repo(tmp, direction)
+        self.assertEqual(
+            git(repo, "diff", "--numstat", "HEAD~1", "HEAD"),
+            "0\t0\tswap.py",
+        )
+        out = Path(tmp) / "out"
+        result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(out)
+        self.assertTrue(manifest["verified"], manifest["discrepancies"])
+        swap = [
+            entry for entry in manifest["files"]
+            if entry["path"] == "swap.py"
+        ][0]
+        self.assertEqual(swap["status"], "typechange")
+        self.assertEqual(
+            (swap["additions"], swap["deletions"], swap["hunks"]),
+            (1, 1, 2),
+        )
+        section = self.packet_section(
+            (out / "packet.md").read_text(), "swap.py"
+        )
+        self.assertIn("deleted file mode %s" % deleted_mode, section)
+        self.assertIn("-target.txt", section)
+        self.assertIn("new file mode %s" % new_mode, section)
+        self.assertIn("+target.txt", section)
+        self.assert_packet_stamps(repo, out)
+
+    def test_identical_blob_file_to_symlink_typechange_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            self.assert_identical_blob_packet(
+                tmp, "file_to_symlink", "100644", "120000"
+            )
+
+    def test_identical_blob_symlink_to_file_typechange_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            self.assert_identical_blob_packet(
+                tmp, "symlink_to_file", "120000", "100644"
+            )
+
+    def test_differing_typechange_pair_keeps_numstat_counts(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {
+                "target.txt": "target line\n",
+                "file_b.py": "one\ntwo\nthree\n",
+                "plain.py": "p = 1\n",
+            })
+            os.symlink("target.txt", repo / "link_a.py")
+            commit_all(repo, "base")
+            (repo / "link_a.py").unlink()
+            (repo / "link_a.py").write_text("alpha\nbeta\n")
+            (repo / "file_b.py").unlink()
+            os.symlink("target.txt", repo / "file_b.py")
+            write_tree(repo, {"plain.py": "p = 2\n"})
+            commit_all(repo, "swap both types with new content")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            by_path = {
+                entry["path"]: entry for entry in manifest["files"]
+            }
+            self.assertEqual(by_path["link_a.py"]["status"], "typechange")
+            self.assertEqual(
+                (by_path["link_a.py"]["additions"],
+                 by_path["link_a.py"]["deletions"]),
+                (2, 1),
+            )
+            self.assertEqual(by_path["file_b.py"]["status"], "typechange")
+            self.assertEqual(
+                (by_path["file_b.py"]["additions"],
+                 by_path["file_b.py"]["deletions"]),
+                (1, 3),
+            )
+            self.assertEqual(
+                (by_path["plain.py"]["additions"],
+                 by_path["plain.py"]["deletions"]),
+                (1, 1),
+            )
+            self.assert_packet_stamps(repo, out)
+
+    def test_mode_only_change_keeps_zero_counts(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"run.sh": "#!/bin/sh\necho hi\n"})
+            commit_all(repo, "base")
+            (repo / "run.sh").chmod(0o755)
+            commit_all(repo, "make the script executable")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            entry = manifest["files"][0]
+            self.assertEqual(entry["status"], "modified")
+            self.assertEqual(
+                (entry["additions"], entry["deletions"], entry["hunks"]),
+                (0, 0, 0),
+            )
+            section = self.packet_section(
+                (out / "packet.md").read_text(), "run.sh"
+            )
+            self.assertIn("old mode 100644", section)
+            self.assertIn("new mode 100755", section)
+            self.assert_packet_stamps(repo, out)
+
     def test_merged_typechange_chunk_counts_both_sections(self):
         deletion = (
             "diff --git a/swap.txt b/swap.txt\n"

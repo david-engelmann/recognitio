@@ -1842,6 +1842,19 @@ This unreleased work carries version 1.3.0.
   manifest it never read. A genuinely absent native
   manifest keeps the single extension path problem it
   has always carried.
+- A typechange whose blob is identical on both sides now
+  verifies instead of failing its own recount. Plain
+  numstat reports no added and no deleted lines for that
+  shape because the bytes never changed, while the diff
+  body shows the deletion of the old form and the
+  creation of the new form and counts the lines those
+  two sections carry. The extractor now records the
+  body count for that one shape in both directions, so
+  the manifest and the packet body and the recount tell
+  one story and the packet still shows both forms with
+  their modes. A typechange whose bytes differ in any
+  way keeps the count numstat gave it, and a mode only
+  change keeps its zero counts.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
