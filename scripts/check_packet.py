@@ -2029,7 +2029,11 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
     accounting. A findings hash must stand only where the
     recorded command carries a findings flag, because the hash
     is the digest of the file that flag named and a run that
-    named no such file used no findings file to digest.
+    named no such file used no findings file to digest. Where
+    a findings flag stands and the packet carries no findings
+    accounting, the re-review reading holds the hash to the
+    file the flag names at its last value, because no packet
+    line stands in for that file there.
     A range or commit or since value written as a full hash
     names an immutable commit, so a hash that names a different
     commit than the manifest records, or no commit at all,
@@ -2523,7 +2527,17 @@ def rereview_problems(packet_text, manifest, repo, extractor,
     fallback reading a finding invented whole, whose path and
     text no findings file ever carried, cannot be told from a
     real one, and that limit is recorded in the fix report
-    rather than hidden.
+    rather than hidden. One reading stands before both of
+    those. Where the packet carries no findings accounting at
+    all, no packet line can stand in for the findings file in
+    the fallback reading, so a non null findings hash in the
+    manifest is held to the file the recorded command names
+    at its last findings flag. A file that cannot be read, and
+    a file whose bytes hash to a different value, each refuse
+    the stamp there. A packet that does carry an accounting
+    keeps the two readings above whole, so a genuine packet
+    whose findings file is gone still stamps on the findings
+    its section itself carries.
     """
     problems = []
     span = span_text(packet_text, "## Re-review")
@@ -2537,6 +2551,37 @@ def rereview_problems(packet_text, manifest, repo, extractor,
     findings_file = None
     if findings_path:
         findings_file = resolve_findings_file(findings_path, packet_dir)
+    recorded_hash = manifest.get("findings_sha256")
+    accounted = "### Prior findings accounting" in span.split("\n")
+    findings_flagged = bool(flags) and "--findings" in flags
+    if findings_flagged and recorded_hash is not None and not accounted:
+        if findings_file is None or not findings_file.is_file():
+            return [
+                "the manifest records a findings hash but the "
+                "findings file its command records cannot be "
+                "read, so the hash claims a findings file that "
+                "does not stand to be checked"
+            ]
+        try:
+            unaccounted_bytes = findings_file.read_bytes()
+        except OSError:
+            return [
+                "the manifest records a findings hash but the "
+                "findings file its command records cannot be "
+                "read, so the hash claims a findings file that "
+                "does not stand to be checked"
+            ]
+        unaccounted_hash = hashlib.sha256(
+            unaccounted_bytes
+        ).hexdigest()
+        if unaccounted_hash != recorded_hash:
+            return [
+                "the findings file the manifest command "
+                "records hashes to %s, which is not the "
+                "findings hash %s the manifest records, so "
+                "the file the run used is not the file "
+                "standing there" % (unaccounted_hash, recorded_hash)
+            ]
     if findings_file is not None and findings_file.is_file():
         # The findings file the command records is still where
         # the run left it, so its findings are the ground truth

@@ -772,6 +772,16 @@ class TestFindingsHashBinding(VerifierFixture):
     findings path stands in the recorded command. The tests
     below hold the correct forms on both sides of the rule and
     fail against the pre fix checker on the invented hash.
+
+    Round 114 finding 1 then appended a findings flag naming
+    an absent file to a genuine since packet and set an
+    invented hash beside it. The pairing reading was satisfied
+    by the genuine since flag and the hash was never compared,
+    because no file stood there and the packet carried no
+    findings accounting for the fallback reading to stand on.
+    The appended flag tests below hold that shape on both
+    spellings and on a directory, and they fail against the
+    checker as it stood before this second fix.
     """
 
     def run_check_capture(self, out):
@@ -821,6 +831,138 @@ class TestFindingsHashBinding(VerifierFixture):
             manifest["findings_sha256"],
             hashlib.sha256(findings.read_bytes()).hexdigest(),
         )
+        self.assertEqual(self.run_check(out), 0)
+
+    def make_since_only(self, name="sinceonly114"):
+        out = extract_packet(
+            self.repo, Path(self.tmp.name) / name,
+            "--range", "HEAD~1..HEAD", "--since", "HEAD~2",
+        )
+        manifest = self.manifest(out)
+        self.assertIsNone(manifest["findings_sha256"])
+        self.assertNotIn("--findings", manifest["command"])
+        self.assertNotIn(
+            "### Prior findings accounting", self.packet_text(out)
+        )
+        return out
+
+    def make_real_findings(self, name="real114-findings.txt"):
+        findings = Path(self.tmp.name) / name
+        findings.write_text(
+            findings_text_for(
+                self.repo, "HEAD~2", "b.py:2: the value changed\n"
+            ),
+            encoding="utf-8",
+        )
+        return findings
+
+    def smuggled_since_packet(self, name, tokens, digest="b" * 64):
+        out = self.clone(name, self.make_since_only(name + "-base"))
+        manifest = self.manifest(out)
+        manifest["command"] = manifest["command"] + tokens
+        manifest["findings_sha256"] = digest
+        self.save_manifest(out, manifest)
+        return out
+
+    def test_an_appended_findings_flag_with_an_invented_hash_fails(self):
+        absent = str(Path(self.tmp.name) / "absent-findings.txt")
+        out = self.smuggled_since_packet(
+            "smuggleplain", ["--findings", absent]
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but the "
+            "findings file its command records cannot be read",
+            output,
+        )
+
+    def test_an_appended_equals_findings_flag_with_an_invented_hash_fails(self):
+        absent = str(Path(self.tmp.name) / "absent-findings.txt")
+        out = self.smuggled_since_packet(
+            "smuggleequal", ["--findings=" + absent]
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but the "
+            "findings file its command records cannot be read",
+            output,
+        )
+
+    def test_an_appended_findings_flag_with_an_empty_value_fails(self):
+        out = self.smuggled_since_packet(
+            "smuggleempty", ["--findings="]
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but the "
+            "findings file its command records cannot be read",
+            output,
+        )
+
+    def test_an_appended_findings_flag_naming_a_directory_fails(self):
+        directory = Path(self.tmp.name) / "findings-dir"
+        directory.mkdir()
+        out = self.smuggled_since_packet(
+            "smuggledir", ["--findings", str(directory)]
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but the "
+            "findings file its command records cannot be read",
+            output,
+        )
+
+    def test_an_appended_findings_flag_with_a_mismatched_hash_fails(self):
+        findings = self.make_real_findings()
+        out = self.smuggled_since_packet(
+            "smugglemismatch", ["--findings", str(findings)]
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn("is not the findings hash", output)
+
+    def test_duplicated_findings_flags_are_read_at_the_last_value(self):
+        findings = self.make_real_findings("dup114-findings.txt")
+        absent = str(Path(self.tmp.name) / "absent-findings.txt")
+        out = self.smuggled_since_packet(
+            "smuggledup",
+            ["--findings", str(findings), "--findings", absent],
+        )
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the manifest records a findings hash but the "
+            "findings file its command records cannot be read",
+            output,
+        )
+
+    def test_a_genuine_rereview_packet_in_equals_form_passes(self):
+        findings = self.make_real_findings("eq114-findings.txt")
+        source = extract_packet(
+            self.repo, Path(self.tmp.name) / "eq114",
+            "--range", "HEAD~1..HEAD", "--since", "HEAD~2",
+            "--findings", str(findings),
+        )
+        out = self.clone("eq114clone", source)
+        manifest = self.manifest(out)
+        command = []
+        index = 0
+        while index < len(manifest["command"]):
+            token = manifest["command"][index]
+            if token == "--findings":
+                command.append(
+                    "--findings=" + manifest["command"][index + 1]
+                )
+                index += 2
+            else:
+                command.append(token)
+                index += 1
+        manifest["command"] = command
+        self.save_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 0)
 
     def test_the_extractor_clears_a_stale_hash_when_no_findings_file_is_named(self):

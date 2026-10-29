@@ -1877,6 +1877,18 @@ This unreleased work carries version 1.3.0.
   stripped or rewritten on either side, because the packet
   body is evidence and a rewritten body would no longer
   be the bytes the recount counted.
+- The packet check now refuses an invented findings hash
+  on a since packet that carries no findings accounting
+  where a findings flag appended to its recorded command
+  names a file that cannot be read. The earlier reading
+  refused a hash only where no findings flag stood, so
+  one appended token disarmed it while the genuine since
+  flag satisfied the pairing reading and the absent file
+  meant the hash was never compared. A standing file
+  whose bytes hash to a different value is refused on
+  the same reading, while a packet that carries a
+  findings accounting keeps the fallback reading on the
+  findings its section itself carries.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
