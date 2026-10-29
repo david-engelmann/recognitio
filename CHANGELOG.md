@@ -2215,6 +2215,15 @@ This unreleased work carries version 1.3.0.
   the path is not a regular file without hanging, and
   regression tests cover each planted change from the
   audit that found the gap.
+- The Claude submission pack now states the size of
+  the largest file that is not an image or a font at
+  254,610 bytes. The gate test file grew through the
+  persona settings file landing and the Antigravity
+  version gate landing and the pack figure had kept
+  the earlier size. The size limits item stands
+  restated against the current tree, and the file
+  stays the largest of its kind and stays under the
+  cap the checklist holds at 7,534 bytes of headroom.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
