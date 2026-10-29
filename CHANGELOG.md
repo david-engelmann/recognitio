@@ -1915,6 +1915,20 @@ This unreleased work carries version 1.3.0.
   assert the error flag problem by name, so the error
   subtype reading and the merged capture reading can
   no longer satisfy them in the flag reading place.
+- Regeneration over an existing verified packet is
+  now conservative in both directions. A successful
+  publish refuses before any rename when the output
+  directory holds an entry the new packet does not
+  receipt and leaves the standing pair untouched,
+  apart from the findings file the run itself read
+  from that directory, which the publish removes
+  because the new packet already receipts its hash
+  and its accounting. A failing regeneration now
+  leaves a standing verified pair intact in the same
+  way the budget refusal already did, whether the
+  change is empty or the run inputs cannot be read
+  or resolved, and reports its failure only in its
+  exit code and its message.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

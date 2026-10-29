@@ -3753,11 +3753,63 @@ class OutputTarget:
                 % (final_name, self.path, exc.strerror or exc)
             ) from exc
 
-    def publish_pair(self, packet_data, manifest):
-        """Move a finished packet and manifest into place together."""
+    def _unreceipted_entries(self):
+        """Entries in the directory that no packet manifest receipts.
+
+        The sealed pair is packet.md and manifest.json, and a
+        staging name belongs to this publish itself, so every
+        other entry standing here is content a reader who copies
+        the directory as a whole would inherit unreceipted, and
+        the packet check refuses such a directory by name.
+        """
+        try:
+            entries = os.listdir(self.dir_fd)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot list the output directory %s because %s, "
+                "so nothing was published"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        return sorted(
+            entry for entry in entries
+            if entry not in ("packet.md", "manifest.json")
+            and not entry.startswith(".recognitio-tmp-")
+        )
+
+    def publish_pair(self, packet_data, manifest, removable_entries=()):
+        """Move a finished packet and manifest into place together.
+
+        The publish is conservative over entries it does not
+        receipt. Before any rename, an entry standing in the
+        directory that the finished manifest does not receipt
+        refuses the publish and leaves the standing pair exactly
+        as it stood, because a success line for a directory its
+        own packet check then refuses would name a pair the stamp
+        does not cover. The one entry a publish may remove is an
+        entry the caller names as removable, which is the
+        findings file this run itself read from the directory
+        before building. Its bytes are already receipted by the
+        hash and the accounting the new packet carries, and the
+        shipped findings in the output directory flow pins a
+        successful run there, so removing that entry as part of
+        the publish is the branch that flow takes while every
+        foreign entry takes the refusal branch.
+        """
         self.open_dir()
         self._verify_still_pinned()
         self._check_names(("packet.md", "manifest.json"))
+        extras = self._unreceipted_entries()
+        foreign = [
+            entry for entry in extras
+            if entry not in removable_entries
+        ]
+        if foreign:
+            raise OutputRefusal(
+                "the output directory %s holds an entry no "
+                "manifest receipts, %s, so nothing was published. "
+                "Move it aside or pick another output directory"
+                % (self.path, foreign[0])
+            )
         self._discard_stale_temps()
         temp_packet = self._stage("packet.md", packet_data)
         try:
@@ -3773,6 +3825,17 @@ class OutputTarget:
         finally:
             self._discard(temp_packet)
             self._discard(temp_manifest)
+        for entry in extras:
+            try:
+                os.unlink(entry, dir_fd=self.dir_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise OutputRefusal(
+                    "cannot remove the entry %s the run read from "
+                    "the output directory %s because %s"
+                    % (entry, self.path, exc.strerror or exc)
+                ) from exc
         os.fsync(self.dir_fd)
 
     def _standing_verified(self):
@@ -3809,18 +3872,21 @@ class OutputTarget:
         ) is True
 
     def publish_failure(self, argv, message, resolved=None, tiers=None,
-                        budget_block=None, preserve_verified=False):
+                        budget_block=None, preserve_verified=True):
         """Replace the old packet with a failure receipt, or nothing.
 
         Both final names are checked before either is touched, so a
         blocked name leaves the directory exactly as it stood instead
-        of half cleared. A caller that passes preserve_verified, as
-        the budget refusal path does, never replaces a standing
-        verified packet with a failure receipt, and the directory
-        is left exactly as it stood while the refusal itself is
-        still printed by the caller. The method returns True when
-        a receipt was published and False when a standing packet
-        was preserved.
+        of half cleared. Preservation of a standing verified packet
+        is the default here and every failure caller passes it, the
+        budget refusal path and the empty change path and the input
+        failure paths alike, so a failed run never replaces a
+        standing verified packet with a failure receipt and never
+        preserves only one file of the pair. The directory is left
+        exactly as it stood while the failure itself is still
+        printed by the caller and carried in the exit code. The
+        method returns True when a receipt was published and False
+        when a standing packet was preserved.
         """
         self.open_dir()
         self._verify_still_pinned()
@@ -4271,7 +4337,9 @@ def run_pipeline(args, repo, target, argv, prepared=None):
     files = change["files"]
     if not files:
         message = "the resolved change is empty, no packet was built"
-        target.publish_failure(argv, message, resolved)
+        target.publish_failure(
+            argv, message, resolved, preserve_verified=True
+        )
         print("recognitio: %s" % message, file=sys.stderr)
         return 2
     exclusions = enrich_files(repo, diff_base, head, change)
@@ -4338,8 +4406,16 @@ def run_pipeline(args, repo, target, argv, prepared=None):
         ),
     )
 
+    removable_entries = ()
+    if args.findings:
+        findings_path = Path(args.findings).resolve()
+        if findings_path.parent == target.path and (
+            findings_path.name not in ("packet.md", "manifest.json")
+        ):
+            removable_entries = (findings_path.name,)
     target.publish_pair(
-        packet.encode("utf-8", "surrogateescape"), manifest
+        packet.encode("utf-8", "surrogateescape"), manifest,
+        removable_entries=removable_entries,
     )
 
     if not verified:
@@ -4417,7 +4493,9 @@ def refuse_tracked_output_root(target):
 def publish_failure_quietly(target, argv, message, resolved=None):
     """Leave a failure receipt where one can be left, else say why."""
     try:
-        target.publish_failure(argv, message, resolved)
+        target.publish_failure(
+            argv, message, resolved, preserve_verified=True
+        )
     except OutputRefusal as exc:
         print("recognitio: %s" % exc, file=sys.stderr)
 

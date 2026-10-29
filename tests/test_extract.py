@@ -1006,6 +1006,162 @@ class TestOutputReceipts(Fixture):
         self.assertNotIn("Traceback", result.stderr)
 
 
+class TestRegenerationConservation(unittest.TestCase):
+    """Regeneration over a verified packet is conservative.
+
+    Round 114 Note 1, graded in round 154. A planted extra entry
+    standing in the output directory survived a successful
+    regeneration untouched while the extractor reported the
+    packet written and verified, and the packet check then
+    refused that same directory for the entry no manifest
+    receipts. A failing regeneration over a verified path
+    removed the packet file and left a failure manifest in its
+    place. The tests below fail against the pre fix extractor
+    on both halves.
+    """
+
+    def build_verified_pair(self, tmp):
+        repo = make_repo(tmp, [
+            {"a.py": "x = 1\n"},
+            {"a.py": "x = 2\n"},
+        ])
+        out = Path(tmp) / "out"
+        result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(read_manifest(out)["verified"])
+        return repo, out
+
+    def pair_bytes(self, out):
+        return (
+            (out / "packet.md").read_bytes(),
+            (out / "manifest.json").read_bytes(),
+        )
+
+    def assert_pair_intact(self, out, before):
+        self.assertEqual(self.pair_bytes(out), before)
+        self.assertTrue(read_manifest(out)["verified"])
+
+    def assert_checker_stamps(self, repo, out):
+        check = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "check_packet.py"),
+             str(out), "--repo", str(repo)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+
+    def test_planted_entries_refuse_regeneration_and_spare_the_pair(self):
+        for plant in ("planted.txt", "findings.txt", "prior-findings.txt"):
+            with self.subTest(plant=plant):
+                with RetryingTemporaryDirectory() as tmp:
+                    repo, out = self.build_verified_pair(tmp)
+                    before = self.pair_bytes(out)
+                    (out / plant).write_text("planted\n")
+                    refused = run_extract_cli(
+                        repo, out, "--range", "HEAD~1..HEAD"
+                    )
+                    self.assertEqual(refused.returncode, 2, refused.stderr)
+                    self.assertIn(plant, refused.stderr)
+                    self.assertIn(
+                        "no manifest receipts", refused.stderr
+                    )
+                    self.assert_pair_intact(out, before)
+                    self.assertEqual(
+                        (out / plant).read_text(), "planted\n"
+                    )
+
+    def test_planted_findings_entry_refuses_a_rereview_regeneration(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "a = 1\nb = 2\n"},
+                {"mod.py": "a = 1\nb = 22\n"},
+            ])
+            previous = git(repo, "rev-parse", "HEAD~1")
+            external = Path(tmp) / "external-findings.txt"
+            external.write_text(findings_text_for(
+                repo, previous, "mod.py:2: the b line needs a look\n"
+            ))
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD",
+                "--since", previous, "--findings", str(external),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            before = self.pair_bytes(out)
+            planted = out / "findings.txt"
+            planted.write_bytes(external.read_bytes())
+            refused = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD",
+                "--since", previous, "--findings", str(external),
+            )
+            self.assertEqual(refused.returncode, 2, refused.stderr)
+            self.assertIn("findings.txt", refused.stderr)
+            self.assert_pair_intact(out, before)
+            self.assertEqual(planted.read_bytes(), external.read_bytes())
+
+    def test_findings_read_from_the_output_directory_do_not_block_it(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            out.mkdir()
+            (out / "findings.txt").write_text(findings_text_for(
+                repo, "HEAD~1", "a.py:1: a note\n"
+            ))
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD",
+                "--since", "HEAD~1",
+                "--findings", str(out / "findings.txt"),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            # The findings file this run read from the directory
+            # is removed as part of the publish, so the pair the
+            # success line names is the sealed pair alone and
+            # the packet check stamps the directory it left.
+            self.assertFalse((out / "findings.txt").exists())
+            self.assertEqual(
+                sorted(entry.name for entry in out.iterdir()),
+                ["manifest.json", "packet.md"],
+            )
+            self.assert_checker_stamps(repo, out)
+
+    def test_empty_change_regeneration_leaves_the_verified_pair(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            failed = run_extract_cli(repo, out, "--range", "HEAD..HEAD")
+            self.assertEqual(failed.returncode, 2, failed.stderr)
+            self.assert_pair_intact(out, before)
+            self.assert_checker_stamps(repo, out)
+
+    def test_input_failure_regeneration_leaves_the_verified_pair(self):
+        with RetryingTemporaryDirectory() as tmp:
+            cases = [
+                ["--range", "nope..HEAD"],
+                ["--range", "HEAD~1..HEAD", "--since", "nope123"],
+                [
+                    "--range", "HEAD~1..HEAD", "--since", "HEAD~1",
+                    "--findings", str(
+                        Path(tmp) / "absent-findings.txt"
+                    ),
+                ],
+                ["--commit", "deadbeefdeadbeef"],
+            ]
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            for args in cases:
+                with self.subTest(args=args):
+                    failed = run_extract_cli(repo, out, *args)
+                    self.assertEqual(
+                        failed.returncode, 2, failed.stderr
+                    )
+                    self.assert_pair_intact(out, before)
+            self.assert_checker_stamps(repo, out)
+
+
 class TestFailClosedEndToEnd(Fixture):
     def test_failed_verification_exits_3_with_unverified_manifest(self):
         out = Path(self.tmp.name) / "forced"
@@ -3770,6 +3926,12 @@ class TestOutputPathDiscipline(unittest.TestCase):
         )
         self.assertEqual((out / "keep.txt").read_text(), "keep\n")
 
+    def make_receipt_dir(self, name):
+        out = Path(self.tmp.name) / name
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "keep.txt").write_text("keep\n")
+        return out
+
     def raw_run(self, args, env=None):
         return subprocess.run(
             [sys.executable, str(EXTRACT)] + list(args),
@@ -3862,7 +4024,11 @@ class TestOutputPathDiscipline(unittest.TestCase):
         ]
         for index, (name, args) in enumerate(cases):
             with self.subTest(case=name):
-                out = self.make_sentinel("receipt%d" % index)
+                # A receipt is written where no verified pair
+                # stands. A directory holding a standing verified
+                # pair keeps that pair instead, which the
+                # regeneration conservation tests below pin.
+                out = self.make_receipt_dir("receipt%d" % index)
                 result = self.raw_run(
                     args + ["--out", str(out), "--repo", str(self.repo)]
                 )
@@ -3909,7 +4075,7 @@ class TestOutputPathDiscipline(unittest.TestCase):
         self.assert_sentinel_intact(out)
 
     def test_missing_repository_leaves_a_receipt_not_a_hole(self):
-        out = self.make_sentinel("missing-repo")
+        out = self.make_receipt_dir("missing-repo")
         result = self.raw_run([
             "--range", "HEAD~1..HEAD", "--out", str(out),
             "--repo", str(Path(self.tmp.name) / "no-such-repo"),
@@ -3927,7 +4093,7 @@ class TestOutputPathDiscipline(unittest.TestCase):
             capture_output=True, text=True,
         )
         self.assertEqual(clone.returncode, 0, clone.stderr)
-        out = self.make_sentinel("shallow-out")
+        out = self.make_receipt_dir("shallow-out")
         result = self.raw_run([
             "--range", "HEAD~1..HEAD", "--out", str(out),
             "--repo", str(shallow),
