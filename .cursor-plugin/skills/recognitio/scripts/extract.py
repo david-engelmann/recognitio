@@ -3793,11 +3793,39 @@ class OutputTarget:
                 % (final_name, self.path, exc.strerror or exc)
             ) from exc
 
+    def _staging_entry_is_discardable(self, entry):
+        """Whether a staging named entry is one the discard drops.
+
+        A staging name belongs to this publish itself only when
+        the entry standing under it is a regular file or a link,
+        because the stale staging discard drops such entries by
+        unlink and leaves their targets untouched. A directory
+        or any other type of entry under a staging name is not
+        a staging file a killed run could have left, because the
+        staging write creates regular files alone, and unlink
+        can never drop a directory, so such an entry is foreign
+        content the publish must refuse over rather than a temp
+        it may silently keep. The reading is by lstat alone, so
+        a special file is named by its type and never opened.
+        """
+        try:
+            info = os.stat(
+                entry, dir_fd=self.dir_fd, follow_symlinks=False
+            )
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        return stat.S_ISREG(info.st_mode) or stat.S_ISLNK(
+            info.st_mode
+        )
+
     def _unreceipted_entries(self):
         """Entries in the directory that no packet manifest receipts.
 
         The sealed pair is packet.md and manifest.json, and a
-        staging name belongs to this publish itself, so every
+        staging name belongs to this publish itself when the
+        entry under it is a regular file or a link, so every
         other entry standing here is content a reader who copies
         the directory as a whole would inherit unreceipted, and
         the packet check refuses such a directory by name.
@@ -3813,7 +3841,10 @@ class OutputTarget:
         return sorted(
             entry for entry in entries
             if entry not in ("packet.md", "manifest.json")
-            and not entry.startswith(".recognitio-tmp-")
+            and not (
+                entry.startswith(".recognitio-tmp-")
+                and self._staging_entry_is_discardable(entry)
+            )
         )
 
     def publish_pair(self, packet_data, manifest, removable_entries=()):

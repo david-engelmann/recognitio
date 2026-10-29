@@ -4,6 +4,7 @@ import io
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1068,6 +1069,90 @@ class TestRegenerationConservation(unittest.TestCase):
                     self.assertEqual(
                         (out / plant).read_text(), "planted\n"
                     )
+
+    def test_staging_named_directory_refuses_and_spares_the_pair(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            plant = out / ".recognitio-tmp-424242-packet.md"
+            plant.mkdir()
+            (plant / "inner.txt").write_text("planted\n")
+            refused = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(refused.returncode, 2, refused.stderr)
+            self.assertIn(plant.name, refused.stderr)
+            self.assertIn("no manifest receipts", refused.stderr)
+            self.assert_pair_intact(out, before)
+            self.assertTrue(plant.is_dir())
+            self.assertEqual(
+                (plant / "inner.txt").read_text(), "planted\n"
+            )
+            # The extractor refusal and the packet check now
+            # agree about the planted directory instead of the
+            # success line and the stamp disagreeing over it.
+            check = subprocess.run(
+                [sys.executable,
+                 str(ROOT / "scripts" / "check_packet.py"),
+                 str(out), "--repo", str(repo)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(check.returncode, 1, check.stderr)
+            self.assertIn(plant.name, check.stdout + check.stderr)
+
+    def test_staging_named_file_and_symlink_are_still_discarded(self):
+        for shape in ("file", "symlink"):
+            with self.subTest(shape=shape):
+                with RetryingTemporaryDirectory() as tmp:
+                    repo, out = self.build_verified_pair(tmp)
+                    plant = out / ".recognitio-tmp-424242-packet.md"
+                    sentinel = Path(tmp) / "sentinel.txt"
+                    sentinel.write_text("outside\n")
+                    if shape == "file":
+                        plant.write_text("stale staging\n")
+                    else:
+                        plant.symlink_to(sentinel)
+                    result = run_extract_cli(
+                        repo, out, "--range", "HEAD~1..HEAD"
+                    )
+                    self.assertEqual(
+                        result.returncode, 0, result.stderr
+                    )
+                    self.assertTrue(read_manifest(out)["verified"])
+                    self.assertFalse(
+                        os.path.lexists(plant), os.listdir(out)
+                    )
+                    self.assertEqual(
+                        sentinel.read_text(), "outside\n"
+                    )
+                    self.assertEqual(
+                        sorted(
+                            entry.name for entry in out.iterdir()
+                        ),
+                        ["manifest.json", "packet.md"],
+                    )
+                    self.assert_checker_stamps(repo, out)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "needs mkfifo")
+    def test_staging_named_fifo_refuses_without_hanging(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            plant = out / ".recognitio-tmp-424242-packet.md"
+            os.mkfifo(plant)
+            cmd = [
+                sys.executable, str(EXTRACT),
+                "--out", str(out), "--repo", str(repo),
+                "--range", "HEAD~1..HEAD",
+            ]
+            refused = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30
+            )
+            self.assertEqual(refused.returncode, 2, refused.stderr)
+            self.assertIn(plant.name, refused.stderr)
+            self.assertIn("no manifest receipts", refused.stderr)
+            self.assert_pair_intact(out, before)
+            self.assertTrue(stat.S_ISFIFO(os.lstat(plant).st_mode))
 
     def test_planted_findings_entry_refuses_a_rereview_regeneration(self):
         with RetryingTemporaryDirectory() as tmp:

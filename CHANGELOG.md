@@ -2002,6 +2002,17 @@ This unreleased work carries version 1.3.0.
   argument so a spelling carrying a segment that does
   not exist followed by a parent segment reaches the
   same sealed pair at both doors.
+- A directory or another special entry named as a
+  publish staging file no longer survives a verified
+  publish that its own packet check then refuses. The
+  staging exemption in the publish path is now type
+  aware and only a regular file or a link under a
+  staging name is treated as a temp a killed run left
+  behind and discarded, while any other staging named
+  entry takes the same refusal branch as every other
+  entry no manifest receipts, naming the entry and
+  refusing the publish before any rename and leaving
+  the standing verified pair byte for byte untouched.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
