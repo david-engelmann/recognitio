@@ -2096,6 +2096,22 @@ This unreleased work carries version 1.3.0.
   contract is no longer refused for an extra field the
   page never named and a future drift between the page
   and the file fails the suite.
+- The eval gate and the regeneration gate now refuse
+  a file that is not a regular file at every artefact
+  reading door instead of hanging when a FIFO stands
+  there. Every reading in both scripts now stands
+  behind one guarded helper per script that tests
+  existence first and the regular file shape second
+  and only then reads, raising the same unreadable
+  shape their callers already turn into their own
+  cannot be read problems, so the shipped packet
+  manifest and packet and sources and diff readings
+  of the eval gate and the examples index and packet
+  length readings of the regeneration gate refuse
+  promptly in the wording each site already carried,
+  while a link to a regular file still reads through
+  and an absent path and a dangling link keep the
+  behaviour they have always carried.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

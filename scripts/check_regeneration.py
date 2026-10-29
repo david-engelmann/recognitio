@@ -304,6 +304,31 @@ def strict_json_loads(text):
     return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
 
 
+def guarded_read_text(path, *args, **kwargs):
+    """Read a text file only when it stands as a regular file.
+
+    A path that exists and is not a regular file raises the
+    same OSError shape an unreadable file raises, so every
+    caller keeps the problem wording it already carries and
+    no caller can block opening a FIFO that stands at the
+    path. A path that does not exist at all falls through to
+    the read itself, so an absent path and a dangling link
+    keep the behaviour they have always carried. The test
+    follows links, so a link to a regular file still reads
+    through and a link to a FIFO refuses.
+    """
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
+    return path.read_text(*args, **kwargs)
+
+
+def guarded_read_bytes(path):
+    """Read a file as bytes under the same guard as the text form."""
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
+    return path.read_bytes()
+
+
 def scrubbed_child_env(extra=None):
     env = {
         key: value
@@ -428,6 +453,8 @@ def manifest_problems(label, shipped, rebuilt, keep_tokens,
 
 def load_sibling(name):
     path = ROOT / "scripts" / ("%s.py" % name)
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
     spec = importlib.util.spec_from_file_location("gate_%s" % name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -443,7 +470,7 @@ def printed_example_block(root):
     missing block is itself a problem, because the printed
     provenance is the claim under test.
     """
-    text = (root / "examples" / "README.md").read_text(encoding="utf-8")
+    text = guarded_read_text((root / "examples" / "README.md"), encoding="utf-8")
     match = re.search(r"```bash\n(.*?)```", text, re.DOTALL)
     if match is None:
         return None, ["the examples index prints no command block"]
@@ -853,7 +880,7 @@ def printed_out_problems(values, expected):
 
 def printed_length_problems(root, packet_lines):
     problems = []
-    index_text = (root / "examples" / "README.md").read_text(
+    index_text = guarded_read_text((root / "examples" / "README.md"),
         encoding="utf-8"
     )
     match = re.search(r"Packet length (\d+) lines", index_text)
@@ -862,7 +889,7 @@ def printed_length_problems(root, packet_lines):
             "the examples index prints a packet length that is "
             "not the %d lines the shipped packet runs" % packet_lines
         )
-    readme = (root / "README.md").read_text(encoding="utf-8")
+    readme = guarded_read_text((root / "README.md"), encoding="utf-8")
     match = re.search(
         r"full packet for this commit runs (\d+) lines", readme
     )
@@ -897,7 +924,7 @@ def example_problems(root):
         link_problems = checked_symlink_problems(root, rel_folder)
         if link_problems:
             return link_problems
-        shipped_packet = (folder / "packet.md").read_text(encoding="utf-8")
+        shipped_packet = guarded_read_text((folder / "packet.md"), encoding="utf-8")
         problems.extend(
             printed_length_problems(
                 root, len(shipped_packet.splitlines())
@@ -1053,7 +1080,7 @@ def example_regeneration_problems(block, root, folder, shipped_packet):
                     "stand as real files in a real folder"
                     % ("%s/%s" % (rel_folder, name))
                 ]
-        rebuilt_packet = (out / "packet.md").read_text(encoding="utf-8")
+        rebuilt_packet = guarded_read_text((out / "packet.md"), encoding="utf-8")
         if rebuilt_packet != shipped_packet:
             problems.append(
                 diff_summary(
@@ -1061,10 +1088,10 @@ def example_regeneration_problems(block, root, folder, shipped_packet):
                 )
             )
         shipped_manifest = strict_json_loads(
-            (folder / "manifest.json").read_text(encoding="utf-8")
+            guarded_read_text((folder / "manifest.json"), encoding="utf-8")
         )
         rebuilt_manifest = strict_json_loads(
-            (out / "manifest.json").read_text(encoding="utf-8")
+            guarded_read_text((out / "manifest.json"), encoding="utf-8")
         )
         problems.extend(
             manifest_problems(
@@ -1132,7 +1159,7 @@ def eval_task_problems(root, eval_gate, task_dir):
     )
     try:
         sources = eval_gate.strict_json_loads(
-            (task_dir / "sources.json").read_text(encoding="utf-8")
+            guarded_read_text((task_dir / "sources.json"), encoding="utf-8")
         )
         if not isinstance(sources, dict):
             return problems + [
@@ -1143,7 +1170,7 @@ def eval_task_problems(root, eval_gate, task_dir):
             repo, base, head, rebuilt_diff = (
                 eval_gate.build_fixture_repo(tmp, sources)
             )
-            saved_diff = (task_dir / "diff.patch").read_bytes()
+            saved_diff = guarded_read_bytes((task_dir / "diff.patch"))
             if rebuilt_diff != saved_diff:
                 problems.append(
                     "the diff of %s does not rebuild byte for byte "
@@ -1159,10 +1186,10 @@ def eval_task_problems(root, eval_gate, task_dir):
                     "the extractor failed on the rebuilt history of "
                     "%s with %s" % (task_dir.name, result.stderr.strip())
                 ]
-            shipped_packet = (task_dir / "packet.md").read_text(
+            shipped_packet = guarded_read_text((task_dir / "packet.md"),
                 encoding="utf-8"
             )
-            rebuilt_packet = (out / "packet.md").read_text(
+            rebuilt_packet = guarded_read_text((out / "packet.md"),
                 encoding="utf-8"
             )
             if norm_eval_packet(rebuilt_packet) != norm_eval_packet(
@@ -1176,10 +1203,10 @@ def eval_task_problems(root, eval_gate, task_dir):
                     )
                 )
             shipped_manifest = strict_json_loads(
-                (task_dir / "manifest.json").read_text(encoding="utf-8")
+                guarded_read_text((task_dir / "manifest.json"), encoding="utf-8")
             )
             rebuilt_manifest = strict_json_loads(
-                (out / "manifest.json").read_text(encoding="utf-8")
+                guarded_read_text((out / "manifest.json"), encoding="utf-8")
             )
             problems.extend(
                 manifest_problems(
@@ -1339,7 +1366,7 @@ def proof_problems(root):
     problems = []
     try:
         sources = strict_json_loads(
-            sources_path.read_text(encoding="utf-8")
+            guarded_read_text(sources_path, encoding="utf-8")
         )
         if not isinstance(sources, dict):
             return problems + [
@@ -1369,10 +1396,10 @@ def proof_problems(root):
                     "the extractor failed on the rebuilt proof "
                     "fixture with %s" % result.stderr.strip()
                 ]
-            shipped_packet = (folder / "packet.md").read_text(
+            shipped_packet = guarded_read_text((folder / "packet.md"),
                 encoding="utf-8"
             )
-            rebuilt_packet = (out / "packet.md").read_text(
+            rebuilt_packet = guarded_read_text((out / "packet.md"),
                 encoding="utf-8"
             )
             if norm_proof_packet(rebuilt_packet) != norm_proof_packet(
@@ -1386,10 +1413,10 @@ def proof_problems(root):
                     )
                 )
             shipped_manifest = strict_json_loads(
-                (folder / "manifest.json").read_text(encoding="utf-8")
+                guarded_read_text((folder / "manifest.json"), encoding="utf-8")
             )
             rebuilt_manifest = strict_json_loads(
-                (out / "manifest.json").read_text(encoding="utf-8")
+                guarded_read_text((out / "manifest.json"), encoding="utf-8")
             )
             problems.extend(
                 manifest_problems(
@@ -1432,7 +1459,7 @@ def folder_snapshot(folder):
     for path in sorted(folder.rglob("*")):
         if path.is_file() and ".build-tmp" not in path.parts:
             snap[path.relative_to(folder).as_posix()] = hashlib.sha256(
-                path.read_bytes()
+                guarded_read_bytes(path)
             ).hexdigest()
     return snap
 
@@ -1509,7 +1536,7 @@ def traced_opens(trace_path):
     writes = set()
     if not trace_path.is_file():
         return reads, writes
-    for line in trace_path.read_text(
+    for line in guarded_read_text(trace_path,
         encoding="utf-8", errors="surrogateescape"
     ).splitlines():
         if line.startswith("W "):

@@ -193,6 +193,31 @@ def strict_json_loads(text):
     return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
 
 
+def guarded_read_text(path, *args, **kwargs):
+    """Read a text file only when it stands as a regular file.
+
+    A path that exists and is not a regular file raises the
+    same OSError shape an unreadable file raises, so every
+    caller keeps the problem wording it already carries and
+    no caller can block opening a FIFO that stands at the
+    path. A path that does not exist at all falls through to
+    the read itself, so an absent path and a dangling link
+    keep the behaviour they have always carried. The test
+    follows links, so a link to a regular file still reads
+    through and a link to a FIFO refuses.
+    """
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
+    return path.read_text(*args, **kwargs)
+
+
+def guarded_read_bytes(path):
+    """Read a file as bytes under the same guard as the text form."""
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
+    return path.read_bytes()
+
+
 def record_key(root, path):
     """Spell a record key with forward slashes on every host.
 
@@ -221,7 +246,7 @@ def artefact_paths(root):
 
 
 def file_digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(guarded_read_bytes(path)).hexdigest()
 
 
 def build_record(root):
@@ -247,7 +272,7 @@ def checksum_problems(root):
     if not target.is_file():
         return ["no checksum record stands at %s" % CHECKSUM_REL]
     try:
-        data = strict_json_loads(target.read_text(encoding="utf-8"))
+        data = strict_json_loads(guarded_read_text(target, encoding="utf-8"))
         recorded = data["files"]
     except DuplicateKeyError:
         return [
@@ -293,7 +318,7 @@ def results_problems(root):
     """Check the results totals against the per task entries."""
     path = root / "evals" / "RESULTS.md"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = guarded_read_text(path, encoding="utf-8")
     except OSError:
         return ["the results file cannot be read"]
     rows = table_rows(text)
@@ -348,7 +373,7 @@ def readme_eval_claim_problems(root):
     """
     path = root / "README.md"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = guarded_read_text(path, encoding="utf-8")
     except OSError:
         return ["the README cannot be read for the eval claim"]
     flat = re.sub(r"\s+", " ", text)
@@ -380,7 +405,7 @@ def task06_planted_rule(task_dir):
     against a guess.
     """
     try:
-        text = (task_dir / "planted.md").read_text(encoding="utf-8")
+        text = guarded_read_text((task_dir / "planted.md"), encoding="utf-8")
     except OSError:
         return None, None, None, ["the task-06 planted file cannot be read"]
     rename = re.search(r"renames (\w+)\.py to (\w+)\.py", text)
@@ -393,7 +418,7 @@ def task06_planted_rule(task_dir):
 def transcript_fences(task_dir):
     """Split the task-06 transcripts into the raw and packet fences."""
     try:
-        text = (task_dir / "transcripts.md").read_text(encoding="utf-8")
+        text = guarded_read_text((task_dir / "transcripts.md"), encoding="utf-8")
     except OSError:
         return None, ["the task-06 transcripts cannot be read"]
     fences = []
@@ -513,7 +538,7 @@ def recorded_task06_scores(root):
         ("PASS-NOTES.md", "## The round 6 passes over the replay task-06"),
     ):
         try:
-            text = (root / "evals" / name).read_text(encoding="utf-8")
+            text = guarded_read_text((root / "evals" / name), encoding="utf-8")
         except OSError:
             return None, ["the %s file cannot be read" % name]
         start = text.find(marker)
@@ -595,7 +620,7 @@ def _anchor_doubled_result(repo, new_module, func_name, sample=(1, 2, 3)):
     moved into a comment no longer passes.
     """
     try:
-        source = (repo / (new_module + ".py")).read_text(encoding="utf-8")
+        source = guarded_read_text((repo / (new_module + ".py")), encoding="utf-8")
     except OSError as exc:
         return "the D2 effect probe cannot read %s.py with %s" % (
             new_module,
@@ -656,8 +681,7 @@ def task06_anchor_problems(repo, rebuilt_diff, d1_file, old_module, new_module):
         ]
     try:
         first_line = (
-            (repo / d1_file)
-            .read_text(encoding="utf-8", errors="replace")
+            guarded_read_text((repo / d1_file), encoding="utf-8", errors="replace")
             .splitlines()[0]
         )
     except (OSError, IndexError):
@@ -707,7 +731,7 @@ def task06_problems(root):
         return problems
     try:
         sources = strict_json_loads(
-            (task_dir / "sources.json").read_text(encoding="utf-8")
+            guarded_read_text((task_dir / "sources.json"), encoding="utf-8")
         )
     except (OSError, ValueError, KeyError, TypeError) as exc:
         return ["the task-06 sources cannot be read with %s" % exc]
@@ -899,7 +923,7 @@ def task_anchor_problems(root, task_name):
     task_dir = root / "evals" / "tasks" / task_name
     try:
         sources = strict_json_loads(
-            (task_dir / "sources.json").read_text(encoding="utf-8")
+            guarded_read_text((task_dir / "sources.json"), encoding="utf-8")
         )
     except (OSError, ValueError, KeyError, TypeError) as exc:
         return ["the %s sources cannot be read with %s" % (task_name, exc)]
@@ -933,7 +957,7 @@ def suite_test_names(root):
         return names
     for path in sorted(tests.glob("*.py")):
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
+            tree = ast.parse(guarded_read_text(path, encoding="utf-8"))
         except (OSError, SyntaxError):
             continue
         for node in ast.walk(tree):
@@ -947,7 +971,7 @@ def corpus_problems(root):
     """Name every test the corpus cites that the suite lacks."""
     path = root / "evals" / "corpus.md"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = guarded_read_text(path, encoding="utf-8")
     except OSError:
         return ["the corpus index cannot be read"]
     missing = sorted(cited_test_names(text) - suite_test_names(root))
@@ -990,7 +1014,7 @@ def corpus_coverage_problems(root):
             "no corpus coverage record stands at %s" % CORPUS_COVERAGE_REL
         ]
     try:
-        data = strict_json_loads(target.read_text(encoding="utf-8"))
+        data = strict_json_loads(guarded_read_text(target, encoding="utf-8"))
         recorded = data["sections"]
     except DuplicateKeyError:
         return [
@@ -1008,7 +1032,7 @@ def corpus_coverage_problems(root):
             % CORPUS_COVERAGE_REL
         ]
     try:
-        text = (root / "evals" / "corpus.md").read_text(encoding="utf-8")
+        text = guarded_read_text((root / "evals" / "corpus.md"), encoding="utf-8")
     except OSError:
         return ["the corpus index cannot be read"]
     current = corpus_sections(text)
@@ -1058,7 +1082,7 @@ def corpus_scope_problems(root):
     complete index from one abandoned mid program.
     """
     try:
-        text = (root / "evals" / "corpus.md").read_text(encoding="utf-8")
+        text = guarded_read_text((root / "evals" / "corpus.md"), encoding="utf-8")
     except OSError:
         return ["the corpus index cannot be read"]
     head = text.split("## ", 1)[0]
@@ -1092,7 +1116,7 @@ def corpus_scope_problems(root):
 
 
 def write_corpus_coverage(root):
-    text = (root / "evals" / "corpus.md").read_text(encoding="utf-8")
+    text = guarded_read_text((root / "evals" / "corpus.md"), encoding="utf-8")
     sections = {
         title: sorted(names)
         for title, names in sorted(corpus_sections(text).items())
@@ -1121,7 +1145,7 @@ def source_anchor_problems(root):
             "no source anchor record stands at %s" % SOURCE_ANCHORS_REL
         ]
     try:
-        data = strict_json_loads(target.read_text(encoding="utf-8"))
+        data = strict_json_loads(guarded_read_text(target, encoding="utf-8"))
         anchored = data["sources"]
     except DuplicateKeyError:
         return [
@@ -1249,6 +1273,8 @@ def build_fixture_repo(tmp, sources):
 
 def load_packet_checker(root):
     path = root / "scripts" / "check_packet.py"
+    if path.exists() and not path.is_file():
+        raise OSError("%s is not a regular file" % path)
     spec = importlib.util.spec_from_file_location("gate_check_packet", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -1259,9 +1285,9 @@ def shipped_packet_problems(root, task_dir, checker):
     problems = []
     try:
         manifest = strict_json_loads(
-            (task_dir / "manifest.json").read_text(encoding="utf-8")
+            guarded_read_text((task_dir / "manifest.json"), encoding="utf-8")
         )
-        packet_text = (task_dir / "packet.md").read_text(
+        packet_text = guarded_read_text((task_dir / "packet.md"),
             encoding="utf-8", errors="surrogateescape"
         )
     except DuplicateKeyError:
@@ -1296,11 +1322,11 @@ def shipped_packet_problems(root, task_dir, checker):
 
 def rebuild_problems(root, task_dir, tmp):
     sources = strict_json_loads(
-        (task_dir / "sources.json").read_text(encoding="utf-8")
+        guarded_read_text((task_dir / "sources.json"), encoding="utf-8")
     )
     repo, base, head, rebuilt_diff = build_fixture_repo(tmp, sources)
     problems = []
-    saved_diff = (task_dir / "diff.patch").read_bytes()
+    saved_diff = guarded_read_bytes((task_dir / "diff.patch"))
     if rebuilt_diff != saved_diff:
         problems.append(
             "the diff of %s does not rebuild byte for byte from "
@@ -1323,10 +1349,10 @@ def rebuild_problems(root, task_dir, tmp):
         )
         return problems
     rebuilt = strict_json_loads(
-        (out / "manifest.json").read_text(encoding="utf-8")
+        guarded_read_text((out / "manifest.json"), encoding="utf-8")
     )
     saved = strict_json_loads(
-        (task_dir / "manifest.json").read_text(encoding="utf-8")
+        guarded_read_text((task_dir / "manifest.json"), encoding="utf-8")
     )
     if rebuilt.get("verified") is not True:
         problems.append(
