@@ -1929,6 +1929,16 @@ This unreleased work carries version 1.3.0.
   change is empty or the run inputs cannot be read
   or resolved, and reports its failure only in its
   exit code and its message.
+- The readme and the extractor opening now state the
+  regeneration preservation the code already carries.
+  A failed run leaves a standing verified packet and
+  its manifest untouched on every failure path and
+  reports its failure in its exit code and its message,
+  and a failure receipt is left only where no standing
+  verified packet stands. The earlier readme sentence
+  that a failed run removes an earlier packet first and
+  the unqualified receipt sentence in the extractor
+  opening are gone.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

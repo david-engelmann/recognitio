@@ -32,8 +32,10 @@ its final names inside that directory and moved into place with
 renames under an exclusive lock, and a second run naming the same
 directory is refused while the first is working. A run that fails
 after its inputs were read leaves a failure receipt in place of the
-old packet, and a run that is refused or interrupted leaves whatever
-already stood in the directory untouched.
+old packet only where no standing verified packet stands and
+leaves a standing verified packet untouched, and a run that is
+refused or interrupted leaves whatever already stood in the
+directory untouched.
 """
 
 import argparse
