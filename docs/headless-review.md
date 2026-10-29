@@ -54,6 +54,7 @@ head it summarises.
 ```json
 {
   "type": "object",
+  "additionalProperties": false,
   "required": ["verdict", "findings"],
   "properties": {
     "verdict": {"enum": ["pass", "fail"]},
@@ -63,6 +64,7 @@ head it summarises.
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": ["severity", "location", "evidence"],
         "properties": {
           "id": {"type": "string"},

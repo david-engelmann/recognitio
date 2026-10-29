@@ -32,6 +32,31 @@ def load_headless():
 
 headless = load_headless()
 
+ANNOTATION_KEYS = {"$id", "$schema", "description", "title"}
+
+
+def schema_shape(value):
+    """Return a schema with its annotation fields removed.
+
+    The shipped schema carries descriptions and a title and
+    names a type beside each enum, and the printed schema
+    carries none of those, so a full shape comparison sets
+    them aside and compares every remaining field.
+    """
+    if isinstance(value, dict):
+        shaped = {}
+        for key, item in value.items():
+            if key in ANNOTATION_KEYS:
+                continue
+            if key == "type" and "enum" in value:
+                continue
+            shaped[key] = schema_shape(item)
+        return shaped
+    if isinstance(value, list):
+        return [schema_shape(item) for item in value]
+    return value
+
+
 MANIFEST_FILES = ["src/app.py", "src/lib.py"]
 PROOF_DIR = ROOT / "workflows" / "proof-run"
 
@@ -319,6 +344,32 @@ class TestHeadlessCheck(unittest.TestCase):
             schema["properties"]["findings"]["items"]["required"],
             ["severity", "location", "evidence"],
         )
+        shipped = json.loads(
+            (ROOT / "workflows" / "headless-findings.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        # The printed block and the shipped schema file must
+        # agree on the additional properties refusal at both
+        # levels and in full shape once the annotation fields
+        # and the type word beside an enum are set aside, so
+        # a drift in any limb fails here and not on a run a
+        # reader built to the printed contract.
+        self.assertIs(schema.get("additionalProperties"), False)
+        self.assertIs(shipped.get("additionalProperties"), False)
+        self.assertIs(
+            schema["properties"]["findings"]["items"].get(
+                "additionalProperties"
+            ),
+            False,
+        )
+        self.assertIs(
+            shipped["properties"]["findings"]["items"].get(
+                "additionalProperties"
+            ),
+            False,
+        )
+        self.assertEqual(schema_shape(schema), schema_shape(shipped))
 
     def test_the_cli_fails_a_denied_run_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

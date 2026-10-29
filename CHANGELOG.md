@@ -2086,6 +2086,16 @@ This unreleased work carries version 1.3.0.
   output directory stand behind the same regular file
   test, so a FIFO standing at either of those paths
   can no longer block a run or its failure receipt.
+- The headless review page now prints the findings
+  schema in the shipped shape. Its printed block carries
+  the additional properties refusal at the top level and
+  inside the finding object, matching the schema file
+  the invocation hands the host, and the headless test
+  now compares the printed block against the shipped
+  schema in full shape, so a run built to the printed
+  contract is no longer refused for an extra field the
+  page never named and a future drift between the page
+  and the file fails the suite.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
