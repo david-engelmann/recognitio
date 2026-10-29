@@ -1997,6 +1997,11 @@ This unreleased work carries version 1.3.0.
   packet whose diff body copy or rename header wording
   disagrees with the status its manifest records for that
   section.
+- The packet check now resolves its packet directory
+  argument the way the extractor resolves its output
+  argument so a spelling carrying a segment that does
+  not exist followed by a parent segment reaches the
+  same sealed pair at both doors.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -491,6 +491,40 @@ class TestDirectorySealingAndEncoding(VerifierFixture):
         link.symlink_to(real, target_is_directory=True)
         self.assertEqual(self.run_check(link), 0)
 
+    def test_a_packet_dir_spelling_with_a_missing_segment_then_a_parent_segment_stamps(self):
+        out = self.clone("spelldir")
+        spelling = str(out) + "/missing/.."
+        self.assertEqual(self.run_check(spelling), 0)
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_the_spellings_that_already_work_still_stamp(self):
+        out = self.clone("spellcontrols")
+        self.assertEqual(self.run_check(str(out) + "/"), 0)
+        self.assertEqual(self.run_check(str(out) + "/./"), 0)
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_the_extractor_and_the_checker_agree_on_the_split_spelling(self):
+        plain = Path(self.tmp.name) / "spellpair"
+        spelling = str(plain) + "/missing/.."
+        extract_packet(
+            self.repo, spelling, "--range", "HEAD~1..HEAD"
+        )
+        self.assertTrue((plain / "packet.md").is_file())
+        self.assertTrue((plain / "manifest.json").is_file())
+        self.assertEqual(self.run_check(spelling), 0)
+        self.assertEqual(self.run_check(plain), 0)
+
+    def test_the_extractor_and_the_checker_agree_on_a_dot_segment_after_a_missing_segment(self):
+        spelling = str(Path(self.tmp.name)) + "/missing/./dotpair"
+        resolved = Path(self.tmp.name) / "missing" / "dotpair"
+        extract_packet(
+            self.repo, spelling, "--range", "HEAD~1..HEAD"
+        )
+        self.assertTrue((resolved / "packet.md").is_file())
+        self.assertTrue((resolved / "manifest.json").is_file())
+        self.assertEqual(self.run_check(spelling), 0)
+        self.assertEqual(self.run_check(resolved), 0)
+
     def test_a_non_utf8_filename_packet_fails(self):
         repo = Path(self.tmp.name) / "nonutf8repo"
         init_repo(repo)

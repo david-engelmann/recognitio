@@ -3374,7 +3374,15 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    packet_dir = Path(args.packet_dir)
+    # The packet directory is resolved the way the extractor
+    # resolves its output directory, a single time before any
+    # reading, so a spelling the extractor publishes under and
+    # the same spelling handed here name the one directory the
+    # pair lives in. A spelling carrying a segment that does
+    # not exist followed by a parent segment resolves to the
+    # plain path at both doors, while an unresolved spelling
+    # cannot be traversed to the pair at all.
+    packet_dir = Path(args.packet_dir).resolve()
     problems = []
     problems.extend(packet_dir_problems(packet_dir))
 
