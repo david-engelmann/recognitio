@@ -370,6 +370,12 @@ def schema_problems_at(value, schema, root_schema, where):
 
 def manifest_schema_problems(manifest):
     """Validate a manifest against the schema shipped in the tree."""
+    if SCHEMA_PATH.exists() and not SCHEMA_PATH.is_file():
+        return [
+            "the packet manifest schema cannot be read, so no "
+            "manifest can be validated against it (it is not a "
+            "regular file)"
+        ]
     try:
         schema = strict_json_loads(
             SCHEMA_PATH.read_text(encoding="utf-8")
@@ -565,6 +571,16 @@ def repo_state_problems(repo):
         if not common_path.is_absolute():
             common_path = Path(repo) / common_path
         info_attributes = common_path / "info" / "attributes"
+        if info_attributes.exists() and not info_attributes.is_file():
+            problems.append(
+                "the repository attributes in %s cannot be read, "
+                "it is not a regular file, so the recount cannot "
+                "credit its markings to the tree under review and "
+                "the packet cannot be stamped from this clone. "
+                "Remove that path, then run the check again"
+                % info_attributes
+            )
+            return problems, True
         try:
             info_text = info_attributes.read_text(
                 encoding="utf-8", errors="surrogateescape"

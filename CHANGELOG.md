@@ -2159,6 +2159,20 @@ This unreleased work carries version 1.3.0.
   path and the skills path alone derived from the
   package root constant, and the gate root constant
   itself was not removed and stands in the gate today.
+- The packet checker now refuses a clone attributes
+  path that is not a regular file instead of hanging
+  when a FIFO stands there. The repository state
+  reading tests existence first and the regular file
+  shape second and only then reads, and a path that
+  stands but is not a regular file draws a named
+  cannot be read problem at exit 1 with the deep
+  checks skipped, while an absent path and a dangling
+  link keep the absent reading they have always
+  carried and a regular file keeps its standing
+  verdicts. The manifest schema reading in the same
+  script stands behind the same guard, and the other
+  readings in the script already stood behind regular
+  file tests of their own.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

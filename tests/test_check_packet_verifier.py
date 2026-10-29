@@ -2221,5 +2221,91 @@ class TestRound27Notes(Round27Fixture):
         self.assertIn("merge base", text)
         self.assertIn("the review named no expected range", text)
 
+
+@unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+class TestCheckerInfoAttributesFifo(VerifierFixture):
+    """Round 233. The checker clone attributes reading is guarded.
+
+    The shipped FIFO test at this path exercised the extractor
+    subprocess alone, so the checker reading stood untested while
+    it read the same path with a plain read and no regular file
+    test. A FIFO there blocked the checker without bound and
+    without output. Every run below is a bounded subprocess, so a
+    checker that still reads the pipe fails at the bound instead
+    of hanging this suite.
+    """
+
+    def info_attributes(self):
+        return self.repo / ".git" / "info" / "attributes"
+
+    def clear_attributes(self):
+        info = self.info_attributes()
+        if info.is_symlink() or info.exists():
+            info.unlink()
+        return info
+
+    def run_check_bounded(self, out):
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable, str(CHECK_PATH),
+                    str(out), "--repo", str(self.repo),
+                ],
+                capture_output=True, text=True, timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the checker did not finish inside ten seconds, "
+                "so it blocked on the info attributes path"
+            )
+        return result.returncode, result.stderr
+
+    def test_a_fifo_at_the_attributes_path_refuses_promptly(self):
+        info = self.clear_attributes()
+        os.mkfifo(info)
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "cannot be read, it is not a regular file", output
+        )
+        self.assertIn("attributes", output)
+
+    def test_a_symlink_to_a_fifo_at_the_attributes_path_refuses(self):
+        target = Path(self.tmp.name) / "attributes-pipe"
+        os.mkfifo(target)
+        info = self.clear_attributes()
+        info.symlink_to(target)
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "cannot be read, it is not a regular file", output
+        )
+
+    def test_a_regular_effective_attributes_file_still_refuses(self):
+        info = self.clear_attributes()
+        info.write_text("b.py binary\n", encoding="utf-8")
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 1)
+        self.assertIn("carries attributes in", output)
+        self.assertIn("were skipped because", output)
+
+    def test_a_comment_only_attributes_file_still_stamps(self):
+        info = self.clear_attributes()
+        info.write_text("# a local note\n\n", encoding="utf-8")
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 0, output)
+
+    def test_absent_attributes_still_stamps(self):
+        self.clear_attributes()
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 0, output)
+
+    def test_a_dangling_attributes_symlink_still_stamps(self):
+        info = self.clear_attributes()
+        info.symlink_to(Path(self.tmp.name) / "no-such-target")
+        code, output = self.run_check_bounded(self.genuine)
+        self.assertEqual(code, 0, output)
+
+
 if __name__ == "__main__":
     unittest.main()
