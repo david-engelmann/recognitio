@@ -2149,6 +2149,16 @@ This unreleased work carries version 1.3.0.
   sibling loaders in the headless gate and the merge
   bridge and at the packet checker recount the fan-out
   gate runs as a subprocess.
+- A correction to the package gate bullet in the
+  Removed section below, which states that the five
+  dead path constants hung from the package root
+  constant. Three of those five derived from the gate
+  root constant and not from the package root constant,
+  being the canonical skill path and the native
+  manifest path and the brief path, while the manifest
+  path and the skills path alone derived from the
+  package root constant, and the gate root constant
+  itself was not removed and stands in the gate today.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
