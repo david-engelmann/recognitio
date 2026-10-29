@@ -654,7 +654,7 @@ This unreleased work carries version 1.3.0.
 - A principles page at docs/principles.md states what a
   review packet owes its reader as claims, each one beside
   the failure in this project record that produced it, and
-  the README links it from the Why section.
+  the README links it from the Going deeper section.
 
 - The demo assets rebuilt in visual round 3. The hero
   recording is rebuilt from the same recorded session
@@ -2052,6 +2052,12 @@ This unreleased work carries version 1.3.0.
   restated against the current tree, and the count
   stands under the cap the checklist holds for a
   reviewer at 291 files of headroom.
+- The principles page bullet in the Added section above
+  now names the Going deeper section as the section the
+  README links the page from. The storefront rebuild
+  moved the link into that section and its own bullet
+  records the move, and the principles bullet still
+  named the Why section the link first stood in.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
