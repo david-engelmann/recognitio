@@ -2121,6 +2121,20 @@ This unreleased work carries version 1.3.0.
   the current tree, and the count stands under the
   cap the checklist holds for a reviewer at 290
   files of headroom.
+- The CodeRabbit gate now reads the shipped config
+  at the repo root and pins the settings the review
+  brief states for that file. The reading covers the
+  chill profile and the request changes workflow and
+  automatic review beside the pre merge checks at
+  warning with docstrings off and the knowledge base
+  code guidelines enabled with their file patterns
+  on AGENTS.md and README.md and the advisory step 0
+  comment and the stated absence of a Claude rules
+  folder. A deleted config and a config that is not
+  a regular file now fail the gate by name instead
+  of passing in silence, and regression tests cover
+  each planted change from the audit that found the
+  gap.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

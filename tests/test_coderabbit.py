@@ -15,17 +15,37 @@ dropped provenance pin, a dropped .claude/rules/ pin, a dropped
 pairing guard, a claimed calendar, a guideline without a
 derivation note, a passing prose title mention, and a decision
 record without a decision 4 statement each fail the CodeRabbit
-gate.
+gate. The shipped config at the repo root stands under the
+same gate, and a planted change to a setting the brief states
+for that file, a deleted config, and a FIFO at the config
+path each fail it as well.
 """
 
 import importlib.util
+import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+CONFIG_DRIVER = r"""
+import importlib.util
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location(
+    "config_door", Path(sys.argv[1])
+)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+for problem in mod.coderabbit_problems(Path(sys.argv[2])):
+    print(problem)
+"""
 
 
 def load_script(name):
@@ -48,6 +68,7 @@ class TestCheckCoderabbit(unittest.TestCase):
         for rel in (
             "docs/coderabbit-review-brief.md",
             "docs/decisions.md",
+            ".coderabbit.yaml",
         ):
             source = ROOT / rel
             target = root / rel
@@ -84,6 +105,52 @@ class TestCheckCoderabbit(unittest.TestCase):
         self.assertTrue(hits > 0)
         self.write_brief(root, broken)
         return self.problems(root)
+
+    def read_config(self, root):
+        return (root / ".coderabbit.yaml").read_text(
+            encoding="utf-8"
+        )
+
+    def write_config(self, root, text):
+        (root / ".coderabbit.yaml").write_text(
+            text, encoding="utf-8"
+        )
+
+    def break_config(self, root, old, new):
+        # The config is read as shipped text, so the old
+        # string names the exact lines the plant moves and
+        # the rest of the file stands untouched. A plant
+        # that names a string the file does not carry is
+        # not a test.
+        text = self.read_config(root)
+        broken = text.replace(old, new, 1)
+        self.assertNotEqual(broken, text)
+        self.write_config(root, broken)
+        return self.problems(root)
+
+    def run_config_door(self, root):
+        # The FIFO doors run in a subprocess bounded at ten
+        # seconds, so a door that reads its FIFO fails this
+        # test at the bound instead of hanging the suite.
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    CONFIG_DRIVER,
+                    str(ROOT / "scripts" / "check_coderabbit.py"),
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the config door did not finish within ten "
+                "seconds"
+            )
+        return result.stdout + result.stderr
 
     def test_the_shipped_tree_holds(self):
         self.assertEqual(self.mod.coderabbit_problems(ROOT), [])
@@ -426,6 +493,324 @@ class TestCheckCoderabbit(unittest.TestCase):
                 any("decision 4" in p for p in problems), problems
             )
 
+
+    def test_the_unmutated_config_holds(self):
+        # Round 230 control. The shipped config in a scratch
+        # layout passes the config reading whole.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_config_profile_plant_fails(self):
+        # Round 230. The profile moved from chill to
+        # assertive returned zero problems at the base.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                'profile: "chill"',
+                'profile: "assertive"',
+            )
+            self.assertTrue(
+                any(
+                    "reviews profile to chill" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_title_check_plant_fails(self):
+        # Round 230. The pre merge title check moved from
+        # warning to error returned zero problems.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                'title:\n      mode: "warning"',
+                'title:\n      mode: "error"',
+            )
+            self.assertTrue(
+                any(
+                    "pre merge title check to warning" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_description_check_plant_fails(self):
+        # Round 230. The pre merge description check moved
+        # from warning to error returned zero problems.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                'description:\n      mode: "warning"',
+                'description:\n      mode: "error"',
+            )
+            self.assertTrue(
+                any(
+                    "pre merge description check to warning"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_guideline_patterns_plant_fails(self):
+        # Round 230. The guideline file patterns replaced
+        # whole returned zero problems.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                '      - "**/AGENTS.md"\n'
+                '      - "README.md"',
+                '      - "**/CHANGELOG.md"',
+            )
+            self.assertTrue(
+                any("file patterns on" in p for p in problems),
+                problems,
+            )
+
+    def test_a_config_request_changes_plant_fails(self):
+        # Round 230. The request changes workflow switched
+        # on returned zero problems.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "request_changes_workflow: false",
+                "request_changes_workflow: true",
+            )
+            self.assertTrue(
+                any(
+                    "request changes workflow to false" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_auto_review_plant_fails(self):
+        # Round 230. Automatic review switched off returned
+        # zero problems.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "  auto_review:\n    enabled: true",
+                "  auto_review:\n    enabled: false",
+            )
+            self.assertTrue(
+                any(
+                    "automatic review to enabled" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_issue_assessment_plant_fails(self):
+        # The brief sets the pre merge checks to warning
+        # mode, and the issue assessment check is one of
+        # them beside the title and description checks.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                'issue_assessment:\n      mode: "warning"',
+                'issue_assessment:\n      mode: "error"',
+            )
+            self.assertTrue(
+                any(
+                    "pre merge issue assessment check to "
+                    "warning" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_docstrings_plant_fails(self):
+        # The shipped shape the round 230 reading recorded
+        # holds docstrings off beside the warning checks.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                'docstrings:\n      mode: "off"',
+                'docstrings:\n      mode: "warning"',
+            )
+            self.assertTrue(
+                any(
+                    "pre merge docstrings check to off" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_guidelines_disabled_plant_fails(self):
+        # The brief pairs the config through the knowledge
+        # base code guidelines, so the enabled flag is part
+        # of the pairing claim and not only its patterns.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "code_guidelines:\n    enabled: true",
+                "code_guidelines:\n    enabled: false",
+            )
+            self.assertTrue(
+                any(
+                    "does not enable the knowledge base "
+                    "code guidelines" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_advisory_comment_plant_fails(self):
+        # The brief states the file own comment records
+        # CodeRabbit as advisory step 0 in this repo.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "CodeRabbit is advisory step 0 in this repo.",
+                "CodeRabbit is a review tool in this repo.",
+            )
+            self.assertTrue(
+                any("advisory step 0" in p for p in problems),
+                problems,
+            )
+
+    def test_a_deleted_config_fails(self):
+        # Round 230. Deleting the config whole returned
+        # zero problems at the base.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".coderabbit.yaml").unlink()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    ".coderabbit.yaml is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_directory_at_the_config_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".coderabbit.yaml").unlink()
+            (root / ".coderabbit.yaml").mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "is not a regular file" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    @unittest.skipUnless(
+        hasattr(os, "mkfifo"), "no mkfifo on this host"
+    )
+    def test_a_fifo_at_the_config_path_refuses_promptly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".coderabbit.yaml").unlink()
+            os.mkfifo(root / ".coderabbit.yaml")
+            output = self.run_config_door(root)
+            self.assertIn("not a regular file", output, output)
+
+    @unittest.skipUnless(
+        hasattr(os, "mkfifo"), "no mkfifo on this host"
+    )
+    def test_a_link_to_a_fifo_at_the_config_path_refuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".coderabbit.yaml").unlink()
+            os.mkfifo(root / "config-target")
+            (root / ".coderabbit.yaml").symlink_to(
+                root / "config-target"
+            )
+            output = self.run_config_door(root)
+            self.assertIn("not a regular file", output, output)
+
+    def test_a_planted_claude_rules_directory_fails(self):
+        # The brief states the repo ships no .claude/rules
+        # directory today, in the same passage that states
+        # the guideline file patterns.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".claude" / "rules").mkdir(parents=True)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    ".claude/rules stands in the tree" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_reordered_config_holds(self):
+        # Control. The pinned settings in a different key
+        # order, with the file patterns in the other order,
+        # hold in substance and must pass.
+        text = (
+            "# CodeRabbit is advisory step 0 in this repo.\n"
+            "knowledge_base:\n"
+            "  code_guidelines:\n"
+            "    filePatterns:\n"
+            '      - "README.md"\n'
+            '      - "**/AGENTS.md"\n'
+            "    enabled: true\n"
+            "reviews:\n"
+            "  pre_merge_checks:\n"
+            "    issue_assessment:\n"
+            '      mode: "warning"\n'
+            "    description:\n"
+            '      mode: "warning"\n'
+            "    title:\n"
+            '      mode: "warning"\n'
+            "    docstrings:\n"
+            '      mode: "off"\n'
+            "  auto_review:\n"
+            "    enabled: true\n"
+            "  request_changes_workflow: false\n"
+            '  profile: "chill"\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_config(root, text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_config_with_unknown_keys_holds(self):
+        # Control. Keys the brief makes no claim about are
+        # not policed, at the top level or inside a section.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_config(root)
+            text = text.replace(
+                '  profile: "chill"',
+                '  profile: "chill"\n'
+                "  extra_review_key: true",
+                1,
+            )
+            text += "\nextra_top_level:\n  extra_key: true\n"
+            self.write_config(root, text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_config_with_crlf_endings_holds(self):
+        # Control. The shipped settings with CRLF line
+        # endings hold in substance and must pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_config(root).replace(
+                "\n", "\r\n"
+            )
+            (root / ".coderabbit.yaml").write_bytes(
+                data.encode("utf-8")
+            )
+            self.assertEqual(self.problems(root), [])
 
     def test_linked_source_plants_fail(self):
         # R36-RT-04. Linked source promised on an excluded

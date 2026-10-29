@@ -17,7 +17,10 @@ and the fourth .claude/rules/ guideline source, and every
 guideline to carry a checkable derivation note, so the scoped
 guidance cannot become a rival instruction source. A later edit
 that drops any of them fails the gate instead of drifting in
-silence.
+silence. The gate also reads the shipped config at the repo
+root and pins the settings the brief states for that file, so
+the config CodeRabbit consumes cannot drift or vanish while
+the brief keeps reading as proven.
 """
 
 import re
@@ -680,6 +683,172 @@ def decision_problems(root=None):
     return []
 
 
+# The shipped config settings the brief states in its own
+# words. The pre merge passage sets the title and description
+# and issue assessment checks to warning with docstrings off,
+# and the guideline provenance passage pairs the knowledge
+# base code guidelines enabled with file patterns on
+# AGENTS.md and README.md. The remaining values are the six settings the
+# round 230 hunt planted one at a time, being the chill
+# profile, the request changes workflow off, and automatic
+# review on beside the two pre merge modes and the guideline
+# patterns above. Each entry names its problem in the gate
+# voice, and a setting that is missing counts as not set.
+CONFIG_PINNED = (
+    (("reviews", "profile"), "chill",
+     ".coderabbit.yaml does not set the reviews profile "
+     "to chill"),
+    (("reviews", "request_changes_workflow"), "false",
+     ".coderabbit.yaml does not set the request changes "
+     "workflow to false"),
+    (("reviews", "auto_review", "enabled"), "true",
+     ".coderabbit.yaml does not set automatic review "
+     "to enabled"),
+    (("reviews", "pre_merge_checks", "docstrings", "mode"),
+     "off",
+     ".coderabbit.yaml does not set the pre merge "
+     "docstrings check to off"),
+    (("reviews", "pre_merge_checks", "title", "mode"),
+     "warning",
+     ".coderabbit.yaml does not set the pre merge title "
+     "check to warning"),
+    (("reviews", "pre_merge_checks", "description", "mode"),
+     "warning",
+     ".coderabbit.yaml does not set the pre merge "
+     "description check to warning"),
+    (("reviews", "pre_merge_checks", "issue_assessment",
+      "mode"), "warning",
+     ".coderabbit.yaml does not set the pre merge issue "
+     "assessment check to warning"),
+    (("knowledge_base", "code_guidelines", "enabled"), "true",
+     ".coderabbit.yaml does not enable the knowledge base "
+     "code guidelines"),
+)
+
+CONFIG_PATTERNS = ("**/AGENTS.md", "README.md")
+
+CONFIG_PATTERNS_PATH = (
+    "knowledge_base", "code_guidelines", "filePatterns"
+)
+
+
+def _config_scalar(raw_value):
+    """The plain or quoted scalar spelling of a config value."""
+    value = raw_value.strip()
+    if value[:1] in ("\"", "'"):
+        end = value.find(value[0], 1)
+        if end > 0:
+            return value[1:end]
+        return value
+    if " #" in value:
+        value = value.split(" #", 1)[0]
+    return value.strip()
+
+
+def config_settings(raw):
+    """The pinned settings in the shipped config text.
+
+    A narrow line reader for the shipped file alone. Mapping
+    keys are tracked by their indent path, so a setting counts
+    in any key order and unknown keys pass by, and the file
+    patterns list under the code guidelines key is collected
+    in full. Block scalar bodies are skipped by indent, so
+    the path instruction prose is never read as keys. A
+    repeated pinned setting is reported by the caller, and a
+    shape this reader cannot see leaves its setting unset,
+    which the caller names as a problem.
+    """
+    values = {}
+    patterns = []
+    repeats = []
+    stack = []
+    block_indent = None
+    for raw_line in raw.splitlines():
+        line = raw_line.rstrip()
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if block_indent is not None:
+            if indent > block_indent:
+                continue
+            block_indent = None
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        if stripped.startswith("- "):
+            owner = tuple(key for _depth, key in stack)
+            if owner == CONFIG_PATTERNS_PATH:
+                patterns.append(
+                    _config_scalar(stripped[2:])
+                )
+            continue
+        match = re.match(
+            r"^([A-Za-z0-9_]+):(?:\s+(.*))?$", stripped
+        )
+        if match is None:
+            continue
+        key = match.group(1)
+        value = match.group(2)
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if value is None:
+            stack.append((indent, key))
+            continue
+        if value.strip() in ("|", "|-", "|+", ">", ">-", ">+"):
+            block_indent = indent
+            continue
+        path = tuple(item for _depth, item in stack) + (key,)
+        if path not in values:
+            values[path] = _config_scalar(value)
+        elif any(path == pinned for pinned, _want, _text
+                 in CONFIG_PINNED):
+            repeats.append(path)
+    return values, patterns, repeats
+
+
+def config_problems(root=None):
+    """Problems with the shipped CodeRabbit config.
+
+    The reading goes through the guarded read helper above,
+    so a FIFO or a link to a FIFO or a directory at the
+    config path refuses promptly with a named problem and
+    never hangs, and an absent config is a named problem
+    rather than a silent pass.
+    """
+    root = ROOT if root is None else root
+    path = root / ".coderabbit.yaml"
+    if path.is_symlink() or path.exists():
+        if not path.is_file():
+            return [".coderabbit.yaml is not a regular file"]
+    raw = read_text(path)
+    if raw is None:
+        return [".coderabbit.yaml is missing"]
+    values, patterns, repeats = config_settings(raw)
+    problems = []
+    for pinned, want, problem in CONFIG_PINNED:
+        if values.get(pinned) != want or pinned in repeats:
+            problems.append(problem)
+    if sorted(patterns) != sorted(CONFIG_PATTERNS):
+        problems.append(
+            ".coderabbit.yaml does not pair the knowledge "
+            "base code guidelines with file patterns on "
+            "**/AGENTS.md and README.md"
+        )
+    if "advisory step 0" not in raw:
+        problems.append(
+            ".coderabbit.yaml does not record CodeRabbit as "
+            "advisory step 0"
+        )
+    rules = root / ".claude" / "rules"
+    if rules.is_symlink() or rules.exists():
+        problems.append(
+            ".claude/rules stands in the tree, while the "
+            "coderabbit brief states the repo ships no "
+            ".claude/rules directory"
+        )
+    return problems
+
+
 def coderabbit_problems(root=None):
     """Every Build 11 CodeRabbit guidelines problem."""
     problems = []
@@ -687,6 +856,7 @@ def coderabbit_problems(root=None):
     problems.extend(guidelines_problems(root))
     problems.extend(linked_problems(root))
     problems.extend(decision_problems(root))
+    problems.extend(config_problems(root))
     return problems
 
 
