@@ -94,7 +94,7 @@ Never present a partial packet as a complete one. Never let a review begin on a 
 
 A path that carries a newline or another control character is escaped wherever the packet names the file, so a crafted name cannot print a forged section in the packet voice.
 
-A failed run leaves a standing verified packet untouched, and a successful run refuses to publish over an entry its packet does not receipt. Argument, output and interruption refusals touch nothing, and a second run into the same directory is refused while the first works.
+A failed run leaves a standing verified packet untouched, and a run refuses to publish over an entry its packet does not receipt, before the renames and at the recheck after. Other refusals touch nothing, and a second run at that directory is refused while the first works.
 
 ## Re-review
 

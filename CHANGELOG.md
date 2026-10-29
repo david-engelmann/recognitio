@@ -2058,6 +2058,22 @@ This unreleased work carries version 1.3.0.
   moved the link into that section and its own bullet
   records the move, and the principles bullet still
   named the Why section the link first stood in.
+- A staging named entry recreated during a publish
+  no longer rides into a verified publish its own
+  packet check then refuses. The publish now lists
+  the output directory again after its renames and
+  again after it removes the entries it read, and
+  any entry standing beyond the sealed pair at
+  either reading takes the same refusal as every
+  other entry no manifest receipts, naming the
+  entry and putting the pair that stood there
+  before the publish back byte for byte before it
+  refuses. A staging name earns no exemption at
+  that reading, because the stale staging discard
+  already ran, so a regular file or a link
+  recreated under a staging name during the
+  publish refuses in the same way as a directory
+  or a FIFO.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -1154,6 +1154,248 @@ class TestRegenerationConservation(unittest.TestCase):
             self.assert_pair_intact(out, before)
             self.assertTrue(stat.S_ISFIFO(os.lstat(plant).st_mode))
 
+    staging_watcher_source = (
+        "import os, sys, time\n"
+        "from pathlib import Path\n"
+        "target = Path(sys.argv[1])\n"
+        "mode = sys.argv[2]\n"
+        "ready = Path(sys.argv[3])\n"
+        "fired = Path(sys.argv[4])\n"
+        "sentinel = Path(sys.argv[5])\n"
+        "ready.write_text('ready\\n')\n"
+        "start = time.time()\n"
+        "while time.time() - start < 25:\n"
+        "    try:\n"
+        "        os.lstat(target)\n"
+        "    except FileNotFoundError:\n"
+        "        if mode == 'dir':\n"
+        "            target.mkdir()\n"
+        "            (target / 'inner.txt').write_text('race inner\\n')\n"
+        "        elif mode == 'regular':\n"
+        "            target.write_text('race recreated\\n')\n"
+        "        elif mode == 'fifo':\n"
+        "            os.mkfifo(target)\n"
+        "        elif mode == 'symlink':\n"
+        "            target.symlink_to(sentinel)\n"
+        "        fired.write_text('fired\\n')\n"
+        "        sys.exit(0)\n"
+        "    except OSError:\n"
+        "        pass\n"
+        "fired.write_text('never\\n')\n"
+    )
+
+    def run_raced_publish(self, tmp, repo, out, mode):
+        """Run one publish while a watcher recreates the plant.
+
+        The plant is a staging named regular file the publish
+        judges discardable and unlinks, and the watcher polls
+        for that unlink and recreates the same name in the
+        named shape inside the same publish, which is the
+        window round 207 executed.
+        """
+        plant = out / ".recognitio-tmp-raceentry"
+        plant.write_text("stale staging plant\n")
+        sentinel = Path(tmp) / "race-sentinel.txt"
+        sentinel.write_text("outside\n")
+        watcher = Path(tmp) / "staging_watcher.py"
+        watcher.write_text(self.staging_watcher_source)
+        ready = Path(tmp) / "watcher-ready"
+        fired = Path(tmp) / "watcher-fired"
+        proc = subprocess.Popen([
+            sys.executable, str(watcher), str(plant), mode,
+            str(ready), str(fired), str(sentinel),
+        ])
+        try:
+            deadline = time.time() + 10
+            while not ready.exists() and time.time() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(ready.exists())
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+        finally:
+            proc.wait(timeout=30)
+        self.assertEqual(fired.read_text(), "fired\n")
+        return result, plant, sentinel
+
+    def assert_checker_refuses(self, repo, out, plant):
+        check = subprocess.run(
+            [sys.executable,
+             str(ROOT / "scripts" / "check_packet.py"),
+             str(out), "--repo", str(repo)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 1, check.stderr)
+        self.assertIn(
+            plant.name, check.stdout + check.stderr
+        )
+
+    def test_staging_entry_recreated_as_directory_during_publish_refuses(self):
+        # The watcher recreation lands inside the publish only
+        # when its polling reaction beats the staging writes,
+        # which are milliseconds on a fast filesystem, so the
+        # run repeats on fresh pairs until one landing is
+        # observed and judged. A run the recreation missed
+        # publishes clean and proves nothing either way, and
+        # eight misses in a row fail the test rather than
+        # passing it in silence. The deterministic form of the
+        # same window stands in the staging step test below.
+        for _attempt in range(8):
+            with RetryingTemporaryDirectory() as tmp:
+                repo, out = self.build_verified_pair(tmp)
+                before = self.pair_bytes(out)
+                result, plant, _sentinel = self.run_raced_publish(
+                    tmp, repo, out, "dir"
+                )
+                if result.returncode == 0:
+                    continue
+                self.assertEqual(
+                    result.returncode, 2, result.stderr
+                )
+                self.assertIn(plant.name, result.stderr)
+                self.assertIn(
+                    "no manifest receipts", result.stderr
+                )
+                self.assert_pair_intact(out, before)
+                self.assertTrue(plant.is_dir())
+                self.assertEqual(
+                    (plant / "inner.txt").read_text(),
+                    "race inner\n",
+                )
+                # The extractor refusal and the packet check
+                # agree about the directory the raced publish
+                # left, and once the foreign entry is moved
+                # aside the pair the rollback restored stamps
+                # clean, so the state the refusal left is the
+                # standing verified pair beside the named
+                # entry and nothing else.
+                self.assert_checker_refuses(repo, out, plant)
+                shutil.rmtree(plant)
+                self.assert_checker_stamps(repo, out)
+                return
+        self.fail(
+            "the watcher recreation never landed inside the "
+            "publish in eight attempts"
+        )
+
+    def publish_with_recreation(self, tmp, out, mode):
+        """Publish the standing pair with a recreation inside it.
+
+        The recreation is driven at the first staging write,
+        which is the first publish step after the discard pass
+        unlinks the judged staging plant, so the recreated
+        entry lands inside the publish window on every run
+        with no polling reaction to beat. The shape is the
+        watcher shape of the test above with its timing made
+        deterministic, and the publish it drives is the real
+        publish pair path from its pre publish reading to its
+        final sync.
+        """
+        plant = out / ".recognitio-tmp-raceentry"
+        plant.write_text("stale staging plant\n")
+        sentinel = Path(tmp) / "seam-sentinel.txt"
+        sentinel.write_text("outside\n")
+        packet_data = (out / "packet.md").read_bytes()
+        manifest = read_manifest(out)
+        target = extract_mod.OutputTarget(out.resolve())
+        real_stage = target._stage
+        calls = []
+
+        def recreating_stage(hint, data):
+            if not calls:
+                calls.append(hint)
+                if mode == "dir":
+                    plant.mkdir()
+                    (plant / "inner.txt").write_text(
+                        "race inner\n"
+                    )
+                elif mode == "regular":
+                    plant.write_text("race recreated\n")
+                elif mode == "fifo":
+                    os.mkfifo(plant)
+                elif mode == "symlink":
+                    plant.symlink_to(sentinel)
+            return real_stage(hint, data)
+
+        target._stage = recreating_stage
+        try:
+            target.publish_pair(packet_data, manifest)
+        finally:
+            target.close()
+        return plant, sentinel
+
+    def test_publish_recheck_refuses_a_recreation_at_the_staging_step(self):
+        for mode in ("dir", "regular", "symlink"):
+            with self.subTest(mode=mode):
+                with RetryingTemporaryDirectory() as tmp:
+                    repo, out = self.build_verified_pair(tmp)
+                    before = self.pair_bytes(out)
+                    with self.assertRaises(
+                        extract_mod.OutputRefusal
+                    ) as caught:
+                        self.publish_with_recreation(
+                            tmp, out, mode
+                        )
+                    plant = out / ".recognitio-tmp-raceentry"
+                    self.assertIn(
+                        plant.name, str(caught.exception)
+                    )
+                    self.assertIn(
+                        "no manifest receipts",
+                        str(caught.exception),
+                    )
+                    self.assert_pair_intact(out, before)
+                    self.assertTrue(os.path.lexists(plant))
+                    self.assertEqual(
+                        (Path(tmp) / "seam-sentinel.txt")
+                        .read_text(),
+                        "outside\n",
+                    )
+                    self.assert_checker_refuses(repo, out, plant)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "needs mkfifo")
+    def test_publish_recheck_refuses_a_fifo_at_the_staging_step(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            before = self.pair_bytes(out)
+            with self.assertRaises(
+                extract_mod.OutputRefusal
+            ) as caught:
+                self.publish_with_recreation(tmp, out, "fifo")
+            plant = out / ".recognitio-tmp-raceentry"
+            self.assertIn(plant.name, str(caught.exception))
+            self.assertIn(
+                "no manifest receipts", str(caught.exception)
+            )
+            self.assert_pair_intact(out, before)
+            self.assertTrue(
+                stat.S_ISFIFO(os.lstat(plant).st_mode)
+            )
+            self.assert_checker_refuses(repo, out, plant)
+
+    def test_publish_recheck_without_recreation_still_publishes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, out = self.build_verified_pair(tmp)
+            plant, _sentinel = self.publish_with_recreation(
+                tmp, out, "none"
+            )
+            self.assertTrue(read_manifest(out)["verified"])
+            self.assertFalse(os.path.lexists(plant))
+            self.assertEqual(
+                sorted(entry.name for entry in out.iterdir()),
+                ["manifest.json", "packet.md"],
+            )
+            self.assert_checker_stamps(repo, out)
+            # An ordinary rerun over the published pair still
+            # publishes, so the post rename recheck is
+            # idempotent on a clean directory.
+            again = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            self.assert_checker_stamps(repo, out)
+
     def test_planted_findings_entry_refuses_a_rereview_regeneration(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [

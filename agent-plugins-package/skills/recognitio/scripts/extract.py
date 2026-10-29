@@ -3847,6 +3847,138 @@ class OutputTarget:
             )
         )
 
+    def _snapshot_entry(self, entry):
+        """The standing form of one entry, read for a rollback.
+
+        The reading is by lstat first, so a link is recorded as
+        a link with its target and never followed, a regular
+        file is recorded as its bytes, and any other type is
+        recorded as unknown and left out of the rollback. An
+        entry that does not stand is recorded as absent.
+        """
+        try:
+            info = os.stat(
+                entry, dir_fd=self.dir_fd, follow_symlinks=False
+            )
+        except FileNotFoundError:
+            return ("absent", None)
+        except OSError:
+            return ("unknown", None)
+        if stat.S_ISLNK(info.st_mode):
+            try:
+                return ("link", os.readlink(entry, dir_fd=self.dir_fd))
+            except OSError:
+                return ("unknown", None)
+        if stat.S_ISREG(info.st_mode):
+            try:
+                fd = os.open(
+                    entry,
+                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                    dir_fd=self.dir_fd,
+                )
+            except OSError:
+                return ("unknown", None)
+            try:
+                with os.fdopen(fd, "rb") as handle:
+                    return ("file", handle.read())
+            except OSError:
+                return ("unknown", None)
+        return ("unknown", None)
+
+    def _restore_entry(self, entry, snapshot):
+        """Put one entry back in the form a snapshot recorded."""
+        kind, value = snapshot
+        if kind == "unknown":
+            return
+        if kind == "absent":
+            try:
+                os.unlink(entry, dir_fd=self.dir_fd)
+            except FileNotFoundError:
+                pass
+            return
+        if kind == "file":
+            temp_name = self._stage("rollback-" + entry, value)
+            try:
+                self._replace(temp_name, entry)
+            finally:
+                self._discard(temp_name)
+            return
+        temp_name = ".recognitio-tmp-%d-rollback-%s" % (
+            os.getpid(), entry
+        )
+        self._discard(temp_name)
+        os.symlink(value, temp_name, dir_fd=self.dir_fd)
+        try:
+            self._replace(temp_name, entry)
+        finally:
+            self._discard(temp_name)
+
+    def _restore_snapshot(self, snapshot, names):
+        """Restore the named entries and report any failure."""
+        problems = []
+        for entry in names:
+            try:
+                self._restore_entry(entry, snapshot[entry])
+            except (OSError, OutputRefusal) as exc:
+                problems.append(
+                    "%s could not be put back because %s"
+                    % (entry, exc)
+                )
+        return problems
+
+    def _entries_beyond(self, allowed=()):
+        """Entries standing here beyond the pair and the allowed.
+
+        The packet check receipts the sealed pair alone, so an
+        entry of any type standing beside the pair once the
+        renames land is unreceipted whatever its name or type.
+        A staging name earns no exemption at this point, because
+        the stale staging discard already ran before the pair
+        was staged, so a staging named entry standing now is
+        one that arrived during the publish and not a leftover
+        the publish itself still has to drop.
+        """
+        try:
+            entries = os.listdir(self.dir_fd)
+        except OSError as exc:
+            raise OutputRefusal(
+                "cannot list the output directory %s because %s, "
+                "so nothing was published"
+                % (self.path, exc.strerror or exc)
+            ) from exc
+        return sorted(
+            entry for entry in entries
+            if entry not in ("packet.md", "manifest.json")
+            and entry not in allowed
+        )
+
+    def _refuse_raced_publish(self, snapshot, names, raced):
+        """Roll a raced publish back and refuse over its entry.
+
+        The standing entries named in the snapshot go back in
+        their recorded form before the refusal is raised, so
+        the refusal leaves the directory with the pair that
+        stood there before the publish and the message that
+        nothing was published stays true of the directory.
+        """
+        problems = self._restore_snapshot(snapshot, names)
+        try:
+            os.fsync(self.dir_fd)
+        except OSError:
+            pass
+        message = (
+            "the output directory %s holds an entry no "
+            "manifest receipts, %s, so nothing was published. "
+            "Move it aside or pick another output directory"
+            % (self.path, raced[0])
+        )
+        if problems:
+            message += (
+                " The publish could not be put back in full "
+                "because %s" % problems[0]
+            )
+        raise OutputRefusal(message)
+
     def publish_pair(self, packet_data, manifest, removable_entries=()):
         """Move a finished packet and manifest into place together.
 
@@ -3865,6 +3997,19 @@ class OutputTarget:
         successful run there, so removing that entry as part of
         the publish is the branch that flow takes while every
         foreign entry takes the refusal branch.
+
+        The judgement above is a reading taken before the
+        publish, so the publish reads the directory again after
+        its renames and again after the removable entries go.
+        An entry that arrives during the publish, for example
+        a judged staging file recreated the instant the discard
+        unlinks it, stands beyond the sealed pair at that
+        reading whatever its name or type, and takes the same
+        refusal. The standing pair and any removable entry are
+        snapshotted before the first mutation, and a raced
+        refusal restores them from the snapshot before it
+        raises, so the directory keeps the pair that stood
+        there before the publish.
         """
         self.open_dir()
         self._verify_still_pinned()
@@ -3881,6 +4026,14 @@ class OutputTarget:
                 "Move it aside or pick another output directory"
                 % (self.path, foreign[0])
             )
+        removable = [
+            entry for entry in extras
+            if entry in removable_entries
+        ]
+        snapshot = {
+            entry: self._snapshot_entry(entry)
+            for entry in ("packet.md", "manifest.json", *removable)
+        }
         self._discard_stale_temps()
         temp_packet = self._stage("packet.md", packet_data)
         try:
@@ -3896,6 +4049,11 @@ class OutputTarget:
         finally:
             self._discard(temp_packet)
             self._discard(temp_manifest)
+        raced = self._entries_beyond(allowed=removable)
+        if raced:
+            self._refuse_raced_publish(
+                snapshot, ("packet.md", "manifest.json"), raced
+            )
         for entry in extras:
             try:
                 os.unlink(entry, dir_fd=self.dir_fd)
@@ -3907,6 +4065,13 @@ class OutputTarget:
                     "the output directory %s because %s"
                     % (entry, self.path, exc.strerror or exc)
                 ) from exc
+        raced = self._entries_beyond()
+        if raced:
+            self._refuse_raced_publish(
+                snapshot,
+                ("packet.md", "manifest.json", *removable),
+                raced,
+            )
         os.fsync(self.dir_fd)
 
     def _standing_verified(self):
