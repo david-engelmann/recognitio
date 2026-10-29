@@ -571,20 +571,39 @@ class TestHeadlessChain(ChainFixture):
 
     def test_an_error_result_with_a_pass_verdict_fails(self):
         # Finding F7. The envelope says the run errored and the
-        # structured output says pass with no findings.
+        # structured output says pass with no findings. The
+        # assertion names the error flag problem itself, so
+        # the error subtype reading in the same event cannot
+        # satisfy this test in the flag reading place.
         events = [self.result(
             {"verdict": "pass", "findings": []},
             is_error=True, subtype="error_during_execution",
         )]
-        self.assertTrue(self.check(events))
+        problems = self.check(events)
+        self.assertTrue(
+            any("carries an error flag" in p for p in problems),
+            problems,
+        )
 
     def test_an_error_result_fails_in_either_position(self):
         clean = self.result({"verdict": "pass", "findings": []})
         errored = self.result(
             {"verdict": "pass", "findings": []}, is_error=True
         )
-        self.assertTrue(self.check([errored, clean]))
-        self.assertTrue(self.check([clean, errored]))
+        # Each assertion names the error flag problem itself,
+        # so the merged capture reading that the two result
+        # messages also earn cannot satisfy either assertion
+        # in the flag reading place.
+        first = self.check([errored, clean])
+        self.assertTrue(
+            any("carries an error flag" in p for p in first),
+            first,
+        )
+        second = self.check([clean, errored])
+        self.assertTrue(
+            any("carries an error flag" in p for p in second),
+            second,
+        )
 
     def test_a_missing_permission_denials_field_fails(self):
         event = self.result({"verdict": "pass", "findings": []})

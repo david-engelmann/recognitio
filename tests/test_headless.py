@@ -97,6 +97,48 @@ class TestHeadlessCheck(unittest.TestCase):
         ]
         self.assertEqual(self.check(0, events), [])
 
+    def test_an_error_flag_alone_fails_the_run(self):
+        # One result message carrying the error flag alone.
+        # The subtype is success and the denials list is empty
+        # and the verdict is pass with no findings, so no
+        # sibling reading can earn a problem in its place.
+        events = [
+            result_event(
+                is_error=True,
+                subtype="success",
+                permission_denials=[],
+                structured_output={
+                    "verdict": "pass",
+                    "findings": [],
+                },
+            )
+        ]
+        self.assertEqual(
+            self.check(0, events),
+            [
+                "result message 0 carries an error flag, so "
+                "the run errored inside the capture"
+            ],
+        )
+
+    def test_a_clear_error_flag_alone_reads_green(self):
+        # The same single result message with the error flag
+        # clear. Nothing else differs from the flagged case
+        # above, so this control passes the flag reading and
+        # reads green whole.
+        events = [
+            result_event(
+                is_error=False,
+                subtype="success",
+                permission_denials=[],
+                structured_output={
+                    "verdict": "pass",
+                    "findings": [],
+                },
+            )
+        ]
+        self.assertEqual(self.check(0, events), [])
+
     def test_a_nonzero_exit_fails_the_run(self):
         problems = self.check(1, [])
         self.assertTrue(

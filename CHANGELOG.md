@@ -1889,6 +1889,16 @@ This unreleased work carries version 1.3.0.
   the same reading, while a packet that carries a
   findings accounting keeps the fallback reading on the
   findings its section itself carries.
+- The headless review gate error flag reading now
+  stands pinned by a test that isolates it. A single
+  result message carrying the error flag alone with a
+  success subtype and an empty denials list and a pass
+  verdict earns the named error flag problem, and the
+  same message with the flag clear reads green. The
+  two review chain tests named for this shape now
+  assert the error flag problem by name, so the error
+  subtype reading and the merged capture reading can
+  no longer satisfy them in the flag reading place.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
