@@ -1833,19 +1833,29 @@ This unreleased work carries version 1.3.0.
   name and called later keeps its credit, and so do an
   alias bound to anything but a pure builtin and a
   comprehension over an iterable the reading cannot
-  settle.
+  settle and a comprehension whose element expression
+  reads a mutable element of its iterable and a
+  comprehension over a call outside the pure set such
+  as a range call.
 - The package gate now fails closed when the native
   plugin manifest stands in the tree but yields no
   version it can check the portable version against.
   A native manifest that cannot be read or does not
   parse or is not an object or carries no version or
   carries a version that is not a string now draws a
-  named problem from the package gate itself, where
-  the version agreement reading once skipped in
-  silence and the gate printed its holds line over a
-  manifest it never read. A genuinely absent native
-  manifest keeps the single extension path problem it
-  has always carried.
+  named problem from the package gate itself. The
+  version agreement reading once skipped in silence
+  and the gate printed its holds line over the corrupt
+  and empty and versionless and not an object shapes
+  and over a manifest standing as a directory that it
+  could not read. The non string version shape stood
+  apart from that silence, because the disagreement
+  sentence already noticed it and the gate exited
+  nonzero, and an undecodable manifest stood apart as
+  well, because the shipped helper let its decode
+  error escape as a traceback. A genuinely absent
+  native manifest keeps the single extension path
+  problem it has always carried.
 - A typechange whose blob is identical on both sides now
   verifies instead of failing its own recount. Plain
   numstat reports no added and no deleted lines for that
@@ -1871,11 +1881,12 @@ This unreleased work carries version 1.3.0.
   refuses a findings file carrying one, and the packet
   check refuses to stamp such a packet and names the
   findings file ground in its own words. The refused set
-  is the escape character, the C0 controls other than tab
-  and newline, and the delete character, with a carriage
-  return refused only where it stands alone, so tab
-  characters and CRLF line endings in a genuine change
-  still build and stamp. The C1 controls stand outside
+  is the escape character, the C0 controls from U+0000
+  to U+001F other than tab and newline, and the delete
+  character, with a carriage return refused only where
+  it stands alone, so tab characters and CRLF line
+  endings in a genuine change still build and stamp.
+  The C1 controls from U+0080 to U+009F stand outside
   the set for the reasons the verifier completeness
   reference states. No byte is
   stripped or rewritten on either side, because the packet
@@ -1883,8 +1894,9 @@ This unreleased work carries version 1.3.0.
   be the bytes the recount counted.
 - The packet check now refuses an invented findings hash
   on a since packet that carries no findings accounting
-  where a findings flag appended to its recorded command
-  names a file that cannot be read. The earlier reading
+  where the manifest findings hash is not null and a
+  findings flag appended to its recorded command names
+  a file that cannot be read. The earlier reading
   refused a hash only where no findings flag stood, so
   one appended token disarmed it while the genuine since
   flag satisfied the pairing reading and the absent file
