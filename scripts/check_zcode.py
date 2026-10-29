@@ -30,11 +30,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "zcode-plugin-brief.md"
-MANIFEST = ROOT / ".zcode-plugin" / "plugin.json"
-HOME_MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
-SKILL = ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The ZCode rules"
 

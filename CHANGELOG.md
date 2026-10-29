@@ -2075,3 +2075,11 @@ This unreleased work carries version 1.3.0.
   a derivation note citation by the page path the note
   names, so the gate now holds one spelling of each path
   and no dead one beside it.
+- The five dead constants in the ZCode gate, being the
+  brief path and the plugin manifest path and the home
+  manifest path and the skill path and the decisions
+  path at its head. No code in the gate loaded any of
+  them, and every function in the gate builds the paths
+  it needs from the root argument it is handed, so the
+  gate now holds one spelling of each path and no dead
+  one beside it.
