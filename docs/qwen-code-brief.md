@@ -210,7 +210,13 @@ input carries a manifest at
 qoder-input/.qoder-plugin/plugin.json holding the name
 and the version and the description of the plugin, the
 three fields the round 33 input manifest carried as
-rule R7 records. The input also carries the skill
+rule R7 records. Take the three values from the shipped
+manifest at `.claude-plugin/plugin.json` in the
+checkout, where the name is recognitio and the version
+is 1.3.0 and the description reads Pulls the relevant
+changes from a pull request or a commit range, with the
+context a reviewer needs, into one verified review
+packet. The input also carries the skill
 files at qoder-input/skills/recognitio, being SKILL.md
 and scripts/extract.py copied unchanged from the
 canonical skill tree at `.agents/skills/recognitio/`
