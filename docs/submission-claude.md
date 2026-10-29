@@ -223,7 +223,9 @@ launcher field, so the launcher pinning row has nothing to
 engage. The terms of service URL field stands absent from
 the shipped manifest in the same unset state as the
 documentation and support fields the listing URLs item
-above records.
+above records. The privacy policy URL field also stands
+absent from the shipped manifest, pending the privacy
+determination the pack records below.
 
 **Open, the verified contact information.** The directory
 policy asks for verified contact information, and the

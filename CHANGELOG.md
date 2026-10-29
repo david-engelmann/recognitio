@@ -2030,6 +2030,20 @@ This unreleased work carries version 1.3.0.
   link to a regular file still reads through
   everywhere and an absent path keeps the behaviour
   it has always carried.
+- The Qwen Code brief now gives the build list for the
+  Qoder test input its install route names. Rule R4
+  states that the input is a new folder named qoder-input
+  at the root of the checkout, carrying a manifest at
+  its .qoder-plugin/plugin.json path with the name and
+  version and description fields and the skill files
+  under skills/recognitio, being SKILL.md and
+  scripts/extract.py copied unchanged from the canonical
+  skill tree, in the shape of the round 33 test input
+  the brief records in rule R7. The Claude submission
+  pack now states in its component paths evidence item
+  that the privacy policy URL field also stands absent
+  from the shipped manifest, pending the privacy
+  determination the pack records.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

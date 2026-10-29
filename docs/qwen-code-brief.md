@@ -204,7 +204,19 @@ qwen extensions install ./recognitio-qwen/qoder-input
 The Qoder conversion command above carries its pinned
 form in this same section. Replace COMMIT_SHA with the
 commit SHA you reviewed, then build the Qoder input
-from that checkout. No Qoder manifest for recognitio
+from that checkout. Build the input as a new folder
+named qoder-input at the root of the checkout. The
+input carries a manifest at
+qoder-input/.qoder-plugin/plugin.json holding the name
+and the version and the description of the plugin, the
+three fields the round 33 input manifest carried as
+rule R7 records. The input also carries the skill
+files at qoder-input/skills/recognitio, being SKILL.md
+and scripts/extract.py copied unchanged from the
+canonical skill tree at `.agents/skills/recognitio/`
+in the checkout. An input built this way carries the
+skill files beside its manifest and nothing else, in
+the shape of the round 33 test input rule R7 records. No Qoder manifest for recognitio
 ships in this repo, so a Qoder input is built from a
 checkout for a test and is not a shipped listing.
 Activation of preserved Qoder commands and agents in Qwen stays UNVERIFIED. The primary extension
