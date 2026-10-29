@@ -84,7 +84,12 @@ the purpose in the canonical sentence, an author object with
 a name and an email, the license value MIT, and the homepage
 and repository values pointing at the public repo. The
 discovery fields the manifest schema names stand filled, as
-the discovery gate pins.
+the discovery gate pins. The manifest paths, skills at
+./skills/recognitio/ and rules at ./rules/recognitio.mdc
+and logo at docs/brand/recognitio-icon.svg, and the
+marketplace entry paths, source at ./ with the same skills
+and logo values, are each relative with no parent
+reference and no absolute form.
 
 **Met, the logo.** The manifest logo value is a relative path
 to docs/brand/recognitio-icon.svg, committed in the repo. No

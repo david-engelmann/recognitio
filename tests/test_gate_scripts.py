@@ -2341,7 +2341,8 @@ class TestReadmeRound9(unittest.TestCase):
             "skill to review the change from `365da81e` to "
             "`ecdda4c8` in this repository, 28 files and 3,233 "
             "lines of diff, and its capture record stands at "
-            "`docs/images/capture-record.md`.",
+            "[docs/images/capture-record.md]"
+            "(docs/images/capture-record.md).",
             first_screen,
         )
 
@@ -3033,6 +3034,8 @@ class TestDemoAssets(unittest.TestCase):
     def test_every_readme_image_reference_resolves(self):
         # The page names the poster still as a link inside
         # the demo lead in and embeds the recording itself,
+        # and the lead in also links the capture record and
+        # the short cut of the same session as plain links,
         # and every reference it carries resolves. The top 20
         # program added the session stills of item 18 and the
         # link to their capture record, and the list below is
@@ -3047,7 +3050,9 @@ class TestDemoAssets(unittest.TestCase):
         self.assertEqual(
             refs,
             [
+                "docs/images/capture-record.md",
                 "docs/images/recognitio-cursor-agent-poster.png",
+                "docs/images/recognitio-cursor-agent-demo-short.gif",
                 "docs/images/capture-record.md",
                 "docs/images/recognitio-cursor-agent-verified-crop.png",
                 "docs/images/recognitio-cursor-agent-demo.gif",

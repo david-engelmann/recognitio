@@ -153,7 +153,17 @@ how it is installed, and how a review runs from a packet.
 few megabytes in total, as restated on 2026-10-28 against
 the tree that then held that count. Its largest file is the
 demo recording at 646,314 bytes, well under the 5 MiB file
-limit.
+limit. The file count also holds under the cap the
+checklist holds for a reviewer, at 220 files against a cap
+of 512 files. Its largest file that is not an image or a
+font is tests/test_gate_scripts.py at 238,788 bytes, under
+the 256 KiB cap of 262,144 bytes the same checklist holds
+for such files. Its tracked extensions run to .gif and .js
+and .json and .md and .mdc and .patch and .png and .py and
+.svg and .ts and .yaml and .yml beside five entries with
+no extension, of which one is the Claude skill symlink and
+four are regular files, so no file falls outside the
+allowed file type list on its extension.
 
 **Open, the worked examples.** The directory policy asks for
 at least three working examples that show the core
@@ -196,6 +206,33 @@ required, and the support value is the cleanest evidence for
 the policy requirement of a support channel. Setting both is
 a small manifest change the owner can make before filing,
 and this pack records the choice instead of making it.
+
+**Met, the component paths and the folder bars.** The four
+component paths in the shipped manifest, the icon and the
+agents entry and the skills entry and the outputStyles
+entry, all resolve inside the repo root on relative paths.
+The three component files carry frontmatter descriptions
+as single text values, the skill at 548 characters and the
+reviewer agent at 122 characters and the output style at
+172 characters. A credential pattern scan over all 220
+tracked files, for private key headers and AWS key shapes
+and GitHub token shapes, returned zero hits, so no real
+credential stands in the folder. No package.json ships
+anywhere in the tree and the shipped manifest carries no
+launcher field, so the launcher pinning row has nothing to
+engage. The terms of service URL field stands absent from
+the shipped manifest in the same unset state as the
+documentation and support fields the listing URLs item
+above records.
+
+**Open, the verified contact information.** The directory
+policy asks for verified contact information, and the
+shipped manifest carries an author name and the email
+81196676+david-engelmann@users.noreply.github.com that the
+verification would attach to. Verification itself is an
+account act at filing that no tree check can perform, so
+this pack records the obligation as open and unverified
+here.
 
 **Open, the privacy determination.** No primary source makes
 a privacy policy link turn on which component types a plugin

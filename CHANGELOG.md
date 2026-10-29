@@ -1764,10 +1764,10 @@ This unreleased work carries version 1.3.0.
   no findings file, so it cannot write such a manifest.
 - The test vacuity guard no longer credits a fail call
   inside a conditional branch as a live assertion on its
-  own. A test whose only other assertion was trivial and
-  whose listing guard carried a conditional fail once
-  read as live to the guard, so softening its real
-  assertion to an always true one passed the guard in
+  own. A test whose real assertion was softened to an
+  always true one, leaving a trivial assertion standing
+  beside a listing guard whose conditional fail once
+  read as live to the guard, passed the guard in
   silence. Such a test now fails the guard by name, while
   a fail call outside every conditional branch still
   counts and a conditional fail beside a real assertion
@@ -1778,9 +1778,12 @@ This unreleased work carries version 1.3.0.
   literal values no longer passes the guard in silence.
   A builtin name standing as an operand counts as a
   constant beside the literal operands, and the same
-  reading reaches a helper called with a literal, where
-  the first literal once bound to the receiver and left
-  the real first parameter unbound. A call over a value
+  reading reaches a helper reached through an attribute
+  call, a method whose first declared parameter is the
+  receiver and not a call argument, called with a
+  literal, so the first literal now binds to the real
+  first parameter where it once bound to the receiver
+  and left that parameter unbound. A call over a value
   keeps its credit in full, and so does a pure call over
   a name bound to a mutable container, because the
   container can gain contents the guard cannot see.
@@ -1798,7 +1801,8 @@ This unreleased work carries version 1.3.0.
   comma with the word and or then, beside the heads they
   already admitted, while descriptive prose about approval
   done by a named subject and prose quoting a label as data
-  keep reading green. The runbook passage and the validator
+  and then naming that label with a subject verb keep
+  reading green. The runbook passage and the validator
   docstring and the comment over the phrase list now name
   the screen as a listed phrase screen plus an imperative
   shape screen and state the four shapes and their clause

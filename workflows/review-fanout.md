@@ -48,12 +48,14 @@ pull request word, with this or that or the or a or my
 or your or no determiner before the name. A shape counts
 only at a clause head. A clause head stands at the start
 of a text or at the head of a line or after a sentence or
-clause boundary,
-and the boundary set holds a colon and an opening
-parenthesis beside the marks it has always held. Behind
-a boundary a shape may open with a run of opening marks,
-each a quotation mark or a list marker or a parenthesis,
-then with a run of conjunction words, each the word and
+clause boundary, and the boundary set holds a full stop
+and a question mark and an exclamation mark and a
+semicolon and a comma and a slash and a dash and a colon
+and an opening parenthesis. Behind a boundary a shape
+may open with a run of opening marks, each a straight
+quotation mark or a list marker or an asterisk or a hash
+mark or a greater than sign or a parenthesis, then with
+a run of conjunction words, each the word and
 or the word then, where a comma or a boundary or the
 start of the text stands before the run, then with the
 word please or just. A verb phrase a named subject governs

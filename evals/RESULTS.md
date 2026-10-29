@@ -5,7 +5,9 @@ fixture review tasks were reviewed under three input conditions.
 One pass held only the raw diff. One pass held the raw diff plus
 the changed file list. The other pass held only the recognitio
 packet for the same change. The planted defects were graded the
-same way in every pass.
+same way in every pass. The numbers table below records the raw
+diff pass and the packet pass alone, and the fair raw pass
+carries its own account in the prose under the table.
 
 ## Method
 
@@ -49,10 +51,10 @@ found 0 of 4 and the packet pass found 4 of 4. The delta this
 skill claims is the second row of that split, and the measured
 delta in this run is four findings on four tasks.
 
-The fair raw pass found the same 4 of 8. It tied the packet
-pass at 4 of 4 on the defects inside the diff and it found 0 of
-4 on the defects in unchanged files, exactly as the original
-raw pass did. The construction limit is stated plainly for
+The fair raw pass found the same 4 of 8 on the first four
+tasks. It tied the packet pass at 4 of 4 on the defects
+inside the diff and it found 0 of 4 on the defects in
+unchanged files, exactly as the original raw pass did. The construction limit is stated plainly for
 both raw conditions. A raw pass holds no content from any
 unchanged file, and the changed file list names no unchanged
 file, so under the grading rule above an unchanged file defect
@@ -98,6 +100,16 @@ import in the imports section, so both halves stood on the page.
 D2 is the trailing space and case change in the returned string,
 and both passes found it.
 
+task-05 plants nothing. The change adds the add_tax helper in
+util.py and updates its one caller in page.py with the right
+arguments, and test_util.py still calls the unchanged add
+function it always called. The raw pass and the fair raw pass
+read the diff and found no defect, and the packet pass read the
+packet, saw the surviving add definition beside its test file
+calls, and found no defect. No pass claimed a finding, so the
+false lead count for the task is zero under all three input
+conditions.
+
 task-06 is the replay task added in round 6. It rebuilds at
 fixture scale the rename shape that pull request 9 fixed,
 where a paired rename dropped the old module name from the
@@ -118,16 +130,6 @@ control record over task-05 stay reproducible as they stand.
 The full verbatim transcripts of both passes stand in
 transcripts.md inside the task-06 folder, and the per pass
 entry in PASS-NOTES.md points at them.
-
-task-05 plants nothing. The change adds the add_tax helper in
-util.py and updates its one caller in page.py with the right
-arguments, and test_util.py still calls the unchanged add
-function it always called. The raw pass and the fair raw pass
-read the diff and found no defect, and the packet pass read the
-packet, saw the surviving add definition beside its test file
-calls, and found no defect. No pass claimed a finding, so the
-false lead count for the task is zero under all three input
-conditions.
 
 ## Run notes
 
@@ -183,11 +185,12 @@ this file moves on its evidence.
 
 ## Limits
 
-This is a small run and its limits are part of the result. Five
-tasks and eight defects cannot carry a rate anyone should quote
-beyond this repo, and one clean task cannot carry a false lead
-rate at all. One reviewer ran both original passes and graded
-both passes, so the grading is not blind and the passes are not
+This is a small run and its limits are part of the result. The
+first set of five tasks, tasks 01 to 05, and its eight planted
+defects cannot carry a rate anyone should quote beyond this
+repo, and one clean task cannot carry a false lead rate at all.
+One reviewer ran both original passes and graded both passes,
+so the grading is not blind and the passes are not
 independent in the way a two-reviewer study would be. The tasks
 were designed around the packet strengths, because the point of
 the run is to measure the claimed delta, and a task set built

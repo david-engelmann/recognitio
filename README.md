@@ -16,7 +16,7 @@ For reviewers and the agents who assist them, judging a pull request or a commit
 
 [![CI passing](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-One recorded run in full. A session in the Cursor agent uses the recognitio skill to review the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff, and its capture record stands at `docs/images/capture-record.md`. The recording is that session as it happened, cut for pace only, with idle spans shortened and no frame reordered or redrawn, and [one frame of it stands as a still](docs/images/recognitio-cursor-agent-poster.png) at the moment the packet check passes.
+One recorded run in full. A session in the Cursor agent uses the recognitio skill to review the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff, and its capture record stands at [docs/images/capture-record.md](docs/images/capture-record.md). The recording is that session as it happened, cut for pace only, with idle spans shortened and no frame reordered or redrawn, and [one frame of it stands as a still](docs/images/recognitio-cursor-agent-poster.png) at the moment the packet check passes, and [a short cut of it](docs/images/recognitio-cursor-agent-demo-short.gif) covers the packet build and the verified moment alone.
 
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-cursor-agent-verified-crop.png">

@@ -108,10 +108,12 @@ STEERING_PHRASES = (
 # exclamation mark or a semicolon or a comma or a slash or a
 # dash or a colon or an opening parenthesis. Behind a
 # boundary the shape may open with a run of opening marks,
-# each a quotation mark or a list marker or a parenthesis,
-# then a run of conjunction words, each the word and or the
-# word then, where a comma or a boundary or the start of the
-# text stands before the run, then the words please or just.
+# each a straight quotation mark or a list marker or an
+# asterisk or a hash mark or a greater than sign or a
+# parenthesis, then a run of conjunction words, each the
+# word and or the word then, where a comma or a boundary
+# or the start of the text stands before the run, then the
+# words please or just.
 # The approval object may carry this or that or the or a or
 # my or your or no determiner and may name the change or the
 # pull request or the short pull request word. The

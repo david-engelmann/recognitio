@@ -103,7 +103,8 @@ field to be present before it reads a single finding, and a
 missing field fails the run.
 
 Fourth, the findings must match the schema above. Schema
-drift between the packet and the CI output fails the gate,
+drift between the schema above and the output of the run
+fails the gate,
 because a run that cannot describe its findings in the
 agreed shape has produced no review the pipeline can trust.
 
