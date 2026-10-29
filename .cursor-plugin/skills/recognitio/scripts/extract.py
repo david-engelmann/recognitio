@@ -751,6 +751,29 @@ def refuse_info_attributes(repo):
     if not common_path.is_absolute():
         common_path = Path(repo) / common_path
     info_attributes = common_path / "info" / "attributes"
+    # Two tests stand before the read. A named pipe at this
+    # path refuses the run outright, because git reads the
+    # same path as its clone attributes file and opening a
+    # pipe would block the git calls themselves, so no
+    # silent treatment can save the run here. Any other
+    # path that is not a regular file draws the same silent
+    # treatment the unreadable path below has always drawn,
+    # and a directory standing here reads that same way in
+    # git as well.
+    try:
+        info_mode = os.stat(info_attributes).st_mode
+    except OSError:
+        info_mode = None
+    if info_mode is not None and stat.S_ISFIFO(info_mode):
+        raise GitError(
+            "the clone carries a named pipe at %s and git "
+            "reads that path as its clone attributes file, "
+            "so the git calls this run makes would block on "
+            "opening it. Remove the pipe, then run again"
+            % info_attributes
+        )
+    if not info_attributes.is_file():
+        return
     try:
         text = info_attributes.read_text(
             encoding="utf-8", errors="surrogateescape"
@@ -4089,6 +4112,16 @@ class OutputTarget:
             )
             if not stat.S_ISREG(packet_info.st_mode):
                 return False
+            # The regular file test stands before the open,
+            # so a FIFO standing as the manifest cannot block
+            # this reading. The test follows links, as the
+            # open below does, so a link to a regular manifest
+            # still reads through.
+            manifest_info = os.stat(
+                "manifest.json", dir_fd=self.dir_fd
+            )
+            if not stat.S_ISREG(manifest_info.st_mode):
+                return False
             fd = os.open(
                 "manifest.json", os.O_RDONLY, dir_fd=self.dir_fd
             )
@@ -4221,6 +4254,17 @@ def load_findings(args, resolved=None):
     is built, and the hash of the file bytes is recorded on
     the args for the manifest, so the packet check can judge
     the file the run actually used.
+
+    The regular file test stands before the read. A path
+    that does not stand at all keeps the cannot read
+    problem the read itself earns, and a dangling link
+    reads the same way because the existence test follows
+    the link. A path that stands but is not a regular file
+    draws the cannot read problem without a read being
+    attempted, because opening a FIFO can block for a
+    writer that never comes. The file test follows links,
+    so a link to a regular file still reads through while
+    a link to a FIFO refuses like a FIFO.
     """
     if not args.findings:
         # A run with no findings file records no findings hash,
@@ -4228,8 +4272,14 @@ def load_findings(args, resolved=None):
         # an earlier findings run set on it.
         args.findings_sha256 = None
         return []
+    findings_path = Path(args.findings)
+    if findings_path.exists() and not findings_path.is_file():
+        raise GitError(
+            "cannot read the findings file: %s is not a "
+            "regular file" % findings_path
+        )
     try:
-        findings_bytes = Path(args.findings).read_bytes()
+        findings_bytes = findings_path.read_bytes()
     except OSError as exc:
         raise GitError("cannot read the findings file: %s" % exc)
     args.findings_sha256 = hashlib.sha256(findings_bytes).hexdigest()

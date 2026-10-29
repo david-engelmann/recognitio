@@ -2074,6 +2074,18 @@ This unreleased work carries version 1.3.0.
   recreated under a staging name during the
   publish refuses in the same way as a directory
   or a FIFO.
+- The extractor now refuses a findings file that is
+  not a regular file instead of hanging on the read.
+  The findings reading tests for a regular file before
+  any read and follows links, so a link to a regular
+  findings file still reads through and a link to a
+  FIFO refuses the same way, and a findings path
+  standing as a FIFO or a directory draws the named
+  cannot read problem at exit 2. The clone attributes
+  reading and the standing manifest reading in the
+  output directory stand behind the same regular file
+  test, so a FIFO standing at either of those paths
+  can no longer block a run or its failure receipt.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

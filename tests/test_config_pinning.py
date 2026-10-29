@@ -575,6 +575,45 @@ class TestAttributeConfinement(unittest.TestCase):
         self.assertEqual(run_extract_tiers(repo, out), 0)
         self.assertTrue(read_manifest(out)["verified"])
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_info_attributes_standing_as_a_fifo_do_not_block(self):
+        # Scope addition beside round 178 New Minor 1. The
+        # clone attributes reading read the info attributes
+        # file with a plain read and no regular file test,
+        # so a FIFO standing at that path blocked the open
+        # the same way a FIFO findings file did, and the git
+        # calls the run makes read the same path and block
+        # on it as well, so no silent treatment can save
+        # this door. The run must refuse the pipe by name
+        # before any of those calls, at exit 2. The run is
+        # a bounded subprocess because an in process run
+        # that still reads the FIFO would hang this test
+        # process itself.
+        repo = make_repo(self.tmp.name, PLAIN_COMMITS)
+        info = repo / ".git" / "info" / "attributes"
+        if info.exists() or info.is_symlink():
+            info.unlink()
+        os.mkfifo(info)
+        out = Path(self.tmp.name) / "out"
+        cmd = [
+            sys.executable, str(EXTRACT_PATH),
+            "--repo", str(repo), "--out", str(out),
+            "--range", "HEAD~1..HEAD", "--tiers", "0,1",
+        ]
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=10
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the extractor did not finish inside ten "
+                "seconds, so it blocked on the info "
+                "attributes path"
+            )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("named pipe", result.stderr)
+        self.assertFalse(read_manifest(out)["verified"])
+
 
 def build_two_author_repo(tmp):
     """Lines written by one author and edited by a second author."""

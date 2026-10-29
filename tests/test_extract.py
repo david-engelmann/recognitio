@@ -2379,6 +2379,167 @@ class TestReReviewTraces(unittest.TestCase):
             self.assertIn("Findings capped at 100 of 250", packet)
 
 
+class TestFindingsFileTypes(unittest.TestCase):
+    """A findings path that is not a regular file refuses (R178)."""
+
+    def make_repo_and_findings(self, tmp):
+        repo = make_repo(tmp, [
+            {"a.py": "x = 1\n"},
+            {"a.py": "x = 2\n"},
+        ])
+        previous = git(repo, "rev-parse", "HEAD~1")
+        genuine = Path(tmp) / "genuine-findings.txt"
+        genuine.write_text(findings_text_for(
+            repo, previous, "a.py:1: a note\n"
+        ))
+        return repo, previous, genuine
+
+    def run_bounded(self, repo, out, findings):
+        # Round 178 New Minor 1. A run handed a FIFO as its
+        # findings file blocks on the open, so every run in
+        # this class carries a ten second bound, and a run
+        # that still reads a FIFO fails the one test at the
+        # bound instead of hanging the suite.
+        cmd = [
+            sys.executable, str(EXTRACT),
+            "--out", str(out),
+            "--repo", str(repo),
+            "--range", "HEAD~1..HEAD",
+            "--since", "HEAD~1",
+            "--findings", str(findings),
+        ]
+        try:
+            return subprocess.run(
+                cmd, capture_output=True, text=True, timeout=10
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the extractor did not finish inside ten "
+                "seconds, so it blocked on the findings path "
+                "%s" % findings
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_findings_file_standing_as_a_fifo_is_refused_promptly(self):
+        # Round 178 New Minor 1. Opening a FIFO for reading
+        # blocks until a writer opens the other end, so a
+        # plain read of a findings file standing as a FIFO
+        # hangs the extractor in silence with no failure
+        # receipt. The run must refuse it by name without
+        # reading it, at the exit the directory form earns.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, _genuine = self.make_repo_and_findings(tmp)
+            fifo = Path(tmp) / "findings-fifo"
+            os.mkfifo(fifo)
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out, fifo)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot read the findings file", result.stderr
+            )
+            self.assertIn("not a regular file", result.stderr)
+            manifest = read_manifest(out)
+            self.assertFalse(manifest["verified"])
+            self.assertTrue(manifest["error"])
+
+    def test_a_findings_file_standing_as_a_directory_is_refused(self):
+        # Round 178 New Minor 1. The directory form already
+        # refused at exit 2 with the cannot read problem, and
+        # the regular file test must keep that refusal and
+        # its wording family.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, _genuine = self.make_repo_and_findings(tmp)
+            directory = Path(tmp) / "findings-dir"
+            directory.mkdir()
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out, directory)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot read the findings file", result.stderr
+            )
+            self.assertIn("not a regular file", result.stderr)
+
+    def test_a_findings_file_linking_to_a_regular_file_reads_through(self):
+        # Round 178 New Minor 1. The regular file test
+        # follows links, so a findings file standing as a
+        # link to a regular file with the genuine content
+        # still reads through and the run verifies whole.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, genuine = self.make_repo_and_findings(tmp)
+            link = Path(tmp) / "findings-link.txt"
+            link.symlink_to(genuine)
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out, link)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"])
+            self.assertIn(
+                "### Prior findings accounting",
+                (out / "packet.md").read_text(),
+            )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_findings_file_linking_to_a_fifo_is_refused_promptly(self):
+        # Round 178 New Minor 1. The regular file test
+        # follows links, so a link whose target is a FIFO
+        # refuses exactly as a FIFO standing at the path
+        # itself does.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, _genuine = self.make_repo_and_findings(tmp)
+            fifo = Path(tmp) / "findings-target-fifo"
+            os.mkfifo(fifo)
+            link = Path(tmp) / "findings-link"
+            link.symlink_to(fifo)
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out, link)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot read the findings file", result.stderr
+            )
+            self.assertIn("not a regular file", result.stderr)
+
+    def test_a_regular_findings_file_verifies_whole(self):
+        # Round 178 New Minor 1. The standing control beside
+        # the refusal shapes. A regular findings file reads
+        # and the run it feeds verifies.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, genuine = self.make_repo_and_findings(tmp)
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out, genuine)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"])
+            self.assertTrue(manifest["findings_sha256"])
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_standing_manifest_standing_as_a_fifo_does_not_block(self):
+        # Scope addition beside round 178 New Minor 1. The
+        # failure receipt path reads the standing manifest
+        # in the output directory to judge whether a verified
+        # pair stands there, and that reading opened the
+        # manifest with no regular file test, so a FIFO
+        # standing as the manifest blocked a failing run
+        # before the refusal that names a non regular final
+        # name could be reached. The failing run below must
+        # refuse promptly at exit 2 and name that refusal.
+        with RetryingTemporaryDirectory() as tmp:
+            repo, _previous, _genuine = self.make_repo_and_findings(tmp)
+            out = Path(tmp) / "out"
+            out.mkdir()
+            (out / "packet.md").write_text("standing packet\n")
+            os.mkfifo(out / "manifest.json")
+            missing = Path(tmp) / "absent-findings.txt"
+            result = self.run_bounded(repo, out, missing)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot read the findings file", result.stderr
+            )
+            self.assertIn(
+                "cannot replace manifest.json", result.stderr
+            )
+            self.assertIn("not a regular file", result.stderr)
+
+
 class TestExclusionReceiptDedup(unittest.TestCase):
     """One receipt entry per file, in one voice (N13)."""
 
