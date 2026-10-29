@@ -31,7 +31,11 @@ including a whole nested packet, fail the stamp, because the stamp
 covers the pair that lives in the directory and nothing else. The
 packet is decoded as strict UTF-8, because a packet holding bytes
 no UTF-8 reader can open is not the document its consumers are
-handed. The recorded extractor command is also read back, so its
+handed. A packet carrying a terminal control character is refused
+as well, and so is a findings file carrying one, because a
+terminal would render those bytes as colours and screen control
+and links rather than as the text this check counted. The
+recorded extractor command is also read back, so its
 mode flag must name the mode the manifest records and any full
 hash it carries must name the refs the manifest records. The
 second pass over this verifier widened that reading. The recorded
@@ -851,6 +855,60 @@ def display_path(path):
         else:
             out.append(char)
     return "".join(out)
+
+
+def terminal_control_character(text):
+    """The first terminal control character in a text, or None.
+
+    The extractor refuses to build a packet carrying one of
+    these, and this copy is the stamp side of the same rule, so
+    a packet built by any other means is refused here as well.
+    The refused set is the escape character, the C0 controls
+    other than tab and newline, and the delete character. A
+    carriage return is refused only where it stands alone,
+    because a carriage return standing ahead of a newline is
+    the CRLF ending a genuine file can carry, while a carriage
+    return inside a line is the overwrite shape itself. The
+    C1 controls stand outside the set for the reasons the
+    extractor copy of this reading states. This copy and the
+    extractor copy are held to one behaviour by the agreement
+    test in the test suite, so the two sides cannot diverge
+    again without a test failing.
+    """
+    for index, char in enumerate(text):
+        code = ord(char)
+        if char == "\r":
+            if index + 1 < len(text) and text[index + 1] == "\n":
+                continue
+            return char
+        if code < 32 and char not in ("\t", "\n"):
+            return char
+        if code == 127:
+            return char
+    return None
+
+
+def packet_control_problems(packet_text):
+    """Refuse a packet whose bytes a terminal would act on.
+
+    The check counts the packet bytes as they stand, and a
+    terminal renders those same bytes through its escape
+    sequences, so a packet carrying a terminal control
+    character can show a reader a different document than the
+    one this check counted. The packet is refused with the
+    character named, and no byte of it is stripped or
+    rewritten, because a rewritten body would no longer be
+    the evidence the recount counted.
+    """
+    control = terminal_control_character(packet_text)
+    if control is None:
+        return []
+    return [
+        "the packet carries a terminal control character %s, "
+        "so the packet a terminal shows a reader is not the "
+        "packet this check counts, and the packet is refused "
+        "rather than stamped" % ("U+%04X" % ord(control))
+    ]
 
 
 def file_problems(packet_text, files):
@@ -2495,6 +2553,15 @@ def rereview_problems(packet_text, manifest, repo, extractor,
                 "cannot be read back, so the re-review accounting "
                 "cannot be verified (%s)" % exc
             ]
+        control = terminal_control_character(findings_text)
+        if control is not None:
+            return [
+                "the findings file the manifest command records "
+                "carries a terminal control character %s, so the "
+                "accounting it grounds would print text a terminal "
+                "renders differently from the bytes this check "
+                "counts" % ("U+%04X" % ord(control))
+            ]
         recorded_hash = manifest.get("findings_sha256")
         if recorded_hash is not None:
             actual_hash = hashlib.sha256(findings_bytes).hexdigest()
@@ -3237,6 +3304,7 @@ def main(argv=None):
             # for a filename carrying a non UTF-8 byte does, is
             # not a document its consumers can be handed.
             packet_text = packet_path.read_bytes().decode("utf-8")
+            problems.extend(packet_control_problems(packet_text))
         except UnicodeDecodeError:
             problems.append(
                 "packet.md is not valid UTF-8, so it is not the "

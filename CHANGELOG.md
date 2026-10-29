@@ -1855,6 +1855,28 @@ This unreleased work carries version 1.3.0.
   their modes. A typechange whose bytes differ in any
   way keeps the count numstat gave it, and a mode only
   change keeps its zero counts.
+- Terminal escape sequences in packet content are now
+  refused on both sides of the stamp. A diff body carrying
+  colour or clear screen or OSC 8 hyperlink or window title
+  sequences printed them raw in a verified packet, and a
+  hostile findings file printed the same family raw in the
+  prior findings accounting of a verified re-review packet
+  through the file the packet check reads back as ground
+  truth. The extractor now refuses to build a packet whose
+  assembled text carries a terminal control character and
+  refuses a findings file carrying one, and the packet
+  check refuses to stamp such a packet and names the
+  findings file ground in its own words. The refused set
+  is the escape character, the C0 controls other than tab
+  and newline, and the delete character, with a carriage
+  return refused only where it stands alone, so tab
+  characters and CRLF line endings in a genuine change
+  still build and stamp. The C1 controls stand outside
+  the set for the reasons the verifier completeness
+  reference states. No byte is
+  stripped or rewritten on either side, because the packet
+  body is evidence and a rewritten body would no longer
+  be the bytes the recount counted.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

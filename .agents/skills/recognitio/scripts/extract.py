@@ -294,6 +294,47 @@ def display_path(path):
     return "".join(out)
 
 
+def terminal_control_character(text):
+    """The first terminal control character in a text, or None.
+
+    A terminal acts on the escape character and its sequence
+    family instead of printing them, so a text carrying one can
+    show a reader colours and a cleared screen and a changed
+    window title and a clickable link whose target the link text
+    does not name, and a line whose head its own tail overwrites.
+    The text a reader then sees is not the text the recount
+    counted. The refused set is the escape character, the C0
+    controls other than tab and newline, and the delete
+    character. A carriage return is refused only where
+    it stands alone, because a carriage return standing ahead of
+    a newline is the CRLF ending a genuine file can carry, while
+    a carriage return inside a line is the overwrite shape
+    itself. Tab stands because it is ordinary source text, and
+    newline stands because it is the line structure of the text
+    itself. The C1 controls stand outside the set, because in a
+    packet they arrive as UTF-8 characters no terminal acts on
+    as controls, the single bytes that name them in an eight
+    bit encoding cannot stand in a packet the check can decode
+    at all, and the next line character among them can stand in
+    a genuine file name whose diff header prints it raw and
+    whose packet stamps today. The packet check carries its own
+    copy of this reading, and the two copies are held to one
+    behaviour by the agreement test in the packet check test
+    suite.
+    """
+    for index, char in enumerate(text):
+        code = ord(char)
+        if char == "\r":
+            if index + 1 < len(text) and text[index + 1] == "\n":
+                continue
+            return char
+        if code < 32 and char not in ("\t", "\n"):
+            return char
+        if code == 127:
+            return char
+    return None
+
+
 def sanitize_packet_text(text):
     """Keep raw NUL bytes out of packet text.
 
@@ -3893,6 +3934,16 @@ def load_findings(args, resolved=None):
     findings_text = findings_bytes.decode(
         encoding="utf-8", errors="surrogateescape"
     )
+    control = terminal_control_character(findings_text)
+    if control is not None:
+        raise GitError(
+            "the findings file carries a terminal control "
+            "character %s, so a packet built from it would print "
+            "an accounting a terminal renders differently from "
+            "the bytes the recount counts. Remove the control "
+            "character from the findings file, then run again"
+            % ("U+%04X" % ord(control))
+        )
     if resolved is not None:
         problems = findings_header_problems(
             findings_text, resolved["head"], resolved["since"]
@@ -4260,6 +4311,23 @@ def run_pipeline(args, repo, target, argv, prepared=None):
         header, tier_texts, rereview, tier_info, dropped,
         args.budget, verified, discrepancies, counts,
     )
+    # The reading runs over the assembled packet itself, after
+    # the NUL naming the packet builder applies, so it refuses
+    # exactly the bytes that would ship and nothing the packet
+    # never prints. No byte is stripped or rewritten here, because
+    # a rewritten body would no longer be the evidence the
+    # recount counted.
+    control = terminal_control_character(packet)
+    if control is not None:
+        raise GitError(
+            "the assembled packet carries a terminal control "
+            "character %s in content the reviewed change or its "
+            "inputs supplied, so the packet a terminal shows a "
+            "reader would not be the packet the recount counted. "
+            "No packet was built. Remove the control character "
+            "from the reviewed content, then run again"
+            % ("U+%04X" % ord(control))
+        )
     manifest = assemble_manifest(
         argv, args, resolved, head, manifest_files, exclusions,
         selected, tier_info, packet, packet_estimate, dropped,

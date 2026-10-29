@@ -1302,6 +1302,161 @@ class TestRound27ReReview(Round27Fixture):
         self.assertEqual(self.run_check(out), 1)
 
 
+class TestTerminalControlRefusal(Round27Fixture):
+    """Terminal escape sequences in a packet are refused at the stamp.
+
+    Round 111 finding 2 held a verified packet whose diff body
+    carried colour and clear screen and OSC 8 hyperlink and
+    window title sequences raw, and round 119 finding 1 held
+    the same family in the prior findings accounting of a
+    verified re-review packet, grounded on a findings file the
+    check itself reads back. The stamp now refuses both
+    channels with the character named. Each forgery below is
+    settled with the shipped token arithmetic, the way the
+    round records settled theirs, so the control reading is
+    the only reading that can refuse it, and each test fails
+    against the pre fix checker, which stamped both packets.
+    """
+
+    def make_rereview(self, name):
+        findings = Path(self.tmp.name) / (name + "-findings.txt")
+        findings.write_text(
+            findings_text_for(
+                self.repo, "HEAD~2", "b.py:2: the value changed\n"
+            ),
+            encoding="utf-8",
+        )
+        return extract_packet(
+            self.repo, Path(self.tmp.name) / name,
+            "--range", "HEAD~1..HEAD", "--since", "HEAD~2",
+            "--findings", str(findings),
+        )
+
+    def test_an_escape_sequence_in_a_diff_body_fails(self):
+        out = self.clone("escbody")
+        text = self.packet_text(out)
+        self.assertIn("return 2", text)
+        self.save_packet(out, text.replace(
+            "return 2",
+            "return 2 \x1b[31mREDALERTCANARY\x1b[0m",
+            1,
+        ))
+        self.fix_accounting(out)
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the packet carries a terminal control character "
+            "U+001B",
+            output,
+        )
+
+    def test_a_hostile_findings_accounting_and_its_file_fail(self):
+        source = self.make_rereview("escfind")
+        out = self.clone("escfindclone", source)
+        findings = Path(self.tmp.name) / "escfind-findings.txt"
+        hostile = (
+            "the value changed \x1b[31mFINDCANARY\x1b[0m "
+            "\x1b]8;;https://example.invalid/findphish\x1b\\"
+            "FINDCLICK\x1b]8;;\x1b\\"
+        )
+        findings.write_text(
+            findings_text_for(
+                self.repo, "HEAD~2", "b.py:2: " + hostile + "\n"
+            ),
+            encoding="utf-8",
+        )
+        text = self.packet_text(out)
+        self.assertIn("the value changed", text)
+        self.save_packet(
+            out, text.replace("the value changed", hostile, 1)
+        )
+        manifest = self.manifest(out)
+        manifest["findings_sha256"] = hashlib.sha256(
+            findings.read_bytes()
+        ).hexdigest()
+        self.save_manifest(out, manifest)
+        self.fix_accounting(out)
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the packet carries a terminal control character "
+            "U+001B",
+            output,
+        )
+        self.assertIn(
+            "the findings file the manifest command records "
+            "carries a terminal control character U+001B",
+            output,
+        )
+
+    def test_a_genuine_rereview_packet_still_passes(self):
+        out = self.make_rereview("escgenuine")
+        manifest = self.manifest(out)
+        findings = Path(self.tmp.name) / "escgenuine-findings.txt"
+        self.assertEqual(
+            manifest["findings_sha256"],
+            hashlib.sha256(findings.read_bytes()).hexdigest(),
+        )
+        code, _output = self.run_check_capture(out)
+        self.assertEqual(code, 0)
+
+
+class TestTerminalControlAgreement(unittest.TestCase):
+    """The two terminal control copies must agree on every text.
+
+    The extractor refuses with its copy and the checker
+    refuses with its own, so a character the two read
+    differently could be built by one side and stamped by
+    the other. This battery is the single behaviour the
+    two copies are held to.
+    """
+
+    TEXTS = (
+        "plain text",
+        "a\tb",
+        "a\nb",
+        "a\r\nb",
+        "\r\n",
+        "a\rb",
+        "a\r",
+        "trail\r",
+        "a\x1b[31mb",
+        "a\x07b",
+        "a\x0bb",
+        "a\x0cb",
+        "a\x7fb",
+        "a\u0085b",
+        "a\u009bb",
+        "caf\u00e9",
+        "emoji \U0001f600",
+    )
+
+    def test_the_two_copies_agree_on_the_battery(self):
+        for text in self.TEXTS:
+            with self.subTest(text=text):
+                self.assertEqual(
+                    check_mod.terminal_control_character(text),
+                    extract_mod.terminal_control_character(text),
+                )
+        for code in range(256):
+            with self.subTest(code=code):
+                text = "a" + chr(code) + "b"
+                self.assertEqual(
+                    check_mod.terminal_control_character(text),
+                    extract_mod.terminal_control_character(text),
+                )
+
+    def test_the_refused_set_is_the_stated_set(self):
+        reading = check_mod.terminal_control_character
+        self.assertEqual(reading("a\x1bb"), "\x1b")
+        self.assertEqual(reading("a\rb"), "\r")
+        self.assertIsNone(reading("a\u0085b"))
+        self.assertIsNone(reading("a\u009bb"))
+        self.assertIsNone(reading("a\tb"))
+        self.assertIsNone(reading("a\r\nb"))
+        self.assertIsNone(reading("plain text"))
+
+
 class TestRound27PullRequest(Round27Fixture):
     """Finding 2. The PR preamble and the manifest PR record."""
 

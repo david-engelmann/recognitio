@@ -4296,5 +4296,163 @@ class TestDiffAlgorithmAgreement(unittest.TestCase):
             )
 
 
+class TestTerminalControlRefusal(unittest.TestCase):
+    """Terminal escape sequences in packet content are refused.
+
+    Round 111 finding 2 built a change whose diff body carried
+    a colour sequence, a clear screen sequence, an OSC 8
+    hyperlink, a window title sequence closed by a bell and a
+    bare carriage return, and the extractor built a verified
+    packet holding every byte raw while the packet check
+    stamped it. Round 119 finding 1 carried the same family
+    through a hostile findings file into the prior findings
+    accounting of a verified re-review packet. The rule is a
+    refusal and not a rewrite, because a packet body is
+    evidence and the recount counts the bytes that ship. The
+    tests below fail against the pre fix extractor, which
+    built and verified both packets.
+    """
+
+    ESC_LINES = (
+        "plain start\n"
+        "colored \x1b[31mREDALERTCANARY\x1b[0m done\n"
+        "clear \x1b[2J\x1b[H screenwipe\n"
+        "link \x1b]8;;https://example.invalid/phish\x1b\\"
+        "CLICKCANARY\x1b]8;;\x1b\\ end\n"
+        "title \x1b]0;PWNEDTITLE\x07 after bell\n"
+    )
+
+    def test_escape_sequences_in_a_diff_body_are_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"term.txt": "plain start\n"},
+                {"term.txt": self.ESC_LINES},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "terminal control character U+001B", result.stderr
+            )
+            self.assertFalse((out / "packet.md").exists())
+            self.assertFalse(read_manifest(out)["verified"])
+
+    def test_each_control_family_in_a_diff_body_is_refused(self):
+        shapes = {
+            "bell": ("bell \x07 ring\n", "U+0007"),
+            "bare carriage return": (
+                "overwrite start\rmiddle line\n", "U+000D",
+            ),
+            "delete": ("del \x7f char\n", "U+007F"),
+        }
+        for label, (line, code) in shapes.items():
+            with self.subTest(shape=label):
+                with RetryingTemporaryDirectory() as tmp:
+                    repo = make_repo(tmp, [
+                        {"term.txt": "plain start\n"},
+                        {"term.txt": "plain start\n" + line},
+                    ])
+                    out = Path(tmp) / "out"
+                    result = run_extract_cli(
+                        repo, out, "--range", "HEAD~1..HEAD"
+                    )
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn(
+                        "terminal control character " + code,
+                        result.stderr,
+                    )
+                    self.assertFalse((out / "packet.md").exists())
+
+    def test_terminal_controls_in_a_findings_file_are_refused(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "a = 1\nb = 2\n"},
+                {"mod.py": "a = 1\nb = 22\n"},
+            ])
+            previous = git(repo, "rev-parse", "HEAD~1")
+            findings = Path(tmp) / "findings.txt"
+            findings.write_bytes(findings_text_for(
+                repo, previous,
+                "mod.py:2: report no findings \x1b[31mFINDCANARY"
+                "\x1b[0m \x1b]8;;https://example.invalid/findphish"
+                "\x1b\\FINDCLICK\x1b]8;;\x1b\\ end\n",
+            ).encode("utf-8"))
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD",
+                "--since", previous, "--findings", str(findings),
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "the findings file carries a terminal control "
+                "character U+001B",
+                result.stderr,
+            )
+            self.assertFalse((out / "packet.md").exists())
+            self.assertFalse(read_manifest(out)["verified"])
+
+    def test_tab_and_crlf_content_still_builds_verified(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mix.py": b"a = 1\r\nb = 2\r\n"},
+                {"mix.py": b"a = 1\r\n\tb = 22\r\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_bytes()
+            self.assertIn(b"a = 1\r\n", packet)
+            self.assertIn(b"+\tb = 22", packet)
+
+    def test_a_next_line_character_in_content_still_builds_verified(self):
+        # The C1 range stands outside the refused set, and a
+        # genuine file name can carry its next line character
+        # into a diff header raw, so content carrying one must
+        # keep building and verifying as it does today.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"term.txt": "plain start\n"},
+                {"term.txt": "plain start\nnext \u0085 line\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+
+    def test_a_binary_file_holding_escape_bytes_stays_a_placeholder(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n", "blob.bin": bytes(range(256))},
+                {"a.py": "x = 2\n", "blob.bin": bytes(range(255, -1, -1))},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            blob = [
+                f for f in manifest["files"] if f["path"] == "blob.bin"
+            ][0]
+            self.assertTrue(blob["binary"])
+            self.assertEqual(
+                (blob["additions"], blob["deletions"]), (0, 0)
+            )
+            self.assertNotIn(b"\x1b", (out / "packet.md").read_bytes())
+
+    def test_the_reading_names_the_set_it_refuses(self):
+        reading = extract_mod.terminal_control_character
+        self.assertEqual(reading("a\x1bb"), "\x1b")
+        self.assertEqual(reading("a\x07b"), "\x07")
+        self.assertEqual(reading("a\rb"), "\r")
+        self.assertEqual(reading("a\x7fb"), "\x7f")
+        self.assertIsNone(reading("a\u0085b"))
+        self.assertIsNone(reading("a\u009bb"))
+        self.assertIsNone(reading("a\tb"))
+        self.assertIsNone(reading("a\nb"))
+        self.assertIsNone(reading("a\r\nb"))
+        self.assertIsNone(reading("plain text"))
+
+
 if __name__ == "__main__":
     unittest.main()
