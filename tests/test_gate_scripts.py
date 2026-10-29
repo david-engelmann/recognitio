@@ -5863,6 +5863,196 @@ class TestPersonaBuild(unittest.TestCase):
             any("auditor" in problem for problem in problems), problems
         )
 
+    def write_settings_file(self, root, payload):
+        (root / "settings.json").write_text(
+            payload if isinstance(payload, str) else json.dumps(payload),
+            encoding="utf-8",
+        )
+
+    def test_a_root_settings_file_naming_another_agent_fails(self):
+        # Round 238 hunt. The brief states the settings object
+        # may ship as settings.json at the plugin root, and a
+        # plant naming another agent returned zero problems
+        # while the gate printed its pinned line, because no
+        # shipped check read that path at all. The pin must
+        # name the override.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            self.write_settings_file(root, {"agent": "not-the-reviewer"})
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any(
+                "settings file" in problem
+                and "not-the-reviewer" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_root_settings_file_agreeing_with_the_pin_passes(self):
+        # The control beside the plant above. A settings file
+        # carrying only the pinned agent value is the benign
+        # shape the brief allows, so it passes whole. This
+        # test also passed against the blind gate by design,
+        # because a gate that never reads the file passes
+        # every shape it carries.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            self.write_settings_file(root, {"agent": "reviewer"})
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def test_the_settings_file_wins_over_a_disagreeing_manifest_key(self):
+        # The brief states the precedence in plain words.
+        # When both shapes exist the file wins and the
+        # manifest key is ignored, so a manifest key naming
+        # another agent draws no problem beside a file that
+        # carries the pinned value, while the reverse plant
+        # above fails on the file value alone.
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./agents/reviewer.md"],
+            "settings": {"agent": "auditor"},
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            self.write_settings_file(root, {"agent": "reviewer"})
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def test_a_settings_file_with_an_extra_key_fails(self):
+        # Only agent and subagentStatusLine take effect in
+        # plugin settings and every other key is dropped at
+        # load, the same claim the manifest key pin rests on,
+        # so the file shape is held to the same allowed set.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            self.write_settings_file(
+                root, {"agent": "reviewer", "theme": "dark"}
+            )
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any("theme" in problem for problem in problems), problems
+        )
+
+    def test_a_missing_manifest_settings_key_passes_beside_the_file(self):
+        # The manifest key is ignored when the file stands,
+        # so its absence beside a file carrying the pinned
+        # value is no problem. The file is the whole settings
+        # surface in that shape.
+        manifest = {
+            "name": "recognitio",
+            "agents": ["./agents/reviewer.md"],
+            "version": "1.3.0",
+        }
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, manifest=manifest)
+            self.write_settings_file(root, {"agent": "reviewer"})
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def test_a_malformed_settings_file_fails_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            self.write_settings_file(root, "{ not json")
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any(
+                "settings file" in problem
+                and "does not parse" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_non_utf8_settings_file_fails_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            (root / "settings.json").write_bytes(b"\xff\xfe{")
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any(
+                "settings file" in problem
+                and "does not parse" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_settings_file_that_is_a_directory_fails_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            (root / "settings.json").mkdir()
+            problems = self.persona.persona_problems(root)
+        self.assertTrue(
+            any(
+                "settings file" in problem
+                and "not a regular file" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_dangling_settings_file_link_keeps_the_absent_reading(self):
+        # A dangling link names no file, so it keeps the
+        # absent reading the guarded read pattern gives an
+        # absent path, and the manifest key stays the pinned
+        # surface. This test also passed against the blind
+        # gate by design.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            (root / "settings.json").symlink_to(root / "missing.json")
+            problems = self.persona.persona_problems(root)
+        self.assertEqual(problems, [], problems)
+
+    def run_persona_problems_bounded(self, root):
+        driver = (
+            "import importlib.util, sys\n"
+            "spec = importlib.util.spec_from_file_location("
+            "'gate_under_test', sys.argv[1])\n"
+            "mod = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(mod)\n"
+            "from pathlib import Path\n"
+            "for problem in mod.persona_problems(Path(sys.argv[2])):\n"
+            "    print(problem)\n"
+        )
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    driver,
+                    str(ROOT / "scripts" / "check_persona.py"),
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail("the persona gate did not finish within ten seconds")
+        return result.stdout + result.stderr
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_settings_file_fifo_refuses_promptly_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            os.mkfifo(root / "settings.json")
+            output = self.run_persona_problems_bounded(root)
+        self.assertIn("settings file", output, output)
+        self.assertIn("not a regular file", output, output)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_settings_file_link_to_a_fifo_refuses_promptly_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_tree(tmp)
+            os.mkfifo(root / "settings-target")
+            (root / "settings.json").symlink_to(root / "settings-target")
+            output = self.run_persona_problems_bounded(root)
+        self.assertIn("settings file", output, output)
+        self.assertIn("not a regular file", output, output)
+
     def test_a_missing_agents_key_fails(self):
         manifest = {
             "name": "recognitio",

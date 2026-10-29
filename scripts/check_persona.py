@@ -7,8 +7,13 @@ The plugin manifest declares the reviewer agent under the
 frontmatter field by field, and forbids a tool allowlist or
 a permission mode on the persona as defense in depth,
 because the persona changes the persona and not the tool
-access. The persona prose sentence discipline lives in the
-gate test suite beside the output style sentence check. See
+access. The same settings object may ship as a settings
+file at the plugin root, and the brief states that when
+both shapes exist the file wins and the manifest key is
+ignored, so the gate pins the file when it stands and
+reads the manifest key only when no file stands. The
+persona prose sentence discipline lives in the gate test
+suite beside the output style sentence check. See
 docs/reviewer-persona.md for the brief and the primary
 sources behind each rule.
 
@@ -206,6 +211,70 @@ def resolve_component(root, declared):
     return candidate
 
 
+def settings_object_problems(settings, carries_subject, agent_subject):
+    """The settings object pins, shared by both shipped shapes.
+
+    Only `agent` and `subagentStatusLine` take effect in
+    plugin settings and every other key is dropped at load,
+    so the shipped object carries the agent key and nothing
+    outside the allowed set, and its agent value is the
+    pinned persona name. The two subjects name the shape
+    under judgement in the gate wording of that shape.
+    """
+    problems = []
+    for key in sorted(settings):
+        if key not in ALLOWED_SETTINGS_KEYS:
+            problems.append(
+                "%s carries %r, which the host drops at load"
+                % (carries_subject, key)
+            )
+    if settings.get("agent") != AGENT_NAME:
+        problems.append(
+            "%s is %r, not the pinned %r"
+            % (agent_subject, settings.get("agent"), AGENT_NAME)
+        )
+    return problems
+
+
+def settings_file_problems(root):
+    """The settings file at the plugin root, when it stands.
+
+    The brief states that the settings object may ship as
+    `settings.json` at the plugin root instead of inline
+    under the manifest `settings` key, and that when both
+    shapes exist the file wins. An absent file is no
+    problem, because this plugin ships the manifest key
+    only. A file that stands is read behind the guarded
+    read pattern, so a path that is not a regular file
+    draws a named problem and is never read, and a file
+    that stands is held to the same object pins as the
+    manifest key it overrides.
+    """
+    path = root / "settings.json"
+    if not path.exists():
+        return []
+    if not path.is_file():
+        return [
+            "cannot read the settings file: "
+            "it is not a regular file"
+        ]
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return ["cannot read the settings file: %s" % exc]
+    except UnicodeDecodeError as exc:
+        return ["the settings file does not parse: %s" % exc]
+    try:
+        settings = strict_json_loads(text)
+    except (json.JSONDecodeError, DuplicateKeyError) as exc:
+        return ["the settings file does not parse: %s" % exc]
+    if not isinstance(settings, dict):
+        return ["the settings file is not an object"]
+    return settings_object_problems(
+        settings, "the settings file", "the settings file agent"
+    )
+
+
 def manifest_problems(root):
     """The `agents` and `settings` manifest key pins."""
     problems = []
@@ -231,22 +300,25 @@ def manifest_problems(root):
             "the manifest agents key is %r, not the pinned %r"
             % (agents, [AGENT_DECLARATION])
         )
-    settings = manifest.get("settings")
-    if not isinstance(settings, dict):
-        problems.append(
-            "the manifest settings key is %r, not an object" % settings
-        )
-    else:
-        for key in sorted(settings):
-            if key not in ALLOWED_SETTINGS_KEYS:
-                problems.append(
-                    "the manifest settings key carries %r, which "
-                    "the host drops at load" % key
-                )
-        if settings.get("agent") != AGENT_NAME:
+    # When a settings file stands at the plugin root the
+    # brief states that the file wins and the manifest key
+    # is ignored, so the manifest settings key is pinned
+    # only when no file stands. The file itself is pinned
+    # by settings_file_problems on the same reading.
+    if not (root / "settings.json").exists():
+        settings = manifest.get("settings")
+        if not isinstance(settings, dict):
             problems.append(
-                "the manifest settings agent is %r, not the pinned "
-                "%r" % (settings.get("agent"), AGENT_NAME)
+                "the manifest settings key is %r, not an object"
+                % settings
+            )
+        else:
+            problems.extend(
+                settings_object_problems(
+                    settings,
+                    "the manifest settings key",
+                    "the manifest settings agent",
+                )
             )
     resolved = resolve_component(root, AGENT_DECLARATION)
     if resolved is None:
@@ -293,6 +365,10 @@ def persona_problems(root):
         "manifest: %s" % problem
         for problem in manifest_problems(root)
     ]
+    problems.extend(
+        "settings file: %s" % problem
+        for problem in settings_file_problems(root)
+    )
     problems.extend(
         "agent dir: %s" % problem for problem in agent_dir_problems(root)
     )

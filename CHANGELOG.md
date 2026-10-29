@@ -2184,6 +2184,24 @@ This unreleased work carries version 1.3.0.
   block now fails the gate by name instead of passing
   in silence, and regression tests cover each planted
   change from the audit that found the gap.
+- The persona gate now reads the settings file at the
+  plugin root that the persona brief names beside the
+  manifest settings key and pins the object it carries
+  to the same agent value and allowed key set as the
+  manifest shape. When the file stands the precedence
+  the brief states applies and the manifest settings
+  key is ignored, and a file naming another agent or
+  carrying a key the host drops at load or failing to
+  parse now fails the gate by name instead of passing
+  in silence while the gate printed its pinned line.
+  The reading tests existence first and the regular
+  file shape second and only then reads, so a FIFO or
+  a link to a FIFO or a directory at that path draws
+  a named problem stating the path is not a regular
+  file without hanging, while an absent file and a
+  dangling link keep the absent reading they have
+  always carried and the shipped tree keeps its
+  pinned verdict.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
