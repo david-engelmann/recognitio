@@ -68,7 +68,7 @@ A review is stamped only on a verified packet. The gate report records base, hea
 
 ## The tier model
 
-The packet is built in four tiers and a closing receipt, and each tier is a named section of the packet.
+The packet is built in four tiers and a closing recount receipt, and each tier is a section of the packet.
 
 - T0 holds triage. It carries the pull request title, body, and spec references when the mode resolves them, the file list, the numstat summary, and the commit list for the range, so a reviewer sees why the change exists and what shape it has before its content. A changed file whose name marks it as an instruction bearing file is flagged as an instruction file in the file list, and its record in the manifest carries the same flag as a boolean named instruction_file. The name set is AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth, the Copilot instructions file name, a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix, the .cursorrules file name, a Cursor rules file under a .cursor folder, and a Claude rules file under a .claude/rules folder. A Kimi
 plugin manifest named kimi.plugin.json at any depth, a Kimi plugin

@@ -30,7 +30,7 @@ A relative findings path in the recorded command resolves beside the packet dire
 
 The manifest records a hash of the findings file a run used, or no hash where the run used no findings file. The check refuses a packet whose manifest records a findings hash while its recorded command carries no findings flag. A hash standing on a run that named no findings file claims a digest of an input the run never saw, and no accounting in such a packet can earn that claim back, in the same way an estimated size for a tier that was never built is refused.
 
-Where a since packet carries no findings accounting and its recorded command carries a findings flag at its last value, the check also holds the manifest hash to the file that flag names. A file that cannot be read refuses the stamp, and a file whose bytes hash to a different value refuses it on the same terms. A packet that carries a findings accounting keeps the fallback reading, so its stamp can still rest on the findings the section itself carries when the file is gone.
+Where a since packet carries no findings accounting and its recorded command carries a findings flag at its last value, the check also holds the manifest hash to the file that flag names where the manifest findings hash is not null. A file that cannot be read refuses the stamp, and a file whose bytes hash to a different value refuses it on the same terms. A packet that carries a findings accounting keeps the fallback reading, so its stamp can still rest on the findings the section itself carries when the file is gone.
 
 ## The terminal control characters
 

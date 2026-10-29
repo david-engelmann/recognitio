@@ -1,6 +1,6 @@
 # Example packet
 
-This folder holds one complete real packet a visitor can open without installing anything. The packet stands in [the packet file](example-packet-991ac6a/packet.md) beside this note, and its receipt stands in [the manifest](example-packet-991ac6a/manifest.json) beside the packet.
+This folder holds one complete real packet a visitor can open without installing anything. The packet stands in [the packet file](example-packet-991ac6a/packet.md) beside this note, and its manifest receipt stands in [the manifest](example-packet-991ac6a/manifest.json) beside the packet.
 
 ## What change it covers
 

@@ -1939,6 +1939,20 @@ This unreleased work carries version 1.3.0.
   that a failed run removes an earlier packet first and
   the unqualified receipt sentence in the extractor
   opening are gone.
+- The findings hash section of the verifier
+  completeness reference now states the non null
+  condition on its appended flag reading. The check
+  holds the manifest hash to the file a findings flag
+  names only where the manifest findings hash is not
+  null, and a packet whose manifest records no hash
+  draws no refusal from that reading.
+- The bare word receipt no longer names two different
+  artefacts on the front surfaces. The README and the
+  examples note now call the manifest file the manifest
+  receipt, and the skill text and the packet output
+  style now name the closing section of the packet the
+  closing recount receipt, so each use names the
+  artefact it means.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

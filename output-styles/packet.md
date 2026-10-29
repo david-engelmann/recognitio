@@ -20,7 +20,7 @@ unchanged.
 
 ## The packet shape
 
-The packet is built in four tiers and a closing receipt, and each tier is a named section of the packet.
+The packet is built in four tiers and a closing recount receipt, and each tier is a section of the packet.
 
 ```text
 ## T0 Triage
