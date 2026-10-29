@@ -1983,6 +1983,20 @@ This unreleased work carries version 1.3.0.
   limits item stands restated against the current
   tree, and the file stays the largest of its kind
   and stays under the cap the checklist holds.
+- A copied entry measured as text through the binary
+  measurement path now carries copy header lines in its
+  diff body when its source was renamed away in the same
+  range. The narrowed per file reading paired the source
+  and the copy as a rename and the stored chunk kept that
+  wording in both of its forms while the manifest and
+  the packet prose said copied, so one packet presented
+  one source as renamed to two destinations. The
+  extractor now restores the header wording of the entry
+  status the full range reading recorded and the counts
+  stay unchanged, and the packet check now refuses a
+  packet whose diff body copy or rename header wording
+  disagrees with the status its manifest records for that
+  section.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

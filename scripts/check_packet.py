@@ -1454,6 +1454,55 @@ def diff_fence_for(text):
     return "`" * max(3, longest + 1)
 
 
+def diff_header_wording_problems(entry, inner):
+    """Check the movement wording of the git header lines.
+
+    The copy from and copy to lines and the rename from and
+    rename to lines inside a diff body name the movement the
+    body is evidence for, so their wording must agree with the
+    status the manifest records for the section they stand in.
+    A copied section carrying rename header lines presents its
+    source as renamed to the copy destination, and a renamed
+    section carrying copy header lines presents its source as
+    standing beside the rename, and either wording stamps a
+    provenance the same packet manifest contradicts. The lines
+    are read bare at the head of the body, because a content
+    line inside a hunk always carries its diff prefix and can
+    never stand as one of these header lines. A section whose
+    manifest status is neither copied nor renamed carries no
+    such header lines at all.
+    """
+    copy_lines = [
+        line for line in inner
+        if line.startswith(("copy from ", "copy to "))
+    ]
+    rename_lines = [
+        line for line in inner
+        if line.startswith(("rename from ", "rename to "))
+    ]
+    if entry["status"] == "copied" and rename_lines:
+        return [
+            "the diff body for %s carries rename header lines, "
+            "but its manifest record names it copied"
+            % entry["path"]
+        ]
+    if entry["status"] == "renamed" and copy_lines:
+        return [
+            "the diff body for %s carries copy header lines, "
+            "but its manifest record names it renamed"
+            % entry["path"]
+        ]
+    if entry["status"] not in ("copied", "renamed") and (
+        copy_lines or rename_lines
+    ):
+        return [
+            "the diff body for %s carries copy or rename header "
+            "lines, but its manifest record names it %s"
+            % (entry["path"], entry["status"])
+        ]
+    return []
+
+
 def change_tier_problems(packet_text, manifest, fresh_change, extractor):
     problems = []
     span = section_span(packet_text, "## T1 The change")
@@ -1581,6 +1630,7 @@ def change_tier_problems(packet_text, manifest, fresh_change, extractor):
                         % entry["path"]
                     )
             continue
+        problems.extend(diff_header_wording_problems(entry, inner))
         if "@@ " in inner_text or any(
             line.startswith("@@ ") for line in inner
         ):

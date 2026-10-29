@@ -1255,6 +1255,39 @@ def entry_paths(entry):
     return paths
 
 
+def restore_status_header_wording(chunk, entry):
+    """Put the entry status wording back on a chunk header.
+
+    A narrowed per file reading can pair the two sides of an
+    entry under the other movement word. When the source of a
+    copied entry was renamed away in the same range, the source
+    stands deleted inside a reading over the source and the copy
+    alone and its rename destination stands outside that
+    reading, so git pairs the deleted source with the added copy
+    as a rename and the chunk header says rename from and rename
+    to for an entry the full range reading records as copied.
+    The entry status from the full range reading is the truth
+    the packet stands on, so the header wording of the stored
+    chunk is corrected to that status and the paths the header
+    names are carried over word for word. A renamed entry gets
+    the same correction in the other direction. Every other
+    entry and every other line of the chunk stands untouched,
+    so the counts the chunk measures never move.
+    """
+    if entry["status"] == "copied":
+        wrong, right = "rename", "copy"
+    elif entry["status"] == "renamed":
+        wrong, right = "copy", "rename"
+    else:
+        return chunk
+    corrected = []
+    for line in chunk.splitlines(keepends=True):
+        if line.startswith((wrong + " from ", wrong + " to ")):
+            line = right + line[len(wrong):]
+        corrected.append(line)
+    return "".join(corrected)
+
+
 def per_file_text_diff(repo, diff_base, head, entry, context_flag):
     """Diff one file with the text flag, for attribute marked files.
 
@@ -1273,6 +1306,11 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
     emits its two sections inside that one pairing, and grouping
     has already reunited them, so the entry is measured and shown
     whole instead of by its deletion half alone.
+
+    The narrowed reading can also re-pair the entry itself under
+    the other movement word, so the stored chunk goes through
+    restore_status_header_wording against the entry status the
+    full range reading recorded before it is returned.
     """
     paths = entry_paths(entry)
     result = run_git(
@@ -1296,7 +1334,7 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
             "the per file diff for %s holds no section the entry "
             "owns, so it cannot be measured as text" % entry["path"]
         )
-    return paired[entry["path"]]
+    return restore_status_header_wording(paired[entry["path"]], entry)
 
 
 def per_file_text_numstat(repo, diff_base, head, entry):
