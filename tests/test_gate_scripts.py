@@ -2238,7 +2238,7 @@ class TestReadmePhoneWidth(unittest.TestCase):
             "Assemble the packet in four tiers",
             "Recount the change",
             "Verified packet",
-            "The run fails and no packet stands",
+            "A failed run leaves a standing verified packet untouched",
             "The review reads the packet",
         ):
             self.assertIn(label, self.readme)

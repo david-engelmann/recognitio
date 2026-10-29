@@ -55,7 +55,7 @@ extract.py \
   --out packet --repo .
 ```
 
-3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a run that fails leaves no packet standing and prints the disagreement.
+3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message.
 
 4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The `manifest.json` file beside it is the manifest receipt for the run.
 
@@ -143,7 +143,7 @@ flowchart TB
     B --> C[Assemble the packet in four tiers]
     C --> D{Recount the change}
     D -->|Counts agree| E([Verified packet])
-    D -->|Counts disagree| F[The run fails and no packet stands]
+    D -->|Counts disagree| F[A failed run leaves a standing verified packet untouched]
     E --> G[The review reads the packet]
 ```
 

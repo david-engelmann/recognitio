@@ -1963,6 +1963,12 @@ This unreleased work carries version 1.3.0.
   at either manifest path. A dangling link keeps the
   absent reading at both paths, and a genuinely absent
   manifest keeps the behaviour it has always carried.
+- The readme quickstart and the How it works diagram
+  now state the same preservation. A failed run leaves
+  a standing verified packet and its manifest untouched
+  and reports its failure in its exit code and its
+  message, and the two earlier wordings that a failed
+  run leaves no packet standing are gone.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
