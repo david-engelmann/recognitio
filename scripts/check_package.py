@@ -121,8 +121,28 @@ def describe(path, root=ROOT):
 
 
 def load_manifest(root):
-    """The parsed portable manifest, or a problem."""
+    """The parsed portable manifest, or a problem.
+
+    The regular file test stands before any read. A path that
+    does not exist at all keeps the missing reading, and a
+    dangling link reads the same way because the existence
+    test follows the link. A path that stands in the tree but
+    is not a regular file draws the cannot be read problem
+    without a read being attempted, because opening a FIFO
+    can block for a writer that never comes. The file test
+    follows links, so a link to a regular file still reads
+    through while a link to a FIFO refuses like a FIFO.
+    """
     path = root / "agent-plugins-package" / "plugin.json"
+    if not path.exists():
+        return None, "the portable manifest at %s is missing" % describe(
+            path, root
+        )
+    if not path.is_file():
+        return None, (
+            "the portable manifest at %s cannot be read, "
+            "it is not a regular file" % describe(path, root)
+        )
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -148,11 +168,20 @@ def native_version(root):
     instead of skipping in silence over a manifest it never
     read. A manifest that does not stand in the tree yields
     neither a version nor a problem, because the extension path
-    reading already names that absence in its own terms.
+    reading already names that absence in its own terms. The
+    regular file test in load_manifest stands here as well,
+    with the same link following reading, so a dangling link
+    keeps the absent reading and a link to a regular file
+    still reads through.
     """
     path = root / ".claude-plugin" / "plugin.json"
     if not path.exists():
         return None, None
+    if not path.is_file():
+        return None, (
+            "the native manifest at %s cannot be read, "
+            "it is not a regular file" % describe(path, root)
+        )
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:

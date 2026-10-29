@@ -19,13 +19,20 @@ pin. A native manifest that cannot be read or does not parse
 or is not an object or carries no version or carries a
 version that is not a string fails the gate by name, while a
 genuinely absent native manifest keeps the single extension
-path problem it has always carried.
+path problem it has always carried. A manifest standing as a
+FIFO at either manifest path fails promptly with the cannot
+be read problem instead of blocking on the read, and a link
+to a regular file still reads through while a dangling link
+keeps the absent reading at both paths.
 """
 
 import importlib.util
 import io
 import json
+import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -109,6 +116,41 @@ class TestCheckPackage(unittest.TestCase):
 
     def problems(self, root):
         return self.mod.package_problems(root)
+
+    def run_gate(self, root):
+        # The FIFO shapes can only be graded in a subprocess
+        # with a bound, because a gate that still reads the
+        # FIFO would block this test process itself and hang
+        # the whole suite instead of failing one test. The
+        # driver loads the shipped gate script and runs its
+        # main entry against the scratch root.
+        driver = (
+            "import importlib.util, sys\n"
+            "from pathlib import Path\n"
+            "spec = importlib.util.spec_from_file_location(\n"
+            "    'gate_under_test', sys.argv[1])\n"
+            "module = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(module)\n"
+            "sys.exit(module.main(Path(sys.argv[2])))\n"
+        )
+        try:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    driver,
+                    str(ROOT / "scripts" / "check_package.py"),
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the package gate did not finish within ten "
+                "seconds against the scratch root"
+            )
 
     def test_the_shipped_package_holds(self):
         self.assertEqual(self.mod.package_problems(ROOT), [])
@@ -245,6 +287,160 @@ class TestCheckPackage(unittest.TestCase):
                 ),
                 problems,
             )
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_native_manifest_standing_as_a_fifo_fails_promptly(self):
+        # Round 159 Finding 1. Opening a FIFO for reading
+        # blocks until a writer opens the other end, so a
+        # plain read of a native manifest standing as a FIFO
+        # hangs the gate in silence. The gate must refuse it
+        # by name without reading it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.unlink()
+            os.mkfifo(path)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("native manifest", result.stderr)
+            self.assertIn("cannot be read", result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_portable_manifest_standing_as_a_fifo_fails_promptly(self):
+        # Round 159 Finding 1. The portable manifest reading
+        # carries the same plain read as the native one, so a
+        # FIFO at the portable path hangs the gate the same
+        # way and must draw the same cannot be read problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "agent-plugins-package" / "plugin.json"
+            path.unlink()
+            os.mkfifo(path)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("portable manifest", result.stderr)
+            self.assertIn("cannot be read", result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_native_manifest_linking_to_a_fifo_fails_promptly(self):
+        # Round 159 Finding 1. The regular file test follows
+        # links, so a link whose target is a FIFO refuses
+        # exactly as a FIFO standing at the path itself does.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            target = Path(tmp) / "native-fifo"
+            os.mkfifo(target)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.unlink()
+            path.symlink_to(target)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("native manifest", result.stderr)
+            self.assertIn("cannot be read", result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_portable_manifest_linking_to_a_fifo_fails_promptly(self):
+        # Round 159 Finding 1. A link to a FIFO at the
+        # portable path refuses the same way as at the
+        # native path.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            target = Path(tmp) / "portable-fifo"
+            os.mkfifo(target)
+            path = root / "agent-plugins-package" / "plugin.json"
+            path.unlink()
+            path.symlink_to(target)
+            result = self.run_gate(root)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("portable manifest", result.stderr)
+            self.assertIn("cannot be read", result.stderr)
+
+    def test_a_portable_manifest_that_is_a_directory_fails(self):
+        # Round 159 Finding 1. A directory is not a regular
+        # file either, so the portable path draws the cannot
+        # be read problem the native directory shape already
+        # drew instead of the missing reading.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "agent-plugins-package" / "plugin.json"
+            path.unlink()
+            path.mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "portable manifest" in problem
+                    and "cannot be read" in problem
+                    for problem in problems
+                ),
+                problems,
+            )
+
+    def test_a_native_manifest_linking_to_a_regular_file_holds(self):
+        # The regular file test follows links, so a native
+        # manifest standing as a link to a regular file with
+        # the genuine content still reads through and the
+        # scratch layout still holds.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            target = Path(tmp) / "native-copy.json"
+            shutil.copyfile(path, target)
+            path.unlink()
+            path.symlink_to(target)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_portable_manifest_linking_to_a_regular_file_holds(self):
+        # A portable manifest standing as a link to a regular
+        # file with the genuine content reads through the
+        # same way and the scratch layout still holds.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "agent-plugins-package" / "plugin.json"
+            target = Path(tmp) / "portable-copy.json"
+            shutil.copyfile(path, target)
+            path.unlink()
+            path.symlink_to(target)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_dangling_native_manifest_link_reads_as_absent(self):
+        # A dangling link keeps the absent reading the plain
+        # missing shape carries, namely the single extension
+        # path problem and no added version problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.unlink()
+            path.symlink_to(Path(tmp) / "no-native-manifest.json")
+            problems = self.problems(root)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn(".claude-plugin/plugin.json", problems[0])
+            self.assertIn("does not resolve", problems[0])
+
+    def test_a_dangling_portable_manifest_link_reads_as_missing(self):
+        # A dangling link at the portable path keeps the
+        # missing reading a genuinely absent portable
+        # manifest carries.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "agent-plugins-package" / "plugin.json"
+            path.unlink()
+            path.symlink_to(Path(tmp) / "no-portable-manifest.json")
+            problems = self.problems(root)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn("portable manifest", problems[0])
+            self.assertIn("is missing", problems[0])
+
+    def test_a_missing_portable_manifest_reads_as_missing(self):
+        # A genuinely absent portable manifest keeps its
+        # exact current behaviour, namely the single missing
+        # problem and nothing else.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "agent-plugins-package" / "plugin.json").unlink()
+            problems = self.problems(root)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn("portable manifest", problems[0])
+            self.assertIn("is missing", problems[0])
 
     def test_a_native_manifest_that_is_not_an_object_fails(self):
         # Round 115 Finding 1. A native manifest that parses to

@@ -1953,6 +1953,16 @@ This unreleased work carries version 1.3.0.
   style now name the closing section of the packet the
   closing recount receipt, so each use names the
   artefact it means.
+- The package gate now refuses a manifest standing as
+  a FIFO instead of hanging on the read. Both manifest
+  readings test for a regular file before any read and
+  follow links, so a link to a regular file still reads
+  through and a link to a FIFO refuses the same way,
+  and a manifest that stands in the tree but is not a
+  regular file draws the named cannot be read problem
+  at either manifest path. A dangling link keeps the
+  absent reading at both paths, and a genuinely absent
+  manifest keeps the behaviour it has always carried.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
