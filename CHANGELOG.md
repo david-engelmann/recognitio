@@ -2173,6 +2173,17 @@ This unreleased work carries version 1.3.0.
   script stands behind the same guard, and the other
   readings in the script already stood behind regular
   file tests of their own.
+- The CodeRabbit gate now pins the path filters and
+  the path instruction paths of the shipped config
+  beside the settings it already pinned. The reading
+  covers the four filter entries that keep generated
+  packets and bytecode out of review and the four
+  paths that carry path instructions and the wording
+  of the Markdown path passage that states the copy
+  bar for public prose. A weakened entry or a deleted
+  block now fails the gate by name instead of passing
+  in silence, and regression tests cover each planted
+  change from the audit that found the gap.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -18,7 +18,10 @@ record without a decision 4 statement each fail the CodeRabbit
 gate. The shipped config at the repo root stands under the
 same gate, and a planted change to a setting the brief states
 for that file, a deleted config, and a FIFO at the config
-path each fail it as well.
+path each fail it as well. A planted change to the config
+path filters, to the path instruction paths, or to the
+Markdown path instruction wording, and the deletion of
+either path block whole, each fail it as well.
 """
 
 import importlib.util
@@ -681,6 +684,215 @@ class TestCheckCoderabbit(unittest.TestCase):
                 problems,
             )
 
+    def test_a_config_markdown_path_wording_plant_fails(self):
+        # Round 236. The wording flipped in the Markdown
+        # path passage returned zero problems at the base.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "No em dashes in prose",
+                "Em dashes are welcome in prose",
+            )
+            self.assertTrue(
+                any(
+                    "copy bar path instructions for **/*.md"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_path_instructions_block_deleted_fails(
+        self,
+    ):
+        # Round 236. The path instructions block deleted
+        # whole returned zero problems at the base.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_config(root)
+            start = text.index("  path_instructions:")
+            end = text.index("  pre_merge_checks:")
+            self.write_config(root, text[:start] + text[end:])
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "does not carry path instructions for"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_path_filters_block_deleted_fails(self):
+        # Round 236. The path filters block deleted whole
+        # returned zero problems at the base.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_config(root)
+            start = text.index("  path_filters:")
+            end = text.index("  path_instructions:")
+            self.write_config(root, text[:start] + text[end:])
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "does not carry the reviews path filters"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_path_instruction_path_plant_fails(self):
+        # Round 236 scope. The path instruction paths are
+        # pinned as a set, so a moved path fails by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                '- path: "tests/**"',
+                '- path: "test/**"',
+            )
+            self.assertTrue(
+                any(
+                    "does not carry path instructions for"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_path_filter_entry_plant_fails(self):
+        # Round 236 scope. The path filter entries are
+        # pinned as a set, so a weakened entry fails by
+        # name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                '- "!packet/**"',
+                '- "!packet/"',
+            )
+            self.assertTrue(
+                any(
+                    "does not carry the reviews path filters"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_extra_path_instruction_entry_fails(
+        self,
+    ):
+        # Round 236 scope. An added path instruction entry
+        # moves the pinned path set and fails by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "\n  pre_merge_checks:",
+                '\n    - path: "docs/**"\n'
+                "      instructions: |\n"
+                "        Extra guidance.\n"
+                "\n  pre_merge_checks:",
+            )
+            self.assertTrue(
+                any(
+                    "does not carry path instructions for"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_extra_path_filter_entry_fails(self):
+        # Round 236 scope. An added path filter entry
+        # moves the pinned filter set and fails by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                '- "!packets/**"',
+                '- "!packets/**"\n    - "!docs/**"',
+            )
+            self.assertTrue(
+                any(
+                    "does not carry the reviews path filters"
+                    in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_config_other_path_wording_change_holds(self):
+        # Control. The instruction wording of the non
+        # Markdown path entries is not pinned under the
+        # round 236 scope, so a wording change there passes
+        # in both states while its path stays pinned.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "The extractor reads local git only",
+                "The extractor reads hosted diffs only",
+            )
+            self.assertEqual(problems, [])
+
+    def test_a_config_markdown_block_deeper_indent_holds(
+        self,
+    ):
+        # Control. The Markdown block scalar carried at a
+        # deeper indentation holds the same words, and the
+        # pin reads wording rather than indentation.
+        old = (
+            "      instructions: |\n"
+            "        Public prose here follows a copy bar. "
+            "No em dashes in prose,\n"
+            "        and no colons or semicolons in prose "
+            "sentences either. When\n"
+            "        flagging one of these marks, never "
+            "suggest another banned\n"
+            "        mark as the replacement. Suggest short "
+            "plain sentences\n"
+            "        instead. Flag claims about what the "
+            "skill does that the\n"
+            "        README and SKILL files do not back.\n"
+        )
+        new = (
+            "      instructions: |\n"
+            "          Public prose here follows a copy "
+            "bar. No em dashes in prose,\n"
+            "          and no colons or semicolons in prose "
+            "sentences either. When\n"
+            "          flagging one of these marks, never "
+            "suggest another banned\n"
+            "          mark as the replacement. Suggest "
+            "short plain sentences\n"
+            "          instead. Flag claims about what the "
+            "skill does that the\n"
+            "          README and SKILL files do not back.\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(root, old, new)
+            self.assertEqual(problems, [])
+
+    def test_a_config_markdown_wording_rewrapped_holds(self):
+        # Control. The Markdown passage rewrapped onto
+        # different lines holds the same words in order,
+        # and the pin reads wording rather than wrapping.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_config(
+                root,
+                "No em dashes in prose,\n"
+                "        and no colons",
+                "No em dashes\n"
+                "        in prose, and no colons",
+            )
+            self.assertEqual(problems, [])
+
     def test_a_deleted_config_fails(self):
         # Round 230. Deleting the config whole returned
         # zero problems at the base.
@@ -777,6 +989,34 @@ class TestCheckCoderabbit(unittest.TestCase):
             "    enabled: true\n"
             "  request_changes_workflow: false\n"
             '  profile: "chill"\n'
+            "  path_filters:\n"
+            '    - "!packets/**"\n'
+            '    - "!packet/**"\n'
+            '    - "!**/*.pyc"\n'
+            '    - "!**/__pycache__/**"\n'
+            "  path_instructions:\n"
+            '    - path: "scripts/**"\n'
+            "      instructions: |\n"
+            "        Gate scripts are stdlib only.\n"
+            '    - path: "**/*.md"\n'
+            "      instructions: |\n"
+            "        Public prose here follows a copy bar. "
+            "No em dashes in prose, and\n"
+            "        no colons or semicolons in prose "
+            "sentences either. When flagging\n"
+            "        one of these marks, never suggest "
+            "another banned mark as the\n"
+            "        replacement. Suggest short plain "
+            "sentences instead. Flag claims\n"
+            "        about what the skill does that the "
+            "README and SKILL files do\n"
+            "        not back.\n"
+            '    - path: "tests/**"\n'
+            "      instructions: |\n"
+            "        Every test must be able to fail.\n"
+            '    - path: ".agents/skills/recognitio/**"\n'
+            "      instructions: |\n"
+            "        The extractor reads local git only.\n"
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

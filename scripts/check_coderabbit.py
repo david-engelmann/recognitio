@@ -20,7 +20,11 @@ that drops any of them fails the gate instead of drifting in
 silence. The gate also reads the shipped config at the repo
 root and pins the settings the brief states for that file, so
 the config CodeRabbit consumes cannot drift or vanish while
-the brief keeps reading as proven.
+the brief keeps reading as proven. The same reading pins the
+config path filters and the path instruction paths and the
+Markdown path instruction wording, so the operative review
+guidance those blocks carry cannot be weakened or deleted in
+silence either.
 """
 
 import re
@@ -731,6 +735,43 @@ CONFIG_PATTERNS_PATH = (
     "knowledge_base", "code_guidelines", "filePatterns"
 )
 
+# The path blocks of the shipped config, pinned in the form
+# round 236 named. The path filters under reviews carry the
+# exclusions that keep generated packets and bytecode out of
+# review, and the path instructions under reviews carry one
+# entry per shipped path. The instruction wording is pinned
+# for the Markdown entry alone, the passage the round 236
+# plant flipped, because the brief states no wording for the
+# other three entries and their paths alone are pinned.
+CONFIG_PATH_FILTERS = (
+    "!**/__pycache__/**",
+    "!**/*.pyc",
+    "!packet/**",
+    "!packets/**",
+)
+
+CONFIG_PATH_FILTERS_PATH = ("reviews", "path_filters")
+
+CONFIG_INSTRUCTION_PATHS = (
+    "**/*.md",
+    ".agents/skills/recognitio/**",
+    "tests/**",
+    "scripts/**",
+)
+
+CONFIG_INSTRUCTIONS_PATH = ("reviews", "path_instructions")
+
+CONFIG_MARKDOWN_PATH = "**/*.md"
+
+CONFIG_MARKDOWN_INSTRUCTIONS = (
+    "Public prose here follows a copy bar. No em dashes in "
+    "prose, and no colons or semicolons in prose sentences "
+    "either. When flagging one of these marks, never suggest "
+    "another banned mark as the replacement. Suggest short "
+    "plain sentences instead. Flag claims about what the "
+    "skill does that the README and SKILL files do not back."
+)
+
 
 def _config_scalar(raw_value):
     """The plain or quoted scalar spelling of a config value."""
@@ -752,35 +793,59 @@ def config_settings(raw):
     keys are tracked by their indent path, so a setting counts
     in any key order and unknown keys pass by, and the file
     patterns list under the code guidelines key is collected
-    in full. Block scalar bodies are skipped by indent, so
-    the path instruction prose is never read as keys. A
-    repeated pinned setting is reported by the caller, and a
-    shape this reader cannot see leaves its setting unset,
-    which the caller names as a problem.
+    in full. The path filters list and the path instruction
+    paths under reviews are collected in full the same way.
+    Block scalar bodies are skipped by indent, so the path
+    instruction prose is never read as keys, with one stated
+    exception. The body of the Markdown path entry is kept as
+    stripped lines and joined with single spaces, so its
+    wording is pinned while its wrapping and its block
+    indentation carry no weight. A repeated pinned setting
+    is reported by the caller, and a shape this reader cannot
+    see leaves its setting unset, which the caller names as
+    a problem.
     """
     values = {}
     patterns = []
     repeats = []
+    filters = []
+    instruction_paths = []
+    markdown_lines = []
     stack = []
     block_indent = None
+    block_capture = False
+    current_path = None
     for raw_line in raw.splitlines():
         line = raw_line.rstrip()
         if not line.strip():
             continue
         indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
         if block_indent is not None:
             if indent > block_indent:
+                if block_capture:
+                    markdown_lines.append(stripped)
                 continue
             block_indent = None
-        stripped = line.strip()
+            block_capture = False
         if stripped.startswith("#"):
             continue
         if stripped.startswith("- "):
             owner = tuple(key for _depth, key in stack)
+            item = stripped[2:]
             if owner == CONFIG_PATTERNS_PATH:
-                patterns.append(
-                    _config_scalar(stripped[2:])
+                patterns.append(_config_scalar(item))
+            elif owner == CONFIG_PATH_FILTERS_PATH:
+                filters.append(_config_scalar(item))
+            elif owner == CONFIG_INSTRUCTIONS_PATH:
+                item_match = re.match(
+                    r"^path:\s+(.*)$", item
                 )
+                if item_match is not None:
+                    current_path = _config_scalar(
+                        item_match.group(1)
+                    )
+                    instruction_paths.append(current_path)
             continue
         match = re.match(
             r"^([A-Za-z0-9_]+):(?:\s+(.*))?$", stripped
@@ -791,11 +856,19 @@ def config_settings(raw):
         value = match.group(2)
         while stack and stack[-1][0] >= indent:
             stack.pop()
+        if indent <= 2:
+            current_path = None
         if value is None:
             stack.append((indent, key))
             continue
         if value.strip() in ("|", "|-", "|+", ">", ">-", ">+"):
             block_indent = indent
+            block_capture = (
+                key == "instructions"
+                and current_path == CONFIG_MARKDOWN_PATH
+                and tuple(item for _depth, item in stack)
+                == CONFIG_INSTRUCTIONS_PATH
+            )
             continue
         path = tuple(item for _depth, item in stack) + (key,)
         if path not in values:
@@ -803,7 +876,11 @@ def config_settings(raw):
         elif any(path == pinned for pinned, _want, _text
                  in CONFIG_PINNED):
             repeats.append(path)
-    return values, patterns, repeats
+    markdown = " ".join(markdown_lines)
+    return (
+        values, patterns, repeats, filters, instruction_paths,
+        markdown,
+    )
 
 
 def config_problems(root=None):
@@ -823,7 +900,8 @@ def config_problems(root=None):
     raw = read_text(path)
     if raw is None:
         return [".coderabbit.yaml is missing"]
-    values, patterns, repeats = config_settings(raw)
+    values, patterns, repeats, filters, instruction_paths, \
+        markdown = config_settings(raw)
     problems = []
     for pinned, want, problem in CONFIG_PINNED:
         if values.get(pinned) != want or pinned in repeats:
@@ -833,6 +911,26 @@ def config_problems(root=None):
             ".coderabbit.yaml does not pair the knowledge "
             "base code guidelines with file patterns on "
             "**/AGENTS.md and README.md"
+        )
+    if sorted(filters) != sorted(CONFIG_PATH_FILTERS):
+        problems.append(
+            ".coderabbit.yaml does not carry the reviews "
+            "path filters !**/__pycache__/** and !**/*.pyc "
+            "and !packet/** and !packets/**"
+        )
+    if sorted(instruction_paths) != sorted(
+        CONFIG_INSTRUCTION_PATHS
+    ):
+        problems.append(
+            ".coderabbit.yaml does not carry path "
+            "instructions for **/*.md and "
+            ".agents/skills/recognitio/** and tests/** and "
+            "scripts/**"
+        )
+    if markdown != CONFIG_MARKDOWN_INSTRUCTIONS:
+        problems.append(
+            ".coderabbit.yaml does not carry the shipped "
+            "copy bar path instructions for **/*.md"
         )
     if "advisory step 0" not in raw:
         problems.append(
