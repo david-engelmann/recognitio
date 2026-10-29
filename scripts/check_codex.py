@@ -24,8 +24,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "codex-review-brief.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The review rules"
 
@@ -56,11 +54,6 @@ PRIMARY_CITATIONS = (
     "learn.chatgpt.com/docs/config-file/",
     "github.com/openai/codex-plugin-cc",
 )
-
-# Decision 4 is the standing record that scripts carry enforcement
-# with no model judgment, and a rule may derive from it directly.
-ALLOWED_SOURCES = tuple(CANONICAL_SECTIONS) + PRIMARY_CITATIONS \
-    + ("Decision 4",)
 
 # Brief sentences the gate pins. Each is a fragment of the exact
 # sentence the brief carries, so a later edit that softens or drops

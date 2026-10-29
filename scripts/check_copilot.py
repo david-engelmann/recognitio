@@ -25,8 +25,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "copilot-sdk-brief.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The SDK rules"
 

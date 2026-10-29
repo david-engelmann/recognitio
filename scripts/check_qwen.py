@@ -27,10 +27,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "qwen-code-brief.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
-CHANGELOG = ROOT / "CHANGELOG.md"
-README = ROOT / "README.md"
 
 RULES_HEADING = "## The Qwen rules"
 
@@ -297,8 +293,6 @@ FIGURE_SCOPE = (
     "large|high effort|top effort|practice|"
     "same repository|same deadline"
 )
-
-FIGURE_WORDS = FIGURE_ADVERBS + "|" + FIGURE_AGENTS
 
 # Wrapper nouns from G-02 and R-02.
 # Bare shell is the R-02 noun. A bare shell mention alone

@@ -2165,3 +2165,17 @@ This unreleased work carries version 1.3.0.
   it needs from the root argument it is handed, so the
   gate now holds one spelling of each path and no dead
   one beside it.
+- The twenty six dead constants across seven provider
+  gates, being the brief and decisions paths in the Codex
+  and CodeRabbit and Antigravity and Copilot gates with
+  the allowed sources tuple and the comment that
+  described it alone in the Codex gate, the nine paths at
+  the head of the Cursor gate with the plugin directory
+  path that only those nine loaded, the brief and skill and
+  decisions paths in the Devin gate, and the brief and
+  decisions and changelog and readme paths with the
+  figure words string in the Qwen gate. No code in any
+  of the seven gates loaded any of them, and every
+  function in those gates builds the paths it needs from
+  the root argument it is handed, so each gate now holds
+  one spelling of each path and no dead one beside it.

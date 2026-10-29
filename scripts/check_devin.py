@@ -33,9 +33,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "devin-playbook-brief.md"
-SKILL = ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The Devin rules"
 

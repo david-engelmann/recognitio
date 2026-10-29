@@ -35,16 +35,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_DIR = ROOT / ".cursor-plugin"
-PLUGIN_JSON = PLUGIN_DIR / "plugin.json"
-MARKETPLACE_JSON = PLUGIN_DIR / "marketplace.json"
-SKILL_COPY = PLUGIN_DIR / "skills" / "recognitio"
-CANONICAL_SKILL = ROOT / ".agents" / "skills" / "recognitio"
-BUGBOT_MD = ROOT / ".cursor" / "BUGBOT.md"
-BUGBOT_YAML = ROOT / ".cursor" / "config" / "bugbot.yaml"
-BRIEF = ROOT / "docs" / "cursor-plugin-brief.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
-CLAUDE_PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 
 RULES_HEADING = "## The review rules"
 
