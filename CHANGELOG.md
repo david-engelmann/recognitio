@@ -2112,6 +2112,15 @@ This unreleased work carries version 1.3.0.
   while a link to a regular file still reads through
   and an absent path and a dangling link keep the
   behaviour they have always carried.
+- The Claude submission pack now states the repo
+  holds 222 files. The residual doors landing added
+  the test file tests/test_fifo_residual_doors.py
+  after the last restatement and the pack figure had
+  kept the earlier count. The size limits item and
+  the credential scan sentence stand restated against
+  the current tree, and the count stands under the
+  cap the checklist holds for a reviewer at 290
+  files of headroom.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
