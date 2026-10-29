@@ -2044,6 +2044,14 @@ This unreleased work carries version 1.3.0.
   that the privacy policy URL field also stands absent
   from the shipped manifest, pending the privacy
   determination the pack records.
+- The Claude submission pack now states the repo
+  holds 221 files. The FIFO sweep landing added the
+  doors test file after the last restatement and the
+  pack figure had kept the earlier count. The size
+  limits item and the credential scan sentence stand
+  restated against the current tree, and the count
+  stands under the cap the checklist holds for a
+  reviewer at 291 files of headroom.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
