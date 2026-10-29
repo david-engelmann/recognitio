@@ -37,8 +37,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEF = ROOT / "docs" / "kimi-plugin-brief.md"
-DECISIONS = ROOT / "docs" / "decisions.md"
 
 RULES_HEADING = "## The Kimi rules"
 
@@ -84,17 +82,6 @@ CANONICAL_SECTIONS = {
     "Trust and limits",
     "The boundary",
 }
-
-# Primary citations a derivation note may name, written as URL
-# stems so the note pins the surface the claim was read from.
-# "kimi.com" is the docs host for the plugins, whats new, and
-# agents pages. "github.com" is the releases host for the
-# qualified names and hook working directory entries and the
-# host of the alibaba/open-code-review reference repo.
-PRIMARY_CITATIONS = (
-    "kimi.com",
-    "github.com",
-)
 
 # Brief sentences the gate pins. Each is a fragment of the exact
 # sentence the brief carries, so a later edit that softens or

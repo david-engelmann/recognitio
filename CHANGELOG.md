@@ -2038,3 +2038,12 @@ This unreleased work carries version 1.3.0.
   in the gate builds the paths it needs from the root
   argument it is handed, so the gate now holds one
   spelling of each path and no dead one beside it.
+- The three dead constants in the Kimi gate, being the
+  brief path and the decisions path at its head and the
+  primary citations tuple further down with the comment
+  that described it alone. No code in the gate loaded any
+  of them, and every function in the gate builds the paths
+  it needs from the root argument it is handed and screens
+  a derivation note citation by the page path the note
+  names, so the gate now holds one spelling of each path
+  and no dead one beside it.
