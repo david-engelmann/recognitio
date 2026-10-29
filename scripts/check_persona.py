@@ -26,7 +26,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_JSON = ROOT / ".claude-plugin" / "plugin.json"
 AGENT_DECLARATION = "./agents/reviewer.md"
 AGENT_NAME = "reviewer"
 

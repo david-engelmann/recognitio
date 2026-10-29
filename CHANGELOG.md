@@ -2269,3 +2269,11 @@ This unreleased work carries version 1.3.0.
   function in those gates builds the paths it needs from
   the root argument it is handed, so each gate now holds
   one spelling of each path and no dead one beside it.
+- The two dead constants in the persona gate and the
+  test vacuity gate, being the plugin manifest path in
+  the persona gate and the tests folder path in the
+  vacuity gate. No code in either gate loaded either
+  of them, and every function in those gates builds
+  the paths it needs from the root argument it is
+  handed, so each gate now holds one spelling of
+  each path and no dead one beside it.
