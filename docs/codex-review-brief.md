@@ -10,11 +10,11 @@ The derivation noted Codex review rule set in this brief, written for the Codex 
 
 **What was proven**
 
-Every rule carries a derivation note naming its skill section, gate or primary source, and the gate pins the notes against silent drift.
+Every rule carries a derivation note naming its skill section, gate or primary source, and the gate pins the notes against silent drift. A paired live Codex review run on 2026-10-29 then showed the rules changing a review, as the live run section of this brief records.
 
 **What is unverified**
 
-No live Codex review run stands in this brief, so the rules are documented guidance here and their effect in a live review stays unverified.
+The live record is one paired run on one small range with one model, so the rules at other scales and on other models stand unverified, and the packet gating rule was not exercised because the paired run reviewed a plain range with no packet in play.
 
 ## Summary
 
@@ -196,6 +196,40 @@ unrelated change. The post states that Code Review stays an
 additional reviewer while tests, branch protections, and required
 approvals provide hard enforcement. Reviews can also be requested
 directly with `@codex review`.
+
+## The live run
+
+The rules' effect in a live review was tested on 2026-10-29
+in a paired run, after the blocker audit proved a live Codex
+session route on this box. Codex CLI 0.164.0-alpha.9 ran its
+built in review surface through a custom provider on the
+responses wire API with the model openai/gpt-5.3-codex, its
+key supplied by the connected OpenRouter credential. Two
+scratch repositories carried the same reviewed range, byte
+identical across the pair, and differed only in the base
+AGENTS.md. One carried ordinary project guidance, and the
+other carried the same guidance plus the seven rule
+statements placed verbatim under a Code review rules heading.
+
+The range carried three changes. A loyalty discount stated
+five years or more at fifteen percent while its code required
+more than five years. A CLAUDE.md edit flipped the pull
+request instruction to direct pushes with no signpost
+anywhere. A correct price formatter stood as a clean change.
+The session without the rules caught the discount bug and
+said nothing about CLAUDE.md. The session with the rules
+caught the same bug and flagged the CLAUDE.md change as an
+instruction bearing file edit, citing the AGENTS.md lines of
+the R4 rule itself as the guidance behind the finding, with a
+location and a priority. Neither session raised a finding on
+the clean change.
+
+The record is one paired run on one small range with one
+model. The packet gating rule was not exercised, because the
+run reviewed a plain range with no packet in play, and the
+rules at other scales and on other models stand unverified.
+The full record stands in the perfection program's live
+effect report dated 2026-10-29.
 
 ## The Stop gate
 

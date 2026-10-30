@@ -2266,6 +2266,16 @@ This unreleased work carries version 1.3.0.
   as the largest file at 607,309 bytes, and the gate
   test file at 260,103 bytes with 2,041 bytes of
   headroom under its cap.
+- The Build 9 brief no longer carries its review rules as
+  live unverified. A paired live Codex review run on
+  2026-10-29, one arm with the seven rule statements in
+  AGENTS.md and one arm without them over a byte identical
+  range, showed the rules arm flagging an instruction
+  bearing file change the control arm passed over, citing
+  the rule itself as the guidance behind the finding. The
+  brief records the run and scopes what stands unverified
+  to other scales, other models, and the packet gating
+  rule, which the plain range run did not exercise.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
