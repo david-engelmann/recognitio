@@ -189,6 +189,14 @@ class VerifierFixture(unittest.TestCase):
                 [str(out), "--repo", str(self.repo)] + list(extra)
             )
 
+    def run_check_captured(self, out, *extra):
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            code = check_mod.main(
+                [str(out), "--repo", str(self.repo)] + list(extra)
+            )
+        return code, stream.getvalue()
+
 
 class TestFabricationBattery(VerifierFixture):
     """Every fabrication from rounds 2, 7 and 10 must now fail."""
@@ -570,6 +578,86 @@ class TestDirectorySealingAndEncoding(VerifierFixture):
         ]
         self.save_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
+
+
+class TestPacketDirectoryLoopShapes(VerifierFixture):
+    """A loop spelling of the packet directory refuses by name.
+
+    Round 255 New Minor 1 and round 271. The checker resolved
+    the packet directory argument before any problem list
+    existed, so a symlink loop at that argument raised through
+    the resolve call uncaught and the run handed the caller a
+    traceback and no named problem, while every sibling shape
+    at the same argument refused by name. Round 258 New Note 1
+    stands in the last two tests of this class.
+    """
+
+    def make_loop(self, name):
+        loop = Path(self.tmp.name) / name
+        loop.symlink_to(loop)
+        return loop
+
+    def test_a_symlink_loop_as_the_packet_directory_refuses_by_name(self):
+        loop = self.make_loop("packetloop")
+        code, err = self.run_check_captured(loop)
+        self.assertEqual(code, 1)
+        self.assertIn("cannot be resolved", err)
+        self.assertIn("Symlink loop", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_a_symlink_loop_in_an_intermediate_component_refuses_by_name(self):
+        loop = self.make_loop("midloop")
+        code, err = self.run_check_captured(loop / "genuine")
+        self.assertEqual(code, 1)
+        self.assertIn("cannot be resolved", err)
+        self.assertIn("Symlink loop", err)
+        self.assertNotIn("Traceback", err)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_fifo_as_the_packet_directory_keeps_its_reading(self):
+        fifo = Path(self.tmp.name) / "packetfifo"
+        os.mkfifo(fifo)
+        code, err = self.run_check_captured(fifo)
+        self.assertEqual(code, 1)
+        self.assertIn("no packet.md in", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_a_regular_file_as_the_packet_directory_keeps_its_reading(self):
+        plain = Path(self.tmp.name) / "packetfile"
+        plain.write_text("not a directory\n", encoding="utf-8")
+        code, err = self.run_check_captured(plain)
+        self.assertEqual(code, 1)
+        self.assertIn("no packet.md in", err)
+        self.assertNotIn("Traceback", err)
+
+    def test_a_failure_manifest_draws_no_claims_verified_sentence(self):
+        # Round 258 New Note 1. A manifest whose verified flag
+        # is false never claimed verified, so the sentence
+        # stating that claim must not print beside the correct
+        # not verified refusal on that shape.
+        out = self.clone("failuremanifest")
+        manifest = self.manifest(out)
+        manifest["verified"] = False
+        manifest["discrepancies"] = ["a recount disagreement"]
+        self.save_manifest(out, manifest)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("does not report verified", err)
+        self.assertNotIn("claims verified", err)
+
+    def test_a_verified_manifest_with_discrepancies_keeps_the_sentence(self):
+        # The control beside round 258 New Note 1. A manifest
+        # that does claim verified while carrying a non empty
+        # discrepancy list still draws the sentence in full.
+        out = self.clone("verifieddiscrep")
+        manifest = self.manifest(out)
+        manifest["discrepancies"] = [
+            "file in manifest but not in recount: b.py"
+        ]
+        self.save_manifest(out, manifest)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("claims verified", err)
 
 
 class TestSubrangeStamp(VerifierFixture):

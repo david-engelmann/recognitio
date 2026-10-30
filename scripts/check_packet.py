@@ -3397,8 +3397,23 @@ def main(argv=None):
     # pair lives in. A spelling carrying a segment that does
     # not exist followed by a parent segment resolves to the
     # plain path at both doors, while an unresolved spelling
-    # cannot be traversed to the pair at all.
-    packet_dir = Path(args.packet_dir).resolve()
+    # cannot be traversed to the pair at all. A spelling
+    # carrying a symlink loop in any component, whether the
+    # loop stands as the final component or in an intermediate
+    # one, raises through that resolve call, so the failure is
+    # turned into a named problem in the wording family of the
+    # repository refusal at this same door rather than escaping
+    # as an uncaught traceback.
+    try:
+        packet_dir = Path(args.packet_dir).resolve()
+    except (RuntimeError, OSError) as exc:
+        print(
+            "check_packet: the packet directory %s cannot be "
+            "resolved, so no packet in it can be checked (%s)"
+            % (args.packet_dir, exc),
+            file=sys.stderr,
+        )
+        return 1
     problems = []
     problems.extend(packet_dir_problems(packet_dir))
 
@@ -3472,7 +3487,8 @@ def main(argv=None):
             )
         schema_sound = not schema_problem_list
         discrepancies = manifest.get("discrepancies")
-        if isinstance(discrepancies, list) and discrepancies:
+        if manifest.get("verified") is True and \
+                isinstance(discrepancies, list) and discrepancies:
             problems.append(
                 "the manifest claims verified but its own "
                 "discrepancies list is not empty, so the run that "

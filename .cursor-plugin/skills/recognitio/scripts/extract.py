@@ -4794,8 +4794,39 @@ def main(argv=None):
     # message argparse prints is the whole record of an argument
     # failure and no generic receipt overwrites it or the packet.
     args = parse_args(argv)
-    repo = Path(args.repo).resolve()
-    target = OutputTarget(Path(args.out).resolve())
+    # The two directory arguments are resolved before any
+    # refusal path exists, and a spelling carrying a symlink
+    # loop in any component, whether the loop stands as the
+    # final component or in an intermediate one, raises
+    # through its resolve call. Each failure is turned into
+    # the named refusal its own door already uses, at the
+    # exit those refusals carry and in the shape the findings
+    # file door uses for the same loop shape, so no loop
+    # spelling of either argument hands the caller a
+    # traceback instead of a refusal it can grade.
+    try:
+        repo = Path(args.repo).resolve()
+    except (RuntimeError, OSError) as exc:
+        print(
+            "recognitio: cannot read the repository at %s "
+            "because the path cannot be resolved (%s). Fix "
+            "the path or pick another repository"
+            % (args.repo, exc),
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        out_path = Path(args.out).resolve()
+    except (RuntimeError, OSError) as exc:
+        print(
+            "recognitio: cannot prepare the output directory "
+            "%s because the path cannot be resolved (%s). "
+            "Fix the path or pick another output directory"
+            % (args.out, exc),
+            file=sys.stderr,
+        )
+        return 2
+    target = OutputTarget(out_path)
     try:
         refuse_tracked_output_root(target)
         # The inputs are resolved and read before the output

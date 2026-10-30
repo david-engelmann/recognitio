@@ -2276,6 +2276,16 @@ This unreleased work carries version 1.3.0.
   brief records the run and scopes what stands unverified
   to other scales, other models, and the packet gating
   rule, which the plain range run did not exercise.
+- The packet checker and the extractor now refuse a
+  symlink loop handed as a directory argument by name
+  instead of escaping as an uncaught traceback, with the
+  checker turning a loop in any component of its packet
+  directory spelling into a named problem at exit 1 and
+  the extractor turning a loop in any component of its
+  repo or output directory spelling into a named refusal
+  at exit 2, and the checker now prints its claims
+  verified sentence only beside a manifest whose
+  verified flag stands true.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

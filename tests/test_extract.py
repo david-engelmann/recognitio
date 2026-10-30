@@ -2540,6 +2540,159 @@ class TestFindingsFileTypes(unittest.TestCase):
             self.assertIn("not a regular file", result.stderr)
 
 
+class TestDirectoryArgumentLoopShapes(unittest.TestCase):
+    """A loop spelling of a directory argument refuses by name.
+
+    Round 263 New Minor 1 and round 271. The extractor resolved
+    its repo argument and its output directory argument before
+    any refusal path existed, so a symlink loop at either
+    argument raised through its resolve call uncaught and the
+    run handed the caller a traceback and no named refusal,
+    while the FIFO and regular file shapes at the output door
+    and the dangling shape at the repo door refused by name at
+    exit 2 in the same run. The refusal shapes below follow
+    the findings file door, which already turns every loop
+    spelling into a named refusal naming Errno 40.
+    """
+
+    def run_bounded(self, repo, out):
+        cmd = [
+            sys.executable, str(EXTRACT),
+            "--out", str(out),
+            "--repo", str(repo),
+            "--range", "HEAD~1..HEAD",
+        ]
+        try:
+            return subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the extractor did not finish inside thirty "
+                "seconds, so it hung on a directory argument"
+            )
+
+    def make_loop(self, tmp, name):
+        loop = Path(tmp) / name
+        loop.symlink_to(loop)
+        return loop
+
+    def test_a_symlink_loop_as_the_repo_argument_refuses_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            loop = self.make_loop(tmp, "repoloop")
+            result = self.run_bounded(loop, Path(tmp) / "out")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("cannot be resolved", result.stderr)
+            self.assertIn("Symlink loop", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_symlink_loop_as_the_output_argument_refuses_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            loop = self.make_loop(tmp, "outloop")
+            result = self.run_bounded(repo, loop)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot prepare the output directory", result.stderr
+            )
+            self.assertIn("cannot be resolved", result.stderr)
+            self.assertIn("Symlink loop", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_loop_in_an_intermediate_component_of_the_repo_spelling_refuses(self):
+        with RetryingTemporaryDirectory() as tmp:
+            make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            loop = self.make_loop(tmp, "midrepoloop")
+            result = self.run_bounded(
+                loop / "repo", Path(tmp) / "out"
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("cannot be resolved", result.stderr)
+            self.assertIn("Symlink loop", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_loop_in_an_intermediate_component_of_the_output_spelling_refuses(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            loop = self.make_loop(tmp, "midoutloop")
+            result = self.run_bounded(repo, loop / "out")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot prepare the output directory", result.stderr
+            )
+            self.assertIn("cannot be resolved", result.stderr)
+            self.assertIn("Symlink loop", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_fifo_as_the_output_argument_keeps_its_reading(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            fifo = Path(tmp) / "outfifo"
+            os.mkfifo(fifo)
+            result = self.run_bounded(repo, fifo)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot prepare the output directory", result.stderr
+            )
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_regular_file_as_the_output_argument_keeps_its_reading(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            plain = Path(tmp) / "outfile"
+            plain.write_text("not a directory\n")
+            result = self.run_bounded(repo, plain)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn(
+                "cannot prepare the output directory", result.stderr
+            )
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_dangling_link_as_the_repo_argument_keeps_its_reading(self):
+        with RetryingTemporaryDirectory() as tmp:
+            make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            dangling = Path(tmp) / "danglingrepo"
+            dangling.symlink_to(Path(tmp) / "absent-target")
+            result = self.run_bounded(dangling, Path(tmp) / "out")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("recognitio:", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
+    def test_a_genuine_pair_of_arguments_extracts_as_before(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = self.run_bounded(repo, out)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+
+
 class TestExclusionReceiptDedup(unittest.TestCase):
     """One receipt entry per file, in one voice (N13)."""
 
