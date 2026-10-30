@@ -93,11 +93,24 @@ frames show the persona's words at work in a session and
 claim nothing about the Claude Code host behaviour the
 sections above describe.
 
-<img alt="A Cursor agent session opens under the reviewer persona instruction and reads the shipped agent file first." src="images/recognitio-session-persona-opening.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="images/recognitio-session-persona-opening-phone.png">
+  <img alt="A Cursor agent session opens under the reviewer persona instruction and reads the shipped agent file first." src="images/recognitio-session-persona-opening.png" width="792">
+</picture>
 
-<img alt="The session reports what the packet holds, closing on the history tier and the verification recount." src="images/recognitio-session-persona-packet.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="images/recognitio-session-persona-packet-phone.png">
+  <img alt="The session reports what the packet holds, closing on the history tier and the verification recount." src="images/recognitio-session-persona-packet.png" width="792">
+</picture>
 
-<img alt="Asked whether the change should merge, the session refuses the judgement and names the review skill downstream." src="images/recognitio-session-persona-refusal.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="images/recognitio-session-persona-refusal-phone.png">
+  <img alt="Asked whether the change should merge, the session refuses the judgement and names the review skill downstream." src="images/recognitio-session-persona-refusal.png" width="792">
+</picture>
+
+On a narrow screen the three frames are the same
+three beats from a second session run at phone
+width over the same range.
 
 ## Limits
 

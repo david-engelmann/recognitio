@@ -2240,6 +2240,32 @@ This unreleased work carries version 1.3.0.
   a regular file without hanging, and regression tests
   cover each planted change from the audit that found
   the gap.
+- The demo and session assets were rebuilt against
+  the audit findings that stood against them. The
+  hero recording was re-encoded from its original
+  cast with its captions set on landmark boundaries
+  in the screen text, so a caption can no longer sit
+  one beat behind the screen it names, and its poster
+  is now a frame of the encode itself. The short cut
+  ends on the verified moment it has always claimed
+  to show. The session stills were re-rendered or
+  recaptured with the terminal spinner drawn by font
+  fallback in place of the missing glyph box, and
+  the persona stills come from a fresh session whose
+  prompt was pasted and verified before it was
+  submitted, closing the garbled prompt word the
+  earlier capture carried. Every still set gained a
+  phone width variant from a session run in a narrow
+  terminal, served through a picture source, and the
+  eval chart and the principles panel were redrawn
+  with their text raised to sizes that stay legible
+  at phone width.
+  The same landing restates the size figures in the
+  Claude submission pack against this tree, the repo
+  now holding 228 files, the demo recording standing
+  as the largest file at 607,309 bytes, and the gate
+  test file at 260,103 bytes with 2,041 bytes of
+  headroom under its cap.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

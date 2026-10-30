@@ -2600,6 +2600,26 @@ class TestReadmeWp2(unittest.TestCase):
         self.assertTrue(chart.is_file())
         self.assertIn("8 of 8", chart.read_text(encoding="utf-8"))
 
+    def test_the_eval_chart_keeps_its_paired_eval_content(self):
+        chart = (ROOT / "docs" / "images" / "eval-chart.svg").read_text(
+            encoding="utf-8"
+        )
+        for fragment in (
+            "Paired eval results",
+            "Planted defects found across four fixture tasks",
+            "Packet pass",
+            "Raw diff pass",
+            "4 of 8",
+            "On defects inside the diff the passes tied at 4 of 4 each.",
+            "In unchanged files the packet found 4 of 4 and the raw "
+            "pass found 0 of 4.",
+            "Every defect the raw pass missed lived in a file the "
+            "diff never showed.",
+            "evals/RESULTS.md",
+        ):
+            self.assertIn(fragment, chart, fragment)
+        self.assertNotIn("hosted", chart)
+
     def test_the_eval_caption_keeps_its_pinned_claims(self):
         for fragment in (
             "Eight planted defects across four fixture tasks.",
@@ -3088,13 +3108,33 @@ class TestWp4Docs(unittest.TestCase):
         for fragment in (
             ">The hosted diff<",
             ">The packet from the local clone<",
+            "The failure to packet story.",
+            "From a silent summary to a counted packet",
+            "The failure behind the first principle on this page, "
+            "in one frame",
             "File counts capped by the service",
             "Oversized patches dropped whole",
+            "No flag on either loss",
+            "Success reported over the top",
+            "Each silence passes downstream unseen",
+            "Extraction reads git objects on disk",
+            "The packet lists the whole range",
             "An unaccounted file fails the run",
+            "Nothing passes unnoticed",
+            "The packet list is the range list",
             "No check downstream can restore a file the source "
             "never mentioned.",
+            "Source. The failure record stated in the first "
+            "section of this page.",
         ):
             self.assertEqual(svg.count(fragment), 1, fragment)
+        for invented in (
+            "Patch text cut past a size ceiling",
+            "Every file from git itself",
+            "Full patch text at any size",
+            "The packet is built from the local clone",
+        ):
+            self.assertNotIn(invented, svg, invented)
         for value in ("#13151B", "#181B23", "#343842", "#D97757", "#4AC76A"):
             self.assertIn(value, svg, value)
 
@@ -3148,8 +3188,8 @@ class TestDemoAssets(unittest.TestCase):
     )
     POSTER_GEOMETRY = (792, 570)
     POSTER_SHA256 = (
-        "89b417c3ec456e64f8706b5a788c64a2fc02224cf3dfc54edd7328"
-        "f3fb3e65f5"
+        "b63dd2f84835319d71ad13d4ab91860b3bb807e8a013c3632406bb954e9"
+        "c684d"
     )
     # The byte budget moved down for WP1 in the open. The
     # work order set a 700,000 byte target for the captioned
@@ -3169,16 +3209,17 @@ class TestDemoAssets(unittest.TestCase):
 
     def test_the_verdict_rest_frame_is_present_and_clean(self):
         _w, _h, frames, delays = _gif_frames(self.HERO)
-        # The WP1 re-encode pins, re-derived from the shipped
-        # file. It carries 28 frames over 26,700 ms in total,
-        # with the closing verdict frame held for 2,400 ms.
-        self.assertEqual(len(frames), 28)
-        self.assertEqual(sum(delays), 26700)
+        # The visual fix re-encode pins, re-derived from
+        # the shipped file. It carries 20 frames over
+        # 27,580 ms in total, with the closing verdict
+        # frame held for 2,400 ms.
+        self.assertEqual(len(frames), 20)
+        self.assertEqual(sum(delays), 27580)
         self.assertEqual(delays[-1], 2400)
         last = frames[-1]
         # The brightness floor is re-derived from this last
         # frame, whose composited bright share measures
-        # 0.0926. The floor stands at 0.08, under that
+        # 0.0925. The floor stands at 0.08, under that
         # measure and well above a dark field.
         self.assertGreater(_bright_fraction(last), 0.08)
 
@@ -3187,9 +3228,9 @@ class TestDemoAssets(unittest.TestCase):
         self.assertTrue(path.is_file())
         width, height, frames, delays = _gif_frames(path)
         self.assertEqual((width, height), (792, 608))
-        self.assertEqual(len(frames), 20)
-        self.assertEqual(sum(delays), 8000)
-        self.assertEqual(path.stat().st_size, 337523)
+        self.assertEqual(len(frames), 11)
+        self.assertEqual(sum(delays), 7350)
+        self.assertEqual(path.stat().st_size, 256870)
 
     def test_the_phone_crop_geometry_and_hash_are_pinned(self):
         path = (
@@ -3232,8 +3273,11 @@ class TestDemoAssets(unittest.TestCase):
         # program added the session stills of item 18 and the
         # link to their capture record, and the list below is
         # the page order the two finds return, links first
-        # and then embeds. No retired asset name may return
-        # to the page.
+        # and then embeds. The visual fix pass added a phone
+        # width source in front of each output style still,
+        # and each source stands in the list ahead of the
+        # still it replaces on a narrow screen. No retired
+        # asset name may return to the page.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
         refs += re.findall(
@@ -3249,8 +3293,11 @@ class TestDemoAssets(unittest.TestCase):
                 "docs/images/recognitio-cursor-agent-verified-crop.png",
                 "docs/images/recognitio-cursor-agent-demo.gif",
                 "docs/images/eval-chart.svg",
+                "docs/images/recognitio-session-style-tiers-phone.png",
                 "docs/images/recognitio-session-style-tiers.png",
+                "docs/images/recognitio-session-style-change-phone.png",
                 "docs/images/recognitio-session-style-change.png",
+                "docs/images/recognitio-session-style-recount-phone.png",
                 "docs/images/recognitio-session-style-recount.png",
             ],
         )
@@ -3336,6 +3383,15 @@ class TestWp5SessionScreenshots(unittest.TestCase):
     section and the persona brief, the alt text guideline
     the WP1 pass set, and the capture record naming every
     file it stands behind.
+
+    The visual fix pass re-rendered the output style set
+    through the renderer with the spinner fallback, which
+    left the recount still byte identical, and recaptured
+    the persona set in a fresh session whose prompt was
+    pasted and verified before it was submitted. Every set
+    also gained a phone width variant from a session run
+    in a 48 column terminal, and the phone pins hold the
+    same facts for the narrow frames.
     """
 
     IMAGES = ROOT / "docs" / "images"
@@ -3349,33 +3405,67 @@ class TestWp5SessionScreenshots(unittest.TestCase):
         "recognitio-session-persona-packet.png",
         "recognitio-session-persona-refusal.png",
     )
+    STYLE_PHONE = (
+        "recognitio-session-style-tiers-phone.png",
+        "recognitio-session-style-change-phone.png",
+        "recognitio-session-style-recount-phone.png",
+    )
+    PERSONA_PHONE = (
+        "recognitio-session-persona-opening-phone.png",
+        "recognitio-session-persona-packet-phone.png",
+        "recognitio-session-persona-refusal-phone.png",
+    )
     SIZES = {
-        "recognitio-session-style-tiers.png": 18961,
-        "recognitio-session-style-change.png": 29843,
+        "recognitio-session-style-tiers.png": 18972,
+        "recognitio-session-style-change.png": 29838,
         "recognitio-session-style-recount.png": 22297,
-        "recognitio-session-persona-opening.png": 19044,
-        "recognitio-session-persona-packet.png": 25698,
-        "recognitio-session-persona-refusal.png": 22382,
+        "recognitio-session-persona-opening.png": 20056,
+        "recognitio-session-persona-packet.png": 19809,
+        "recognitio-session-persona-refusal.png": 18640,
+        "recognitio-session-style-tiers-phone.png": 14455,
+        "recognitio-session-style-change-phone.png": 13487,
+        "recognitio-session-style-recount-phone.png": 11575,
+        "recognitio-session-persona-opening-phone.png": 15436,
+        "recognitio-session-persona-packet-phone.png": 14718,
+        "recognitio-session-persona-refusal-phone.png": 12637,
     }
     SHA256 = {
         "recognitio-session-style-tiers.png":
-            "9b224525bdd468d080cfed9914280708d47ad87afa0a15d2900dc08"
-            "ce4b4af60",
+            "150f764eae551801f1681a441809aa86da4f4a5aba827f42d6eb6411071"
+            "cfdde",
         "recognitio-session-style-change.png":
-            "acada0103b69bfd5148ce3f154a1ef99c0cb7498bf3aadac8f815972"
-            "76d1b9ca",
+            "7733b9a5eb4d861f16087c5309a1533c3ce3721a76a7a4c6936bc5531e7"
+            "c8d00",
         "recognitio-session-style-recount.png":
             "f1732118c3742a3e9f6420379a89d203afbba215ecfa348386c1a1564"
             "e7322c3",
         "recognitio-session-persona-opening.png":
-            "e503ce3e1ba7aef511bf49625781c276927dc97e11c8ee3003d65747d"
-            "52653b0",
+            "a883139e957eaca75518ed8d41832bcb97726c2a643e141149ff5785"
+            "52e6ae32",
         "recognitio-session-persona-packet.png":
-            "81e08d6ae224777498423260dd171d1f69b75bc51eeb46d316ca55af"
-            "49a92b49",
+            "a4408475a9db79d3931fd9ee1f6fbd38797aba76a0e500195066eb7d"
+            "05d8638a",
         "recognitio-session-persona-refusal.png":
-            "944b1f59392108d6954b8e85d1d4d0ed944c455a4980097b28844567"
-            "f88cccc1",
+            "6e78d9e3702e47a6f3077e2e737eb35c085198d019e4df5c76f05f8b"
+            "1ed4f953",
+        "recognitio-session-style-tiers-phone.png":
+            "0d74782ad3c87c2b8747e734636d2d14ebfa861a59088ab83e21c209"
+            "cfe55296",
+        "recognitio-session-style-change-phone.png":
+            "923a293e572da79f490bc27f4494827b1438a81579716a2d31673a99"
+            "9c72b09a",
+        "recognitio-session-style-recount-phone.png":
+            "97a4958dfd33b60cff47da05423f166452fb721870b821f4d8609727"
+            "81dbf251",
+        "recognitio-session-persona-opening-phone.png":
+            "0d7a13247c67c104dd1c5cc465e99b393273dddaa33a9ab6918531bd"
+            "1ba0e426",
+        "recognitio-session-persona-packet-phone.png":
+            "7089540a13bb2a3145c116805d373590fc1050ac3f28d80303a90e3d"
+            "8f251866",
+        "recognitio-session-persona-refusal-phone.png":
+            "2654c4eb710aeb36c28f749ccd135ea330abdc615f1feebf226e86d0"
+            "e98c6a64",
     }
 
     def test_the_stills_exist_at_the_pinned_geometry(self):
@@ -3386,6 +3476,15 @@ class TestWp5SessionScreenshots(unittest.TestCase):
             self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n", name)
             width, height = struct.unpack(">II", raw[16:24])
             self.assertEqual((width, height), (792, 570), name)
+
+    def test_the_phone_stills_exist_at_the_pinned_geometry(self):
+        for name in self.STYLE_PHONE + self.PERSONA_PHONE:
+            path = self.IMAGES / name
+            self.assertTrue(path.is_file(), name)
+            raw = path.read_bytes()
+            self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n", name)
+            width, height = struct.unpack(">II", raw[16:24])
+            self.assertEqual((width, height), (432, 570), name)
 
     def test_the_still_sizes_and_hashes_are_pinned(self):
         for name, size in self.SIZES.items():
@@ -3399,7 +3498,7 @@ class TestWp5SessionScreenshots(unittest.TestCase):
         style_section = readme.split(
             "### The packet output style", 1
         )[1].split("### The reviewer persona", 1)[0]
-        for name in self.STYLE:
+        for name in self.STYLE + self.STYLE_PHONE:
             self.assertIn("docs/images/" + name, style_section)
         persona = (
             ROOT / "docs" / "reviewer-persona.md"
@@ -3407,7 +3506,7 @@ class TestWp5SessionScreenshots(unittest.TestCase):
         session_section = persona.split(
             "## The persona in a session", 1
         )[1].split("## Limits", 1)[0]
-        for name in self.PERSONA:
+        for name in self.PERSONA + self.PERSONA_PHONE:
             self.assertIn("images/" + name, session_section)
 
     def test_the_alt_texts_meet_the_guideline(self):
@@ -3434,7 +3533,9 @@ class TestWp5SessionScreenshots(unittest.TestCase):
         record = (
             self.IMAGES / "capture-record.md"
         ).read_text(encoding="utf-8")
-        for name in self.STYLE + self.PERSONA:
+        for name in (
+            self.STYLE + self.PERSONA + self.STYLE_PHONE + self.PERSONA_PHONE
+        ):
             self.assertIn(name, record)
 
 
@@ -3503,6 +3604,18 @@ class TestBrandAssets(unittest.TestCase):
     # to hold the new ledger with 4,465 of headroom over
     # it, because the work order screenshot item puts real
     # session stills on the page the ceiling guards.
+    # The visual fix pass then rebuilds the hero
+    # recording at 607,309 with its captions set on
+    # landmark boundaries, re-renders the three style
+    # stills at 18,972 plus 29,838 plus 22,297 with the
+    # spinner glyph drawn by fallback, adds the three
+    # phone width style stills at 14,455 plus 13,487
+    # plus 11,575 from a session run at phone width, and
+    # redraws the eval chart at 2,999 with its text
+    # raised, which moves the total to 740,901 in the
+    # open. The ceiling does not move, because 750,000
+    # still holds the new ledger with 9,099 of headroom
+    # over it.
     PAGE_CEILING = 750000
 
     def test_the_brand_files_exist(self):
@@ -3562,11 +3675,13 @@ class TestBrandAssets(unittest.TestCase):
 
     def test_the_picture_element_form_is_pinned(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        # Two picture elements stand in the README since
-        # WP1. The wordmark lockup checked here is the
-        # first, and the hero recording picture is the
-        # second, pinned in TestReadmePhoneWidth.
-        self.assertEqual(readme.count("<picture>"), 2)
+        # Five picture elements stand in the README. The
+        # wordmark lockup checked here is the first, the
+        # hero recording picture is the second and pinned
+        # in TestReadmePhoneWidth, and the visual fix pass
+        # added one picture per output style still so each
+        # still carries a phone width source.
+        self.assertEqual(readme.count("<picture>"), 5)
         block = readme.split("<picture>", 1)[1].split("</picture>", 1)[0]
         dark = '<source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">'
         light = '<source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">'
@@ -3671,7 +3786,7 @@ class TestBrandAssets(unittest.TestCase):
         unique = list(dict.fromkeys(refs))
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 740298)
+        self.assertEqual(total, 740901)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

@@ -316,11 +316,22 @@ The plugin ships an output style that shapes the review packet as the tiered sec
 
 The three frames below come from one real Cursor agent session that read the style file first and then presented the packet it built for the range from `682a6e9` to `e2802176` in the section order the style defines. The first opens the presentation on the verified packet, the second stands inside the change tier, and the third closes on the verification recount. The capture record filed at [the demo capture record](docs/images/capture-record.md) states the session and its prompt and its subject in full.
 
-<img alt="A Cursor agent session opens the packet presentation with the range header, the verified line and the T0 heading." src="docs/images/recognitio-session-style-tiers.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-style-tiers-phone.png">
+  <img alt="A Cursor agent session opens its presentation of the verified packet." src="docs/images/recognitio-session-style-tiers.png" width="792">
+</picture>
 
-<img alt="Inside the change tier of the session presentation, one summary per changed file." src="docs/images/recognitio-session-style-change.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-style-change-phone.png">
+  <img alt="Inside the change tier of the session presentation, one entry per changed file." src="docs/images/recognitio-session-style-change.png" width="792">
+</picture>
 
-<img alt="The session closes the presentation with the verification recount and the limit sentence." src="docs/images/recognitio-session-style-recount.png" width="792">
+<picture>
+  <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-style-recount-phone.png">
+  <img alt="The session closes the presentation with the verification recount and the limit sentence." src="docs/images/recognitio-session-style-recount.png" width="792">
+</picture>
+
+On a narrow screen the three frames are the same three beats from a second session run at phone width over the same range.
 
 ### The reviewer persona
 

@@ -832,3 +832,25 @@ element, the composition paragraph and the shipped
 figures in the capture record, and the crop geometry
 and hash pins and the page weight exact total and the
 hero alt pin moved in the same change.
+
+The visual fix pass on 2026-10-29 then closed the
+nine standing visual findings of the 300 round audit
+with new captures rather than edits. The hero
+recording was rebuilt from the moneyshot cast with
+its captions set on landmark boundaries in the
+screen text and its poster cut from the encode
+itself, and the short cut was re-cut to end on the
+verified moment. The output style stills were
+re-rendered with a font fallback that draws the
+terminal spinner the mono face lacks, which left the
+recount still byte identical. The persona stills
+were recaptured in a fresh session on the Auto model
+after the team usage limit refused the model the
+earlier sessions name, with the prompt pasted and
+verified before submission. Every still set gained
+a phone width variant from a session run in a 48
+column terminal behind a picture source, and the
+eval chart and the principles panel were redrawn
+with their text raised to sizes legible at phone
+width, with the demo and screenshot gate pins and
+the page weight ledger moved in the open.
