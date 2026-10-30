@@ -47,7 +47,9 @@ check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_zcode.py`, the Devin playbook and coordinator
 build check at `scripts/check_devin.py`, the Qwen Code
 marketplace presence build check at `scripts/check_qwen.py`,
-the brand asset check at `scripts/check_brand.py`,
+the Comate adaptation build check at
+`scripts/check_comate.py`, the brand asset check at
+`scripts/check_brand.py`,
 the discovery metadata check at
 `scripts/check_discovery.py`, the submission pack check at
 `scripts/check_submissions.py`, the test vacuity guard at
@@ -240,6 +242,12 @@ not a gate.
   plugin folder. One rule file lives at
   `.cursor-plugin/rules/recognitio.mdc`. The plugin ships no agents, no
   commands, no MCP servers, and no hooks.
+- `.comate/` holds the Build 20 native Comate project seat,
+  the byte identical skill copy at
+  `.comate/skills/recognitio/` and nothing beside it, pinned
+  by the gate at `scripts/check_comate.py`. The tree holds
+  no manifest or registration artifact, because none is
+  evidenced for Comate at either scope.
 - `.cursor/` holds the Bugbot rules at `.cursor/BUGBOT.md` with
   the effort level and gate pins, and the repo config at
   `.cursor/config/bugbot.yaml` with `autofix.mode` set to
@@ -310,6 +318,20 @@ not a gate.
   no listing file shipped are pinned by the gate at
   `scripts/check_qwen.py`, so the scoped guidance cannot
   become a rival instruction source.
+- `docs/comate-brief.md` holds the brief for Build 20, the
+  Comate adaptation. The skill format as a folder holding
+  SKILL.md with no manifest, package, or registration step
+  evidenced, the two project paths with the canonical
+  folder standing on the shared one and a byte identical
+  copy on the native one at `.comate/skills/recognitio/`,
+  the user scope path as placement guidance, no
+  marketplace or submission route evidenced, the client
+  run to the Baidu account sign in wall, and the
+  invocation,
+  frontmatter, script execution, size, and precedence
+  questions standing open past it are pinned by the gate
+  at `scripts/check_comate.py`, so the scoped guidance
+  cannot become a rival instruction source.
 - `REVIEW.md` records the review workflow shape for this repo.
 - `.github/` holds the CI workflow and the templates.
 

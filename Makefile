@@ -28,6 +28,7 @@ check:
 	$(PYTHON) scripts/check_zcode.py
 	$(PYTHON) scripts/check_devin.py
 	$(PYTHON) scripts/check_qwen.py
+	$(PYTHON) scripts/check_comate.py
 	$(PYTHON) scripts/check_brand.py
 	$(PYTHON) scripts/check_discovery.py
 	$(PYTHON) scripts/check_submissions.py

@@ -281,6 +281,10 @@ agent-plugins-package
 
 Pin the Qwen route before use by cloning at a commit SHA you reviewed, as the commands above show. Replace COMMIT_SHA with the commit SHA you reviewed. The marketplace source add stays a conditional draft form in the brief only.
 
+### Comate
+
+The Comate route is placement only. This repo already carries the skill at both project paths the host record names, the canonical folder at `.agents/skills/recognitio/` and a byte identical copy at `.comate/skills/recognitio/`, so a checkout of this repo at a pinned commit is the whole project install. For user scope, copy the skill folder to `~/.comate/skills/recognitio/` from the same pinned checkout. No Comate manifest or registration step is evidenced, and no Comate skill marketplace or submission route is evidenced. The client itself demands a sign in before its agent surface runs, and recognitio has not been exercised inside a signed in Comate session, so the brief at [the Comate brief](docs/comate-brief.md) states the placement contract and the open questions.
+
 ### Pinning the install
 
 Before running any route above, pin the install to a commit SHA and read the commands and files the route will run, because a skill ships executable code and an unpinned route can move under you.
@@ -353,6 +357,7 @@ Each adaptation restates the packet discipline in the surface its platform reads
 | Devin | A playbook and coordinator build of derivation noted rules. [the Devin playbook brief](docs/devin-playbook-brief.md) |
 | Qwen | A conditional draft with its route in the Install section. [the Qwen Code brief](docs/qwen-code-brief.md) |
 | Antigravity | A plugin alteration with its manifest in the .antigravity directory as `plugin.json` and its PreToolUse hook wiring. [the Antigravity plugin brief](docs/antigravity-plugin-brief.md) |
+| Comate | A byte identical skill copy on the native project path under `.comate/skills/`, with the canonical folder standing on the shared project path the host record names. [the Comate brief](docs/comate-brief.md) |
 
 A Trae adaptation ships nothing. No Trae skill or plugin surface stands in the primary docs, so the build stands deferred and no Trae brief, gate script or manifest ships.
 

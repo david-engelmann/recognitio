@@ -1198,3 +1198,31 @@ entries stand pinned in the submissions gate and the
 gate script suite. A setup installs one entry or the
 other and never both, because the recognitio plugin
 already includes the mod.
+
+## 32. Build 20, the Comate adaptation
+
+Recorded on 2026-10-30 in the Comate build lane. Baidu
+Comate 4.0 ships Skills support compatible with the
+community Skill protocol on the announcement the parent
+seat read in a live browser, and the implementer record
+states the skill as a folder holding SKILL.md at two
+project paths and one user path. The canonical skill
+already stands at `.agents/skills/recognitio/`, one of the
+two project paths the record names, so the build adds a
+byte identical copy at `.comate/skills/recognitio/` for
+the native project path and ships no manifest, package,
+or registration artifact, because none is evidenced. The
+user scope path at `~/.comate/skills/recognitio/` stands
+as placement guidance in the brief, and no listing or
+submission pack ships, because no Comate skill
+marketplace or submission route is evidenced. The
+official Linux client at version 3.11.5 was downloaded
+against its published hash, installed into scratch, and
+opened on this box on 2026-10-30, and its agent surface
+demands a sign in before any task runs.
+Invocation inside a live Comate session stays unverified,
+and the frontmatter tolerance, bundled script execution,
+size limit, and precedence questions stand open in the
+brief. Decision 4 binds this build like every other
+build. The brief at `docs/comate-brief.md` records the
+contract with a derivation note on every rule.

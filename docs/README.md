@@ -62,6 +62,10 @@ capture record, so no document in this set stands unlisted.
   carries the OpenAI extension in the portable manifest, the
   repo marketplace that offers the package, and the one Codex
   file inside the skill folder.
+- [The Build 20 Comate adaptation](comate-brief.md) (landed)
+  places a byte identical skill copy on the native Comate
+  project path beside the canonical folder, with no manifest
+  evidenced and the live session standing unverified.
 
 ## The submission packs
 

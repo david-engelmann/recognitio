@@ -2361,3 +2361,13 @@ This unreleased work carries version 1.3.0.
   the paths it needs from the root argument it is
   handed, so each gate now holds one spelling of
   each path and no dead one beside it.
+- The Comate adaptation. Build 20 adds a byte identical
+  copy of the canonical skill at `.comate/skills/recognitio/`
+  for the native Comate project path, the brief at
+  `docs/comate-brief.md`, and a new gate at
+  `scripts/check_comate.py` pinning the copy and the brief
+  claims. The official Linux client at version 3.11.5 was
+  downloaded against its published hash and opened on this
+  box, and its agent surface demands a Baidu account sign
+  in, so invocation inside a live Comate session stays
+  unverified.
