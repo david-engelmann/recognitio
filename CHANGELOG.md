@@ -2286,6 +2286,35 @@ This unreleased work carries version 1.3.0.
   at exit 2, and the checker now prints its claims
   verified sentence only beside a manifest whose
   verified flag stands true.
+- The Build 7 mod now loads and gates in a real session.
+  As first shipped, its environment read passed a
+  variable where the host requires a string literal at
+  the call site, so host validation failed and the host
+  refused to load the module in the recorded session,
+  and its file read passed an options object where the
+  host takes the path as its one argument and resolves
+  to the file text. Both call sites now follow the host
+  shapes, and the corrected module stands proven live
+  on Claude Code 2.1.314 in OpenRouter backed sessions
+  across headless sessions, a streamed session, the
+  marketplace install route and the root plugin route.
+  Over the five packet states on the headless route it
+  passed a verified packet, denied an unverified one
+  in the gate's own words, and denied through its catch
+  handler over a missing or corrupt manifest, and it
+  denied the unverified packet on the streamed,
+  marketplace and root plugin routes as well.
+- The mod host side tests now fire the spawn event
+  through the test kit engine with stubs in the
+  documented shapes, where the earlier suite drove the
+  exported functions against a hand stub built in the
+  shapes the code assumed and passed on a module the
+  host refused to load. The Python suite's node harness
+  stub answers the module's read in the same path only
+  shape, the repo gate pins both call shapes beside its
+  earlier pins, and the recognitio-mod entry carries the
+  brand icon in its manifest, where validation had
+  reported the icon missing.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

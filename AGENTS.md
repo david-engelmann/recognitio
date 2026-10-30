@@ -71,7 +71,9 @@ and the headless gate at `scripts/check_headless.py` reads the
 whole captured envelope against the packet the manifest belongs
 to and the exit file the invocation names. The mod contract check pins
 the `hooks/` module list, the `agent.spawn` hook with its `.catch`
-deny handler, the struck `onFailure` language and the withdrawn
+deny handler, the literal environment name and the path only
+file read at the module's call sites, the struck `onFailure`
+language and the withdrawn
 `--mod` flag, the mods API allowlist, and the brief's stated
 limits. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
@@ -175,7 +177,9 @@ not a gate.
   marketplace listing for a setup that wants the spawn gate
   without the skill bundle. Its manifest stands at
   `plugins/recognitio-mod/.claude-plugin/plugin.json`, its
-  README stands in the folder, and its hooks folder carries
+  README stands in the folder, its icon stands under
+  `plugins/recognitio-mod/assets/` as a copy of the brand icon
+  the manifest names in its icon field, and its hooks folder carries
   byte identical copies of every file under `hooks/` beside
   a byte identical copy of the root LICENSE, pinned by the
   gate at `scripts/check_mod.py`. The entry and the discovery fields
@@ -876,3 +880,23 @@ eval chart and the principles panel were redrawn
 with their text raised to sizes legible at phone
 width, with the demo and screenshot gate pins and
 the page weight ledger moved in the open.
+
+The Claude mod perfection pass on 2026-10-30 then ran
+Build 7 live for the first time, on Claude Code 2.1.314
+in OpenRouter backed sessions,
+and found the module as shipped failed host validation
+and loaded in no session, because its environment read
+passed a variable where the host requires a string
+literal at the call site, while its file read passed an
+options object where the host takes the path alone and
+the host side tests stubbed the calls in the same shapes
+the code assumed. The pass corrected both call sites,
+rebuilt the host side tests on the test kit engine with
+stubs in the documented shapes, corrected the Python
+suite's node harness stub to the same path only read,
+pinned both call shapes in the mod gate, gave the mod
+entry its brand icon, and proved the corrected module
+over the five packet states on the headless route and
+over the unverified state on the streamed, marketplace
+and root plugin routes, with the brief and the mod
+README restated to the proven contract.

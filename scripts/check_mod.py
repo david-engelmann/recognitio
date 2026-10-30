@@ -6,7 +6,9 @@ checks the mod's structural contract without a Claude Code host.
 The hooks/hooks.json module list must name exactly the shipped
 hooks module. The module must register its agent.spawn hook with
 a string literal event name, must carry a .catch handler that
-returns the deny shape, must never use the struck onFailure
+returns the deny shape, must read its environment variable
+through a string literal name and its manifest through a path
+only file read, must never use the struck onFailure
 language or the withdrawn --mod flag, and must call no mods API
 beyond the allowlist, so no model judgment can replace the
 deterministic manifest check. The mod brief at docs/mod-build7.md
@@ -157,6 +159,21 @@ def module_problems(path):
             "the hooks module touches disable-model-invocation, which "
             "stays at its default false"
         )
+    for match in re.finditer(r"\$\.env\.(?:get|set)\(\s*(\S)", source):
+        if match.group(1) not in "\"'":
+            problems.append(
+                "the hooks module reads an environment variable "
+                "through a name that is not a string literal, so "
+                "the host cannot list the variables it reads and "
+                "refuses to load the module"
+            )
+    if re.search(r"\$\.fs\.read\(\s*\{", source):
+        problems.append(
+            "the hooks module calls $.fs.read with an options "
+            "object, where the host takes the path as its one "
+            "argument, so the read would throw in a session and "
+            "no verified packet could ever pass the gate"
+        )
     calls = re.findall(r"\$\.[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)?", source)
     for call in sorted(set(calls)):
         if call not in ALLOWED_API_CALLS:
@@ -190,6 +207,12 @@ def brief_problems():
             "offers the mod as its own marketplace entry, "
             "named recognitio-mod",
             "the marketplace entry",
+        ),
+        (
+            "The module validates clean on Claude Code 2.1.314 "
+            "with its agent.spawn hook named in the gating "
+            "hooks report with its catch flag set",
+            "the live validation claim",
         ),
     ):
         if sentence not in text:

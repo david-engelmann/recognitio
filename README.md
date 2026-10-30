@@ -214,9 +214,9 @@ Or install the mod on its own with this one.
 /plugin install recognitio-mod@recognitio-marketplace
 ```
 
-Each entry sets strict to true, so the manifest in each plugin folder is the definition the host loads, and the recognitio listing and its manifest may both name the skill without conflicting. The recognitio manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, and the marketplace entries carry no icon field. Each manifest carries the discovery fields its schema names, a display name and a homepage and a repository and a keyword set, and each entry carries the category and the search tags its schema names there, with every value pinned by the discovery gate.
+Each entry sets strict to true, so the manifest in each plugin folder is the definition the host loads, and the recognitio listing and its manifest may both name the skill without conflicting. The recognitio manifest names the brand icon at `docs/brand/recognitio-icon-512.png` for the directory listing, the recognitio-mod manifest names its own copy of the same icon under its `assets/` folder, and the marketplace entries carry no icon field. Each manifest carries the discovery fields its schema names, a display name and a homepage and a repository and a keyword set, and each entry carries the category and the search tags its schema names there, with every value pinned by the discovery gate.
 
-Installing the recognitio plugin also loads the hooks module under `hooks/`. While the plugin is enabled, the mod checks every agent spawn in the session against the review packet manifest and denies any spawn whose packet is missing or unverified, and it does nothing when no packet directory is configured. The brief at [the mod brief](docs/mod-build7.md) states the mod contract and its limits in full.
+Installing the recognitio plugin also loads the hooks module under `hooks/`. While the plugin is enabled, the mod checks agent spawns in the session against the review packet manifest and denies any spawn whose packet is missing or unverified, and it does nothing when no packet directory is configured. The brief at [the mod brief](docs/mod-build7.md) states the mod contract and its limits in full.
 
 ### Layout
 

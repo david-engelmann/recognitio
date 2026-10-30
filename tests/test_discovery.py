@@ -28,6 +28,7 @@ FILES = (
     ".claude-plugin/plugin.json",
     ".claude-plugin/marketplace.json",
     "plugins/recognitio-mod/.claude-plugin/plugin.json",
+    "plugins/recognitio-mod/assets/icon-512.png",
     ".cursor-plugin/plugin.json",
     ".cursor-plugin/marketplace.json",
 )
@@ -221,6 +222,33 @@ class TestCheckDiscovery(unittest.TestCase):
         problems = self.mutate(CLAUDE_MARKET, change)
         self.assertTrue(
             any("source" in p for p in problems), problems)
+
+    def test_a_drifted_mod_icon_fails(self):
+        # The mod manifest icon is a pinned discovery field,
+        # so a drifted path fails the gate by name.
+        def change(d):
+            d["icon"] = "./assets/other.png"
+        problems = self.mutate(MOD_PLUGIN, change)
+        self.assertTrue(
+            any("icon" in p for p in problems), problems)
+
+    def test_a_mod_icon_that_drifts_from_the_master_fails(self):
+        # The mod ships a copy of the brand master icon, and
+        # a copy whose bytes drift from the master fails.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            master = root / "docs" / "brand" / "recognitio-icon-512.png"
+            master.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / "docs" / "brand"
+                            / "recognitio-icon-512.png", master)
+            icon = root / "plugins" / "recognitio-mod" / "assets" \
+                / "icon-512.png"
+            data = bytearray(icon.read_bytes())
+            data[100] ^= 0xFF
+            icon.write_bytes(bytes(data))
+            problems = self.problems(root)
+        self.assertTrue(
+            any("brand master" in p for p in problems), problems)
 
     def test_a_component_on_the_mod_entry_fails(self):
         # The mod manifest is the whole definition of the

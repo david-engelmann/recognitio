@@ -60,7 +60,10 @@ const $ = {
       name === "RECOGNITIO_PACKET_DIR" ? packetDir || undefined : undefined,
   },
   fs: {
-    read: async ({ path }) => {
+    read: async (path) => {
+      if (typeof path !== "string" || path !== packetDir + "/manifest.json") {
+        throw new Error("fs.read takes the manifest path as a string");
+      }
       if (manifestKind === "unreadable") throw new Error("EACCES: no entry");
       if (manifestKind === "corrupt") return "not json{{{";
       return manifests[manifestKind] ?? manifests.verified;
@@ -302,7 +305,7 @@ class ModContractTestCase(unittest.TestCase):
     def test_a_model_call_in_the_hook_fails_the_pin(self):
         text = MODULE.read_text(encoding="utf-8")
         broken = text.replace(
-            "const text = await $.fs.read({ path: manifestPath });",
+            "const text = await $.fs.read(manifestPath);",
             "const text = await $.model.complete({ prompt: 'judge' });",
         )
         self.assertNotEqual(broken, text)
@@ -312,6 +315,43 @@ class ModContractTestCase(unittest.TestCase):
             problems = self.mod.module_problems(module)
         self.assertTrue(
             any("$.model.complete" in p for p in problems), problems
+        )
+
+    def test_an_options_object_read_fails_the_pin(self):
+        # The live run regression. The host takes the path as the
+        # read's one argument, so an options object read throws in
+        # a session and no verified packet could ever pass.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "const text = await $.fs.read(manifestPath);",
+            "const text = await $.fs.read({ path: manifestPath });",
+        )
+        self.assertNotEqual(broken, text)
+        with tempfile.TemporaryDirectory() as tmp:
+            module = Path(tmp) / "register.js"
+            module.write_text(broken, encoding="utf-8")
+            problems = self.mod.module_problems(module)
+        self.assertTrue(
+            any("$.fs.read" in p and "options" in p for p in problems),
+            problems,
+        )
+
+    def test_a_variable_env_name_fails_the_pin(self):
+        # The live run regression. The host lists the variables a
+        # module reads from the call site and refuses to load a
+        # module that passes a variable instead of a literal.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            'const packetDir = await $.env.get("RECOGNITIO_PACKET_DIR");',
+            "const packetDir = await $.env.get(PACKET_ENV);",
+        )
+        self.assertNotEqual(broken, text)
+        with tempfile.TemporaryDirectory() as tmp:
+            module = Path(tmp) / "register.js"
+            module.write_text(broken, encoding="utf-8")
+            problems = self.mod.module_problems(module)
+        self.assertTrue(
+            any("not a string literal" in p for p in problems), problems
         )
 
     def make_copy_layout(self, tmp):

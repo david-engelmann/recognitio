@@ -79,6 +79,8 @@ MOD_KEYWORDS = [
     "review-packet",
 ]
 MOD_SOURCE = "./plugins/recognitio-mod"
+MOD_ICON = "./assets/icon-512.png"
+MOD_ICON_PATH = "plugins/recognitio-mod/assets/icon-512.png"
 MOD_DESCRIPTION = (
     "Gates reviewer spawns in Claude Code on the verified "
     "review packet manifest, and denies a spawn whose packet "
@@ -296,6 +298,21 @@ def discovery_problems(root=None):
         value_problems(
             MOD_PLUGIN, mod, "description", MOD_DESCRIPTION,
             problems)
+        value_problems(
+            MOD_PLUGIN, mod, "icon", MOD_ICON, problems)
+        if not (root / MOD_ICON_PATH).is_file():
+            problems.append(
+                "%s names icon %s and no file stands at %s"
+                % (MOD_PLUGIN, MOD_ICON, MOD_ICON_PATH))
+        master_icon = root / "docs" / "brand" / "recognitio-icon-512.png"
+        shipped_icon = root / MOD_ICON_PATH
+        if (shipped_icon.is_file() and master_icon.is_file()
+                and shipped_icon.read_bytes()
+                != master_icon.read_bytes()):
+            problems.append(
+                "the icon at %s differs from the brand master at "
+                "docs/brand/recognitio-icon-512.png, and the mod "
+                "ships a copy of that master" % MOD_ICON_PATH)
         experimental = mod.get("experimental")
         if not isinstance(experimental, dict):
             experimental = {}

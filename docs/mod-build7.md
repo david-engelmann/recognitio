@@ -10,11 +10,11 @@ The hooks module under `hooks/` with its host side tests, registering one agent.
 
 **What was proven**
 
-The module list, the spawn hook, its fail closed catch handler and the deny shape are pinned by the gate in this repo, as the deployment gate section of this brief records.
+The module validates clean on Claude Code 2.1.314 with its agent.spawn hook named in the gating hooks report with its catch flag set, and the module ran live on that build across headless sessions, a streamed session, the marketplace install route and the root plugin route. The five packet states stand proven on the headless route, where a spawn over a verified packet passed, a spawn over an unverified packet was denied in the gate's own words, spawns over a missing or corrupt manifest were denied through the catch handler, and a spawn with no packet configured proceeded untouched. The unverified packet was also denied on the streamed, marketplace and root plugin routes.
 
 **What is unverified**
 
-Live host behaviour stands unverified in this brief, and the brief itself records the limit that a catch handler which throws or times out lets the spawn proceed.
+Agent team teammate spawns, the Desktop and VS Code surfaces, and an induced catch handler timeout stand unverified. The catch handler limit itself stands as the recorded limit section states it, on the primary events guide's word and the reference's one second limit for catch handlers.
 
 ## Summary
 
@@ -68,11 +68,16 @@ The hook never calls a model. No model judgment replaces
 the manifest check. The hook's only mods API calls are
 `$.fs.read` and `$.env.get`.
 
+The mod needs Claude Code v2.1.287 or later, the first
+build with mods, and stands live tested on 2.1.314.
+
 ## The fail closed mechanism
 
-The `agent.spawn` registration carries a `.catch` handler,
-as the Mods reference requires for a hook that refuses an
-action. When the gate hook throws or times out before it
+The `agent.spawn` registration carries a `.catch` handler.
+A hook refuses an action by returning the deny shape, and
+the events guide prescribes the catch handler as the way a
+hook that blocks calls keeps its refusal standing when the
+hook itself fails. When the gate hook throws or times out before it
 answers, the host calls the catch handler with the same
 event, and the handler returns the deny shape for
 `agent.spawn`, which is `{ deny: reason }`. A crashed hook
@@ -115,17 +120,29 @@ what decision 4 requires.
 ## The deployment gate
 
 The build's gate check on a host with the CLI is
-`claude plugin validate --json`. Its `gatingHooks`
-report names every mod hook that can refuse an action
-with a `hasCatch` flag, and the build requires the
-flag set on the `agent.spawn` hook. The host side test
+`claude plugin validate --json` on the plugin
+directory. Its `gatingHooks` report names every mod
+hook that can refuse an action with a `hasCatch`
+flag, and the build requires the flag set on the
+`agent.spawn` hook. On Claude Code 2.1.314 the report
+names the hook exactly so, in the contents entry for
+`hooks/hooks.json`. Validation refuses a module whose
+environment read names its variable through anything
+but a string literal, which is how the first shipped
+module failed, as the live run correction below
+records. The options object file read passes
+validation, and only the live run and the repo gate
+below catch that shape. The host side test
 story is `claude plugin test`, which runs the
 `*.test.ts` files under `hooks/` with no session,
-sign in, or network. Where the CLI is absent, the repo
+sign in, or network, firing the event through the
+loaded module against stubs in the documented shapes.
+Where the CLI is absent, the repo
 gate pins the same contract deterministically. The
 `hooks/hooks.json` module list, the `.catch` handler,
-the deny shape, and the limit sentence above are all
-pinned by `scripts/check_mod.py`.
+the deny shape, the literal environment name, the
+path only file read, and the limit sentence above are
+all pinned by `scripts/check_mod.py`.
 
 ## What the brief strikes
 
@@ -150,6 +167,25 @@ scheduled runs through `/loop` keep working. Setting the
 flag true would turn scheduled fires into plain text
 sends, which is the failure mode the primary scheduled
 tasks page warns about.
+
+## The live run correction
+
+The module as first shipped never ran. Its environment
+read passed a variable where the host requires a string
+literal at the call site, so validation failed on the
+module and the host refused to load it in a session,
+and a spawn over an unverified packet proceeded with
+no gate at all. Its file read passed an options object
+where the host takes the path alone, and no repo gate
+could see either defect, because the host side tests
+stubbed the calls in the same shapes the code assumed.
+A live run on Claude Code 2.1.314 in an OpenRouter
+backed session caught both. This pass corrects the two
+call sites, rebuilds the host
+side tests on the test kit engine with stubs in the
+documented shapes, pins both call shapes in the repo
+gate, and gives the mod entry the brand icon its
+manifest lacked.
 
 ## Skill tightness
 

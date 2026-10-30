@@ -28,6 +28,11 @@ bundle, such as a folder copy install of the skill. Install one
 shape or the other, and never both, because installing both
 registers the same gate twice.
 
+The mod needs Claude Code v2.1.287 or later, the first build
+with mods, and stands live tested on 2.1.314, where it
+validates clean and gates spawns in headless and streamed
+sessions and on the marketplace install route.
+
 ```bash
 /plugin marketplace add david-engelmann/recognitio
 /plugin install recognitio-mod@recognitio-marketplace
