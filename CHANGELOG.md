@@ -2321,6 +2321,17 @@ This unreleased work carries version 1.3.0.
   primary page also names now fails by name instead of
   passing under the contract holds line while turning
   Autofix on for this repo.
+- The README wordmark follows the GitHub theme a reader
+  has set instead of the system colour scheme. The
+  picture element keyed to `prefers-color-scheme` gave a
+  reader who forces a GitHub theme against their system
+  scheme the master drawn for the other ground, dark ink
+  on a near black page in the proven case. The two
+  masters now stand as plain images carrying the
+  `gh-dark-mode-only` and `gh-light-mode-only` fragments
+  from the GitHub changelog definition of theme context,
+  which keys the choice to the GitHub theme itself. The
+  masters and their geometry are unchanged.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

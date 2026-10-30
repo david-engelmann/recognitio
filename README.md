@@ -1,9 +1,6 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">
-    <img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300" height="72">
-  </picture>
+  <img alt="recognitio" src="docs/brand/wordmark-dark.svg#gh-dark-mode-only" width="300" height="72">
+  <img alt="recognitio" src="docs/brand/wordmark-light.svg#gh-light-mode-only" width="300" height="72">
 </p>
 
 **A review starts from evidence instead of a bare diff.**

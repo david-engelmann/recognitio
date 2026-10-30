@@ -1226,3 +1226,39 @@ size limit, and precedence questions stand open in the
 brief. Decision 4 binds this build like every other
 build. The brief at `docs/comate-brief.md` records the
 contract with a derivation note on every rule.
+
+## 33. The wordmark follows the GitHub theme, not the system scheme
+
+Recorded on 2026-10-29 in the wordmark theme fix pass.
+The README wordmark stood in a picture element keyed to
+the `prefers-color-scheme` media feature, and the WP1
+rendered pass proved the pairing correct for a reader
+whose GitHub appearance follows their system scheme.
+A signed in reader who forces a GitHub theme against
+their system scheme broke the pairing, because the
+media feature reads the system scheme and never the
+GitHub setting. The proven case stood system light with
+GitHub forced dark, and the page served the light master
+with its dark ink on the near black dark ground. The
+wordmark now stands as two plain images, the dark master
+carrying the `gh-dark-mode-only` fragment and the light
+master carrying the `gh-light-mode-only` fragment. The
+GitHub changelog entry of November 24 2021 defines those
+fragments as showing an image only to viewers using the
+matching GitHub theme, so the choice follows the GitHub
+setting itself, forced or not. A picture element cannot
+be made to follow the GitHub setting, because README
+markup carries no author styling and the media feature
+has no input but the system scheme. A single dual safe
+mark was weighed and set aside, because no one ink
+reaches the brand gate contrast floor of 4.5 to 1
+against both grounds, and a plated mark would change
+the shipped lockup to solve a selection problem the
+fragments solve with both masters pixel identical.
+The cost of the fragments stands on the record.
+Renderers outside GitHub ignore them and would show
+both masters stacked, and the current GitHub formatting
+documentation names the picture element and no longer
+documents the fragments, so the mechanism rests on the
+changelog definition and on the rendered checks named
+in the fix report, signed in and forced both ways.

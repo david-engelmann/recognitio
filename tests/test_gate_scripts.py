@@ -238,11 +238,15 @@ class TestCheckCopy(unittest.TestCase):
             self.assertEqual(self.run_main_on([path]), 1)
 
     def test_a_picture_tag_line_is_markup_not_prose(self):
-        # Visual round 8. The README wordmark stands in a
+        # Visual round 8. The README wordmark stood in a
         # picture element whose source lines carry a media
-        # attribute value with a colon inside it. A line
-        # holding one HTML tag and nothing else is markup
+        # attribute value with a colon inside it, and the
+        # fence learned from that landing to read a line
+        # holding one HTML tag and nothing else as markup,
         # so the attribute syntax is not judged as prose.
+        # The wordmark has since moved to the theme fragment
+        # pair and the tag lines of both hero shapes stand
+        # in the same class.
         with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "page.md",
@@ -2317,7 +2321,11 @@ class TestReadmePhoneWidth(unittest.TestCase):
         return found
 
     def test_the_hero_picture_serves_the_phone_crop(self):
-        block = self.readme.split("<picture>", 2)[2].split(
+        # The hero picture is the first picture element in
+        # the README since the wordmark theme fix landing
+        # moved the wordmark to the theme fragment pair, so
+        # the block stands after the first picture opening.
+        block = self.readme.split("<picture>", 1)[1].split(
             "</picture>", 1
         )[0]
         self.assertIn(
@@ -3543,8 +3551,8 @@ class TestBrandAssets(unittest.TestCase):
     """The visual round 8 brand asset gate.
 
     The brand masters and exports stand under geometry and
-    weight and hash pins and the README picture element and
-    its fallback alt stand under form pins and the page
+    weight and hash pins and the README wordmark theme
+    fragment pair stands under form pins and the page
     weight ledger stands under its ceiling. The manifest
     and palette pins live in scripts/check_brand.py and its
     own test file drives that script against scratch trees.
@@ -3673,36 +3681,42 @@ class TestBrandAssets(unittest.TestCase):
         self.assertEqual(palette["reserved_verified_green"], "#4AC76A")
         self.assertEqual(palette["accent"], "#D97757")
 
-    def test_the_picture_element_form_is_pinned(self):
+    def test_the_wordmark_theme_fragment_form_is_pinned(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        # Five picture elements stand in the README. The
-        # wordmark lockup checked here is the first, the
-        # hero recording picture is the second and pinned
-        # in TestReadmePhoneWidth, and the visual fix pass
-        # added one picture per output style still so each
-        # still carries a phone width source.
-        self.assertEqual(readme.count("<picture>"), 5)
-        block = readme.split("<picture>", 1)[1].split("</picture>", 1)[0]
-        dark = '<source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-dark.svg">'
-        light = '<source media="(prefers-color-scheme: light)" srcset="docs/brand/wordmark-light.svg">'
-        fallback = '<img alt="recognitio" src="docs/brand/wordmark-light.svg" width="300" height="72">'
-        for fragment in (dark, light, fallback):
-            self.assertIn(fragment, block)
-        positions = [block.index(item) for item in (dark, light, fallback)]
+        # The wordmark lockup stands on the GitHub theme
+        # fragments since the theme fix landing. Four
+        # picture elements remain in the README, the hero
+        # recording picture, pinned in TestReadmePhoneWidth,
+        # and one picture per output style still from the
+        # visual fix pass, each carrying a phone width
+        # source. The picture form keyed to
+        # prefers-color-scheme is refused, because the
+        # media feature follows the system scheme and a
+        # reader who forces a GitHub theme against their
+        # system scheme was served the master drawn for
+        # the other ground.
+        self.assertEqual(readme.count("<picture>"), 4)
+        self.assertNotIn("prefers-color-scheme", readme)
+        dark = '<img alt="recognitio" src="docs/brand/wordmark-dark.svg#gh-dark-mode-only" width="300" height="72">'
+        light = '<img alt="recognitio" src="docs/brand/wordmark-light.svg#gh-light-mode-only" width="300" height="72">'
+        for fragment in (dark, light):
+            self.assertIn(fragment, readme)
+        positions = [readme.index(item) for item in (dark, light)]
         self.assertEqual(positions, sorted(positions))
-        self.assertEqual(block.count("<img"), 1)
-        self.assertEqual(block.count("<source"), 2)
+        self.assertEqual(readme.count("#gh-dark-mode-only"), 1)
+        self.assertEqual(readme.count("#gh-light-mode-only"), 1)
+        # The crossed pairings stay out. A dark master under
+        # the light fragment is the defect in another dress.
+        self.assertNotIn("wordmark-dark.svg#gh-light-mode-only", readme)
+        self.assertNotIn("wordmark-light.svg#gh-dark-mode-only", readme)
         centred = '<p align="center">'
         self.assertIn(centred, readme)
+        self.assertLess(readme.index(centred), readme.index(dark))
+        # The wordmark pair is the whole hero lockup and no
+        # heading repeats it, so the pair stands before the
+        # headline and the old heading stays out.
         self.assertLess(
-            readme.index(centred), readme.index("<picture>")
-        )
-        # The README rebuild after visual round 10. The
-        # wordmark picture is the whole hero lockup and no
-        # heading repeats it, so the picture closes before
-        # the headline and the old heading stays out.
-        self.assertLess(
-            readme.index("</picture>"),
+            readme.index(light),
             readme.index(
                 "**A review starts from evidence instead "
                 "of a bare diff.**"
@@ -3783,7 +3797,14 @@ class TestBrandAssets(unittest.TestCase):
         refs += re.findall(
             r"(?:src|srcset)=\"(docs/[^\"]+)\"", readme
         )
-        unique = list(dict.fromkeys(refs))
+        # A src may carry a fragment, as the two wordmark
+        # images carry their GitHub theme fragments. A
+        # fragment is a rendering instruction and not part
+        # of the file path, so it is stripped before the
+        # file is weighed.
+        unique = list(
+            dict.fromkeys(ref.split("#", 1)[0] for ref in refs)
+        )
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
         self.assertEqual(total, 740901)

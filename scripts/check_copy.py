@@ -13,12 +13,13 @@ as are YAML frontmatter keys, link reference definitions and lines
 that hold nothing but a file path. A line that holds one HTML tag
 and nothing else is markup and is skipped in the same way, because
 an attribute value inside a tag is syntax and not a sentence, and
-the picture element the README carries for its wordmark stands in
-that class. Text standing beside a tag on the same line stays
-prose and is judged. A URL exempts only its own span of
-a line, never the whole line, so a banned mark hiding beside a link
-is still caught. The span ends at the link boundary, so punctuation
-sitting right after a link stays in the prose and is judged.
+the tag lines of the README hero stand in that class, the wordmark
+image pair and the recording picture alike. Text standing beside a
+tag on the same line stays prose and is judged. A URL exempts only
+its own span of a line, never the whole line, so a banned mark
+hiding beside a link is still caught. The span ends at the link
+boundary, so punctuation sitting right after a link stays in the
+prose and is judged.
 
 Four files are mostly code with prose living in their comments.
 The workflow, the dependabot config, the Makefile and the

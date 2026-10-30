@@ -900,3 +900,15 @@ over the five packet states on the headless route and
 over the unverified state on the streamed, marketplace
 and root plugin routes, with the brief and the mod
 README restated to the proven contract.
+
+The wordmark theme fix landing on 2026-10-29 then
+replaced the wordmark picture element with the two
+masters as plain images carrying the GitHub theme
+fragments, after a signed in live test proved the
+picture form served the light master to a reader whose
+system scheme stood light and whose GitHub theme stood
+forced dark. The form pin in the gate script suite now
+pins the fragment pair and refuses the picture form and
+the crossed pairings, the page weight test strips a
+fragment before weighing a file, and decision 33
+records the mechanism and its costs.
