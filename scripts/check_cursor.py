@@ -106,6 +106,14 @@ BUGBOT_YAML_FIELDS = {"autofix"}
 AUTOFIX_FIELDS = {"mode"}
 # The autofix.mode values the primary page names in its example.
 AUTOFIX_MODES = {"newBranch", "disabled"}
+# The one autofix.mode value this build ships. The brief states
+# that the shipped file sets mode to disabled and that decision 4
+# keeps Autofix off in this repo, and the shipped file states the
+# same position in its own comment. The gate therefore pins the
+# exact shipped value beside the primary vocabulary above, so a
+# move to newBranch fails here even though the primary page names
+# that value, because newBranch turns Autofix on.
+PINNED_AUTOFIX_MODE = "disabled"
 
 YAML_SIZE_LIMIT = 64 * 1024
 RULE_CHAR_LIMIT = 30000
@@ -837,7 +845,9 @@ def bugbot_yaml_problems(root=None):
     The primary page documents autofix.mode as the only repo
     YAML field, and an unknown field falls back silently down
     the precedence order, so the gate rejects unknown fields
-    instead of trusting Cursor to complain.
+    instead of trusting Cursor to complain. The mode itself is
+    pinned to the disabled value the brief states, because
+    decision 4 keeps Autofix off in this repo.
     """
     root = ROOT if root is None else root
     path = root / ".cursor" / "config" / "bugbot.yaml"
@@ -884,6 +894,13 @@ def bugbot_yaml_problems(root=None):
         problems.append(
             ".cursor/config/bugbot.yaml sets autofix.mode to %r, "
             "which is not a mode the primary page names" % (mode,)
+        )
+    elif mode != PINNED_AUTOFIX_MODE:
+        problems.append(
+            ".cursor/config/bugbot.yaml sets autofix.mode to %r, "
+            "but the brief pins the shipped mode to %r because "
+            "decision 4 keeps Autofix off in this repo"
+            % (mode, PINNED_AUTOFIX_MODE)
         )
     return problems
 

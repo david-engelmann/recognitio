@@ -2315,6 +2315,12 @@ This unreleased work carries version 1.3.0.
   earlier pins, and the recognitio-mod entry carries the
   brand icon in its manifest, where validation had
   reported the icon missing.
+- The Cursor gate now pins the shipped Bugbot autofix
+  mode to the disabled value the brief states under
+  decision 4, so a move to the newBranch value the
+  primary page also names now fails by name instead of
+  passing under the contract holds line while turning
+  Autofix on for this repo.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -6,7 +6,8 @@ rules in .cursor/BUGBOT.md, and the .cursor/config/bugbot.yaml
 repo config. These tests prove the pin fires for a real reason
 on every load bearing claim the round 22 lanes named. A
 symlinked skill copy, a drifted skill copy, an unknown
-bugbot.yaml field, a bad autofix mode, a variables schema
+bugbot.yaml field, a bad autofix mode, an enabling autofix
+mode, a variables schema
 violation on the platform root, a dropped symlink pin, a
 dropped neutral default, a dropped fail on unresolved, a
 dropped effort split, a Bugbot rule without a derivation note,
@@ -327,6 +328,73 @@ class TestCheckCursor(unittest.TestCase):
             self.assertTrue(
                 any("not a mode" in p for p in problems), problems
             )
+
+    def test_the_enabling_autofix_mode_fails(self):
+        # Round 278. The brief states the shipped file sets mode
+        # to disabled and decision 4 keeps Autofix off in this
+        # repo, so the gate pins that exact value. The enabling
+        # value the primary page also names fails by name even
+        # though the shipped comment beside it still states the
+        # disabled position, because the gate reads the value and
+        # not the comment.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor" / "config" / "bugbot.yaml"
+            text = path.read_text(encoding="utf-8")
+            broken = text.replace(
+                "mode: disabled", "mode: newBranch", 1
+            )
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "pins the shipped mode" in p
+                    and "newBranch" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_enabling_mode_fails_without_the_shipped_comment(self):
+        # The pin reads the parsed value alone, so a bare file
+        # carrying only the enabling value and none of the
+        # shipped comment text fails the same way.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor" / "config" / "bugbot.yaml"
+            path.write_text(
+                "autofix:\n  mode: newBranch\n", encoding="utf-8"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "pins the shipped mode" in p
+                    and "newBranch" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_reworded_comment_with_the_disabled_mode_holds(self):
+        # Control. The pin holds the value and not the file
+        # bytes, so a comment rewording that keeps the shipped
+        # disabled value passes the bugbot.yaml reading in both
+        # gate states.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor" / "config" / "bugbot.yaml"
+            text = path.read_text(encoding="utf-8")
+            broken = text.replace(
+                "# Repo settings for Cursor Bugbot, read from the "
+                "PR base branch.",
+                "# Repo settings for Cursor Bugbot.",
+                1,
+            )
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.mod.bugbot_yaml_problems(root)
+            self.assertEqual(problems, [])
 
     def test_a_dropped_symlink_pin_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
