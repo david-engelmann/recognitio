@@ -17,7 +17,8 @@ requires the brief to keep the stated pins, the dated sunset
 sentences, the no page stamp discipline, the version pin and
 the docs lag caveat, the extension boundary sentence, the
 namespace placeholder sentence, the hook file with its
-PreToolUse entry and its three decisions, the documented
+one PreToolUse entry, its matcher, its three decisions and
+its mapping sentences, the documented
 harness contract with a derivation note on every contract
 statement, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
@@ -176,6 +177,29 @@ DECISION_STATEMENT = "Decision 4 binds"
 
 NAMESPACE = "com.google.antigravity"
 HOOK_DECISIONS = ("deny", "force_ask", "auto_approve")
+HOOK_MATCHER = "invoke_subagent"
+
+# The mapping sentences the shipped wiring carries for the
+# three decisions. Each one states the condition and the
+# action of the brief contract statement for its decision, in
+# the wiring form of condition first and action second. S3
+# states the deny condition and action, S4 the force_ask pair,
+# and S5 the auto_approve pair, so a sentence that inverts or
+# softens either half fails here by name.
+HOOK_MAPPING = {
+    "deny": (
+        "the packet manifest is missing or not verified, so "
+        "the tool call is refused with a reason"
+    ),
+    "force_ask": (
+        "the packet manifest is unreadable or unparsable, so "
+        "the tool call is held for user confirmation"
+    ),
+    "auto_approve": (
+        "the packet manifest reads verified, so the tool call "
+        "proceeds without asking"
+    ),
+}
 
 
 def read_text(path):
@@ -281,26 +305,64 @@ def statements_problems(root=None):
     return problems
 
 
+def read_hook_wiring(path):
+    """The hook wiring text and any problem reading it.
+
+    Returns a pair of the text and the problem, with exactly
+    one of the two standing. The reading tests existence and
+    the symlink shape first and the regular file shape second
+    and only then reads, in the guarded shape the persona and
+    CodeRabbit and version gates use, so a FIFO or a link to
+    a FIFO or a directory at the wiring path draws the named
+    not a regular file problem and is never opened. A dangling
+    link stands at the path but names no regular file, so it
+    draws the same problem. The wiring ships in the tree, so
+    an absent path draws the named missing problem rather
+    than passing in silence. Bytes that are not UTF-8 draw
+    the named does not parse problem and never a traceback.
+    """
+    if path.is_symlink() or path.exists():
+        if not path.is_file():
+            return None, ".antigravity/hooks.json is not a regular file"
+        try:
+            return path.read_text(encoding="utf-8"), None
+        except (OSError, UnicodeDecodeError) as exc:
+            return None, (
+                ".antigravity/hooks.json does not parse, %s, so the "
+                "PreToolUse wiring is not a planned state" % exc
+            )
+    return None, (
+        ".antigravity/hooks.json is missing, so the PreToolUse "
+        "wiring the brief documents has no file behind it"
+    )
+
+
 def hook_problems(root=None):
     """Problems with the shipped PreToolUse hook wiring.
 
     A missing or unparseable hook file is a planned degraded
     state, never a silent pass, so either fails this gate. The
-    wiring must declare one PreToolUse entry carrying the three
-    decisions the build pins, or the documented contract has no
-    file behind it.
+    wiring must declare the contract the brief states for the
+    file itself. Statement S1 of the brief states that the
+    wiring declares one PreToolUse entry and that the entry
+    matcher names invoke_subagent, and the plugin format
+    passage states that this build hook uses three decisions,
+    deny and force_ask and auto_approve, so the entry must
+    stand alone as the one PreToolUse entry, name that
+    matcher, and carry exactly those three decisions. The
+    mapping object must carry the mapping sentence for each
+    decision, each stating the condition and the action of
+    its brief contract statement, S3 for deny, S4 for
+    force_ask, and S5 for auto_approve.
     """
     root = ROOT if root is None else root
     path = root / ".antigravity" / "hooks.json"
-    raw = read_text(path)
-    if raw is None:
-        return [
-            ".antigravity/hooks.json is missing, so the PreToolUse "
-            "wiring the brief documents has no file behind it"
-        ]
+    raw, problem = read_hook_wiring(path)
+    if problem is not None:
+        return [problem]
     try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        data = strict_json_loads(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
         return [
             ".antigravity/hooks.json does not parse, %s, so the "
             "PreToolUse wiring is not a planned state" % exc
@@ -322,18 +384,51 @@ def hook_problems(root=None):
             "the build's declared mapping names no event"
         ]
     problems = []
-    for entry in entries:
-        decisions = entry.get("decisions")
-        if not isinstance(decisions, list):
-            problems.append(
-                "the PreToolUse entry carries no decisions list"
-            )
-            continue
+    if len(entries) != 1:
+        problems.append(
+            ".antigravity/hooks.json declares %d PreToolUse entries, "
+            "so the wiring does not declare the one PreToolUse entry "
+            "the brief states" % len(entries)
+        )
+    entry = entries[0]
+    if entry.get("matcher") != HOOK_MATCHER:
+        problems.append(
+            "the PreToolUse entry matcher names %r, not %r, so the "
+            "wiring is not the build's declared mapping for the "
+            "review run tool call"
+            % (entry.get("matcher"), HOOK_MATCHER)
+        )
+    decisions = entry.get("decisions")
+    if not isinstance(decisions, list):
+        problems.append(
+            "the PreToolUse entry carries no decisions list"
+        )
+    else:
         for decision in HOOK_DECISIONS:
             if decision not in decisions:
                 problems.append(
                     "the PreToolUse entry does not carry the %r "
                     "decision the brief pins" % decision
+                )
+        for decision in decisions:
+            if decision not in HOOK_DECISIONS:
+                problems.append(
+                    "the PreToolUse entry carries the %r decision, "
+                    "which is not one of the three decisions the "
+                    "brief pins" % (decision,)
+                )
+    mapping = entry.get("mapping")
+    if not isinstance(mapping, dict):
+        problems.append(
+            "the PreToolUse entry carries no mapping object"
+        )
+    else:
+        for decision, sentence in HOOK_MAPPING.items():
+            if mapping.get(decision) != sentence:
+                problems.append(
+                    "the PreToolUse entry mapping sentence for %r "
+                    "does not state the mapping the brief pins, "
+                    "which reads %r" % (decision, sentence)
                 )
     return problems
 

@@ -23,13 +23,30 @@ dropped honest limit, and a decision record without a decision
 
 import importlib.util
 import json
+import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+HOOK_DRIVER = r"""
+import importlib.util
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location(
+    "hook_door", Path(sys.argv[1])
+)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+for problem in mod.antigravity_problems(Path(sys.argv[2])):
+    print(problem)
+"""
 
 
 def load_script(name):
@@ -64,6 +81,30 @@ class TestCheckAntigravity(unittest.TestCase):
 
     def problems(self, root):
         return self.mod.antigravity_problems(root)
+
+    def run_hook_door(self, root):
+        # The FIFO doors run in a subprocess bounded at ten
+        # seconds, so a door that reads its FIFO fails this
+        # test at the bound instead of hanging the suite.
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    HOOK_DRIVER,
+                    str(ROOT / "scripts" / "check_antigravity.py"),
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.fail(
+                "the hook wiring door did not finish within ten "
+                "seconds"
+            )
+        return result.stdout + result.stderr
 
     def read_brief(self, root):
         return (root / "docs" / "antigravity-plugin-brief.md").read_text(
@@ -484,6 +525,272 @@ class TestCheckAntigravity(unittest.TestCase):
                 any("'auto_approve'" in p for p in problems),
                 problems,
             )
+
+    def test_a_hook_matcher_drift_fails(self):
+        # Round 254. Statement S1 states the entry matcher
+        # names invoke_subagent. The exact plant the round
+        # used must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["matcher"] = "some_other_tool"
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "matcher" in p and "invoke_subagent" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_hook_without_a_matcher_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            del data["hooks"][0]["matcher"]
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "matcher" in p and "invoke_subagent" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_second_pretooluse_entry_fails(self):
+        # Round 254. Statement S1 states the wiring declares
+        # one PreToolUse entry, so a second identical entry
+        # must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"].append(dict(data["hooks"][0]))
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("one PreToolUse entry" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_with_an_extra_decision_fails(self):
+        # Round 254. The brief states this build hook uses
+        # three decisions, so a fourth must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["decisions"].append("allow_always")
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("allow_always" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_deny_mapping_inverted_fails(self):
+        # Round 254. Statement S3 states deny refuses the
+        # tool call when the packet manifest is missing or
+        # not verified. The exact inverted sentence the
+        # round planted must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["mapping"]["deny"] = (
+                "the packet manifest is ignored, so the tool "
+                "call proceeds"
+            )
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "mapping" in p and "'deny'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_hook_force_ask_mapping_drift_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["mapping"]["force_ask"] = (
+                "the packet manifest is unreadable or "
+                "unparsable, so the tool call proceeds"
+            )
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "mapping" in p and "'force_ask'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_hook_auto_approve_mapping_drift_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["mapping"]["auto_approve"] = (
+                "the packet manifest reads verified, so the "
+                "tool call is held for user confirmation"
+            )
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "mapping" in p and "'auto_approve'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_hook_without_a_mapping_object_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            del data["hooks"][0]["mapping"]
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no mapping object" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_mapping_without_the_deny_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            del data["hooks"][0]["mapping"]["deny"]
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "mapping" in p and "'deny'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_directory_at_the_hook_path_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            path.unlink()
+            path.mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not a regular file" in p for p in problems),
+                problems,
+            )
+
+    @unittest.skipUnless(
+        hasattr(os, "mkfifo"), "no mkfifo on this host"
+    )
+    def test_a_fifo_at_the_hook_path_refuses_promptly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            path.unlink()
+            os.mkfifo(path)
+            output = self.run_hook_door(root)
+            self.assertIn("not a regular file", output, output)
+
+    @unittest.skipUnless(
+        hasattr(os, "mkfifo"), "no mkfifo on this host"
+    )
+    def test_a_link_to_a_fifo_at_the_hook_path_refuses(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            path.unlink()
+            os.mkfifo(root / "hook-target")
+            path.symlink_to(root / "hook-target")
+            output = self.run_hook_door(root)
+            self.assertIn("not a regular file", output, output)
+
+    def test_a_dangling_link_at_the_hook_path_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            path.unlink()
+            path.symlink_to(root / "no-such-hook-target")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not a regular file" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_file_with_a_repeated_key_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            text = path.read_text(encoding="utf-8")
+            broken = text.replace(
+                '"event"', '"event": "PreToolUse", "event"', 1
+            )
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("does not parse" in p for p in problems),
+                problems,
+            )
+
+    def test_a_hook_file_with_non_utf8_bytes_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            path.write_bytes(b"\xff\xfe not utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("does not parse" in p for p in problems),
+                problems,
+            )
+
+    def test_a_reordered_hook_decisions_pass(self):
+        # Control. The decision pin is a set pin, so the
+        # same three decisions in another order must keep
+        # passing, in both the fixed state and the state
+        # before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["hooks"][0]["decisions"] = [
+                "auto_approve",
+                "deny",
+                "force_ask",
+            ]
+            self.write_hooks(root, data)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_reformatted_hook_file_passes(self):
+        # Control. A whitespace and key order rewrite that
+        # keeps every pinned value must keep passing, in
+        # both the fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            path = root / ".antigravity" / "hooks.json"
+            path.write_text(
+                json.dumps(data, indent=4, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_link_to_a_regular_hook_file_passes(self):
+        # Control. A link that names a regular file carrying
+        # the pinned wiring must keep passing, in both the
+        # fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "hooks.json"
+            target = root / "hook-wiring-copy.json"
+            target.write_bytes(path.read_bytes())
+            path.unlink()
+            path.symlink_to(target)
+            self.assertEqual(self.problems(root), [])
 
     def test_a_missing_antigravity_namespace_fails(self):
         # R24-RT-01 and R24-RT-02. The Build 12 manifest must

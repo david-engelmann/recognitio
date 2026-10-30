@@ -2224,6 +2224,22 @@ This unreleased work carries version 1.3.0.
   restated against the current tree, and the file
   stays the largest of its kind and stays under the
   cap the checklist holds at 7,534 bytes of headroom.
+- The Antigravity gate now reads the shipped hook wiring
+  through a guarded reading and pins the wiring contract
+  the brief states for that file, being the one PreToolUse
+  entry, its matcher naming `invoke_subagent`, its three
+  decisions standing as the whole decision set, and the
+  mapping sentence for each decision stating the condition
+  and the action its brief contract statement states. A
+  drift in any of those shapes now fails the gate by name
+  instead of passing in silence while the gate printed
+  that the contract holds. The reading tests existence
+  first and the regular file shape second and only then
+  reads, so a FIFO or a link to a FIFO or a directory at
+  that path draws a named problem stating the path is not
+  a regular file without hanging, and regression tests
+  cover each planted change from the audit that found
+  the gap.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
