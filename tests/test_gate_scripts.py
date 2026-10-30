@@ -2129,7 +2129,7 @@ class TestReadmeStorefront(unittest.TestCase):
 
     def test_the_first_screen_order_is_pinned(self):
         # The README rebuild after visual round 10. The hero
-        # is one lockup, the wordmark picture alone, and the
+        # is one lockup, the wordmark pair alone, and the
         # heading that once repeated the wordmark under it
         # stays out, so the first marker is the wordmark
         # itself and the headline follows it.
@@ -3705,6 +3705,22 @@ class TestBrandAssets(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(readme.count("#gh-dark-mode-only"), 1)
         self.assertEqual(readme.count("#gh-light-mode-only"), 1)
+        # The pair is also counted, in the hero block and
+        # across the page. The picture era pin counted one
+        # image and two sources inside its block, and the
+        # count is the part of that pin this form keeps, so
+        # an added master that stands visible in every theme
+        # cannot ride beside the correct pair uncounted, and
+        # no second reference to either master can stand
+        # anywhere else in the README.
+        hero = readme.split('<p align="center">', 1)[1].split(
+            "</p>", 1
+        )[0]
+        self.assertEqual(hero.count("<img"), 2)
+        self.assertEqual(readme.count("docs/brand/wordmark-dark.svg"), 1)
+        self.assertEqual(
+            readme.count("docs/brand/wordmark-light.svg"), 1
+        )
         # The crossed pairings stay out. A dark master under
         # the light fragment is the defect in another dress.
         self.assertNotIn("wordmark-dark.svg#gh-light-mode-only", readme)

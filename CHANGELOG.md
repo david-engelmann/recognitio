@@ -2331,7 +2331,10 @@ This unreleased work carries version 1.3.0.
   `gh-dark-mode-only` and `gh-light-mode-only` fragments
   from the GitHub changelog definition of theme context,
   which keys the choice to the GitHub theme itself. The
-  masters and their geometry are unchanged.
+  behaviour is taken from that definition and stands
+  unverified on the live page until the rendered checks
+  named in the fix report are run. The masters and their
+  geometry are unchanged.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
