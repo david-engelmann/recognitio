@@ -10,12 +10,28 @@ validator messages name the allowed values when they
 refuse one. This file is the single pin. Its classified
 surface list is itself under test, so a new surface that
 names a severity joins the tree only by being classified
-here in the open.
+here in the open. The skill copies and the extractor
+copies are found by census rather than listed by hand, so
+a copy at a new placement joins those checks by
+construction instead of escaping them in silence. The
+census walks through directory symlinks under a cycle
+guard and matches the copy shape in any letter case, so
+a seat reached only through a link and a copy whose name
+drifts in case join as well. In both scans a link free
+spelling of a file displaces an alias spelling of the
+same file, so which spelling stands never depends on
+the order the walk reaches them. The classification and the
+census are tied in both directions for skill copies, so
+a classified copy the census cannot hold is caught by
+the tie, and the known placements stand as a floor under
+the census, so a deleted copy fails instead of shrinking
+the pin in silence.
 """
 
 import importlib.util
 import json
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -31,16 +47,144 @@ OLD_SENTENCE = (
     "severity vocabulary, P1 and P2 and P3."
 )
 
-SKILL_COPIES = [
+
+# Pockets that stand outside the shipped tree in both
+# scans, so the census and the surface scan agree about
+# what stands in the tree.
+EXCLUDED_PARTS = {".git", "__pycache__", ".pytest_cache"}
+
+
+def walk_files(root):
+    """Every file under a root, following directory links safely.
+
+    A directory symlink is descended like a real directory,
+    so a seat reached only through a link is walked beside
+    a seat at a plain path. A directory whose resolved
+    target already stands among its own ancestors is not
+    descended again, so a link cycle ends instead of
+    looping. A file reached under two spellings is yielded
+    under each spelling, and the caller decides how the
+    spellings count.
+    """
+
+    def descend(directory, ancestors):
+        try:
+            entries = sorted(directory.iterdir())
+        except OSError:
+            return
+        for entry in entries:
+            if entry.is_dir():
+                resolved = entry.resolve()
+                if resolved in ancestors:
+                    continue
+                yield from descend(entry, ancestors | {resolved})
+            elif entry.is_file():
+                yield entry
+
+    yield from descend(root, {root.resolve()})
+
+
+def spelling_is_link(root, path):
+    """Whether any part of a spelling below the root is a link.
+
+    The final part can be a link itself, and a seat part
+    above it can be a link that carries the whole folder,
+    so every part of the spelling is checked in turn.
+    """
+    current = root
+    for part in path.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
+def copy_paths(root, tail):
+    """Every copy of one skill file, found by census.
+
+    A copy stands anywhere in the scanned tree at a path
+    ending in the tail, matched in any letter case, so a
+    placement the pin has never named joins the census by
+    construction. A file at a copy shaped path counts as
+    a copy even when it was meant as an excerpt, because
+    the path alone cannot tell the two apart and a host
+    that discovers the skill by folder shape could load
+    either one. Two spellings that resolve to one file
+    count once, because they are one copy, and the
+    spelling that survives is a spelling that passes
+    through no link when one stands, so an alias cannot
+    displace the seat it points at by sorting ahead of
+    it in the walk.
+    """
+    lowered = tuple(part.lower() for part in tail)
+    best = {}
+    for path in walk_files(root):
+        rel = path.relative_to(root)
+        if set(rel.parts) & EXCLUDED_PARTS:
+            continue
+        parts = tuple(part.lower() for part in rel.parts)
+        if parts[-len(lowered):] != lowered:
+            continue
+        resolved = path.resolve()
+        link = spelling_is_link(root, path)
+        held = best.get(resolved)
+        if held is None or (held[1] and not link):
+            best[resolved] = (rel.as_posix(), link)
+    return sorted(spelling for spelling, _ in best.values())
+
+
+def skill_copies(root=ROOT):
+    """Every SKILL.md copy of the skill in the tree."""
+    return copy_paths(root, ("skills", "recognitio", "SKILL.md"))
+
+
+def extractor_copies(root=ROOT):
+    """Every extractor copy of the skill in the tree."""
+    return copy_paths(
+        root, ("skills", "recognitio", "scripts", "extract.py")
+    )
+
+
+SKILL_COPIES = skill_copies()
+EXTRACTOR_COPIES = extractor_copies()
+
+# The placements the tree is known to ship, held as a
+# floor under the census. The census finds the copies the
+# checks read, and this floor fails when a known copy is
+# deleted, so the pin cannot shrink in silence.
+KNOWN_SKILL_COPIES = [
     ".agents/skills/recognitio/SKILL.md",
+    ".comate/skills/recognitio/SKILL.md",
     ".cursor-plugin/skills/recognitio/SKILL.md",
     "agent-plugins-package/skills/recognitio/SKILL.md",
 ]
-EXTRACTOR_COPIES = [
+KNOWN_EXTRACTOR_COPIES = [
     ".agents/skills/recognitio/scripts/extract.py",
+    ".comate/skills/recognitio/scripts/extract.py",
     ".cursor-plugin/skills/recognitio/scripts/extract.py",
     "agent-plugins-package/skills/recognitio/scripts/extract.py",
 ]
+
+
+def unreconciled_skill_copies(classified, copies):
+    """Skill copies the classification and the census disagree on.
+
+    A classified entry shaped like a skill copy, in any
+    letter case, that the census does not hold is pinned
+    by nothing, and a censused copy with no states entry
+    in the classification stands outside the tie from the
+    other side. Both directions stand in the returned
+    list, so the two nets can never drift apart quietly.
+    """
+    shaped = {
+        rel
+        for rel, kind in classified.items()
+        if kind == "states"
+        and tuple(part.lower() for part in rel.split("/"))[-3:]
+        == ("skills", "recognitio", "skill.md")
+    }
+    return sorted(shaped.symmetric_difference(copies))
+
 
 # Every file in the tree that names a severity, classified.
 # A surface states the vocabulary, validates it, carries a
@@ -50,6 +194,7 @@ EXTRACTOR_COPIES = [
 # and stands outside the list it keeps.
 CLASSIFIED = {
     ".agents/skills/recognitio/SKILL.md": "states",
+    ".comate/skills/recognitio/SKILL.md": "states",
     ".cursor-plugin/skills/recognitio/SKILL.md": "states",
     "agent-plugins-package/skills/recognitio/SKILL.md": "states",
     "output-styles/packet.md": "states",
@@ -154,20 +299,70 @@ def read(rel):
     return (ROOT / rel).read_text(encoding="utf-8")
 
 
-def tree_text_files():
-    for path in sorted(ROOT.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(ROOT).as_posix()
+def decode_utf16_surface(data):
+    """The text of a byte string that carries a UTF-16 mark.
+
+    A severity surface written in UTF-16 with its byte
+    order mark decodes here instead of skipping in
+    silence. A byte string with no mark is left alone,
+    because without the mark it cannot be told apart
+    from the binary files the scan skips by design.
+    """
+    if not data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return None
+    try:
+        return data.decode("utf-16")
+    except UnicodeDecodeError:
+        return None
+
+
+def tree_text_files(root=ROOT):
+    """Every text file in the tree under one spelling per file.
+
+    Two spellings that resolve to one file yield once,
+    under a spelling that passes through no link when
+    one stands, so an alias cannot displace the seat it
+    points at by sorting ahead of it in the walk. The
+    spellings are gathered before any is yielded because
+    a link free spelling can stand later in the walk
+    than the alias it must displace.
+    """
+    best = {}
+    for path in walk_files(root):
+        rel = path.relative_to(root).as_posix()
         parts = set(rel.split("/"))
-        if parts & {".git", "__pycache__", ".pytest_cache"}:
+        if parts & EXCLUDED_PARTS:
             continue
         if rel == "tests/test_severity_vocabulary.py":
             continue
         try:
-            yield rel, path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
+            data = path.read_bytes()
+        except OSError:
             continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            text = decode_utf16_surface(data)
+            if text is None:
+                continue
+        resolved = path.resolve()
+        link = spelling_is_link(root, path)
+        held = best.get(resolved)
+        if held is None or (held[2] and not link):
+            best[resolved] = (rel, text, link)
+    for rel, text, _ in sorted(
+        best.values(), key=lambda held: held[0]
+    ):
+        yield rel, text
+
+
+def severity_surfaces(root=ROOT):
+    """Every file under a root that names a severity."""
+    return {
+        rel
+        for rel, text in tree_text_files(root)
+        if "severit" in text.lower()
+    }
 
 
 class TestSeverityVocabulary(unittest.TestCase):
@@ -296,12 +491,238 @@ class TestSeverityVocabulary(unittest.TestCase):
         self.assertEqual(len(set(texts)), 1, "extractor copies drifted")
 
     def test_every_severity_surface_in_the_tree_is_classified(self):
-        found = {
-            rel
-            for rel, text in tree_text_files()
-            if "severit" in text.lower()
-        }
-        self.assertEqual(found, set(CLASSIFIED))
+        self.assertEqual(severity_surfaces(), set(CLASSIFIED))
+
+    def test_a_copy_at_a_novel_path_is_caught_by_the_census(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seat = root / ".novel" / "skills" / "recognitio"
+            (seat / "scripts").mkdir(parents=True)
+            (seat / "SKILL.md").write_text(
+                read(".agents/skills/recognitio/SKILL.md"),
+                encoding="utf-8",
+            )
+            (seat / "scripts" / "extract.py").write_text(
+                read(
+                    ".agents/skills/recognitio/scripts/extract.py"
+                ),
+                encoding="utf-8",
+            )
+            skill_rel = ".novel/skills/recognitio/SKILL.md"
+            extractor_rel = (
+                ".novel/skills/recognitio/scripts/extract.py"
+            )
+            self.assertIn(skill_rel, skill_copies(root))
+            self.assertIn(extractor_rel, extractor_copies(root))
+            self.assertEqual(severity_surfaces(root), {skill_rel})
+            self.assertNotIn(skill_rel, CLASSIFIED)
+
+    def test_a_seat_behind_a_directory_symlink_is_censused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root = base / "tree"
+            outside = base / "outside"
+            (outside / "scripts").mkdir(parents=True)
+            (outside / "SKILL.md").write_text(
+                read(".agents/skills/recognitio/SKILL.md")
+                + "\nA rogue extra line.\n",
+                encoding="utf-8",
+            )
+            (outside / "scripts" / "extract.py").write_text(
+                read(
+                    ".agents/skills/recognitio/scripts/extract.py"
+                )
+                + "\n# a rogue extra line\n",
+                encoding="utf-8",
+            )
+            seat = root / ".newseat" / "skills"
+            seat.mkdir(parents=True)
+            (seat / "recognitio").symlink_to(
+                outside, target_is_directory=True
+            )
+            (outside / "loop").symlink_to(
+                root, target_is_directory=True
+            )
+            skill_rel = ".newseat/skills/recognitio/SKILL.md"
+            extractor_rel = (
+                ".newseat/skills/recognitio/scripts/extract.py"
+            )
+            self.assertIn(skill_rel, skill_copies(root))
+            self.assertIn(extractor_rel, extractor_copies(root))
+            self.assertIn(skill_rel, severity_surfaces(root))
+
+    def test_a_file_symlink_alias_counts_once_in_both_nets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seat = root / ".agents" / "skills" / "recognitio"
+            seat.mkdir(parents=True)
+            skill_rel = ".agents/skills/recognitio/SKILL.md"
+            (seat / "SKILL.md").write_text(
+                read(".agents/skills/recognitio/SKILL.md"),
+                encoding="utf-8",
+            )
+            alias = root / ".alias" / "skills" / "recognitio"
+            alias.mkdir(parents=True)
+            (alias / "SKILL.md").symlink_to(seat / "SKILL.md")
+            self.assertEqual(skill_copies(root), [skill_rel])
+            self.assertEqual(severity_surfaces(root), {skill_rel})
+
+    def test_an_alias_sorting_before_the_seat_displaces_nothing(self):
+        for form in ("file", "directory"):
+            with self.subTest(form=form):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    seat = (
+                        root / ".agents" / "skills" / "recognitio"
+                    )
+                    seat.mkdir(parents=True)
+                    skill_rel = (
+                        ".agents/skills/recognitio/SKILL.md"
+                    )
+                    (seat / "SKILL.md").write_text(
+                        read(
+                            ".agents/skills/recognitio/SKILL.md"
+                        ),
+                        encoding="utf-8",
+                    )
+                    alias_parent = root / ".aaa" / "skills"
+                    if form == "file":
+                        alias = alias_parent / "recognitio"
+                        alias.mkdir(parents=True)
+                        (alias / "SKILL.md").symlink_to(
+                            seat / "SKILL.md"
+                        )
+                    else:
+                        alias_parent.mkdir(parents=True)
+                        (alias_parent / "recognitio").symlink_to(
+                            seat, target_is_directory=True
+                        )
+                    self.assertEqual(
+                        skill_copies(root), [skill_rel]
+                    )
+                    self.assertEqual(
+                        severity_surfaces(root), {skill_rel}
+                    )
+                    self.assertEqual(
+                        [
+                            rel
+                            for rel, _ in tree_text_files(root)
+                        ],
+                        [skill_rel],
+                    )
+                    self.assertEqual(
+                        unreconciled_skill_copies(
+                            {skill_rel: "states"},
+                            skill_copies(root),
+                        ),
+                        [],
+                    )
+
+    def test_the_census_skips_the_pockets_the_scan_skips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for pocket in (".git", "__pycache__"):
+                seat = (
+                    root / pocket / "skills" / "recognitio"
+                )
+                (seat / "scripts").mkdir(parents=True)
+                (seat / "SKILL.md").write_text(
+                    read(".agents/skills/recognitio/SKILL.md"),
+                    encoding="utf-8",
+                )
+                (seat / "scripts" / "extract.py").write_text(
+                    read(
+                        ".agents/skills/recognitio/"
+                        "scripts/extract.py"
+                    ),
+                    encoding="utf-8",
+                )
+            self.assertEqual(skill_copies(root), [])
+            self.assertEqual(extractor_copies(root), [])
+            self.assertEqual(severity_surfaces(root), set())
+
+    def test_classified_skill_copies_and_the_census_agree(self):
+        self.assertEqual(
+            unreconciled_skill_copies(CLASSIFIED, SKILL_COPIES),
+            [],
+        )
+
+    def test_a_case_variant_skill_copy_stands_inside_the_tie(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seat = root / ".case" / "skills" / "recognitio"
+            seat.mkdir(parents=True)
+            variant_rel = ".case/skills/recognitio/skill.md"
+            (seat / "skill.md").write_text(
+                read(".agents/skills/recognitio/SKILL.md"),
+                encoding="utf-8",
+            )
+            self.assertIn(variant_rel, skill_copies(root))
+            classified = {variant_rel: "states"}
+            self.assertEqual(
+                unreconciled_skill_copies(
+                    classified, skill_copies(root)
+                ),
+                [],
+            )
+            classified[".caps/Skills/Recognitio/SKILL.md"] = (
+                "states"
+            )
+            self.assertEqual(
+                unreconciled_skill_copies(
+                    classified, skill_copies(root)
+                ),
+                [".caps/Skills/Recognitio/SKILL.md"],
+            )
+            self.assertEqual(
+                unreconciled_skill_copies(
+                    {}, skill_copies(root)
+                ),
+                [variant_rel],
+            )
+
+    def test_the_census_keeps_every_known_placement(self):
+        for rel in KNOWN_SKILL_COPIES:
+            self.assertIn(rel, SKILL_COPIES)
+        for rel in KNOWN_EXTRACTOR_COPIES:
+            self.assertIn(rel, EXTRACTOR_COPIES)
+
+    def test_deleting_an_extractor_copy_breaks_the_floor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seat = root / ".agents" / "skills" / "recognitio"
+            (seat / "scripts").mkdir(parents=True)
+            extractor_rel = (
+                ".agents/skills/recognitio/scripts/extract.py"
+            )
+            planted = seat / "scripts" / "extract.py"
+            planted.write_text(
+                read(
+                    ".agents/skills/recognitio/scripts/extract.py"
+                ),
+                encoding="utf-8",
+            )
+            floor = {extractor_rel}
+            self.assertLessEqual(
+                floor, set(extractor_copies(root))
+            )
+            planted.unlink()
+            self.assertFalse(
+                floor <= set(extractor_copies(root))
+            )
+
+    def test_a_utf16_severity_surface_is_seen_by_the_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir(parents=True)
+            (root / "docs" / "utf16-surface.md").write_text(
+                "This page names the severity grades in full.\n",
+                encoding="utf-16",
+            )
+            self.assertEqual(
+                severity_surfaces(root),
+                {"docs/utf16-surface.md"},
+            )
 
     def test_no_partial_vocabulary_enumeration_stands_unrecorded(self):
         self.assertEqual(partial_enumeration_offenders(), [])
