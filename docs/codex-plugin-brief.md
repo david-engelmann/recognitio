@@ -27,6 +27,20 @@ Invocation inside a live Codex session stays unverified,
 because no signed in Codex session stands on this box and a
 live session is the only surface that exercises the skill.
 
+**What a Codex session never sees**
+
+Codex embeds at most 32,768 bytes of a repo AGENTS.md
+into first turn instructions, under the
+`project_doc_max_bytes` value the Codex review brief
+records. This repo AGENTS.md stands at 52,746 bytes, so
+its last 19,978 bytes never reach a Codex session. The
+lost bytes are the greater part of the Current state
+chronicle at the foot of the file. Every operative
+section stands inside the cap, so a Codex session holds
+the gate, the layout map, the hard rules, the
+conventions and the docs update map whole, and loses
+history alone.
+
 ## Summary
 
 Build 19 carries recognitio into Codex as a plugin. The skill

@@ -17,6 +17,7 @@ decision 4 statement each fail the Codex plugin gate.
 
 import importlib.util
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -730,6 +731,55 @@ class TestCheckCodexPlugin(unittest.TestCase):
             self.assertTrue(
                 any("decision 4" in p for p in problems), problems
             )
+
+
+class TestEmbeddingLossDisclosure(unittest.TestCase):
+    """The Codex surfaces disclose the AGENTS.md embedding loss.
+
+    Codex embeds at most 32,768 bytes of AGENTS.md, and this
+    repo file runs past that cap, so a Codex session silently
+    loses the tail of the file. The plugin brief and the
+    README Codex route now state the cap, the measured size
+    and the lost figure. Dropping the disclosure from either
+    surface fails here, and so does a size drift in AGENTS.md
+    that leaves the stated figures stale.
+    """
+
+    CAP = 32768
+
+    def figures(self, rel):
+        flat = " ".join(
+            (ROOT / rel).read_text(encoding="utf-8").split()
+        )
+        size = re.search(r"stands at ([\d,]+) bytes", flat)
+        lost = re.search(r"last ([\d,]+) bytes", flat)
+        self.assertIsNotNone(size, rel)
+        self.assertIsNotNone(lost, rel)
+        return (
+            int(size.group(1).replace(",", "")),
+            int(lost.group(1).replace(",", "")),
+        )
+
+    def test_both_surfaces_state_the_measured_loss(self):
+        actual = (ROOT / "AGENTS.md").stat().st_size
+        self.assertGreater(actual, self.CAP)
+        for rel in ("docs/codex-plugin-brief.md", "README.md"):
+            with self.subTest(surface=rel):
+                size, lost = self.figures(rel)
+                self.assertEqual(size, actual)
+                self.assertEqual(lost, actual - self.CAP)
+
+    def test_the_brief_names_what_the_lost_bytes_hold(self):
+        flat = " ".join(
+            (ROOT / "docs" / "codex-plugin-brief.md")
+            .read_text(encoding="utf-8")
+            .split()
+        )
+        self.assertIn(
+            "The lost bytes are the greater part of the "
+            "Current state chronicle",
+            flat,
+        )
 
 
 if __name__ == "__main__":

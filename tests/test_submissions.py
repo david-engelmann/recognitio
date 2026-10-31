@@ -381,9 +381,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 238 files", "holds 236 files"))
+                "holds 239 files", "holds 236 files"))
         self.assertTrue(
-            any("238 files" in p for p in problems), problems)
+            any("239 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the
@@ -613,6 +613,47 @@ class TestCheckSubmissions(unittest.TestCase):
             self.assertTrue(
                 any("fixed location" in p for p in problems),
                 problems)
+
+
+class TestPackPinWidth(unittest.TestCase):
+    """The packs state the pin width the gate actually holds.
+
+    Each pack once stated that the gate pins the facts the
+    check rests on, so drift in a manifest or in the pack
+    fails the gate, while the gate holds no file counting
+    reading and the pack figures outside its pin list drift
+    under a green gate. Restoring the unqualified sentence
+    in any pack, or dropping the scoped sentence from one,
+    fails here.
+    """
+
+    PACKS = (
+        "docs/submission-claude.md",
+        "docs/submission-cursor.md",
+        "docs/submission-agent-plugins.md",
+    )
+
+    def test_each_pack_states_the_scoped_pin_width(self):
+        for rel in self.PACKS:
+            with self.subTest(pack=rel):
+                flat = " ".join(
+                    (ROOT / rel).read_text(encoding="utf-8").split()
+                )
+                self.assertNotIn(
+                    "pins the facts the check rests on", flat
+                )
+                self.assertIn(
+                    "pins the manifest facts the check rests on "
+                    "and the few figures in this pack its pin "
+                    "list names",
+                    flat,
+                )
+                self.assertIn(
+                    "The remaining figures in this pack stand "
+                    "as measurements taken on the date this "
+                    "pack states, and no gate recounts them.",
+                    flat,
+                )
 
 
 if __name__ == "__main__":

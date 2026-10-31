@@ -801,8 +801,14 @@ This unreleased work carries version 1.3.0.
   recorded as open.
 - The regeneration gate at `scripts/check_regeneration.py`
   and the proof run sources file at
-  `workflows/proof-run/sources.json`, which together rerun
-  every gated provenance claim in the tree on every check.
+  `workflows/proof-run/sources.json`, which together
+  regenerate the shipped artefacts that claim a provenance
+  and compare each regeneration against the shipped copy
+  under the strongest comparison its provenance supports.
+  The comparison sets commit hashes aside, because the
+  fixture builder sets no date and a rebuild commits at
+  the moment it runs, and a token only change inside the
+  eval class is drift the gate cannot see.
 - The phone hero composition in place of the shipped
   phone crop. The file at
   docs/images/recognitio-cursor-agent-verified-crop.png
@@ -2471,6 +2477,68 @@ This unreleased work carries version 1.3.0.
   broken entry path passed it in silence while the pack
   it certifies stated the entry paths resolve from the
   one plugin root.
+- The extractor output lock now stands inside the output
+  directory it guards, as a lock file the run removes
+  when it closes, instead of in the machine temporary
+  directory under a digest of the pinned path, so two
+  runs launched with different temporary directory
+  settings meet at the one lock and the second is refused
+  while the first works. The skill sentence on the second
+  run now names the lock and the platform condition the
+  refusal rests on. A standing entry under the lock name
+  that is not a regular file, such as a symbolic link or
+  a FIFO, is now refused by kind at the lock taking step
+  instead of being taken as the lock or reported as a
+  lock that keeps changing.
+- The packet check current head condition now stands
+  where a reader meets the check. The readme Usage
+  paragraph, the skill workflow and stamping sections
+  and the examples note each state that the head the
+  manifest records must be the current head of the
+  repository the check runs against, that a refusal as
+  stale names that condition alone, and that a packet
+  built for a named commit stamps in a checkout standing
+  at that commit, with the examples note giving the copy
+  step its own folder needs at that commit.
+- The Codex plugin brief and the readme Codex route now
+  disclose the AGENTS.md embedding loss. Codex embeds at
+  most 32,768 bytes of the file, and the two surfaces
+  state the measured size of this repo file and the lost
+  figure the cap leaves, and name the lost bytes as the
+  greater part of the Current state chronicle, with the
+  operative sections standing inside the cap whole.
+- The pull request sign off position now stands where a
+  contributor looks first. A new CONTRIBUTING.md states
+  that outside pull requests are not taken and why, in
+  that the DCO job demands the one exact owner trailer
+  no outsider can honestly produce, and routes defect
+  reports to the bug report template, and the pull
+  request template checklist carries the same statement
+  as its first item.
+- The symlink census docstring now states the two rules
+  its test has always carried in a comment, that the pin
+  skips only where no git work tree stands over the tree
+  and that a listing that fails inside a work tree is a
+  failure and never a skip.
+- The regeneration gate entry in the Added list above
+  now states the reach the gate docstring states, in
+  that the gate regenerates the shipped provenance
+  artefacts under the strongest comparison each supports,
+  with commit hashes set aside and a token only change
+  inside the eval class named as drift the gate cannot
+  see.
+- The three submission packs now state the pin width
+  the submissions gate actually holds, in that the gate
+  pins the manifest facts and the few figures its pin
+  list names, and the remaining figures in each pack
+  stand as dated measurements no gate recounts, in place
+  of the claim that drift in a manifest or in a pack
+  fails the gate.
+- The guidance chronicle in AGENTS.md now records the
+  sixty landings its paragraphs never named, in landing
+  order in a catch up written for this landing, and
+  closes with this landing itself, so the chronicle
+  stands current at the head it lands on.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -31,3 +31,7 @@ Nothing in the packet was written or edited by hand.
 ## Verified status from the manifest
 
 The manifest records verified as true with an empty discrepancies list. The extractor printed the same verdict when it finished the run. The packet closes with a verification recount that matches the manifest on every count, and it ends on the limit sentence the shipped packet format carries. Verified here means the packet holds the whole change it names, and the Objections section of the README states what it does not mean.
+
+## Stamping this packet
+
+The packet check stamps a packet only where the head its manifest records is the current head of the repository the check runs against, and it refuses this packet as stale in a checkout standing at any later head, where stale names that condition alone and not any decay in the packet. To stamp this packet, check out its head commit `991ac6ae80d3c00c0b6c7fc06a4a35bdafb2d965` in a scratch clone and copy this folder into that checkout first, because the folder itself entered the tree long after the commit the packet documents. The stamp then passes on the packet as shipped.

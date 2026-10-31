@@ -48,7 +48,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -3644,49 +3643,155 @@ class OutputTarget:
     is staged under temporary names inside that directory and renamed
     over the final names, so no reader can meet a torn file, and a
     link standing at a final name is replaced as a link rather than
-    followed to a file outside the directory. An exclusive lock keyed
-    on the pinned path is held from the build to the publish, so a
-    second run naming the same directory is refused instead of
-    interleaving its writes with the first.
+    followed to a file outside the directory. An exclusive lock is
+    held from the build to the publish on a lock file standing
+    inside the directory itself, so a second run naming the same
+    directory is refused instead of interleaving its writes with
+    the first, and two runs launched with different temporary
+    directory settings still meet at the one lock the directory
+    itself carries. The lock file is removed when the run closes,
+    so a finished directory holds the sealed pair alone.
     """
+
+    LOCK_NAME = ".recognitio.lock"
 
     def __init__(self, pinned):
         self.path = pinned
         self.lock_fd = None
         self.dir_fd = None
 
+    @staticmethod
+    def _standing_matches_held(standing, held):
+        """Whether a standing entry is the file a descriptor holds.
+
+        The identity is the device and inode pair, so an entry
+        that merely carries the name of a held file is not that
+        file.
+        """
+        return (
+            standing.st_ino == held.st_ino
+            and standing.st_dev == held.st_dev
+        )
+
+    def _refuse_non_file_lock(self, mode):
+        """Refuse a lock entry that is not a regular file, by kind."""
+        if stat.S_ISLNK(mode):
+            kind = "a symbolic link"
+        elif stat.S_ISDIR(mode):
+            kind = "a directory"
+        elif stat.S_ISFIFO(mode):
+            kind = "a FIFO"
+        else:
+            kind = "a special file"
+        raise OutputRefusal(
+            "cannot take the output lock for %s because the entry "
+            "standing at the lock name %s is %s and not a regular "
+            "file. Remove it or pick another output directory"
+            % (self.path, self.LOCK_NAME, kind)
+        )
+
+    def _check_lock_entry_is_a_file(self):
+        """Refuse before opening when the lock name holds no file.
+
+        A FIFO standing at the lock name opens without blocking
+        under O_RDWR, so it would be taken as the lock itself
+        and removed when the run closes, and a symbolic link
+        would be followed to a file outside the directory whose
+        identity can never match the link itself. Naming the
+        entry kind here refuses both shapes before either can
+        happen, instead of adopting the one or reporting the
+        other as a lock that keeps changing.
+        """
+        try:
+            standing = os.stat(
+                self.LOCK_NAME, dir_fd=self.dir_fd,
+                follow_symlinks=False,
+            )
+        except OSError:
+            return
+        if not stat.S_ISREG(standing.st_mode):
+            self._refuse_non_file_lock(standing.st_mode)
+
     def acquire_lock(self):
         if fcntl is None or self.lock_fd is not None:
             return
-        digest = hashlib.sha256(
-            str(self.path).encode("utf-8")
-        ).hexdigest()
-        lock_path = Path(tempfile.gettempdir()) / (
-            "recognitio-out-%s.lock" % digest[:32]
+        self.open_dir()
+        # The lock file is unlinked by the holder as it closes, so
+        # a file a contender opened can be replaced under it. The
+        # inode reading after the flock is what proves the lock
+        # this run holds is the lock standing at the name now, and
+        # a mismatch retries on the standing file instead of
+        # holding a lock no other run can see.
+        for _attempt in range(10):
+            self._check_lock_entry_is_a_file()
+            try:
+                fd = os.open(
+                    self.LOCK_NAME, os.O_CREAT | os.O_RDWR, 0o644,
+                    dir_fd=self.dir_fd,
+                )
+            except OSError as exc:
+                raise OutputRefusal(
+                    "cannot take the output lock for %s because %s"
+                    % (self.path, exc.strerror or exc)
+                ) from exc
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(fd)
+                raise OutputRefusal(
+                    "another recognitio run is already writing to "
+                    "the output directory %s. Wait for it to finish "
+                    "or pick another output directory" % self.path
+                )
+            except OSError as exc:
+                os.close(fd)
+                raise OutputRefusal(
+                    "cannot take the output lock for %s because %s"
+                    % (self.path, exc.strerror or exc)
+                ) from exc
+            try:
+                standing = os.stat(
+                    self.LOCK_NAME, dir_fd=self.dir_fd,
+                    follow_symlinks=False,
+                )
+                held = os.fstat(fd)
+            except OSError:
+                standing = None
+                held = None
+            if standing is not None and not stat.S_ISREG(
+                standing.st_mode
+            ):
+                mode = standing.st_mode
+                os.close(fd)
+                self._refuse_non_file_lock(mode)
+            if standing is not None and held is not None and (
+                self._standing_matches_held(standing, held)
+            ):
+                self.lock_fd = fd
+                return
+            os.close(fd)
+        raise OutputRefusal(
+            "cannot take the output lock for %s because the lock "
+            "file keeps changing under the run" % self.path
         )
+
+    def _is_own_lock(self, entry):
+        """Whether an entry is the lock file this run holds.
+
+        The reading is by inode against the held descriptor, so
+        a foreign entry standing under the lock name is not the
+        lock and earns no exemption from the entry readings.
+        """
+        if entry != self.LOCK_NAME or self.lock_fd is None:
+            return False
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
-        except OSError as exc:
-            raise OutputRefusal(
-                "cannot take the output lock for %s because %s"
-                % (self.path, exc.strerror or exc)
-            ) from exc
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            os.close(fd)
-            raise OutputRefusal(
-                "another recognitio run is already writing to the "
-                "output directory %s. Wait for it to finish or pick "
-                "another output directory" % self.path
+            standing = os.stat(
+                entry, dir_fd=self.dir_fd, follow_symlinks=False
             )
-        except OSError as exc:
-            os.close(fd)
-            raise OutputRefusal(
-                "cannot take the output lock for %s because %s"
-                % (self.path, exc.strerror or exc)
-            ) from exc
-        self.lock_fd = fd
+            held = os.fstat(self.lock_fd)
+        except OSError:
+            return False
+        return self._standing_matches_held(standing, held)
 
     def open_dir(self):
         if self.dir_fd is not None:
@@ -3725,14 +3830,44 @@ class OutputTarget:
             ) from exc
 
     def close(self):
-        for attr in ("dir_fd", "lock_fd"):
-            fd = getattr(self, attr)
-            if fd is not None:
+        if self.lock_fd is not None:
+            # The lock file goes with the lock, so a closed run
+            # leaves the directory holding the sealed pair alone.
+            # The unlink is by the inode the descriptor held, so a
+            # fresh lock file a later run already placed at the
+            # name is never the entry removed here.
+            try:
+                held = os.fstat(self.lock_fd)
+            except OSError:
+                held = None
+            try:
+                os.close(self.lock_fd)
+            except OSError:
+                pass
+            self.lock_fd = None
+            if held is not None and self.dir_fd is not None:
                 try:
-                    os.close(fd)
+                    standing = os.stat(
+                        self.LOCK_NAME, dir_fd=self.dir_fd,
+                        follow_symlinks=False,
+                    )
                 except OSError:
-                    pass
-                setattr(self, attr, None)
+                    standing = None
+                if standing is not None and (
+                    self._standing_matches_held(standing, held)
+                ):
+                    try:
+                        os.unlink(
+                            self.LOCK_NAME, dir_fd=self.dir_fd
+                        )
+                    except OSError:
+                        pass
+        if self.dir_fd is not None:
+            try:
+                os.close(self.dir_fd)
+            except OSError:
+                pass
+            self.dir_fd = None
 
     def _verify_still_pinned(self):
         """Refuse a publish if the pinned path stopped naming this dir.
@@ -3883,9 +4018,11 @@ class OutputTarget:
 
         The sealed pair is packet.md and manifest.json, and a
         staging name belongs to this publish itself when the
-        entry under it is a regular file or a link, so every
-        other entry standing here is content a reader who copies
-        the directory as a whole would inherit unreceipted, and
+        entry under it is a regular file or a link, and the lock
+        file this run itself holds belongs to the run in the same
+        way, so every other entry standing here is content a
+        reader who copies the directory as a whole would inherit
+        unreceipted, and
         the packet check refuses such a directory by name.
         """
         try:
@@ -3899,6 +4036,7 @@ class OutputTarget:
         return sorted(
             entry for entry in entries
             if entry not in ("packet.md", "manifest.json")
+            and not self._is_own_lock(entry)
             and not (
                 entry.startswith(".recognitio-tmp-")
                 and self._staging_entry_is_discardable(entry)
@@ -3994,7 +4132,10 @@ class OutputTarget:
         the stale staging discard already ran before the pair
         was staged, so a staging named entry standing now is
         one that arrived during the publish and not a leftover
-        the publish itself still has to drop.
+        the publish itself still has to drop. The one exemption
+        is the lock file this run itself holds, read by inode,
+        because the lock stands in the directory for the whole
+        publish and goes only when the run closes.
         """
         try:
             entries = os.listdir(self.dir_fd)
@@ -4008,6 +4149,7 @@ class OutputTarget:
             entry for entry in entries
             if entry not in ("packet.md", "manifest.json")
             and entry not in allowed
+            and not self._is_own_lock(entry)
         )
 
     def _refuse_raced_publish(self, snapshot, names, raced):

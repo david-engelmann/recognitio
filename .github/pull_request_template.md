@@ -37,6 +37,9 @@ it departs nowhere. -->
 
 ## Checklist
 
+- [ ] This pull request comes from the owner or his agents, as
+      CONTRIBUTING.md states, because outside pull requests are
+      not taken and every commit must carry the owner sign off.
 - [ ] The gate ran locally on this head and stayed green.
 - [ ] Every fix in this change has a test that fails when the fix
       is reverted, and no test was weakened to make the suite pass.

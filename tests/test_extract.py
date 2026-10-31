@@ -5068,6 +5068,161 @@ class TestOutputPathDiscipline(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(read_manifest(out)["verified"])
 
+    def test_the_lock_stands_inside_the_output_directory(self):
+        # The lock once stood in the machine temporary directory
+        # under a digest of the pinned path, so two runs launched
+        # with different temporary directory settings never met
+        # at one lock. The lock now stands in the directory it
+        # guards, and it goes when the run closes.
+        out = Path(self.tmp.name) / "locked"
+        temp_locks_before = set(
+            Path(tempfile.gettempdir()).glob("recognitio-out-*.lock")
+        )
+        target = extract_mod.OutputTarget(out.resolve())
+        target.acquire_lock()
+        try:
+            self.assertTrue((out / ".recognitio.lock").is_file())
+            self.assertEqual(
+                set(
+                    Path(tempfile.gettempdir()).glob(
+                        "recognitio-out-*.lock"
+                    )
+                ),
+                temp_locks_before,
+            )
+        finally:
+            target.close()
+        self.assertFalse((out / ".recognitio.lock").exists())
+        self.assertEqual(os.listdir(out), [])
+
+    def test_a_second_run_is_refused_under_another_tempdir(self):
+        # The refusal must not depend on the temporary directory
+        # the second run happens to inherit. Pointing the second
+        # run at a different temporary directory, the shape that
+        # once split the lock in two, still refuses it.
+        out = Path(self.tmp.name) / "shared-lock"
+        first = extract_mod.OutputTarget(out.resolve())
+        first.acquire_lock()
+        other_tmp = Path(self.tmp.name) / "other-tmp"
+        other_tmp.mkdir()
+        try:
+            with mock.patch.object(
+                tempfile, "tempdir", str(other_tmp)
+            ):
+                second = extract_mod.OutputTarget(out.resolve())
+                with self.assertRaises(extract_mod.OutputRefusal):
+                    second.acquire_lock()
+                second.close()
+        finally:
+            first.close()
+
+    def test_a_foreign_entry_under_the_lock_name_is_not_the_lock(self):
+        # The publish entry readings exempt the lock file this
+        # run holds, read by inode. A foreign entry that merely
+        # carries the lock name earns no exemption, so a publish
+        # over it refuses like a publish over any foreign entry.
+        out = Path(self.tmp.name) / "foreign-lock"
+        out.mkdir()
+        repo = self.repo
+        result = run_extract_cli(
+            repo, out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        packet_data = (out / "packet.md").read_bytes()
+        manifest = read_manifest(out)
+        (out / ".recognitio.lock").write_text("foreign\n")
+        target = extract_mod.OutputTarget(out.resolve())
+        try:
+            with self.assertRaises(extract_mod.OutputRefusal):
+                target.publish_pair(packet_data, manifest)
+        finally:
+            target.close()
+        self.assertEqual(
+            (out / ".recognitio.lock").read_text(), "foreign\n"
+        )
+
+    def test_a_fifo_under_the_lock_name_is_refused_by_kind(self):
+        # A FIFO standing at the lock name opens without
+        # blocking under O_RDWR, so the run once took the
+        # foreign FIFO as its own lock and removed it when it
+        # closed. The lock taking step now refuses any entry
+        # that is not a regular file and names its kind, and
+        # the planted FIFO stands untouched.
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("this host has no mkfifo")
+        out = Path(self.tmp.name) / "fifo-lock"
+        out.mkdir()
+        os.mkfifo(out / ".recognitio.lock")
+        target = extract_mod.OutputTarget(out.resolve())
+        try:
+            with self.assertRaises(
+                extract_mod.OutputRefusal
+            ) as caught:
+                target.acquire_lock()
+        finally:
+            target.close()
+        self.assertIn("FIFO", str(caught.exception))
+        self.assertIn(
+            "not a regular file", str(caught.exception)
+        )
+        self.assertTrue(
+            stat.S_ISFIFO(
+                os.lstat(out / ".recognitio.lock").st_mode
+            )
+        )
+
+    def test_a_symlink_under_the_lock_name_is_refused_by_kind(self):
+        # A symbolic link standing at the lock name was once
+        # followed to a file outside the directory, whose
+        # identity can never match the link itself, so every
+        # retry failed and the refusal blamed a lock that
+        # keeps changing when nothing was changing. The step
+        # now names the link as the reason, and both the link
+        # and its target stand untouched.
+        out = Path(self.tmp.name) / "link-lock"
+        out.mkdir()
+        outside = Path(self.tmp.name) / "outside.txt"
+        outside.write_text("outside\n")
+        try:
+            (out / ".recognitio.lock").symlink_to(outside)
+        except OSError as exc:
+            self.skipTest("cannot plant a symlink here: %s" % exc)
+        target = extract_mod.OutputTarget(out.resolve())
+        try:
+            with self.assertRaises(
+                extract_mod.OutputRefusal
+            ) as caught:
+                target.acquire_lock()
+        finally:
+            target.close()
+        message = str(caught.exception)
+        self.assertIn("symbolic link", message)
+        self.assertIn("not a regular file", message)
+        self.assertNotIn("keeps changing", message)
+        self.assertTrue((out / ".recognitio.lock").is_symlink())
+        self.assertEqual(outside.read_text(), "outside\n")
+
+    def test_a_directory_under_the_lock_name_is_refused_by_kind(self):
+        # A directory standing at the lock name is refused by
+        # the same kind naming as the other non file shapes,
+        # and it stands untouched.
+        out = Path(self.tmp.name) / "dir-lock"
+        out.mkdir()
+        (out / ".recognitio.lock").mkdir()
+        target = extract_mod.OutputTarget(out.resolve())
+        try:
+            with self.assertRaises(
+                extract_mod.OutputRefusal
+            ) as caught:
+                target.acquire_lock()
+        finally:
+            target.close()
+        self.assertIn("directory", str(caught.exception))
+        self.assertIn(
+            "not a regular file", str(caught.exception)
+        )
+        self.assertTrue((out / ".recognitio.lock").is_dir())
+
     def test_smoke_script_scrubs_the_git_location_environment(self):
         with RetryingTemporaryDirectory() as tmp:
             victim = make_repo(tmp, [{"a.py": "x = 1\n"}])

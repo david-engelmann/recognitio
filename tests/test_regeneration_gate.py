@@ -1,6 +1,8 @@
 """The regeneration gate at scripts/check_regeneration.py.
 
-The gate reruns every gated provenance claim in the tree.
+The gate regenerates the shipped artefacts that claim a
+provenance and compares each regeneration against the
+shipped copy under a stated normalisation.
 These tests pin the makefile step by name and position,
 unit test the three normalisation functions on the hash
 and subject and token and blame shapes the shipped packets
@@ -1749,6 +1751,47 @@ class BuilderTamperTest(unittest.TestCase):
                 any("nested-rogue.txt" in p for p in problems),
                 problems,
             )
+
+
+class ChangelogReachTest(unittest.TestCase):
+    """The changelog entry states the reach the gate docstring states.
+
+    The Added entry once claimed the gate and the sources file
+    rerun every gated provenance claim in the tree on every
+    check, while the gate docstring states that commit hashes
+    are set aside and that a token only change inside the eval
+    class is drift the gate cannot see. Restoring the absolute
+    claim, or dropping either stated limit from the entry,
+    fails here.
+    """
+
+    def test_the_entry_states_the_scoped_reach_and_its_limits(self):
+        text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        flat = " ".join(text.split())
+        self.assertNotIn(
+            "rerun every gated provenance claim in the tree "
+            "on every check",
+            flat,
+        )
+        marker = "- The regeneration gate at"
+        start = flat.find(marker)
+        self.assertNotEqual(start, -1)
+        bullet = flat[start:flat.find("- The phone hero", start)]
+        self.assertIn(
+            "regenerate the shipped artefacts that claim "
+            "a provenance",
+            bullet,
+        )
+        self.assertIn(
+            "The comparison sets commit hashes aside, because "
+            "the fixture builder sets no date",
+            bullet,
+        )
+        self.assertIn(
+            "a token only change inside the eval class is "
+            "drift the gate cannot see",
+            bullet,
+        )
 
 
 if __name__ == "__main__":

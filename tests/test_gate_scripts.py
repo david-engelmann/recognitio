@@ -4624,6 +4624,75 @@ class TestDcoWorkflow(unittest.TestCase):
             workflow,
         )
 
+    def test_the_guidance_chronicle_records_the_catch_up(self):
+        # The chronicle in AGENTS.md ended at the visual fix
+        # pass while sixty landings in its own range stood
+        # unrecorded. The catch up paragraphs name them in
+        # landing order and close with this landing itself, so
+        # dropping the catch up, or its closing self record,
+        # fails here.
+        agents = " ".join(
+            (ROOT / "AGENTS.md").read_text(encoding="utf-8").split()
+        )
+        self.assertIn(
+            "The chronicle catch up on 2026-10-30 then recorded "
+            "the sixty landings the paragraphs above never named",
+            agents,
+        )
+        self.assertIn(
+            "counted the wordmark pair in its pin and qualified "
+            "the fragment claim",
+            agents,
+        )
+        self.assertIn(
+            "This claims burn down landing then closed the set",
+            agents,
+        )
+
+    def test_the_sign_off_position_stands_where_a_contributor_looks(self):
+        # The DCO job demands the one exact owner trailer, which
+        # no outsider can honestly produce, so the position has
+        # to stand in the open before the first commit is made
+        # and not only in the failure message after it. Dropping
+        # the contributing note, or its statement that outside
+        # pull requests are not taken, or the template line that
+        # points at it, fails here.
+        note_path = ROOT / "CONTRIBUTING.md"
+        self.assertTrue(note_path.is_file())
+        note = " ".join(note_path.read_text(encoding="utf-8").split())
+        self.assertIn("Outside pull requests are not taken.", note)
+        # The workflow skips the whole job when the actor is
+        # dependabot[bot] and iterates non-merge commits only,
+        # so the note must scope its every commit sentence to
+        # the commits the job actually reaches. The unscoped
+        # sentence coming back, or either carve out dropping,
+        # fails here.
+        self.assertIn(
+            "Every non-merge commit a person puts on a pull "
+            "request must carry one exact",
+            note,
+        )
+        self.assertIn("dependabot[bot]", note)
+        self.assertIn(
+            "merge commits stand outside the list of commits "
+            "it checks",
+            note,
+        )
+        self.assertNotIn(
+            "Every commit on a pull request must carry", note
+        )
+        self.assertIn(
+            "nobody else can honestly sign his name to theirs", note
+        )
+        self.assertIn("the bug report template", note)
+        template = " ".join(
+            (ROOT / ".github" / "pull_request_template.md")
+            .read_text(encoding="utf-8")
+            .split()
+        )
+        self.assertIn("CONTRIBUTING.md states", template)
+        self.assertIn("outside pull requests are not taken", template)
+
 
 class TestCheckEvals(unittest.TestCase):
     def setUp(self):

@@ -20,8 +20,11 @@ and its evidence check.
 The no directory finding rests on the words of the project
 itself, read on 2026-10-27 and named below. The package facts
 were checked against the shipped tree the same day, and the
-gate at scripts/check_submissions.py pins the facts the
-check rests on.
+gate at scripts/check_submissions.py pins the manifest
+facts the check rests on and the few figures in this pack
+its pin list names. The remaining figures in this pack
+stand as measurements taken on the date this pack states,
+and no gate recounts them.
 
 **What is unverified**
 

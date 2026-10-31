@@ -24,6 +24,12 @@ staged nor committed, stands outside this pin and the
 pin makes no claim about it. A checkout made fresh from
 a commit holds its index and its committed tree in
 agreement, so the two censuses read the same there.
+
+The pin skips only where no git work tree stands over
+the tree at all, as in an export or a tarball with no
+metadata above it. Inside a work tree a listing that
+fails is a failure of the pin and never a skip, so no
+planted link can hide behind a failed listing there.
 """
 
 import subprocess
@@ -94,6 +100,30 @@ class TestSymlinkCensus(unittest.TestCase):
             staged.stdout.splitlines(), 1
         )
         self.assertEqual(staged_census, EXPECTED)
+
+
+class TestCensusDocstring(unittest.TestCase):
+    """The docstring states the skip and listing rules it grades.
+
+    The two rules lived only in a comment beside the test, so a
+    reader of the pin met the scoped working tree passage with
+    no statement of when the pin skips or of what a failed
+    listing means inside a work tree. Dropping either sentence
+    from the docstring fails here.
+    """
+
+    def test_the_docstring_states_both_rules(self):
+        doc = " ".join(__doc__.split())
+        self.assertIn(
+            "The pin skips only where no git work tree stands "
+            "over the tree at all",
+            doc,
+        )
+        self.assertIn(
+            "Inside a work tree a listing that fails is a "
+            "failure of the pin and never a skip",
+            doc,
+        )
 
 
 if __name__ == "__main__":

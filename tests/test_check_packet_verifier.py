@@ -2395,5 +2395,106 @@ class TestCheckerInfoAttributesFifo(VerifierFixture):
         self.assertEqual(code, 0, output)
 
 
+class TestHeadConditionDisclosure(unittest.TestCase):
+    """The current head condition stands on the surfaces that teach the check.
+
+    The checker refuses a packet whose recorded head is not
+    the current head of the repository it runs against and
+    calls the packet stale, and for most of the programme no
+    stranger facing surface stated that condition, so the
+    packets the first hour teaches failed with a word no
+    page explained. Dropping the statement from any of the
+    three surfaces fails here.
+    """
+
+    CONDITION = (
+        "must be the current head of the repository "
+        "the check runs against"
+    )
+
+    def flat(self, rel):
+        return " ".join(
+            (ROOT / rel).read_text(encoding="utf-8").split()
+        )
+
+    def test_the_readme_usage_paragraph_states_the_condition(self):
+        flat = self.flat("README.md")
+        self.assertIn(
+            "The head the manifest records " + self.CONDITION, flat
+        )
+        self.assertIn(
+            "refused as stale, where stale names that "
+            "condition alone and not any decay in the packet",
+            flat,
+        )
+
+    def test_the_skill_stamping_section_states_the_condition(self):
+        flat = self.flat(".agents/skills/recognitio/SKILL.md")
+        self.assertIn(
+            "The head the manifest records " + self.CONDITION, flat
+        )
+        self.assertIn(
+            "A packet built for a named commit therefore "
+            "stamps in a checkout standing at that commit",
+            flat,
+        )
+
+    def test_the_examples_note_states_the_condition_and_the_route(self):
+        flat = self.flat("examples/README.md")
+        self.assertIn("## Stamping this packet", flat)
+        self.assertIn(
+            "refuses this packet as stale in a checkout "
+            "standing at any later head",
+            flat,
+        )
+        self.assertIn(
+            "copy this folder into that checkout first", flat
+        )
+
+
+class TestSkillRestoredSentences(unittest.TestCase):
+    """The two skill sentences the claims repair restored stand put.
+
+    The re-review section names the re-review as the right
+    tool after a rebase because the range diff shows whether
+    hunks survived the move, and the findings accounting
+    states that a finding whose path existed at the previous
+    reviewed revision and whose file is gone at the head
+    counts as addressed. The claims landing trimmed both
+    for space and its repair restored both, so dropping
+    either from any of the four skill copies fails here.
+    """
+
+    COPIES = (
+        ".agents/skills/recognitio/SKILL.md",
+        ".comate/skills/recognitio/SKILL.md",
+        ".cursor-plugin/skills/recognitio/SKILL.md",
+        "agent-plugins-package/skills/recognitio/SKILL.md",
+    )
+
+    def flat(self, rel):
+        return " ".join(
+            (ROOT / rel).read_text(encoding="utf-8").split()
+        )
+
+    def test_the_restored_sentences_stand_in_every_copy(self):
+        for rel in self.COPIES:
+            with self.subTest(copy=rel):
+                flat = self.flat(rel)
+                self.assertIn(
+                    "This is also the right tool after a "
+                    "rebase, because the range diff shows "
+                    "whether hunks survived the move",
+                    flat,
+                )
+                self.assertIn(
+                    "A finding whose path existed at the "
+                    "previous reviewed revision and whose "
+                    "file is gone at the head counts as "
+                    "addressed",
+                    flat,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

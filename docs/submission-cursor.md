@@ -16,8 +16,12 @@ decision of the owner without further research.
 
 Every requirement the primary pages state was checked against
 the shipped manifests and files on 2026-10-27. The gate at
-scripts/check_submissions.py pins the facts the check rests
-on, so drift in a manifest or in this pack fails the gate.
+scripts/check_submissions.py pins the manifest facts the
+check rests on and the few figures in this pack its pin
+list names, so drift in a pinned fact or a pinned figure
+fails the gate. The remaining figures in this pack stand
+as measurements taken on the date this pack states, and
+no gate recounts them.
 
 **What is unverified**
 
