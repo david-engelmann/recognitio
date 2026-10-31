@@ -25,12 +25,12 @@ The plugin ships in this repo as a plugin package. No Cursor
 Marketplace listing exists or has been submitted for it, so the
 local load route below is the route.
 
-For a local load test, copy this folder into the local plugin
-folder and reload the window, then confirm every component in
-Customize.
+For a local load test, copy this repository folder into the
+local plugin folder and reload the window, then confirm every
+component in Customize.
 
 ```bash
-cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio
+cp -r . ~/.cursor/plugins/local/recognitio
 ```
 
 ## The Bugbot rules beside it

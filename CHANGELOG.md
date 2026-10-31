@@ -2377,6 +2377,100 @@ This unreleased work carries version 1.3.0.
   measured 197,551 bytes before the fix. The docs index
   test lists the Comate brief in its expected documents and
   its expected briefs.
+- The Antigravity plugin manifest now carries only the
+  keys its primary schema permits, the name and the
+  description beside the `$schema` key. The version and
+  notes fields the manifest once carried are gone,
+  because the schema names no such fields and the
+  manifest did not validate against its own `$schema`
+  while they stood. The version gate no longer reads
+  the manifest as a version surface and fails when a
+  version field stands there.
+- The Antigravity hook wiring now stands in the primary
+  hooks form. The file maps one hook name,
+  `recognitio-packet-gate`, to one `PreToolUse` entry
+  whose matcher names `invoke_subagent`, and its one
+  handler is a command handler running the shipped
+  packet gate script at
+  `.antigravity/scripts/packet_gate.py`. The script
+  reads the packet manifest and returns the `deny`,
+  `force_ask`, or `auto_approve` decision the brief
+  states. The abstract entry the file once carried
+  named no hook and no command, so a host reading the
+  primary form found nothing to execute.
+- Every Cursor manifest path and marketplace entry
+  path now resolves from the one plugin root at the
+  repository root. The skills and rules values in
+  `.cursor-plugin/plugin.json` and the skills value in
+  the marketplace entry are written from that base,
+  and the Cursor and submissions gates read every path
+  from the root and pin the entry source, skills, and
+  logo to the manifest values. The mixed base form
+  left the component paths resolving nowhere under
+  the base their own file declares.
+- The Kimi gate probe now proves the fixture reads the
+  event field. It requires the event in the printed
+  form the fixture contract states, carries a decoy
+  event name in a neighbouring payload field, and
+  sends a malformed payload, an empty payload, a non
+  object payload, a payload with no event field, and
+  one unknown event beside the four events, each held
+  to exit 0 with no false event printed. An echo
+  fixture and a scrape fixture no longer certify as
+  observed.
+- The Kimi blocking negative now covers the round 36
+  battery families, the synonym verbs vetoes, rejects,
+  aborts, cancels, refuses, and ends, the must pass and
+  keeps from conditions, the gatekeeper and checkpoint
+  nouns, the waits for verdict construction, the exit
+  code 2 and deny decision returns, and the fail
+  closed idiom, and it reads the Build 14 decision
+  record beside the brief. The brief states the tested
+  family limit beside the posture, and the remainder
+  stands under the accepted round 34 residual.
+- The Antigravity gate now refuses a hook configuration
+  that stands switched off. An enabled flag set to false
+  once passed on its boolean type alone while a host
+  reading that flag would run no hook at all, so the
+  gate certified the wiring with the wiring off. The
+  packet gate script now also refuses a packet manifest
+  that names one key twice, the way every other trusted
+  reader in this repo does, so a repeated verified key
+  earns force ask instead of letting the last value win.
+- Decision 22 and the Antigravity brief summary now carry
+  a dated correction recording that the hook wiring
+  enforces the contract through the shipped packet gate
+  script, with the round 24 never enforce text left
+  standing as the record it was. The brief also states
+  that the shipped Antigravity pair is a staging copy a
+  user places into a plugin directory, with the copy
+  step written out, as the round 39 rider priced for
+  keeping the folder in place.
+- The Cursor gate now pins the shipped component values
+  themselves, not only the agreement between the
+  manifest and the marketplace entry and their
+  resolution from the plugin root, so the two files can
+  no longer repoint together at another real in root
+  target and pass. The marketplace entry agreement now
+  covers every key the entry carries, refusing an
+  unknown key by name and holding any further component
+  key to the manifest value and to resolution from the
+  root.
+- The Kimi blocking scan now reads its negation guard in
+  the segment of the clause that carries the verb, so an
+  unrelated negation earlier in the clause no longer
+  suppresses an in family claim in a later segment. The
+  live probe now sends a fresh unguessable session id
+  with every payload instead of the one fixed probe id,
+  so a fixture keying on the probe id can no longer earn
+  an observed verdict.
+- The submissions gate now reads the Cursor marketplace
+  entry source, skills, and logo and pins them to the
+  manifest values, the way the Cursor gate does. It once
+  read only the entry count and name, so a planted
+  broken entry path passed it in silence while the pack
+  it certifies stated the entry paths resolve from the
+  one plugin root.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

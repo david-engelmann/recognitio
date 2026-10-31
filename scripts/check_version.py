@@ -11,11 +11,14 @@ any of them drifts from the others. The recognitio-mod plugin
 manifest under plugins/recognitio-mod is one of the plugin
 manifests here, because under strict mode the manifest is the
 definition the host loads for that entry. The Antigravity plugin
-manifest under .antigravity is one of the plugin manifests here
-as well, and the gate reads its version through a guarded
-reading, so a path that is not a regular file draws a named
-problem and is never read, and an absent manifest draws a named
-problem rather than passing in silence.
+manifest under .antigravity is read here through a guarded
+reading as well, but it is not a version surface, because the
+schema its own $schema names permits the name and the
+description beside the $schema key and no further key, so a
+version field in that manifest is a forbidden field and this
+gate fails when one stands there. A path that is not a regular
+file draws a named problem and is never read, and an absent
+manifest draws a named problem rather than passing in silence.
 
 The README carries no version badge. The badge retired in the
 visual round 2 storefront rebuild because a static badge states a
@@ -364,14 +367,22 @@ def main():
     )
     if antigravity_problem is not None:
         problems.append(antigravity_problem)
-        versions["Antigravity plugin.json"] = None
     else:
         try:
-            versions["Antigravity plugin.json"] = plugin_version(text)
+            antigravity = strict_json_loads(text)
         except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
             problems.append(
                 "Antigravity plugin.json does not parse: %s" % exc)
-            versions["Antigravity plugin.json"] = None
+        else:
+            if isinstance(antigravity, dict) and (
+                "version" in antigravity
+            ):
+                problems.append(
+                    "Antigravity plugin.json carries a version "
+                    "field, which the schema its $schema names "
+                    "forbids, so the field is a forbidden field "
+                    "and not a version surface"
+                )
 
     text = read(MARKETPLACE_JSON)
     if text is None:

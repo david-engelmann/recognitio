@@ -9,7 +9,9 @@ Marketplace. Decision 4 binds this build like every other build.
 The plugin and the Bugbot rules advise and never enforce, so this
 script pins the contract without a Cursor host. It requires the
 manifest to name the plugin in lowercase kebab-case with
-relative paths only, the skill copy to be a real directory that
+relative paths only, every manifest path and every marketplace
+entry path to resolve from the one plugin root, which is the
+repository root in this tree, the skill copy to be a real directory that
 is byte identical to the canonical skill because the host skips
 symlinks that point outside the local plugin folder, every
 Bugbot rule to carry a checkable derivation note, the shipped
@@ -69,6 +71,17 @@ PRIMARY_CITATIONS = (
 
 # The manifest component keys the primary packaging rules name.
 COMPONENT_KEYS = ("skills", "rules", "agents", "commands")
+
+# The shipped component values the brief pins in its own
+# sentences. Agreement between the manifest and the
+# marketplace entry plus resolvability from the plugin root
+# is not enough on its own, because both files can repoint
+# together at another real in root target and keep agreeing
+# while the shipped components move. The gate therefore
+# pins the values themselves beside the agreement.
+SHIPPED_SKILLS = ["./.cursor-plugin/skills/recognitio/"]
+SHIPPED_RULES = ["./.cursor-plugin/rules/recognitio.mdc"]
+SHIPPED_LOGO = "docs/brand/recognitio-icon.svg"
 
 # Manifest top level keys the shipped manifest may carry. The
 # list is closed on purpose, so an invented manifest key fails
@@ -296,6 +309,20 @@ PINNED = (
     ("the marketplace and Bugbot items unverified",
      "Marketplace installation from a listing and Bugbot "
      "behaviour on a real pull request stay UNVERIFIED"),
+    ("the single plugin root base",
+     "every path the manifest and the marketplace entry "
+     "carry resolves from that one base"),
+    ("the shipped component paths",
+     "The shipped skills value is "
+     "`./.cursor-plugin/skills/recognitio/` and the shipped "
+     "rules value is `./.cursor-plugin/rules/recognitio.mdc`"),
+    ("the local load nested manifest",
+     "the local load route copies this repository folder "
+     "into the local plugin folder, so the manifest sits at "
+     "`.cursor-plugin/plugin.json` inside the copied folder"),
+    ("the corrected layout run unverified",
+     "a fresh desktop run of the corrected layout stands "
+     "UNVERIFIED"),
 )
 
 # Brief fragments the desktop verification run of 2026-10-25
@@ -336,8 +363,8 @@ README_PINNED = (
     ("the local load route position",
      "so the local load route below is the route"),
     ("the local load test",
-     "For a local load test, copy the folder into the "
-     "local plugin folder"),
+     "For a local load test, copy this repository folder "
+     "into the local plugin folder"),
 )
 
 # README wording the gate refuses outright. The positive
@@ -363,10 +390,10 @@ PLUGIN_README_PINNED = (
     ("the local load route position",
      "so the local load route below is the route"),
     ("the local load test",
-     "For a local load test, copy this folder into the "
-     "local plugin folder"),
+     "For a local load test, copy this repository folder "
+     "into the local plugin folder"),
     ("the local load command",
-     "cp -r .cursor-plugin ~/.cursor/plugins/local/recognitio"),
+     "cp -r . ~/.cursor/plugins/local/recognitio"),
 )
 
 # Plugin README wording the gate refuses outright. The list
@@ -491,6 +518,39 @@ def tree_bytes(directory):
     return found
 
 
+def _resolve_from_root(root, value):
+    """The resolved target of a path read from the plugin root.
+
+    Returns the target when it stays inside the root and
+    None when it escapes, so every manifest and entry path
+    reading in this gate resolves from the one base through
+    the same sequence instead of through copies that can
+    drift apart on the base question.
+    """
+    target = (root / value).resolve()
+    try:
+        target.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return target
+
+
+def _same_path_values(value, shipped):
+    """Whether a component value carries the shipped paths.
+
+    A trailing slash on a directory value names the same
+    directory with or without it, so the comparison reads
+    past that spelling alone and pins the target itself.
+    """
+    if not isinstance(value, list) or len(value) != len(shipped):
+        return False
+    return all(
+        isinstance(item, str)
+        and item.rstrip("/") == pinned.rstrip("/")
+        for item, pinned in zip(value, shipped)
+    )
+
+
 def manifest_problems(root=None):
     """Problems with the Cursor plugin manifest."""
     root = ROOT if root is None else root
@@ -551,7 +611,54 @@ def manifest_problems(root=None):
                 "the pinned discovery value is %r"
                 % (field, data.get(field), expected)
             )
+    if not _same_path_values(data.get("skills"), SHIPPED_SKILLS):
+        problems.append(
+            ".cursor-plugin/plugin.json carries skills %r and "
+            "the shipped skills value is %r, so the manifest "
+            "does not carry the component path the brief pins"
+            % (data.get("skills"), SHIPPED_SKILLS)
+        )
+    if not _same_path_values(data.get("rules"), SHIPPED_RULES):
+        problems.append(
+            ".cursor-plugin/plugin.json carries rules %r and "
+            "the shipped rules value is %r, so the manifest "
+            "does not carry the component path the brief pins"
+            % (data.get("rules"), SHIPPED_RULES)
+        )
+    logo = data.get("logo")
+    if logo is not None:
+        if logo != SHIPPED_LOGO:
+            problems.append(
+                ".cursor-plugin/plugin.json names the logo %r "
+                "and the shipped logo value is %r"
+                % (logo, SHIPPED_LOGO)
+            )
+        if not isinstance(logo, str) or os.path.isabs(logo) \
+                or ".." in Path(logo).parts:
+            problems.append(
+                ".cursor-plugin/plugin.json names the logo %r, "
+                "which is not a relative path inside the plugin "
+                "root" % (logo,)
+            )
+        else:
+            target = _resolve_from_root(root, logo)
+            if target is None:
+                problems.append(
+                    ".cursor-plugin/plugin.json names the logo "
+                    "%r, which escapes the plugin root" % (logo,)
+                )
+            elif target.is_symlink() or not target.is_file():
+                problems.append(
+                    ".cursor-plugin/plugin.json names the "
+                    "logo %r, which is not a real file at "
+                    "the plugin root" % (logo,)
+                )
     plugin_dir = root / ".cursor-plugin"
+    # Every manifest path resolves from the one plugin root,
+    # the folder that holds the .cursor-plugin folder, which
+    # is the repository root in this tree. A path written
+    # from the manifest folder instead resolves nowhere from
+    # that base, so the gate reads each path from the root.
     for key in COMPONENT_KEYS:
         entries = data.get(key, [])
         if not isinstance(entries, list):
@@ -574,13 +681,11 @@ def manifest_problems(root=None):
                     "plugin" % (entry, key)
                 )
                 continue
-            target = (plugin_dir / entry).resolve()
-            try:
-                target.relative_to(plugin_dir.resolve())
-            except ValueError:
+            target = _resolve_from_root(root, entry)
+            if target is None:
                 problems.append(
                     ".cursor-plugin/plugin.json declares %r under "
-                    "%s, which escapes the plugin directory"
+                    "%s, which escapes the plugin root"
                     % (entry, key)
                 )
                 continue
@@ -671,11 +776,17 @@ def marketplace_problems(root=None):
     problems = []
     manifest_raw = read_text(root / ".cursor-plugin" / "plugin.json")
     name = version = None
+    manifest_skills = manifest_logo = None
+    manifest_components = {}
     if manifest_raw is not None:
         try:
             manifest = strict_json_loads(manifest_raw)
             name = manifest.get("name")
             version = manifest.get("version")
+            manifest_skills = manifest.get("skills")
+            manifest_logo = manifest.get("logo")
+            for key in COMPONENT_KEYS:
+                manifest_components[key] = manifest.get(key)
         except (ValueError, DuplicateKeyError):
             pass
     entries = data.get("plugins")
@@ -697,6 +808,76 @@ def marketplace_problems(root=None):
                 "while the manifest is at %r"
                 % (entry.get("version"), version)
             )
+        # The entry paths resolve from the entry source, and
+        # the entry source names the plugin root, so the entry
+        # must carry the manifest values themselves. An entry
+        # path written from another base resolves nowhere
+        # under its own source.
+        if entry.get("source") != "./":
+            problems.append(
+                ".cursor-plugin/marketplace.json entry carries "
+                "source %r, which is not the plugin root the "
+                "manifest stands at" % (entry.get("source"),)
+            )
+        if entry.get("skills") != manifest_skills:
+            problems.append(
+                ".cursor-plugin/marketplace.json entry carries "
+                "skills %r while the manifest carries %r, so "
+                "the entry paths do not resolve from the entry "
+                "source"
+                % (entry.get("skills"), manifest_skills)
+            )
+        if entry.get("logo") != manifest_logo:
+            problems.append(
+                ".cursor-plugin/marketplace.json entry carries "
+                "logo %r while the manifest carries %r"
+                % (entry.get("logo"), manifest_logo)
+            )
+        # The entry agreement covers every key the entry
+        # carries, not only the shipped ones. A key outside
+        # the entry shape the agreement pins rides
+        # unexamined, and a component key the shipped entry
+        # does not carry must still agree with the manifest
+        # and resolve from the plugin root, because a host
+        # reading such a field from the entry would follow
+        # it where it points.
+        entry_keys = {
+            "name", "version", "description", "source",
+            "skills", "logo",
+        } | set(COMPONENT_KEYS)
+        for key in sorted(set(entry) - entry_keys):
+            problems.append(
+                ".cursor-plugin/marketplace.json entry carries "
+                "the %r key, which is not an entry key the "
+                "agreement pins, so it stands unexamined"
+                % key
+            )
+        for key in ("rules", "agents", "commands"):
+            if key not in entry:
+                continue
+            if entry.get(key) != manifest_components.get(key):
+                problems.append(
+                    ".cursor-plugin/marketplace.json entry "
+                    "carries %s %r while the manifest carries "
+                    "%r, so the entry paths do not resolve "
+                    "from the entry source"
+                    % (key, entry.get(key),
+                       manifest_components.get(key))
+                )
+                continue
+            for item in entry.get(key) or []:
+                target = (
+                    _resolve_from_root(root, item)
+                    if isinstance(item, str) else None
+                )
+                if target is None or target.is_symlink() \
+                        or not (target.is_file()
+                                or target.is_dir()):
+                    problems.append(
+                        ".cursor-plugin/marketplace.json entry "
+                        "carries %s %r, which does not resolve "
+                        "from the plugin root" % (key, item)
+                    )
     metadata = data.get("metadata", {})
     if isinstance(metadata, dict) and metadata.get("version") \
             != version:

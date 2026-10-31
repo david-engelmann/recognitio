@@ -10,16 +10,18 @@ October 9 2026 sunset evidence with Antigravity as the named
 path, the v0.65.0 stable pin with the docs lag caveat, and the
 Antigravity native shapes as a second extensions namespace
 beside the portable core, never blended into it. Decision 4
-binds this build like every other build. The brief and the
-hook wiring document the contract and never enforce it, so
-this script pins the contract without an Antigravity host. It
+binds this build like every other build. The brief documents
+the contract and the shipped hook wiring enforces it through
+the packet gate script, and this script pins the contract
+without an Antigravity host. It
 requires the brief to keep the stated pins, the dated sunset
 sentences, the no page stamp discipline, the version pin and
 the docs lag caveat, the extension boundary sentence, the
-namespace placeholder sentence, the hook file with its
-one PreToolUse entry, its matcher, its three decisions and
-its mapping sentences, the notes texts of the plugin
-manifest and the hook wiring pinned word for word, the documented
+namespace placeholder sentence, the plugin manifest with
+exactly the keys its primary schema permits, the hook file
+in the primary hooks form with its one named hook, its one
+PreToolUse entry, its matcher and its one command handler
+naming the shipped packet gate script, the documented
 harness contract with a derivation note on every contract
 statement, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
@@ -80,6 +82,21 @@ PINNED = (
     ("the three hook decisions",
      "This build's hook uses three of them, `deny`, `force_ask`, "
      "and `auto_approve`"),
+    ("the manifest key set",
+     "the shipped manifest at `.antigravity/plugin.json` carries "
+     "exactly those three keys and no version and no notes field"),
+    ("the wiring form",
+     "Its top level maps one hook name, `recognitio-packet-gate`, "
+     "to its event configuration"),
+    ("the command handler",
+     "its one handler is a command handler naming the shipped "
+     "packet gate script"),
+    ("the staging copy",
+     "The shipped pair is a staging copy a user places into "
+     "a plugin directory"),
+    ("the hook enforcement correction",
+     "The hook wiring now enforces the contract through the "
+     "shipped packet gate script"),
     ("the sunset halt",
      "Starting October 9 2026, no new Gemini Code Assist Standard "
      "or Enterprise subscriptions can be purchased"),
@@ -176,55 +193,41 @@ PINNED = (
 DECISION_HEADING = "## 22. Build 12"
 DECISION_STATEMENT = "Decision 4 binds"
 
+# The dated correction the round 39 pricing ordered for this
+# record. The round 24 text that the wiring documents the
+# contract and never enforces it stands in the record, and
+# the correction beside it states the current position, so
+# both fragments must stand or the record contradicts the
+# shipped wiring in silence again.
+DECISION_CORRECTION_DATE = "A correction recorded on 2026-10-31"
+DECISION_CORRECTION = (
+    "now enforces the contract through the shipped "
+    "packet gate script"
+)
+
 NAMESPACE = "com.google.antigravity"
-HOOK_DECISIONS = ("deny", "force_ask", "auto_approve")
 HOOK_MATCHER = "invoke_subagent"
 
-# The notes texts of the two Antigravity files, pinned word for
-# word. The brief states in its second packet guard that the
-# gate pins the notes, so a later edit cannot add an underived
-# statement in silence, and round 262 filed that planted
-# inversions of both texts passed every gate while the gate
-# carried no reading of either text.
-PLUGIN_NOTES = (
-    "Build 12 declared surface, not a primary shape. The "
-    "primary plugins page documents plugin.json as the "
-    "required marker with this $schema value and hooks.json "
-    "as an optional component. This build names no skill, "
-    "agent, rule, or MCP component, because the canonical "
-    "skill is already discoverable at .agents/skills/ on the "
-    "primary documented Antigravity skills discovery path."
-)
-WIRING_NOTES = (
-    "Build 12 declared mapping, not a primary shape. The "
-    "primary hooks page documents exactly six events, the "
-    "stdin and stdout JSON contract, and the required "
-    "decision field, and it names no subagent spawn event. "
-    "The matcher below is the build's declared mapping for "
-    "the review run tool call."
-)
+# The one hook name the shipped wiring declares, the command
+# its one handler runs, and the script that command names,
+# read relative to the .antigravity plugin root in the form
+# the primary hooks page examples use. The decision contract
+# the script implements is the brief contract statements S3
+# and S4 and S5, and the shipped tests run the script itself
+# over the packet manifest states those statements name.
+HOOK_NAME = "recognitio-packet-gate"
+HOOK_COMMAND = "python3 ./scripts/packet_gate.py"
+HOOK_SCRIPT = "scripts/packet_gate.py"
 
-# The mapping sentences the shipped wiring carries for the
-# three decisions. Each one states the condition and the
-# action of the brief contract statement for its decision, in
-# the wiring form of condition first and action second. S3
-# states the deny condition and action, S4 the force_ask pair,
-# and S5 the auto_approve pair, so a sentence that inverts or
-# softens either half fails here by name.
-HOOK_MAPPING = {
-    "deny": (
-        "the packet manifest is missing or not verified, so "
-        "the tool call is refused with a reason"
-    ),
-    "force_ask": (
-        "the packet manifest is unreadable or unparsable, so "
-        "the tool call is held for user confirmation"
-    ),
-    "auto_approve": (
-        "the packet manifest reads verified, so the tool call "
-        "proceeds without asking"
-    ),
-}
+# The keys the primary plugins page schema permits in the
+# plugin manifest, beside the $schema key its own example
+# carries. The schema names the name and the description as
+# its only properties and sets additional properties to
+# false, so a version or a notes key in the shipped manifest
+# is a forbidden field, however true its value reads.
+MANIFEST_KEYS = {"$schema", "name", "description"}
+MANIFEST_SCHEMA = "https://antigravity.google/schemas/v1/plugin.json"
+MANIFEST_NAME = "recognitio"
 
 
 def read_text(path):
@@ -367,18 +370,25 @@ def hook_problems(root=None):
 
     A missing or unparseable hook file is a planned degraded
     state, never a silent pass, so either fails this gate. The
-    wiring must declare the contract the brief states for the
-    file itself. Statement S1 of the brief states that the
-    wiring declares one PreToolUse entry and that the entry
-    matcher names invoke_subagent, and the plugin format
-    passage states that this build hook uses three decisions,
-    deny and force_ask and auto_approve, so the entry must
-    stand alone as the one PreToolUse entry, name that
-    matcher, and carry exactly those three decisions. The
-    mapping object must carry the mapping sentence for each
-    decision, each stating the condition and the action of
-    its brief contract statement, S3 for deny, S4 for
-    force_ask, and S5 for auto_approve.
+    wiring must stand in the form the primary hooks page
+    documents, a top level mapping from hook names to event
+    configurations, because a host reading that form finds no
+    named hook and nothing to execute in any other shape.
+    Statement S1 of the brief states that the wiring maps the
+    one hook name to one PreToolUse entry, that the entry
+    matcher names invoke_subagent, and that the entry carries
+    one command handler naming the shipped packet gate
+    script, so the wiring must stand in exactly that shape
+    and the script the command names must stand in the tree
+    as a regular file. The decisions the script returns are
+    the brief contract statements S3 and S4 and S5, and the
+    shipped tests run the script itself over the packet
+    manifest states those statements name. An enabled flag
+    on the hook configuration is part of that shape, so a
+    non boolean value fails, and a false value fails by
+    name as well, because a host reading that flag runs no
+    hook at all and the gate must not certify wiring that
+    stands switched off.
     """
     root = ROOT if root is None else root
     path = root / ".antigravity" / "hooks.json"
@@ -395,72 +405,182 @@ def hook_problems(root=None):
     if not isinstance(data, dict):
         return [".antigravity/hooks.json is not a JSON object"]
     problems = []
-    if data.get("notes") != WIRING_NOTES:
+    for key in sorted(set(data) - {HOOK_NAME}):
         problems.append(
-            ".antigravity/hooks.json carries notes %r, not the "
-            "pinned notes text the brief states the gate pins, "
-            "which reads %r" % (data.get("notes"), WIRING_NOTES)
+            ".antigravity/hooks.json carries the top level key "
+            "%r, which is not the one hook name the brief "
+            "states, so a host reading the primary form finds "
+            "no named hook under it" % key
         )
-    hooks = data.get("hooks")
-    if not isinstance(hooks, list) or not hooks:
-        return problems + [
-            ".antigravity/hooks.json carries no hook entries"
-        ]
-    entries = [
-        entry for entry in hooks
-        if isinstance(entry, dict) and entry.get("event") == "PreToolUse"
-    ]
-    if not entries:
-        return problems + [
-            ".antigravity/hooks.json carries no PreToolUse entry, so "
-            "the build's declared mapping names no event"
-        ]
+    config = data.get(HOOK_NAME)
+    if config is None:
+        problems.append(
+            ".antigravity/hooks.json maps no hook named %r, so "
+            "the wiring names no hook a host can run" % HOOK_NAME
+        )
+        return problems
+    if not isinstance(config, dict):
+        problems.append(
+            "the %r hook value is not an event configuration "
+            "object" % HOOK_NAME
+        )
+        return problems
+    for key in sorted(set(config) - {"PreToolUse", "enabled"}):
+        problems.append(
+            "the %r hook carries the %r key, which is not "
+            "the one PreToolUse event configuration or the "
+            "enabled flag the primary form carries"
+            % (HOOK_NAME, key)
+        )
+    if "enabled" in config and not isinstance(
+        config.get("enabled"), bool
+    ):
+        problems.append(
+            "the %r hook carries an enabled value that is "
+            "not a boolean" % HOOK_NAME
+        )
+    if config.get("enabled") is False:
+        problems.append(
+            "the %r hook carries enabled false, so the "
+            "wiring stands switched off and a host reading "
+            "that flag runs no hook at all, while the gate "
+            "would still certify the wiring" % HOOK_NAME
+        )
+    entries = config.get("PreToolUse")
+    if not isinstance(entries, list) or not entries:
+        problems.append(
+            ".antigravity/hooks.json carries no PreToolUse "
+            "entry under the %r hook, so the wiring names no "
+            "event a host can run" % HOOK_NAME
+        )
+        return problems
     if len(entries) != 1:
         problems.append(
-            ".antigravity/hooks.json declares %d PreToolUse entries, "
-            "so the wiring does not declare the one PreToolUse entry "
-            "the brief states" % len(entries)
+            ".antigravity/hooks.json declares %d PreToolUse "
+            "entries, so the wiring does not declare the one "
+            "PreToolUse entry the brief states" % len(entries)
         )
     entry = entries[0]
+    if not isinstance(entry, dict):
+        problems.append("the PreToolUse entry is not an object")
+        return problems
+    for key in sorted(set(entry) - {"matcher", "hooks"}):
+        problems.append(
+            "the PreToolUse entry carries the %r key, which "
+            "the primary entry form does not carry" % key
+        )
     if entry.get("matcher") != HOOK_MATCHER:
         problems.append(
-            "the PreToolUse entry matcher names %r, not %r, so the "
-            "wiring is not the build's declared mapping for the "
-            "review run tool call"
+            "the PreToolUse entry matcher names %r, not %r, so "
+            "the wiring is not the build's declared mapping "
+            "for the review run tool call"
             % (entry.get("matcher"), HOOK_MATCHER)
         )
-    decisions = entry.get("decisions")
-    if not isinstance(decisions, list):
+    handlers = entry.get("hooks")
+    if not isinstance(handlers, list) or not handlers:
         problems.append(
-            "the PreToolUse entry carries no decisions list"
+            "the PreToolUse entry carries no hooks array, so "
+            "it names no handler a host can run"
         )
-    else:
-        for decision in HOOK_DECISIONS:
-            if decision not in decisions:
-                problems.append(
-                    "the PreToolUse entry does not carry the %r "
-                    "decision the brief pins" % decision
-                )
-        for decision in decisions:
-            if decision not in HOOK_DECISIONS:
-                problems.append(
-                    "the PreToolUse entry carries the %r decision, "
-                    "which is not one of the three decisions the "
-                    "brief pins" % (decision,)
-                )
-    mapping = entry.get("mapping")
-    if not isinstance(mapping, dict):
+        return problems
+    if len(handlers) != 1:
         problems.append(
-            "the PreToolUse entry carries no mapping object"
+            "the PreToolUse entry declares %d handlers, so "
+            "the wiring does not declare the one command "
+            "handler the brief states" % len(handlers)
         )
-    else:
-        for decision, sentence in HOOK_MAPPING.items():
-            if mapping.get(decision) != sentence:
-                problems.append(
-                    "the PreToolUse entry mapping sentence for %r "
-                    "does not state the mapping the brief pins, "
-                    "which reads %r" % (decision, sentence)
-                )
+    handler = handlers[0]
+    if not isinstance(handler, dict):
+        problems.append("the PreToolUse handler is not an object")
+        return problems
+    for key in sorted(set(handler) - {"type", "command", "timeout"}):
+        problems.append(
+            "the PreToolUse handler carries the %r key, which "
+            "the primary handler form does not carry" % key
+        )
+    if "timeout" in handler and (
+        not isinstance(handler.get("timeout"), int)
+        or isinstance(handler.get("timeout"), bool)
+        or handler.get("timeout") <= 0
+    ):
+        problems.append(
+            "the PreToolUse handler carries a timeout that "
+            "is not a positive integer number of seconds"
+        )
+    if handler.get("type") != "command":
+        problems.append(
+            "the PreToolUse handler carries type %r, not "
+            "'command', so it names no command a host can run"
+            % (handler.get("type"),)
+        )
+    if handler.get("command") != HOOK_COMMAND:
+        problems.append(
+            "the PreToolUse handler command reads %r, not %r, "
+            "so the wiring does not run the shipped packet "
+            "gate script"
+            % (handler.get("command"), HOOK_COMMAND)
+        )
+    script = root / ".antigravity" / HOOK_SCRIPT
+    if script.is_symlink() or not script.is_file():
+        problems.append(
+            "the packet gate script at .antigravity/%s is "
+            "missing or not a regular file, so the command "
+            "the wiring names runs nothing" % HOOK_SCRIPT
+        )
+    return problems
+
+
+def plugin_manifest_problems(root=None):
+    """Problems with the shipped Antigravity plugin manifest.
+
+    The schema the primary plugins page prints permits the
+    name and the description beside the $schema key its own
+    example carries, and sets additional properties to
+    false. A shipped manifest carrying any further key, a
+    version or a notes field among them, fails that schema
+    in the schema's own words, so this gate reads the
+    manifest the brief declares and refuses every key
+    outside the permitted set by name.
+    """
+    root = ROOT if root is None else root
+    path = root / ".antigravity" / "plugin.json"
+    raw = read_text(path)
+    if raw is None:
+        return [".antigravity/plugin.json is missing"]
+    try:
+        data = strict_json_loads(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return [".antigravity/plugin.json does not parse, %s" % exc]
+    if not isinstance(data, dict):
+        return [".antigravity/plugin.json is not a JSON object"]
+    problems = []
+    for key in sorted(set(data) - MANIFEST_KEYS):
+        problems.append(
+            ".antigravity/plugin.json carries the %r key, "
+            "which the primary manifest schema forbids, so "
+            "the manifest does not validate against its own "
+            "$schema" % key
+        )
+    for key in sorted(MANIFEST_KEYS - set(data)):
+        problems.append(
+            ".antigravity/plugin.json carries no %r key, "
+            "which the primary manifest schema names" % key
+        )
+    if "$schema" in data and data.get("$schema") != MANIFEST_SCHEMA:
+        problems.append(
+            ".antigravity/plugin.json carries $schema %r, not "
+            "the value the primary plugins page names"
+            % (data.get("$schema"),)
+        )
+    if "name" in data and data.get("name") != MANIFEST_NAME:
+        problems.append(
+            ".antigravity/plugin.json names %r, not %r"
+            % (data.get("name"), MANIFEST_NAME)
+        )
+    if "description" in data and not data.get("description"):
+        problems.append(
+            ".antigravity/plugin.json carries no description"
+        )
     return problems
 
 
@@ -474,37 +594,6 @@ def strict_json_loads(text):
             seen[key] = value
         return seen
     return json.loads(text, object_pairs_hook=reject)
-
-
-def plugin_problems(root=None):
-    """Problems with the Antigravity plugin manifest notes.
-
-    The brief states that the gate pins the notes, so the
-    notes text of the plugin manifest itself stands pinned
-    here word for word beside the wiring notes pin in the
-    hook reading, which is the pair round 262 filed.
-    """
-    root = ROOT if root is None else root
-    path = root / ".antigravity" / "plugin.json"
-    raw = read_text(path)
-    if raw is None:
-        return [
-            ".antigravity/plugin.json is missing, so the plugin "
-            "notes the brief states the gate pins stand nowhere"
-        ]
-    try:
-        data = strict_json_loads(raw)
-    except (json.JSONDecodeError, ValueError) as exc:
-        return [".antigravity/plugin.json does not parse, %s" % exc]
-    if not isinstance(data, dict):
-        return [".antigravity/plugin.json is not a JSON object"]
-    if data.get("notes") != PLUGIN_NOTES:
-        return [
-            ".antigravity/plugin.json carries notes %r, not the "
-            "pinned notes text the brief states the gate pins, "
-            "which reads %r" % (data.get("notes"), PLUGIN_NOTES)
-        ]
-    return []
 
 
 def manifest_problems(root=None):
@@ -555,12 +644,24 @@ def decision_problems(root=None):
     rest = raw[start + len(DECISION_HEADING):]
     match = re.search(r"(?m)^## ", rest)
     record = rest[:match.start()] if match else rest
+    problems = []
     if DECISION_STATEMENT not in record:
-        return [
+        problems.append(
             "the Build 12 decision record carries no decision 4 "
             "statement, which every landed build must record"
-        ]
-    return []
+        )
+    flat = re.sub(r"\s+", " ", record)
+    if DECISION_CORRECTION_DATE not in flat \
+            or DECISION_CORRECTION not in flat:
+        problems.append(
+            "the Build 12 decision record carries no dated "
+            "correction recording that the hook wiring now "
+            "enforces the contract through the shipped packet "
+            "gate script, so its round 24 never enforce "
+            "statement stands uncorrected beside the shipped "
+            "wiring"
+        )
+    return problems
 
 
 def antigravity_problems(root=None):
@@ -568,8 +669,8 @@ def antigravity_problems(root=None):
     problems = []
     problems.extend(brief_problems(root))
     problems.extend(statements_problems(root))
+    problems.extend(plugin_manifest_problems(root))
     problems.extend(hook_problems(root))
-    problems.extend(plugin_problems(root))
     problems.extend(manifest_problems(root))
     problems.extend(decision_problems(root))
     return problems

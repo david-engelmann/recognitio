@@ -34,6 +34,7 @@ import json
 import re
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,6 +110,12 @@ PINNED = (
      "values that affect the main flow"),
     ("the no blocking consequence",
      "no check on the four events can stop a turn"),
+    ("the tested family limit",
+     "The gate negative on the hook events is a tested "
+     "family check"),
+    ("the tested family remainder",
+     "The check certifies no blocking claim absent beyond "
+     "its tested families"),
     ("the 32KB field limit",
      "limited to 32 KB of UTF-8 bytes"),
     ("the 64KB total limit",
@@ -609,8 +616,31 @@ def numbering_problems(root=None):
     return problems
 
 
-def hook_problems(root=None):
-    """No sentence may claim blocking on the four hook events.
+def _negated_before(clause, index, words):
+    """Whether a negation in the match's own segment precedes it.
+
+    A negation guards only the claim in its own segment of
+    the clause. The segments split at the coordinating
+    joints and at a comma splice, the joints the other
+    negation guards in this repo stop at, so a negation
+    carried by an earlier segment does not suppress the
+    claim a later segment states. A hook that carries no
+    state in one segment and vetoes the turn in the next
+    states the veto plainly, however the first segment
+    reads.
+    """
+    before = clause[:index]
+    start = 0
+    for joint in re.finditer(
+        r",?\s+(?:and|but)\s+|,\s+", before
+    ):
+        start = joint.end()
+    segment = before[start:]
+    return bool(re.search(words, segment))
+
+
+def _blocking_scan(clauses, phrase):
+    """Blocking claim problems in one surface's clauses.
 
     The primary Kimi hooks page lists TurnStarted,
     UserPromptQueued, TaskStarted, and SessionHeartbeat as
@@ -622,19 +652,29 @@ def hook_problems(root=None):
     stops or blocks or gates a turn, states a contract the
     host cannot honor and must fail the gate. A sentence that
     negates the blocking verb states the true posture and is
-    skipped. Calling the events notification only also fails,
+    skipped. The negation is read in the segment of the
+    clause that carries the verb, so an unrelated negation
+    in an earlier segment of the same clause does not skip
+    a claim the later segment states. Calling the events notification only also fails,
     because Notification is a separate event on the same page
     and the four are observation only, not notifications.
+
+    `phrase` names the surface in each problem, a kimi rule
+    for the brief and the decision 24 record for the record,
+    because the negative reads both surfaces the gate
+    certifies. The verb and noun families below are the
+    tested family the brief states beside the posture,
+    widened by the round 36 battery families. A blocking
+    claim phrased outside the tested families could still
+    escape, and the round 34 residual accepts that
+    remainder, so the scan widens the family and states the
+    limit rather than pretending to a meaning check.
     """
-    root = ROOT if root is None else root
-    clauses = _brief_clauses(root)
-    if clauses is None:
-        return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
     blocking_problem = (
-        "a kimi rule claims blocking on one of the four "
+        "%s claims blocking on one of the four "
         "observation only hook events, which the primary "
-        "hooks page denies"
+        "hooks page denies" % phrase
     )
     stop_verb = re.compile(
         r"\b(stops?|blocks?|halts?|prevents?|gates?)\b"
@@ -645,18 +685,21 @@ def hook_problems(root=None):
     for clause in clauses:
         if "notification only" in clause:
             problems.append(
-                "a kimi rule calls the four hook events "
+                "%s calls the four hook events "
                 "notification only, which mislabels the "
                 "observation only events the primary hooks "
-                "page lists"
+                "page lists" % phrase
             )
             break
         if "blocking check" in clause or "blocking posture" in clause:
             problems.append(blocking_problem)
             break
+        # The subject words match on word boundaries, so
+        # the word checkpoint inside a sentence about the
+        # scan itself does not make the scan its own
+        # subject.
         subject = (
-            "hook" in clause or "check" in clause
-            or "event" in clause or "four" in clause
+            re.search(r"\b(hook|check|event|four)\b", clause)
             or any(name in clause for name in event_names)
         )
         if re.search(r"\bblockable\b", clause) and subject:
@@ -669,17 +712,17 @@ def hook_problems(root=None):
         # brief pins for the three other events.
         block_word = re.search(r"\bblocking\b", clause)
         if block_word and subject:
-            before = clause[:block_word.start()]
-            if not re.search(
-                r"\b(no|not|never|cannot|can't|non)\b", before
+            if not _negated_before(
+                clause, block_word.start(),
+                r"\b(no|not|never|cannot|can't|non)\b",
             ) and "pretooluse" not in clause:
                 problems.append(blocking_problem)
                 break
         match = stop_verb.search(clause)
         if match and subject:
-            before = clause[:match.start()]
-            if not re.search(
-                r"\b(no|not|never|cannot|can't)\b", before
+            if not _negated_before(
+                clause, match.start(),
+                r"\b(no|not|never|cannot|can't)\b",
             ):
                 problems.append(blocking_problem)
                 break
@@ -692,7 +735,70 @@ def hook_problems(root=None):
         if re.search(r"\bgated by a (hook|check)\b", clause):
             problems.append(blocking_problem)
             break
+        # Round 36 battery families. The synonym verbs, the
+        # must pass and keeps from conditions, the gatekeeper
+        # and checkpoint nouns, the waits for verdict
+        # construction, the exit code 2 and deny decision
+        # returns, and the fail closed idiom each state the
+        # same blocking posture in ordinary words, under the
+        # same subject scope and the same negation guard as
+        # the stop verbs above.
+        wide = (
+            re.search(
+                r"\b(vetoes|vetoed|rejects?|rejected|aborts?"
+                r"|aborted|cancels?|cancelled|refuses?|refused"
+                r"|ends?)\b\s+(the\s+|a\s+|each\s+|every\s+)?"
+                r"(turn|session|task|main flow|operation"
+                r"|tool call)\b",
+                clause,
+            )
+            or re.search(
+                r"\bturn (is|was) (vetoed|rejected|aborted"
+                r"|cancelled|refused|ended)\b",
+                clause,
+            )
+            or re.search(
+                r"\b(must|has to|needs to) pass before\b",
+                clause,
+            )
+            or re.search(
+                r"\bkeeps?\b.{0,50}\bfrom (running|starting"
+                r"|proceeding)\b",
+                clause,
+            )
+            or re.search(r"\b(gatekeeper|checkpoint)\b", clause)
+            or re.search(
+                r"\b(turn|session|main flow|task) waits? for\b"
+                r".{0,40}\b(verdict|hook|check)\b",
+                clause,
+            )
+            or re.search(r"\bexit code 2\b", clause)
+            or re.search(
+                r"\breturns?\b.{0,30}\b(deny|exit code)\b",
+                clause,
+            )
+            or re.search(r"\bdeny decision\b", clause)
+            or re.search(
+                r"\bfails? closed\b|\bfailing closed\b", clause
+            )
+        )
+        if wide and subject:
+            if not _negated_before(
+                clause, wide.start(),
+                r"\b(no|not|never|cannot|can't)\b",
+            ):
+                problems.append(blocking_problem)
+                break
     return problems
+
+
+def hook_problems(root=None):
+    """No brief sentence may claim blocking on the four events."""
+    root = ROOT if root is None else root
+    clauses = _brief_clauses(root)
+    if clauses is None:
+        return ["docs/kimi-plugin-brief.md is missing"]
+    return _blocking_scan(clauses, "a kimi rule")
 
 
 def collision_problems(root=None):
@@ -2265,7 +2371,65 @@ def decision_problems(root=None):
                 "no contract"
             )
             break
+    # Round 36 F4. The blocking negative reads the decision
+    # record beside the brief, because the gate certifies
+    # both surfaces and the exact original blocking sentence
+    # planted in this record once passed with no problem at
+    # all while the same sentence in the brief failed.
+    record_clauses = []
+    for sentence in _sentences(record):
+        record_clauses.extend(_clauses(sentence))
+    problems.extend(
+        _blocking_scan(record_clauses, "the decision 24 record")
+    )
     return problems
+
+
+PRINTED_EVENT = re.compile(r"^hook event (\S+)\s*$", re.MULTILINE)
+
+# An event name that stands in the probe payload outside the
+# event field, so a fixture that scrapes the raw input for an
+# event name instead of reading the field prints the decoy.
+PROBE_DECOY = "SessionHeartbeat"
+
+
+def _probe_session_id():
+    """A fresh session id for one probe payload.
+
+    Every probe payload once carried the same fixed session
+    id, so a fixture keying on that id could earn observed
+    while doing nothing for any real session. A fresh
+    unguessable id per payload closes that shape, because
+    no fixture can know in advance the id a run will carry.
+    """
+    return "session_" + uuid.uuid4().hex
+
+
+def _probe_run(script, payload_text):
+    """One probe run of the fixture, or None when it cannot run."""
+    try:
+        return subprocess.run(
+            [sys.executable, str(script)],
+            input=payload_text,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _printed_events(stdout):
+    """The events a run printed in the fixture contract form.
+
+    The fixture contract prints the event it ran as one line
+    carrying the hook event prefix and the event name and
+    nothing else. An echoed payload carries the event name
+    as a substring of the payload line and prints no such
+    line, so the substring reading the old probe used
+    certified an echo as an observation.
+    """
+    return set(PRINTED_EVENT.findall(stdout))
 
 
 def hook_observation_verdict(event, root=None):
@@ -2273,41 +2437,103 @@ def hook_observation_verdict(event, root=None):
 
     Runs the fixture observation check the way the Kimi host
     runs a hook, with the event details as JSON on stdin and
-    no arguments. The check prints the event it ran and exits
-    0. Returns "observed" only when the run proves it read
-    the requested event from stdin and no other, and exits 0
-    as an observation hook must. Any other outcome, a nonzero
-    exit, a crash, or output naming another event, returns
+    no arguments. The payload carries a second event name in
+    the cwd field as a decoy, so the run proves the fixture
+    read the event field itself rather than scraping the raw
+    input for a name. Returns "observed" only when the run
+    exits 0, as an observation hook must, and prints the
+    requested event in the printed form the fixture contract
+    states and no other event in that form. Any other
+    outcome, a nonzero exit, a crash, an echoed payload, a
+    scraped decoy, or output naming another event, returns
     "unverified", because a script that prints every event
     name on every invocation proves nothing about any single
     event.
     """
     root = ROOT if root is None else root
     script = root / "tests" / "fixtures" / "kimi-hooks" / "observation_check.py"
+    decoy = PROBE_DECOY if event != PROBE_DECOY else HOOK_EVENTS[0]
     payload = json.dumps({
-        "hook_event_name": event,
-        "session_id": "session_probe",
+        "session_id": _probe_session_id(),
         "client_type": "kimi_code_cli",
-        "cwd": ".",
+        "cwd": decoy,
+        "hook_event_name": event,
     })
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            input=payload,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (OSError, subprocess.SubprocessError):
+    proc = _probe_run(script, payload)
+    if proc is None or proc.returncode != 0:
         return "unverified"
-    if proc.returncode != 0:
+    if _printed_events(proc.stdout) != {event}:
         return "unverified"
-    if event not in proc.stdout:
-        return "unverified"
-    for other in HOOK_EVENTS:
-        if other != event and other in proc.stdout:
-            return "unverified"
     return "observed"
+
+
+def fixture_adverse_problems(root=None):
+    """The probe battery beside the four events.
+
+    Round 36 F2. The fixture contract states the check exits
+    0 on every path, so the probe sends the shapes the
+    contract names beside the four events, a malformed
+    payload, an empty payload, a non object payload, a
+    payload with no event field, and one unknown event, and
+    each must exit 0 with no false event printed. A fixture
+    that crashes on malformed input, or answers the unknown
+    event with the exit code 2 block the primary page names,
+    or prints one of the four events it was never handed,
+    fails here even when its four event runs look sound.
+    """
+    root = ROOT if root is None else root
+    script = root / "tests" / "fixtures" / "kimi-hooks" / "observation_check.py"
+    problems = []
+
+    def fresh_base():
+        return {
+            "session_id": _probe_session_id(),
+            "client_type": "kimi_code_cli",
+            "cwd": ".",
+        }
+
+    adverse = (
+        ("a malformed payload", "{not json"),
+        ("an empty payload", ""),
+        ("a non object payload", json.dumps("TurnStarted")),
+        (
+            "a payload with no event field",
+            json.dumps(dict(fresh_base(), last_event="TaskStarted")),
+        ),
+    )
+    for label, payload_text in adverse:
+        proc = _probe_run(script, payload_text)
+        if proc is None or proc.returncode != 0:
+            problems.append(
+                "the hook observation check did not exit 0 "
+                "on %s, so its every path exit is unproven"
+                % label
+            )
+            continue
+        printed = _printed_events(proc.stdout) & set(HOOK_EVENTS)
+        if printed:
+            problems.append(
+                "the hook observation check printed %s on "
+                "%s, an event the payload never named"
+                % (", ".join(sorted(printed)), label)
+            )
+    unknown = dict(fresh_base(), hook_event_name="PreToolUse")
+    proc = _probe_run(script, json.dumps(unknown))
+    if proc is None or proc.returncode != 0:
+        problems.append(
+            "the hook observation check did not exit 0 on an "
+            "unknown event, so it claims an effect an "
+            "observation only check cannot have"
+        )
+    else:
+        printed = _printed_events(proc.stdout) & set(HOOK_EVENTS)
+        if printed:
+            problems.append(
+                "the hook observation check printed %s on an "
+                "unknown event payload, an event the payload "
+                "never named" % ", ".join(sorted(printed))
+            )
+    return problems
 
 
 def live_hook_problems(root=None):
@@ -2318,7 +2544,8 @@ def live_hook_problems(root=None):
     verdict. A fixture that reads its event from arguments
     crashes under this invocation, and a fixture that exits
     nonzero claims an effect an observation only event
-    cannot have, so both fail here.
+    cannot have, so both fail here. The adverse battery
+    beside the four events runs as part of the same probe.
     """
     root = ROOT if root is None else root
     problems = []
@@ -2330,6 +2557,7 @@ def live_hook_problems(root=None):
                 "as the host runs it, verdict %s"
                 % (event, verdict)
             )
+    problems.extend(fixture_adverse_problems(root))
     return problems
 
 

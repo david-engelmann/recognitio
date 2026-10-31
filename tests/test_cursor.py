@@ -48,6 +48,7 @@ class TestCheckCursor(unittest.TestCase):
             ".cursor-plugin/plugin.json",
             ".cursor-plugin/marketplace.json",
             ".cursor-plugin/rules/recognitio.mdc",
+            "docs/brand/recognitio-icon.svg",
             ".cursor/BUGBOT.md",
             ".cursor/config/bugbot.yaml",
             ".claude-plugin/plugin.json",
@@ -599,6 +600,248 @@ class TestCheckCursor(unittest.TestCase):
                 ),
                 problems,
             )
+
+    def test_a_manifest_folder_relative_skills_path_fails(self):
+        # Every manifest path resolves from the one plugin
+        # root at the repository root. The skills value this
+        # tree once shipped, written from the manifest folder,
+        # resolves nowhere from that base, so restoring it
+        # must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["skills"] = ["./skills/recognitio/"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not a real directory" in p for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_folder_relative_rules_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["rules"] = ["./rules/recognitio.mdc"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not a real file" in p for p in problems),
+                problems,
+            )
+
+    def test_a_logo_written_from_the_manifest_folder_fails(self):
+        # The logo value resolves from the plugin root like
+        # every other manifest path. A value that names a
+        # file only inside the manifest folder resolves
+        # nowhere from the root.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["logo"] = "plugin.json"
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "logo" in p and "plugin root" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_the_old_skills_value_fails(self):
+        # The entry paths resolve from the entry source at
+        # the plugin root, so the entry must carry the
+        # manifest values themselves. The skills value the
+        # entry once shipped, written from the manifest
+        # folder, must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor-plugin" / "marketplace.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["plugins"][0]["skills"] = ["./skills/recognitio/"]
+            path.write_text(json.dumps(data), encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("entry carries skills" in p for p in problems),
+                problems,
+            )
+
+    def test_a_marketplace_entry_source_drift_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor-plugin" / "marketplace.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["plugins"][0]["source"] = "./.cursor-plugin"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("source" in p for p in problems),
+                problems,
+            )
+
+    def test_a_marketplace_entry_logo_drift_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".cursor-plugin" / "marketplace.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["plugins"][0]["logo"] = "docs/brand/other.svg"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("entry carries logo" in p for p in problems),
+                problems,
+            )
+
+    def read_marketplace(self, root):
+        return json.loads(
+            (root / ".cursor-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+    def write_marketplace(self, root, data):
+        (root / ".cursor-plugin" / "marketplace.json").write_text(
+            json.dumps(data), encoding="utf-8"
+        )
+
+    def test_a_joint_skills_repoint_fails(self):
+        # Burn-down repair. The gate once pinned agreement
+        # between the manifest and the entry plus resolution
+        # from the root, so repointing both files together
+        # at the canonical skill copy, which resolves from
+        # the root and keeps the two files agreeing, passed
+        # both readings while the shipped skills value
+        # moved. The shipped value itself is now pinned.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["skills"] = ["./.agents/skills/recognitio/"]
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["skills"] = [
+                "./.agents/skills/recognitio/"
+            ]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("shipped skills value" in p for p in problems),
+                problems,
+            )
+
+    def test_a_rules_repoint_to_another_in_root_file_fails(self):
+        # Burn-down repair. Repointing the manifest rules
+        # value at another existing in root file with a
+        # frontmatter block passed the resolution reading.
+        # The shipped rules value itself is now pinned.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["rules"] = [
+                "./.agents/skills/recognitio/SKILL.md"
+            ]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("shipped rules value" in p for p in problems),
+                problems,
+            )
+
+    def test_a_joint_logo_repoint_fails(self):
+        # Burn-down repair. The logo agreement pinned the
+        # entry to the manifest, so moving both files
+        # together to another real in root file passed. The
+        # shipped logo value itself is now pinned.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["logo"] = ".cursor-plugin/rules/recognitio.mdc"
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["logo"] = (
+                ".cursor-plugin/rules/recognitio.mdc"
+            )
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("shipped logo value" in p for p in problems),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_a_rules_key_fails(self):
+        # Burn-down repair. The entry agreement once covered
+        # only source, skills, and logo, so an entry rules
+        # key written from the manifest folder base, which
+        # resolves nowhere under the entry source, passed
+        # unexamined. The widened agreement reads it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["rules"] = [
+                "./rules/recognitio.mdc"
+            ]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "entry carries rules" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_a_bogus_agents_key_fails(
+        self,
+    ):
+        # Burn-down repair. An entry agents key naming a
+        # path that stands nowhere passed the old agreement
+        # for the same reason. The manifest carries no
+        # agents value for it to agree with.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["agents"] = [
+                "./.cursor-plugin/agents/bogus.md"
+            ]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "entry carries agents" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_an_unknown_key_fails(self):
+        # Burn-down repair. The entry key set is closed by
+        # the widened agreement, so an invented entry key
+        # fails by name instead of riding unexamined.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["invented"] = "docs/brand/x.svg"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "'invented'" in p and "unexamined" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_agreeing_rules_passes(self):
+        # Control. An entry rules key that carries the
+        # manifest value itself agrees and resolves from
+        # the plugin root, so the widened agreement keeps
+        # passing it in the other direction.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["rules"] = [
+                "./.cursor-plugin/rules/recognitio.mdc"
+            ]
+            self.write_marketplace(root, market)
+            self.assertEqual(self.problems(root), [])
 
     def test_an_absolute_manifest_path_fails(self):
         # All manifest paths must be relative with no parent

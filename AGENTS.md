@@ -232,8 +232,10 @@ not a gate.
   pinned by the gate at `scripts/check_antigravity.py`, so the
   scoped guidance cannot become a rival instruction source.
 - `.antigravity/` holds the Build 12 Antigravity plugin
-  manifest at `.antigravity/plugin.json` and the PreToolUse
-  hook wiring at `.antigravity/hooks.json`, declared under the
+  manifest at `.antigravity/plugin.json`, the PreToolUse
+  hook wiring at `.antigravity/hooks.json`, and the packet
+  gate script at `.antigravity/scripts/packet_gate.py` that
+  the wiring runs, declared under the
   second extensions namespace in the portable manifest. The
   Antigravity shapes are a home platform extension beside the
   portable core, not a change to the canonical skill text.

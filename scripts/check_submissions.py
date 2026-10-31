@@ -84,12 +84,12 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 237 files",
-        "held 237 files",
-        "at 237 files against a cap of 512 files",
+        "holds 238 files",
+        "held 238 files",
+        "at 238 files against a cap of 512 files",
         "demo recording at 607,309 bytes",
-        "tests/test_gate_scripts.py at 262,077 bytes",
-        "scan over all 237 tracked files",
+        "tests/test_gate_scripts.py at 263,066 bytes",
+        "scan over all 238 tracked files",
     ),
     PORTABLE_PACK: (
         "six month cycle",
@@ -248,6 +248,31 @@ def entry_problems(rel, market, plugin, problems):
         problems.append(
             "%s entry name %r does not match the manifest "
             "name %r" % (rel, entry.get("name"), plugin.get("name")))
+    if plugin is not None:
+        # The Cursor pack states the entry paths resolve
+        # from the one plugin root, so this gate reads the
+        # entry source, skills, and logo the way the Cursor
+        # gate does and pins them to the manifest values.
+        # An entry path written from another base resolves
+        # nowhere under its own source, and a gate that
+        # never opened those values would certify the pack
+        # sentence in silence.
+        if entry.get("source") != "./":
+            problems.append(
+                "%s entry carries source %r and the pack "
+                "states the plugin root the manifest stands "
+                "at" % (rel, entry.get("source")))
+        if entry.get("skills") != plugin.get("skills"):
+            problems.append(
+                "%s entry carries skills %r and the manifest "
+                "carries %r, so the entry paths do not "
+                "resolve from the entry source"
+                % (rel, entry.get("skills"), plugin.get("skills")))
+        if entry.get("logo") != plugin.get("logo"):
+            problems.append(
+                "%s entry carries logo %r and the manifest "
+                "carries %r"
+                % (rel, entry.get("logo"), plugin.get("logo")))
     return entry
 
 
@@ -394,19 +419,19 @@ def cursor_problems(root, problems):
             problems.append(
                 "%s names a logo path that does not resolve in "
                 "the tree" % CURSOR_PLUGIN)
-        # Component paths in the Cursor manifest resolve from
-        # the plugin dir that holds the manifest, as the
-        # Cursor gate reads them. The logo value resolves
-        # from the repo root, as the reference states.
-        plugin_dir = root / ".cursor-plugin"
+        # Every path in the Cursor manifest resolves from
+        # the one plugin root, which is the repo root in
+        # this tree, as the Cursor gate reads them. A path
+        # written from the manifest folder resolves nowhere
+        # under that base.
         for value in plugin.get("skills") or []:
-            target = shipped_path(plugin_dir, value)
+            target = shipped_path(root, value)
             if target is None or not (target / "SKILL.md").is_file():
                 problems.append(
                     "%s names a skills path with no SKILL.md "
                     "inside it" % CURSOR_PLUGIN)
         for value in plugin.get("rules") or []:
-            target = shipped_path(plugin_dir, value)
+            target = shipped_path(root, value)
             if target is None or not target.is_file():
                 problems.append(
                     "%s names a rule path that does not resolve "

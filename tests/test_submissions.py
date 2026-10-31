@@ -236,6 +236,39 @@ class TestCheckSubmissions(unittest.TestCase):
         self.assertTrue(
             any("exactly one" in p for p in problems), problems)
 
+    def test_a_cursor_entry_source_drift_fails(self):
+        # Burn-down repair. The submissions gate once read
+        # only the entry count and name, so an entry source
+        # drifted off the plugin root passed it while the
+        # Cursor gate failed the same plant. The entry
+        # paths the pack states must fail here by name too.
+        def change(d):
+            d["plugins"][0]["source"] = "./.cursor-plugin"
+        problems = self.mutate_json(CURSOR_MARKET, change)
+        self.assertTrue(
+            any("source" in p for p in problems), problems)
+
+    def test_a_cursor_entry_skills_drift_fails(self):
+        # Burn-down repair. The old entry skills value,
+        # written from the manifest folder, resolves
+        # nowhere under the entry source at the root, and
+        # the submissions gate never opened it.
+        def change(d):
+            d["plugins"][0]["skills"] = ["./skills/recognitio/"]
+        problems = self.mutate_json(CURSOR_MARKET, change)
+        self.assertTrue(
+            any("skills" in p for p in problems), problems)
+
+    def test_a_cursor_entry_logo_drift_fails(self):
+        # Burn-down repair. An entry logo drifted from the
+        # manifest value passed the submissions gate for
+        # the same reason, so it fails here by name now.
+        def change(d):
+            d["plugins"][0]["logo"] = "docs/brand/other.svg"
+        problems = self.mutate_json(CURSOR_MARKET, change)
+        self.assertTrue(
+            any("logo" in p for p in problems), problems)
+
     def test_a_claude_author_loss_fails(self):
         def change(d):
             d.pop("author")
@@ -348,9 +381,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 237 files", "holds 236 files"))
+                "holds 238 files", "holds 236 files"))
         self.assertTrue(
-            any("237 files" in p for p in problems), problems)
+            any("238 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the

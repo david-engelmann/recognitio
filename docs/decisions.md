@@ -837,6 +837,15 @@ plugin tree, and the manifest's second namespace live outside
 the canonical skill text, and the description protocol is
 untouched.
 
+A correction recorded on 2026-10-31. The statement above
+that the brief and the hook wiring document the contract
+and never enforce it stands as the round 24 record and no
+longer states the current position. The shipped hook
+wiring now enforces the contract through the shipped
+packet gate script at `.antigravity/scripts/packet_gate.py`,
+returning the deny and force_ask and auto_approve decisions
+the brief states.
+
 ## 23. Build 13, the Copilot SDK agent build
 
 Recorded on 2026-10-24 in round 26. The brief at
@@ -947,6 +956,35 @@ event claims in those tested families, and every pinned
 claim carries a negative check in that tested sense. This
 note does not claim the gate forbids a phrasing no test
 has yet named.
+
+Residuals burn-down note, recorded on 2026-10-30. The
+round 36 battery widened the tested families again and
+closed two surface gaps the round named. The blocking
+negative now reads the decision 24 record beside the
+brief, under the same families, so a blocking sentence
+planted in the record fails the same way it fails in the
+brief. The families now also cover the synonym verbs
+vetoes, rejects, aborts, cancels, refuses, and ends, the
+must pass and keeps from conditions, the gatekeeper and
+checkpoint nouns, the waits for verdict construction,
+the exit code 2 and deny decision returns, and the fail
+closed idiom. The live hook probe now requires the event
+in the printed form the fixture contract states, sends a
+decoy event name in a neighbouring field, and sends a
+malformed payload, an empty payload, a non object
+payload, a payload with no event field, and one unknown
+event beside the four events, each held to exit 0 with no
+false event printed. The remainder stands where the
+round 34 residual left it. A blocking claim phrased in a
+fresh synonym outside the tested families could still
+escape, that single synonym paraphrase residual stands
+accepted, and the gate states the limit in the brief
+beside the posture rather than claiming a meaning check
+it does not run. The round 35 must not adopt list binds
+the method throughout, so the gate stays inside the
+standard library with no model weights, no network
+calls, no judge verdicts, and no automatic word list
+expansion.
 
 ## 26. Build 15 deferral, round 29
 

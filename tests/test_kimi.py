@@ -834,6 +834,396 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
+    def write_fixture(self, root, text):
+        script = (
+            root / "tests" / "fixtures" / "kimi-hooks"
+            / "observation_check.py"
+        )
+        script.write_text(text, encoding="utf-8")
+        return script
+
+    def test_an_echo_fixture_fails_the_observation_probe(self):
+        # Round 36 F2. A fixture that echoes its standard
+        # input back verbatim parses no JSON, extracts no
+        # event, and prints the whole payload rather than the
+        # event it ran. The old probe certified it on all
+        # four events because the event name stood in the
+        # output as a substring of the echoed payload. The
+        # printed form the fixture contract states is one
+        # line carrying the hook event prefix and the event
+        # name, and an echo prints no such line.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import sys\n"
+                "sys.stdout.write(sys.stdin.read())\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "unverified",
+                    event,
+                )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("verdict unverified" in p for p in problems),
+                problems,
+            )
+
+    def test_a_scrape_fixture_fails_the_observation_probe(self):
+        # Round 36 F2. A fixture that scrapes the raw input
+        # for the first event name it finds reads no event
+        # field. The probe payload carries a decoy event
+        # name in the cwd field ahead of the event field, so
+        # the scrape prints the decoy and fails on every
+        # event.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import re\n"
+                "import sys\n"
+                "raw = sys.stdin.read()\n"
+                "found = re.search(\n"
+                "    r'TurnStarted|UserPromptQueued'\n"
+                "    r'|TaskStarted|SessionHeartbeat', raw)\n"
+                "if found:\n"
+                "    print('hook event ' + found.group(0))\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "unverified",
+                    event,
+                )
+
+    def test_a_bare_event_name_fixture_fails_the_probe(self):
+        # Round 36 F2. The fixture contract states the
+        # printed form, one line carrying the hook event
+        # prefix and the event name. A fixture that prints
+        # the bare event name alone does not state that form.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "payload = json.load(sys.stdin)\n"
+                "print(payload['hook_event_name'])\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "unverified",
+                    event,
+                )
+
+    def test_a_malformed_crashing_fixture_fails_the_probe(self):
+        # Round 36 F2. The fixture contract states the check
+        # exits 0 on every path. A fixture that parses the
+        # four events soundly but crashes on malformed input
+        # passed the old probe, which never sent any.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "payload = json.load(sys.stdin)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event:\n"
+                "    print('hook event ' + event)\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "observed",
+                    event,
+                )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("malformed payload" in p for p in problems),
+                problems,
+            )
+
+    def test_a_fifth_event_blocking_fixture_fails_the_probe(self):
+        # Round 36 F2. A fixture that serves the four events
+        # and answers a fifth event with exit code 2, the
+        # intentional block code of the primary page, passed
+        # the old probe, which never sent an event outside
+        # the four.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "known = ('TurnStarted', 'UserPromptQueued',\n"
+                "         'TaskStarted', 'SessionHeartbeat')\n"
+                "if event in known:\n"
+                "    print('hook event ' + event)\n"
+                "    sys.exit(0)\n"
+                "sys.exit(2)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("unknown event" in p for p in problems),
+                problems,
+            )
+
+    def test_an_unrelated_negation_does_not_guard_a_veto(self):
+        # Burn-down repair. The widened scan once read the
+        # negation guard over the whole clause, so the
+        # unrelated no in the first segment of this exact
+        # sentence suppressed the in family verb in the
+        # second. The verb is inside the tested families,
+        # so this escape is not the accepted round 34
+        # residual, and the sentence must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "### R7. The size limits"
+            self.assertIn(anchor, text)
+            self.write_brief(
+                root,
+                text.replace(
+                    anchor,
+                    "The hook carries no state and vetoes "
+                    "the turn.\n\n" + anchor,
+                    1,
+                ),
+            )
+            problems = self.mod.hook_problems(root)
+            self.assertTrue(
+                any("claims blocking" in p for p in problems),
+                problems,
+            )
+
+    def test_a_same_segment_negation_still_guards_a_veto(self):
+        # Control. A negation standing in the same segment
+        # as the verb states the true posture, so the
+        # scoped guard keeps passing it in the other
+        # direction.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "### R7. The size limits"
+            self.assertIn(anchor, text)
+            self.write_brief(
+                root,
+                text.replace(
+                    anchor,
+                    "The hook carries no state and never "
+                    "vetoes the turn.\n\n" + anchor,
+                    1,
+                ),
+            )
+            self.assertEqual(self.mod.hook_problems(root), [])
+
+    def test_a_probe_id_keyed_fixture_fails_the_probe(self):
+        # Burn-down repair. Every probe payload once
+        # carried the fixed session id session_probe, so a
+        # fixture that answered only that id earned
+        # observed on all four events while doing nothing
+        # for any real session. The probe now sends a fresh
+        # unguessable id per payload, which this fixture
+        # cannot key on.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict) and payload.get(\n"
+                "        'session_id') == 'session_probe':\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "unverified",
+                    event,
+                )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("verdict unverified" in p for p in problems),
+                problems,
+            )
+
+    def test_the_probe_session_ids_vary_per_event(self):
+        # Burn-down repair. The verdict runs must not share
+        # one session id across events, and none may carry
+        # the old fixed probe id. A fixture that records
+        # the ids it was sent proves the variation directly
+        # while serving every event honestly.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "from pathlib import Path\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict):\n"
+                "    log = Path(__file__).with_name(\n"
+                "        'session-ids.log')\n"
+                "    with log.open('a', encoding='utf-8') as fh:\n"
+                "        fh.write(str(payload.get('session_id'))\n"
+                "                 + '\\n')\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(event, root),
+                    "observed",
+                    event,
+                )
+            log = (
+                root / "tests" / "fixtures" / "kimi-hooks"
+                / "session-ids.log"
+            )
+            ids = log.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(ids), len(self.mod.HOOK_EVENTS))
+            self.assertEqual(len(set(ids)), len(ids))
+            self.assertNotIn("session_probe", ids)
+
+    def test_the_round36_fresh_blocking_shapes_fail(self):
+        # Round 36 F3. Fourteen of fifteen fresh sentences
+        # in ordinary words escaped the negative, because the
+        # verb list covered stops, blocks, halts, prevents,
+        # and gates and the word blocking and nothing else.
+        # Each fresh shape from the round 36 battery must now
+        # fail the hook scan by name.
+        sentences = (
+            "A failed hook check vetoes the turn.",
+            "A failed hook check rejects the turn.",
+            "A failed hook check aborts the turn.",
+            "A failed hook check cancels the turn.",
+            "The check must pass before the turn runs.",
+            "A failed check keeps the turn from running.",
+            "One event is a gatekeeper for the session.",
+            "The turn waits for the hook check verdict.",
+            "A failing hook returns exit code 2.",
+            "A failed check returns a deny decision.",
+            "A failed check ends the turn.",
+            "Hook checks on the four events fail closed.",
+            "A failed check refuses the task.",
+            "The hook is a checkpoint on failure.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_negated_synonym_sentences_pass_the_hook_scan(self):
+        # Control. A sentence that negates the synonym verb
+        # states the true posture, so the widened families
+        # must keep passing it.
+        sentences = (
+            "A failed hook check never vetoes the turn.",
+            "A hook check never refuses the task.",
+            "The four events never fail closed.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_a_blocking_sentence_in_the_decision_record_fails(self):
+        # Round 36 F4. The negative once read the brief
+        # alone, so the exact original blocking sentence
+        # planted in the decision 24 record passed with no
+        # problem at all. The record is a certified surface
+        # beside the brief, so the same scan now reads it.
+        plants = (
+            "The four events carry a blocking check, and a "
+            "failed check stops the turn.",
+            "A failed hook check vetoes the turn.",
+        )
+        for plant in plants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                marker = "## 25."
+                self.assertIn(marker, text)
+                path.write_text(
+                    text.replace(
+                        marker, plant + "\n\n" + marker, 1
+                    ),
+                    encoding="utf-8",
+                )
+                problems = self.mod.decision_problems(root)
+                self.assertTrue(
+                    any(
+                        "decision 24 record" in p
+                        and "claims blocking" in p
+                        for p in problems
+                    ),
+                    (plant, problems),
+                )
+
+    def test_a_dropped_tested_family_limit_fails(self):
+        # Round 36 F3. The brief states the tested family
+        # limit beside the posture, because the gate line is
+        # not the only account of what the gate watches.
+        # Dropping the limit sentence must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "The gate negative on the hook events is a "
+                "tested family check",
+                "The gate negative is complete",
+            )
+            self.assertTrue(
+                any("tested family limit" in p for p in problems),
+                problems,
+            )
+
     def test_dropped_secondary_sentences_fail(self):
         # R28-RT-12 and R28-SP-01, union of eight sentences.
         # Each drop is run in its own scratch layout, so one

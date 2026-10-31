@@ -185,9 +185,6 @@
       "test_a_dropped_skills_folder_rule_fails",
       "test_a_dropped_sunset_halt_fails",
       "test_a_dropped_v0_65_0_pin_fails",
-      "test_a_hook_without_auto_approve_fails",
-      "test_a_hook_without_deny_fails",
-      "test_a_hook_without_force_ask_fails",
       "test_a_hook_without_pretooluse_fails",
       "test_a_missing_decision_22_record_fails",
       "test_a_missing_hook_file_fails",
@@ -196,7 +193,12 @@
       "test_a_pinned_page_stamp_reading_fails",
       "test_a_second_namespace_with_a_dangling_path_fails",
       "test_a_statement_without_a_derivation_note_fails",
-      "test_an_unparseable_hook_file_fails"
+      "test_an_unparseable_hook_file_fails",
+      "test_the_hook_script_auto_approves_a_verified_manifest",
+      "test_the_hook_script_denies_a_missing_manifest",
+      "test_the_hook_script_denies_an_unverified_manifest",
+      "test_the_hook_script_force_asks_on_a_malformed_event",
+      "test_the_hook_script_force_asks_on_an_unparsable_manifest"
     ],
     "Round 25": [],
     "Round 26": [

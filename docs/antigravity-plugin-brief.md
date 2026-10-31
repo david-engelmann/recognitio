@@ -40,6 +40,13 @@ other build. The brief and the hook wiring document the
 contract and never enforce it. Enforcement stays on the shipped
 scripts.
 
+A correction recorded on 2026-10-31. The hook wiring now
+enforces the contract through the shipped packet gate script,
+which returns the deny and force_ask and auto_approve
+decisions the contract states. The sentence above stands as
+the position this brief recorded before that script landed,
+and this correction is the current reading.
+
 ## The plugin format
 
 The primary plugins page documents the plugin layout with
@@ -50,6 +57,26 @@ the optional `mcp_config.json`, `hooks.json`,
 Workspace install is `.agents/plugins/` at the workspace root
 and global install is `~/.gemini/config/plugins/`, with a
 Marketplace tab in the Antigravity App.
+
+The shipped pair is a staging copy a user places into a
+plugin directory before a host can load it. The pair is the
+manifest at `.antigravity/plugin.json` and the wiring at
+`.antigravity/hooks.json`, and copying the whole
+`.antigravity` folder carries the packet gate script with
+them at the plugin root relative path the wiring names. To
+place the copy, copy the folder into the global plugin
+location and name the copy for the plugin, as in
+`cp -r .antigravity ~/.gemini/config/plugins/recognitio`, or
+copy it into the workspace plugin location at
+`.agents/plugins/recognitio` the same way.
+
+The schema the primary plugins page prints for that manifest
+permits the name and the description beside the `$schema`
+key and no further key, so the shipped manifest at
+`.antigravity/plugin.json` carries exactly those three keys
+and no version and no notes field. The build version lives
+on the surfaces whose schemas carry one, and the notes this
+build once kept inside the manifest live in this brief.
 
 The primary hooks page documents exactly six events,
 `SessionStart`, `PreToolUse`, `PostToolUse`, `PreInvocation`,
@@ -62,6 +89,18 @@ The `decision` field carries `allow`, `auto_approve`, `deny`,
 `ask`, `force_ask`, and `deny_unless_prior_grant` on the
 primary page. This build's hook uses three of them, `deny`,
 `force_ask`, and `auto_approve`, and the gate pins those three.
+
+The wiring file follows the form that page documents. Its
+top level maps one hook name, `recognitio-packet-gate`, to
+its event configuration, the `PreToolUse` entry carries the
+`invoke_subagent` matcher, and its one handler is a command
+handler naming the shipped packet gate script at
+`.antigravity/scripts/packet_gate.py` by its plugin root
+relative command. The script reads the packet manifest the
+review run rests on, named by the `RECOGNITIO_PACKET_MANIFEST`
+environment variable when it is set and otherwise read as
+`manifest.json` at the root of each workspace path the event
+names, and it returns the decision its reading earns.
 
 ## The dated evidence
 
@@ -139,11 +178,13 @@ and the contract sentences, not the host's enforcement.
 
 ### S1. The wiring declares one PreToolUse entry
 
-The shipped wiring at `.antigravity/hooks.json` declares one
-`PreToolUse` entry, and the entry's matcher names
-`invoke_subagent` with its Subagents spec fields, per the new
-primary Subagents spec evidence. The matcher is the build's
-declared mapping for the review run tool call.
+The shipped wiring at `.antigravity/hooks.json` maps the one
+hook name `recognitio-packet-gate` to one `PreToolUse` entry,
+the entry's matcher names `invoke_subagent` with its
+Subagents spec fields, per the new primary Subagents spec
+evidence, and the entry's one handler is a command handler
+that runs the shipped packet gate script for the review run
+tool call.
 
 Derives from the primary Subagents spec, which documents
 `invoke_subagent` with its fields, and the primary hooks page

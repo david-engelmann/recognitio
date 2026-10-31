@@ -1318,7 +1318,10 @@ class TestCheckVersion(unittest.TestCase):
         if mod_text is None:
             mod_text = plugin_text
         if antigravity_text == "default":
-            antigravity_text = '{"version": "1.3.0"}'
+            antigravity_text = (
+                '{"name": "recognitio", '
+                '"description": "A plugin."}'
+            )
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
             plugin = root / "plugin.json"
@@ -1393,11 +1396,13 @@ class TestCheckVersion(unittest.TestCase):
         '[{"version": "1.3.0"}, {"version": "1.3.0"}]}'
     )
 
-    def test_a_drifted_antigravity_manifest_version_fails(self):
-        # The Antigravity plugin manifest is a version surface
-        # the printed agreement line covers under the plugin
-        # manifests, so a drift there must fail here by name
-        # rather than passing while the gate prints agreement.
+    def test_a_version_field_on_the_antigravity_manifest_fails(self):
+        # The schema the Antigravity manifest names through
+        # its $schema key permits the name and the description
+        # beside that key and no further key, so the manifest
+        # is not a version surface at all. A version field
+        # standing there is a forbidden field and must fail
+        # here by name.
         code, err = self.run_main_on_texts(
             '{"version": "1.3.0"}',
             self.GOOD_MARKET,
@@ -1406,6 +1411,7 @@ class TestCheckVersion(unittest.TestCase):
         )
         self.assertEqual(code, 1, err)
         self.assertIn("Antigravity", err)
+        self.assertIn("forbidden", err)
 
     def test_a_missing_antigravity_manifest_fails_by_name(self):
         # The manifest ships in the tree, so an absent one is
@@ -1420,7 +1426,10 @@ class TestCheckVersion(unittest.TestCase):
         self.assertIn("Antigravity", err)
         self.assertIn("missing", err)
 
-    def test_a_non_string_antigravity_version_is_a_problem(self):
+    def test_a_non_string_version_field_on_the_manifest_fails(self):
+        # The forbidden field fails at any value type, so a
+        # numeric version field is the same problem as a
+        # string one.
         code, err = self.run_main_on_texts(
             '{"version": "1.3.0"}',
             self.GOOD_MARKET,
@@ -1429,6 +1438,7 @@ class TestCheckVersion(unittest.TestCase):
         )
         self.assertEqual(code, 1, err)
         self.assertIn("Antigravity", err)
+        self.assertIn("forbidden", err)
 
     def test_an_unparsable_antigravity_manifest_fails_by_name(self):
         code, err = self.run_main_on_texts(
@@ -1473,29 +1483,45 @@ class TestCheckVersion(unittest.TestCase):
         self.assertIn("Antigravity", err)
         self.assertIn("not a regular file", err)
 
-    def test_an_agreeing_antigravity_manifest_passes(self):
-        # Control. This test also passed against the gate
-        # before the fix by design, because an agreeing
-        # manifest is the shape that must keep passing.
+    def test_an_agreeing_version_field_on_the_manifest_fails(self):
+        # The forbidden field fails even at the value every
+        # real version surface agrees on, because the field
+        # itself is what the schema forbids. Before the fix
+        # this exact text passed as an agreeing surface.
         code, err = self.run_main_on_texts(
             '{"version": "1.3.0"}',
             self.GOOD_MARKET,
             self.GOOD_LOG,
             antigravity_text='{"version": "1.3.0"}',
         )
-        self.assertEqual(code, 0, err)
+        self.assertEqual(code, 1, err)
+        self.assertIn("Antigravity", err)
+        self.assertIn("forbidden", err)
 
-    def test_a_reformatted_antigravity_manifest_passes(self):
-        # Control. A whitespace and key order rewrite that
-        # keeps the version agreeing must keep passing, in
-        # both the fixed state and the state before the fix.
+    def test_a_schema_clean_antigravity_manifest_passes(self):
+        # Control. A manifest carrying only the keys its
+        # schema permits is the shape that must keep passing.
         code, err = self.run_main_on_texts(
             '{"version": "1.3.0"}',
             self.GOOD_MARKET,
             self.GOOD_LOG,
             antigravity_text=(
-                '{\n  "name": "recognitio",\n'
-                '  "version": "1.3.0"\n}\n'
+                '{"name": "recognitio", '
+                '"description": "A plugin."}'
+            ),
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_a_reformatted_antigravity_manifest_passes(self):
+        # Control. A whitespace and key order rewrite of the
+        # schema clean manifest must keep passing.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}',
+            self.GOOD_MARKET,
+            self.GOOD_LOG,
+            antigravity_text=(
+                '{\n  "description": "A plugin.",\n'
+                '  "name": "recognitio"\n}\n'
             ),
         )
         self.assertEqual(code, 0, err)

@@ -221,10 +221,10 @@ The marketplace listing stands at `.claude-plugin/marketplace.json` and names th
 
 ### Cursor
 
-The Cursor route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg`, and the brand assets and their builder and palette record live under `docs/brand/`. The Cursor manifest carries the discovery fields its schema names beside the logo, a display name and a homepage and a repository and keywords and a category and tags, and its marketplace entry schema names no discovery field, so the fields live in the manifest. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy the folder into the local plugin folder and reload the window, then confirm every component in Customize.
+The Cursor route loads the same skill through the Cursor plugin host. The manifest lives under `.cursor-plugin/` and ships the skill as a real directory copy, because the host skips a symlink that points outside the local plugin folder. The Cursor manifest and its marketplace entry both name the brand logo at `docs/brand/recognitio-icon.svg`, and the brand assets and their builder and palette record live under `docs/brand/`. The Cursor manifest carries the discovery fields its schema names beside the logo, a display name and a homepage and a repository and keywords and a category and tags, and its marketplace entry schema names no discovery field, so the fields live in the manifest. The plugin ships in this repo as a plugin package. No Cursor Marketplace listing exists or has been submitted for it, so the local load route below is the route. For a local load test, copy this repository folder into the local plugin folder and reload the window, then confirm every component in Customize.
 
 ```bash
-cp -r .cursor-plugin \
+cp -r . \
   ~/.cursor/plugins/local/\
 recognitio
 ```

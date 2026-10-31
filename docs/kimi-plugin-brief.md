@@ -46,6 +46,16 @@ neither is a rival instruction source and fails the round.
 The gate pins the notes, so a later edit cannot add an
 underived rule in silence.
 
+The gate negative on the hook events is a tested family
+check. It reads the brief and the Build 14 decision record
+for the blocking families its patterns name, the stop verbs
+and their synonym verbs and the gatekeeper and checkpoint
+nouns and the must pass and waits for verdict constructions
+and the exit code and deny returns among them. The check
+certifies no blocking claim absent beyond its tested
+families, and the round 34 residual accepts the remainder
+that a fresh synonym paraphrase could still state.
+
 The restraint test runs against the rules directly. No rule
 may invent a finding, claim a schedule the primaries deny,
 or claim coverage the primaries deny. The rules that survive

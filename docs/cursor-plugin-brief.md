@@ -61,6 +61,27 @@ documenting usage. A multi plugin repo uses
 `.cursor-plugin/marketplace.json` at the repo root, and the whole
 marketplace manifest must stay at or under 10 MB.
 
+Every path in the manifest resolves from the plugin root, the
+folder that holds the `.cursor-plugin` folder, and the
+marketplace entry paths resolve from the entry source, which
+names that same root. This tree keeps the plugin at the
+repository root, so every path the manifest and the
+marketplace entry carry resolves from that one base, and the
+mixed base form, component paths written from the manifest
+folder beside a logo path written from the root, leaves one
+half of the paths resolving nowhere under either base. The
+shipped skills value is `./.cursor-plugin/skills/recognitio/`
+and the shipped rules value is
+`./.cursor-plugin/rules/recognitio.mdc`, and the marketplace
+entry carries the same skills value and the same logo value
+under a source of `./`. Under that base the local load route
+copies this repository folder into the local plugin folder,
+so the manifest sits at `.cursor-plugin/plugin.json` inside
+the copied folder. The desktop run of 2026-10-25 loaded the
+plugin under the path values that stood before this
+correction, so a fresh desktop run of the corrected layout
+stands UNVERIFIED.
+
 The manifest also carries the discovery fields the primary
 manifest schema names, read on 2026-10-26 in the schema the
 Cursor project ships for this manifest. That schema gives

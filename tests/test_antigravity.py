@@ -4,16 +4,21 @@ The brief at docs/antigravity-plugin-brief.md records the
 Antigravity plugin format, the dated October 9 2026 sunset
 evidence, the v0.65.0 stable pin with the docs lag caveat, and
 the Antigravity native shapes as a second extensions namespace
-beside the portable core, with a PreToolUse hook carrying the
-deny, force_ask, and auto_approve decisions as the build's
-declared mapping. These tests prove the pin fires for a real
-reason on every load bearing claim the round 24 lanes named. A
-dropped sunset halt, a dropped named path, a pinned page stamp
-reading, a dropped version pin, a dropped docs lag caveat, a
-dropped extension boundary, a dropped namespace placeholder, a
-dropped skills folder rule, a dropped four keys sentence, a
-missing or unparseable hook file, a hook without its PreToolUse
-entry or one of its three decisions, a missing Antigravity
+beside the portable core, with a PreToolUse hook in the primary
+hooks form carrying one command handler that runs the shipped
+packet gate script, whose deny, force_ask, and auto_approve
+decisions on the packet manifest are the build's declared
+mapping, and a shipped plugin manifest carrying only the keys
+its primary schema permits. These tests prove the pin fires
+for a real reason on every load bearing claim the round 24
+lanes named. A dropped sunset halt, a dropped named path, a
+pinned page stamp reading, a dropped version pin, a dropped
+docs lag caveat, a dropped extension boundary, a dropped
+namespace placeholder, a dropped skills folder rule, a dropped
+four keys sentence, a missing or unparseable hook file, a hook
+without its PreToolUse entry, its matcher, or its command
+handler, a hook script that misreads the packet manifest, a
+manifest carrying a forbidden key, a missing Antigravity
 namespace, a contract statement without a derivation note, a
 passing prose derivation mention, a dropped harness mapping, a
 dropped degraded state, a dropped Claude Code only negative, a
@@ -71,6 +76,7 @@ class TestCheckAntigravity(unittest.TestCase):
             "docs/decisions.md",
             ".antigravity/plugin.json",
             ".antigravity/hooks.json",
+            ".antigravity/scripts/packet_gate.py",
             "agent-plugins-package/plugin.json",
         ):
             source = ROOT / rel
@@ -147,6 +153,14 @@ class TestCheckAntigravity(unittest.TestCase):
 
     def write_manifest(self, root, data):
         path = root / "agent-plugins-package" / "plugin.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def read_plugin(self, root):
+        path = root / ".antigravity" / "plugin.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def write_plugin(self, root, data):
+        path = root / ".antigravity" / "plugin.json"
         path.write_text(json.dumps(data), encoding="utf-8")
 
     def test_the_shipped_tree_holds(self):
@@ -475,11 +489,38 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
+    def hook_entry(self, data):
+        return data["recognitio-packet-gate"]["PreToolUse"][0]
+
+    def run_packet_gate(self, root, payload_text, env=None):
+        # Run the shipped hook script the way the host runs
+        # it, with the event JSON on stdin and no arguments,
+        # and return the parsed decision object and the exit
+        # code. An env mapping, when given, replaces the
+        # inherited environment for that run.
+        script = root / ".antigravity" / "scripts" / "packet_gate.py"
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            input=payload_text,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+        return json.loads(proc.stdout), proc.returncode
+
+    def gate_payload(self, packet):
+        return json.dumps({
+            "toolCall": {"name": "invoke_subagent", "args": {}},
+            "workspacePaths": [str(packet)],
+        })
+
     def test_a_hook_without_pretooluse_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["event"] = "SessionStart"
+            config = data["recognitio-packet-gate"]
+            config["PostToolUse"] = config.pop("PreToolUse")
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
@@ -487,44 +528,123 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
-    def test_a_hook_without_deny_fails(self):
+    def test_the_old_abstract_wiring_shape_fails(self):
+        # The pre fix wiring stood as one abstract entry in a
+        # hooks list with a decisions list and a mapping
+        # object and no command anywhere. A host reading the
+        # primary form finds no named hook in that shape, so
+        # the whole shape must fail by name on its top level
+        # keys.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            decisions = data["hooks"][0]["decisions"]
-            decisions.remove("deny")
-            self.write_hooks(root, data)
+            path = root / ".antigravity" / "hooks.json"
+            path.write_text(
+                json.dumps({
+                    "hooks": [{
+                        "decisions": ["deny", "force_ask",
+                                      "auto_approve"],
+                        "event": "PreToolUse",
+                        "mapping": {"deny": "refused"},
+                        "matcher": "invoke_subagent",
+                    }],
+                    "notes": "declared mapping",
+                }),
+                encoding="utf-8",
+            )
             problems = self.problems(root)
             self.assertTrue(
-                any("'deny'" in p for p in problems),
+                any("'hooks'" in p for p in problems),
+                problems,
+            )
+            self.assertTrue(
+                any("'notes'" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_without_force_ask_fails(self):
+    def test_a_hook_with_an_extra_top_level_key_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            decisions = data["hooks"][0]["decisions"]
-            decisions.remove("force_ask")
+            data["notes"] = "a second top level key"
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any("'force_ask'" in p for p in problems),
+                any("'notes'" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_without_auto_approve_fails(self):
+    def test_the_hook_script_denies_a_missing_manifest(self):
+        # Statement S3. Deny refuses the tool call when the
+        # packet manifest is missing.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            decisions = data["hooks"][0]["decisions"]
-            decisions.remove("auto_approve")
-            self.write_hooks(root, data)
-            problems = self.problems(root)
-            self.assertTrue(
-                any("'auto_approve'" in p for p in problems),
-                problems,
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet)
             )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "deny")
+            self.assertIn("missing", out["reason"])
+
+    def test_the_hook_script_denies_an_unverified_manifest(self):
+        # Statement S3. Deny refuses the tool call when the
+        # packet manifest is not verified.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            (packet / "manifest.json").write_text(
+                json.dumps({"verified": False}), encoding="utf-8"
+            )
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet)
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "deny")
+            self.assertIn("not verified", out["reason"])
+
+    def test_the_hook_script_force_asks_on_an_unparsable_manifest(self):
+        # Statement S4. Force ask holds the tool call when
+        # the packet manifest is unreadable or unparsable.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            (packet / "manifest.json").write_text(
+                "{not json", encoding="utf-8"
+            )
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet)
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "force_ask")
+
+    def test_the_hook_script_auto_approves_a_verified_manifest(self):
+        # Statement S5. Auto approve lets the tool call
+        # through when the packet manifest reads verified.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            (packet / "manifest.json").write_text(
+                json.dumps({"verified": True}), encoding="utf-8"
+            )
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet)
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "auto_approve")
+
+    def test_the_hook_script_force_asks_on_a_malformed_event(self):
+        # An event payload the script cannot parse leaves
+        # the packet unprovable, so the call is held for
+        # user confirmation and the script still exits 0.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            out, code = self.run_packet_gate(root, "not json")
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "force_ask")
 
     def test_a_hook_matcher_drift_fails(self):
         # Round 254. Statement S1 states the entry matcher
@@ -533,7 +653,7 @@ class TestCheckAntigravity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["matcher"] = "some_other_tool"
+            self.hook_entry(data)["matcher"] = "some_other_tool"
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
@@ -548,7 +668,7 @@ class TestCheckAntigravity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            del data["hooks"][0]["matcher"]
+            del self.hook_entry(data)["matcher"]
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
@@ -566,7 +686,8 @@ class TestCheckAntigravity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"].append(dict(data["hooks"][0]))
+            entries = data["recognitio-packet-gate"]["PreToolUse"]
+            entries.append(dict(entries[0]))
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
@@ -574,102 +695,105 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
-    def test_a_hook_with_an_extra_decision_fails(self):
-        # Round 254. The brief states this build hook uses
-        # three decisions, so a fourth must fail by name.
+    def test_a_hook_without_a_command_handler_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["decisions"].append("allow_always")
+            self.hook_entry(data)["hooks"] = []
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any("allow_always" in p for p in problems),
+                any("no hooks array" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_deny_mapping_inverted_fails(self):
-        # Round 254. Statement S3 states deny refuses the
-        # tool call when the packet manifest is missing or
-        # not verified. The exact inverted sentence the
-        # round planted must fail by name.
+    def test_a_hook_with_a_non_command_handler_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["mapping"]["deny"] = (
-                "the packet manifest is ignored, so the tool "
-                "call proceeds"
-            )
+            self.hook_entry(data)["hooks"][0]["type"] = "prompt"
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any(
-                    "mapping" in p and "'deny'" in p
-                    for p in problems
-                ),
+                any("'prompt'" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_force_ask_mapping_drift_fails(self):
+    def test_a_hook_command_drift_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["mapping"]["force_ask"] = (
-                "the packet manifest is unreadable or "
-                "unparsable, so the tool call proceeds"
+            self.hook_entry(data)["hooks"][0]["command"] = (
+                "python3 ./scripts/other_gate.py"
             )
             self.write_hooks(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any(
-                    "mapping" in p and "'force_ask'" in p
-                    for p in problems
-                ),
+                any("packet_gate.py" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_auto_approve_mapping_drift_fails(self):
+    def test_a_missing_hook_script_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            data["hooks"][0]["mapping"]["auto_approve"] = (
-                "the packet manifest reads verified, so the "
-                "tool call is held for user confirmation"
-            )
-            self.write_hooks(root, data)
+            (root / ".antigravity" / "scripts"
+             / "packet_gate.py").unlink()
             problems = self.problems(root)
             self.assertTrue(
-                any(
-                    "mapping" in p and "'auto_approve'" in p
-                    for p in problems
-                ),
+                any("packet gate script" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_without_a_mapping_object_fails(self):
+    def test_a_manifest_with_a_version_key_fails(self):
+        # The primary manifest schema permits the name and
+        # the description beside the $schema key and no
+        # further key, so a version field in the shipped
+        # manifest is a forbidden field and must fail by
+        # name at the value the tree once shipped.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            del data["hooks"][0]["mapping"]
-            self.write_hooks(root, data)
+            data = self.read_plugin(root)
+            data["version"] = "1.3.0"
+            self.write_plugin(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any("no mapping object" in p for p in problems),
+                any("'version'" in p for p in problems),
                 problems,
             )
 
-    def test_a_hook_mapping_without_the_deny_sentence_fails(self):
+    def test_a_manifest_with_a_notes_key_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            del data["hooks"][0]["mapping"]["deny"]
-            self.write_hooks(root, data)
+            data = self.read_plugin(root)
+            data["notes"] = "a declared surface note"
+            self.write_plugin(root, data)
             problems = self.problems(root)
             self.assertTrue(
-                any(
-                    "mapping" in p and "'deny'" in p
-                    for p in problems
-                ),
+                any("'notes'" in p for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_with_an_extra_key_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_plugin(root)
+            data["displayName"] = "Recognitio"
+            self.write_plugin(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("'displayName'" in p for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_without_a_description_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_plugin(root)
+            del data["description"]
+            self.write_plugin(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("'description'" in p for p in problems),
                 problems,
             )
 
@@ -728,7 +852,9 @@ class TestCheckAntigravity(unittest.TestCase):
             path = root / ".antigravity" / "hooks.json"
             text = path.read_text(encoding="utf-8")
             broken = text.replace(
-                '"event"', '"event": "PreToolUse", "event"', 1
+                '"matcher"',
+                '"matcher": "invoke_subagent", "matcher"',
+                1,
             )
             self.assertNotEqual(broken, text)
             path.write_text(broken, encoding="utf-8")
@@ -749,19 +875,160 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
-    def test_a_reordered_hook_decisions_pass(self):
-        # Control. The decision pin is a set pin, so the
-        # same three decisions in another order must keep
-        # passing, in both the fixed state and the state
-        # before the fix.
+    def test_a_disabled_hook_fails(self):
+        # Burn-down repair. The gate once allowed an enabled
+        # key and checked only that its value was a boolean,
+        # so a wiring carrying enabled false passed while a
+        # host reading that flag would run no hook at all.
+        # The gate certified the wiring claim with the
+        # wiring switched off, so the false state must fail
+        # by name.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             data = self.read_hooks(root)
-            data["hooks"][0]["decisions"] = [
-                "auto_approve",
-                "deny",
-                "force_ask",
-            ]
+            data["recognitio-packet-gate"]["enabled"] = False
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "enabled false" in p and "switched off" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_non_boolean_enabled_fails(self):
+        # Burn-down repair. The enabled allowance branch
+        # rejects a value that is not a boolean, and no test
+        # planted one before this pass.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["recognitio-packet-gate"]["enabled"] = "yes"
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "enabled value" in p and "not a boolean" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_enabled_true_hook_passes(self):
+        # Control. An enabled flag set to true states the
+        # wiring stands on, so the shaped allowance keeps
+        # passing in the other direction.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["recognitio-packet-gate"]["enabled"] = True
+            self.write_hooks(root, data)
+            self.assertEqual(self.problems(root), [])
+
+    def test_an_invalid_timeout_fails(self):
+        # Burn-down repair. The handler timeout branch
+        # rejects a value that is not a positive integer,
+        # and the only earlier timeout test was the passing
+        # control, so each bad shape is planted here.
+        for bad in (0, -5, True, "30"):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_hooks(root)
+                self.hook_entry(data)["hooks"][0]["timeout"] = bad
+                self.write_hooks(root, data)
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "timeout" in p
+                        and "not a positive integer" in p
+                        for p in problems
+                    ),
+                    (bad, problems),
+                )
+
+    def test_the_hook_script_reads_the_env_var_manifest_path(self):
+        # Burn-down repair. The packet gate script reads
+        # the manifest path from the RECOGNITIO_PACKET_MANIFEST
+        # environment variable before any workspace path,
+        # and the brief documents that branch, but no test
+        # set the variable before this pass. A dropped env
+        # branch would read the empty workspace instead and
+        # deny, so the verified manifest at the named path
+        # must earn auto approve here.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            named = Path(tmp) / "named-manifest.json"
+            named.write_text(
+                json.dumps({"verified": True}), encoding="utf-8"
+            )
+            env = dict(os.environ)
+            env["RECOGNITIO_PACKET_MANIFEST"] = str(named)
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet), env=env
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "auto_approve")
+
+    def test_the_hook_script_env_var_manifest_decides_first(self):
+        # The env var branch stands before the workspace
+        # search, so an unverified manifest at the named
+        # path decides even when a workspace path carries a
+        # verified one.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            (packet / "manifest.json").write_text(
+                json.dumps({"verified": True}), encoding="utf-8"
+            )
+            named = Path(tmp) / "named-manifest.json"
+            named.write_text(
+                json.dumps({"verified": False}), encoding="utf-8"
+            )
+            env = dict(os.environ)
+            env["RECOGNITIO_PACKET_MANIFEST"] = str(named)
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet), env=env
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "deny")
+
+    def test_the_hook_script_force_asks_on_a_duplicate_key_manifest(
+        self,
+    ):
+        # Burn-down repair. The packet gate script once read
+        # the packet manifest with a plain JSON load, so a
+        # manifest naming verified twice, false and then
+        # true, earned auto approve on the last value. The
+        # repo refuses a repeated key in every trusted
+        # reader, so that manifest is unparsable here and
+        # statement S4 earns force ask.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            packet = Path(tmp) / "packet"
+            packet.mkdir()
+            (packet / "manifest.json").write_text(
+                '{"verified": false, "verified": true}',
+                encoding="utf-8",
+            )
+            out, code = self.run_packet_gate(
+                root, self.gate_payload(packet)
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(out["decision"], "force_ask")
+
+    def test_a_hook_handler_timeout_passes(self):
+        # Control. The primary handler form carries an
+        # optional timeout in seconds beside the type and
+        # the command, so a handler that sets one must keep
+        # passing.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            self.hook_entry(data)["hooks"][0]["timeout"] = 10
             self.write_hooks(root, data)
             self.assertEqual(self.problems(root), [])
 
@@ -791,53 +1058,6 @@ class TestCheckAntigravity(unittest.TestCase):
             path.unlink()
             path.symlink_to(target)
             self.assertEqual(self.problems(root), [])
-
-    def test_an_inverted_plugin_notes_text_fails(self):
-        # Round 262. The plugin notes state that the surface
-        # is a declared surface and not a primary shape and
-        # that the build names no component. Inverting that
-        # account in place must fail the gate, because the
-        # brief states that the gate pins the notes.
-        with tempfile.TemporaryDirectory() as tmp:
-            root = self.make_layout(tmp)
-            path = root / ".antigravity" / "plugin.json"
-            data = json.loads(path.read_text(encoding="utf-8"))
-            data["notes"] = (
-                "Build 12 primary shape. This build names a "
-                "skill, an agent, a rule, and an MCP component, "
-                "because the canonical skill is not discoverable "
-                "at .agents/skills/."
-            )
-            path.write_text(json.dumps(data), encoding="utf-8")
-            problems = self.problems(root)
-            self.assertTrue(
-                any("plugin.json" in p and "notes" in p
-                    for p in problems),
-                problems,
-            )
-
-    def test_an_inverted_wiring_notes_text_fails(self):
-        # Round 262. The wiring notes state that the mapping
-        # is a declared mapping and not a primary shape and
-        # that the primary hooks page documents exactly six
-        # events. Inverting that account must fail the gate.
-        with tempfile.TemporaryDirectory() as tmp:
-            root = self.make_layout(tmp)
-            data = self.read_hooks(root)
-            data["notes"] = (
-                "Build 12 primary shape. The primary hooks "
-                "page documents exactly twelve events and "
-                "names a subagent spawn event, and the matcher "
-                "below is not the build declared mapping for "
-                "the review run tool call."
-            )
-            self.write_hooks(root, data)
-            problems = self.problems(root)
-            self.assertTrue(
-                any("hooks.json" in p and "notes" in p
-                    for p in problems),
-                problems,
-            )
 
     def test_a_missing_antigravity_namespace_fails(self):
         # R24-RT-01 and R24-RT-02. The Build 12 manifest must
@@ -903,6 +1123,74 @@ class TestCheckAntigravity(unittest.TestCase):
                     "S3" in p and "derivation note" in p
                     for p in problems
                 ),
+                problems,
+            )
+
+    def test_a_dropped_staging_copy_sentence_fails(self):
+        # Burn-down repair, spec Minor 2. The round 39 rider
+        # priced keeping the folder only with the brief
+        # stating the pair is a staging copy a user places
+        # into a plugin directory, with the copy step
+        # written out. Dropping that statement must fail.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "The shipped pair is a staging copy a user "
+                "places into a plugin directory",
+                "The shipped pair is the installed plugin",
+            )
+            self.assertTrue(
+                any("staging copy" in p for p in problems),
+                problems,
+            )
+
+    def test_a_dropped_brief_enforcement_correction_fails(self):
+        # Burn-down repair, spec Minor 1. The brief summary
+        # carried the same never enforce sentence as the
+        # record, so it carries the same dated correction.
+        # Dropping the correction must fail.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "The hook wiring now enforces the contract "
+                "through the shipped packet gate script",
+                "The hook wiring documents the contract",
+            )
+            self.assertTrue(
+                any(
+                    "hook enforcement correction" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_missing_decision_22_correction_fails(self):
+        # Burn-down repair, spec Minor 1. Decision 22 kept
+        # stating in the present tense that the wiring
+        # never enforces the contract while the shipped
+        # wiring runs the packet gate script. The round 39
+        # pricing ordered a dated correction appended with
+        # the recorded text left standing, so removing the
+        # correction from the record must fail by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "docs" / "decisions.md"
+            text = path.read_text(encoding="utf-8")
+            start = text.find("## 22. Build 12")
+            self.assertTrue(start >= 0)
+            head, tail = text[:start], text[start:]
+            tail = tail.replace(
+                "now enforces the contract through the "
+                "shipped\npacket gate script",
+                "documents the contract",
+            )
+            self.assertNotEqual(tail, text[start:])
+            path.write_text(head + tail, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("dated correction" in p for p in problems),
                 problems,
             )
 

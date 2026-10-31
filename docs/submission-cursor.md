@@ -85,11 +85,17 @@ a name and an email, the license value MIT, and the homepage
 and repository values pointing at the public repo. The
 discovery fields the manifest schema names stand filled, as
 the discovery gate pins. The manifest paths, skills at
-./skills/recognitio/ and rules at ./rules/recognitio.mdc
+./.cursor-plugin/skills/recognitio/ and rules at
+./.cursor-plugin/rules/recognitio.mdc
 and logo at docs/brand/recognitio-icon.svg, and the
 marketplace entry paths, source at ./ with the same skills
 and logo values, are each relative with no parent
-reference and no absolute form.
+reference and no absolute form, and every one of them
+resolves from the one plugin root at the repository root.
+An earlier form of this pack recorded component paths
+written from the manifest folder beside that logo path,
+a mixed base under which one half of the paths resolved
+nowhere, and the values above are the corrected ones.
 
 **Met, the logo.** The manifest logo value is a relative path
 to docs/brand/recognitio-icon.svg, committed in the repo. No
@@ -122,7 +128,9 @@ stayed unobserved behind the login wall of the client, so
 the confirmation rests on the backing records rather than on
 the page itself. And the run predates the logo value a later
 round added to the manifest, so the copy that was loaded is
-not the shipped manifest in that one field. A fresh local
+not the shipped manifest in that one field. The run also
+predates the path base correction recorded above, so the
+loaded copy carried the mixed base paths. A fresh local
 load of the shipped plugin stands as a small pre-filing
 step, and the verdict here is partly met rather than met.
 
