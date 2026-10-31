@@ -665,6 +665,127 @@ class TestCheckPackage(unittest.TestCase):
                 problems,
             )
 
+    def test_a_manifest_inside_a_cache_folder_at_the_root_fails(self):
+        # Rounds 286 and 294. A manifest wearing a cache folder
+        # name at the package root must stand in the tree census,
+        # so the gate names it inside the portable core instead
+        # of skipping the folder whole.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = root / "agent-plugins-package" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "manifest.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("manifest.json" in problem
+                    and "portable core" in problem
+                    for problem in problems),
+                problems,
+            )
+
+    def test_a_manifest_inside_a_cache_folder_in_the_skill_fails(self):
+        # Rounds 286 and 294. The same shape inside the package
+        # skill copy breaks the byte identical file set reading.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / "agent-plugins-package" / "skills"
+                     / "recognitio" / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "manifest.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("file set" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_bytecode_cache_file_in_a_cache_folder_passes(self):
+        # Control. A genuine bytecode cache file, a .pyc file
+        # inside a cache folder, stays excluded as build state
+        # in both the fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / "agent-plugins-package" / "skills"
+                     / "recognitio" / "scripts" / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "extract.cpython-311.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a cache bytes")
+            self.assertEqual(self.problems(root), [])
+
+    def test_an_inverted_antigravity_extension_note_fails(self):
+        # Round 270. The Antigravity extension note states that
+        # no primary source names a namespace for the platform.
+        # Inverting that account must fail the package gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["extensions"]["com.google.antigravity"]["note"] = (
+                "A primary source names a reverse domain "
+                "namespace for an Antigravity plugin and the "
+                "key is primary."
+            )
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("com.google.antigravity" in problem
+                    and "note" in problem for problem in problems),
+                problems,
+            )
+
+    def test_an_inverted_claude_extension_note_fails(self):
+        # Round 270. The Claude Code extension note states that
+        # the native shapes live at the repo root. Inverting
+        # that account must fail the package gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["extensions"]["com.anthropic.claude-code"]["note"] = (
+                "The native shapes live in the portable core "
+                "itself and replace the repo root shapes."
+            )
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("com.anthropic.claude-code" in problem
+                    and "note" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_deleted_antigravity_extension_namespace_fails(self):
+        # Round 270, the deletion shape. The Antigravity
+        # extension namespace carries a pinned note, so
+        # deleting the namespace whole must fail the package
+        # gate by name, not pass in silence as it did while
+        # the pin read only a present namespace object.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            del data["extensions"]["com.google.antigravity"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("com.google.antigravity" in problem
+                    and "note" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_non_object_antigravity_extension_namespace_fails(self):
+        # Round 270, the wrong type shape. A namespace that
+        # stands in the extensions object but is not an object
+        # carries no note, so the pin must fail it by name too.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["extensions"]["com.google.antigravity"] = "native"
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("com.google.antigravity" in problem
+                    and "note" in problem for problem in problems),
+                problems,
+            )
+
     def test_a_drifted_skill_copy_fails(self):
         # R19-RT-03. The package skill is a second spelling of the
         # canonical skill by construction, and the canonical is
@@ -727,6 +848,49 @@ class TestCheckPackage(unittest.TestCase):
             problems = self.problems(root)
             self.assertTrue(
                 any("mcp.json is present" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_brief_without_the_live_install_record_fails(self):
+        # The blocker audit of 2026-10-29. The glance card
+        # stated that no live install stood in the brief, a
+        # wording that predated the Codex probe proof and the
+        # Qwen Code run proof. Dropping the record of the two
+        # installs must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            brief = root / "docs" / "agent-plugins-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            brief.write_text(
+                text.replace(
+                    "stand proven on two hosts",
+                    "stand unproven in this brief",
+                ),
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("live installs" in problem
+                    for problem in problems),
+                problems,
+            )
+
+    def test_a_brief_with_the_stale_no_live_install_wording_fails(self):
+        # The stale card wording must fail by name even where
+        # the live install record stands beside it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            brief = root / "docs" / "agent-plugins-brief.md"
+            text = brief.read_text(encoding="utf-8")
+            brief.write_text(
+                text + "\nNo live install of the portable "
+                "package stands proven.\n",
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no live install" in problem
+                    for problem in problems),
                 problems,
             )
 

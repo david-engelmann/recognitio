@@ -88,6 +88,91 @@ class TestCheckComate(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def test_a_manifest_inside_a_cache_folder_in_the_copy_fails(self):
+        # Rounds 286 and 294. A manifest wearing a cache folder
+        # name inside the copy must stand in the census, so the
+        # gate names it instead of certifying the copy alone.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / ".comate/skills/recognitio"
+                     / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "manifest.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not the skill copy alone" in p
+                    or "extra file" in p for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_wearing_a_cache_suffix_beside_the_copy_fails(self):
+        # Rounds 286 and 294. A cache suffix alone excludes
+        # nothing, so a manifest named with one is counted.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / ".comate/skills/recognitio"
+             / "manifest.pyc").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not the skill copy alone" in p
+                    or "extra file" in p for p in problems),
+                problems,
+            )
+
+    def test_a_plugin_file_inside_a_cache_folder_at_the_root_fails(self):
+        # Rounds 286 and 294. The cache folder at the .comate
+        # root is inside the census on the same rule.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = root / ".comate" / "__pycache__"
+            cache.mkdir(parents=True)
+            (cache / "plugin.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("not the skill copy alone" in p
+                    or "beside" in p for p in problems),
+                problems,
+            )
+
+    def test_a_bytecode_cache_file_in_a_cache_folder_passes(self):
+        # Control. A genuine bytecode cache file, a .pyc file
+        # inside a cache folder, stays excluded as build state
+        # in both the fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / ".comate/skills/recognitio/scripts"
+                     / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "extract.cpython-311.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a cache bytes")
+            self.assertEqual(self.problems(root), [])
+
+    def test_the_comate_bullet_under_removed_fails(self):
+        # Round 288. The Comate bullet narrates an addition.
+        # Moving it under the Removed subsection, where it
+        # stood at the finding, must fail the gate on its
+        # placement alone.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "CHANGELOG.md"
+            text = self.read(root, rel)
+            start = text.find("\n- The Comate adaptation.")
+            self.assertTrue(start != -1)
+            end = text.find("\n### Fixed", start)
+            self.assertTrue(end != -1)
+            bullet = text[start:end]
+            moved = text[:start] + text[end:] + bullet + "\n"
+            self.write(root, rel, moved)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("outside the Added subsection" in p
+                    for p in problems),
+                problems,
+            )
+
     def test_a_drifted_copy_file_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

@@ -399,10 +399,22 @@ list for that install names the skill and the agent
 only, so file carriage is the whole of what the
 record proves for those shapes.
 
-Runtime invocation stays UNVERIFIED. No authenticated
-Qwen session was run in the round 33 test, so no
-claim is made that a Qwen session invokes the
-installed skill or runs extract.py through it. The
+Runtime invocation stands verified for one scoped
+shape. On 2026-10-29 a live Qwen Code session ran on
+this box through the OpenRouter third party route,
+with Qwen Code 0.26.4 installed from npm and the
+model qwen/qwen3-coder. The shipped Agent Plugins v1
+package was installed from a local checkout and the
+extensions list showed recognitio 1.3.0. The session
+invoked the installed skill under its prefixed name
+as its first action. The session then ran the
+installed extractor itself and read the verified
+packet the extractor produced, over a two commit
+range touching one file with 11 added lines, and
+returned its review. No wider claim is made. Larger
+ranges and other models and the Qoder route at
+runtime and the marketplace source route and
+interactive use stay unverified. The
 scoped npm route stays UNTESTED. Publishing a scoped
 package is an outward publication this round does not
 perform, so no registry install is claimed. The input

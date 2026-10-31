@@ -167,6 +167,37 @@ class TestCheckCodexPlugin(unittest.TestCase):
                 problems,
             )
 
+    def test_a_manifest_inside_a_cache_folder_in_the_assets_fails(self):
+        # Rounds 286 and 294. A manifest wearing a cache folder
+        # name inside the package assets must stand in the
+        # assets census, so the gate names it beside the single
+        # icon instead of skipping the folder whole.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / "agent-plugins-package/assets"
+                     / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "manifest.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("single icon-512.png" in p for p in problems),
+                problems,
+            )
+
+    def test_a_bytecode_cache_file_in_a_cache_folder_passes(self):
+        # Control. A genuine bytecode cache file, a .pyc file
+        # inside a cache folder, stays excluded as build state
+        # in both the fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / "agent-plugins-package/assets"
+                     / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "icon.cpython-311.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a cache bytes")
+            self.assertEqual(self.problems(root), [])
+
     def test_a_codex_plugin_overlay_beside_the_extension_fails(self):
         # The extension replaces the overlay whole, so an overlay
         # directory is dead configuration and fails.

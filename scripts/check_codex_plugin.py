@@ -303,6 +303,18 @@ def extension_problems(manifest, accent, problems):
         )
 
 
+def is_bytecode_cache(path):
+    """Whether a path is a compiled bytecode cache file.
+
+    Only a bytecode file standing inside a cache directory is
+    build state. A cache name alone excludes nothing, so a
+    manifest or plugin file wearing a cache folder name or a
+    cache suffix is counted like any other file, which is the
+    census blindness rounds 286 and 294 filed.
+    """
+    return "__pycache__" in path.parts and path.suffix == ".pyc"
+
+
 def asset_problems(root, problems):
     """Problems with the package assets the interface names."""
     package = root / "agent-plugins-package"
@@ -313,10 +325,27 @@ def asset_problems(root, problems):
             "interface logo paths resolve nowhere"
         )
         return
+    # A cache directory is excluded only when everything under
+    # it is a bytecode cache file, a bytecode file standing
+    # inside a cache directory. A cache directory holding
+    # anything else stands in the census whole, so a manifest
+    # wearing a cache folder name is named as the stray it is,
+    # which is the census blindness rounds 286 and 294 filed.
+    pure_cache_dirs = set()
+    for path in assets.rglob("__pycache__"):
+        if path.is_dir() and all(
+            is_bytecode_cache(item)
+            for item in path.rglob("*")
+            if item.is_file()
+        ):
+            pure_cache_dirs.add(path)
     names = sorted(
         str(path.relative_to(assets))
         for path in assets.rglob("*")
-        if "__pycache__" not in path.parts
+        if not any(
+            cache in path.parents or cache == path
+            for cache in pure_cache_dirs
+        )
     )
     if names != ["icon-512.png"]:
         problems.append(

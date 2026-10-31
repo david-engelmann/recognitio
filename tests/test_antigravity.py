@@ -792,6 +792,53 @@ class TestCheckAntigravity(unittest.TestCase):
             path.symlink_to(target)
             self.assertEqual(self.problems(root), [])
 
+    def test_an_inverted_plugin_notes_text_fails(self):
+        # Round 262. The plugin notes state that the surface
+        # is a declared surface and not a primary shape and
+        # that the build names no component. Inverting that
+        # account in place must fail the gate, because the
+        # brief states that the gate pins the notes.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / ".antigravity" / "plugin.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["notes"] = (
+                "Build 12 primary shape. This build names a "
+                "skill, an agent, a rule, and an MCP component, "
+                "because the canonical skill is not discoverable "
+                "at .agents/skills/."
+            )
+            path.write_text(json.dumps(data), encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("plugin.json" in p and "notes" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_an_inverted_wiring_notes_text_fails(self):
+        # Round 262. The wiring notes state that the mapping
+        # is a declared mapping and not a primary shape and
+        # that the primary hooks page documents exactly six
+        # events. Inverting that account must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_hooks(root)
+            data["notes"] = (
+                "Build 12 primary shape. The primary hooks "
+                "page documents exactly twelve events and "
+                "names a subagent spawn event, and the matcher "
+                "below is not the build declared mapping for "
+                "the review run tool call."
+            )
+            self.write_hooks(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hooks.json" in p and "notes" in p
+                    for p in problems),
+                problems,
+            )
+
     def test_a_missing_antigravity_namespace_fails(self):
         # R24-RT-01 and R24-RT-02. The Build 12 manifest must
         # declare the Antigravity shapes under the new namespace.

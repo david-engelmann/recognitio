@@ -128,6 +128,37 @@ class TestCheckCursor(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def test_a_manifest_inside_a_cache_folder_in_the_copy_fails(self):
+        # Rounds 286 and 294. A manifest wearing a cache folder
+        # name inside the skill copy must stand in the copy
+        # census, so the gate names it as an extra file instead
+        # of certifying the copy against the canonical skill.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / ".cursor-plugin/skills/recognitio"
+                     / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "manifest.json").write_text(
+                "{}\n", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("extra file" in p for p in problems),
+                problems,
+            )
+
+    def test_a_bytecode_cache_file_in_a_cache_folder_passes(self):
+        # Control. A genuine bytecode cache file, a .pyc file
+        # inside a cache folder, stays excluded as build state
+        # in both the fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            cache = (root / ".cursor-plugin/skills/recognitio"
+                     / "scripts" / "__pycache__")
+            cache.mkdir(parents=True)
+            (cache / "extract.cpython-311.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a cache bytes")
+            self.assertEqual(self.problems(root), [])
+
     def test_a_dropped_readme_package_position_fails(self):
         # Visual round 1. No Cursor Marketplace listing
         # exists or has been submitted, so a README that

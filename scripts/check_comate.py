@@ -313,20 +313,34 @@ NEGATED_CITATIONS = (
 )
 
 
+def is_bytecode_cache(path):
+    """Whether a path is a compiled bytecode cache file.
+
+    Only a bytecode file standing inside a cache directory is
+    build state. A cache name alone excludes nothing, so a
+    manifest or plugin file wearing a cache folder name or a
+    cache suffix is counted like any other file, which is the
+    census blindness rounds 286 and 294 filed.
+    """
+    return "__pycache__" in path.parts and path.suffix == ".pyc"
+
+
 def tree_bytes(directory):
     """Map every file under a directory to its bytes.
 
     Compiled bytecode caches are build state, not skill content,
-    so they are excluded the way the other copy gates exclude
-    them.
+    so bytecode cache files are excluded the way the other copy
+    gates exclude them. The exclusion is keyed on the bytecode
+    shape alone, so a file that merely wears a cache name is
+    read and compared like any other file.
     """
     found = {}
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.is_symlink():
             continue
-        rel = str(path.relative_to(directory))
-        if "__pycache__" in rel or rel.endswith(".pyc"):
+        if is_bytecode_cache(path):
             continue
+        rel = str(path.relative_to(directory))
         found[rel] = path.read_bytes()
     return found
 
@@ -383,11 +397,25 @@ def placement_problems(root, problems):
             "path carries no skill copy"
         )
         return
+    # A cache directory is excluded only when everything under
+    # it is a bytecode cache file. A cache directory holding
+    # anything else stands in the census whole, so a manifest
+    # or plugin file inside it is named as the stray it is.
+    pure_cache_dirs = set()
+    for path in comate.rglob("__pycache__"):
+        if path.is_dir() and all(
+            is_bytecode_cache(item)
+            for item in path.rglob("*")
+            if item.is_file()
+        ):
+            pure_cache_dirs.add(path)
     census = sorted(
         str(path.relative_to(comate))
         for path in comate.rglob("*")
-        if "__pycache__" not in path.parts
-        and not str(path).endswith(".pyc")
+        if not any(
+            cache in path.parents or cache == path
+            for cache in pure_cache_dirs
+        )
     )
     copy_dir = comate / "skills" / "recognitio"
     canonical = root / CANONICAL_TREE
@@ -673,6 +701,25 @@ def brief_problems(root, problems):
             problems.append(
                 "CHANGELOG.md carries no Comate adaptation entry"
             )
+        else:
+            # Round 288. The bullet narrates an addition, so it
+            # stands under the Added heading. Standing under a
+            # later heading, the Removed subsection at the
+            # finding, reads the whole platform adaptation as
+            # a removal to anyone scanning by headings.
+            bullet = changelog.find("\n- The Comate adaptation.")
+            added = changelog.find("### Added")
+            fixed = changelog.find("### Fixed")
+            if not (
+                added != -1 and fixed != -1
+                and added < bullet < fixed
+            ):
+                problems.append(
+                    "the Comate adaptation entry stands outside "
+                    "the Added subsection of CHANGELOG.md, so "
+                    "the addition it narrates reads under the "
+                    "wrong heading"
+                )
         problems.extend(
             contradiction_problems(changelog, "CHANGELOG.md")
         )
@@ -707,7 +754,10 @@ def brief_problems(root, problems):
                 "unverified negative could harden into an "
                 "existence claim"
             )
-        if "### Comate" not in readme:
+        if not any(
+            line.strip() == "### Comate"
+            for line in readme.splitlines()
+        ):
             problems.append(
                 "README.md carries no Comate install subsection"
             )

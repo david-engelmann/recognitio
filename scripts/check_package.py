@@ -22,7 +22,9 @@ brief at docs/agent-plugins-brief.md must state the honesty
 sentence, so the package cannot drift into claiming a native
 Claude Code install it does not have, and must record the Agent
 Skills donation transfer as primary on both halves, so the round
-21 one sentence correction cannot quietly revert. The tree shape
+21 one sentence correction cannot quietly revert, and must
+record the live installs proven on the Codex and Qwen hosts,
+so the glance card cannot fall behind those proofs again. The tree shape
 of agent-plugins-package/ itself is pinned to plugin.json, the
 skills/ tree, and the one asset file the builds name inside
 the portable core, so a native platform shape placed inside
@@ -59,6 +61,35 @@ PERMITTED_FIELDS = {
 NATIVE_KEYS = {"agents", "settings", "outputStyles", "skills"}
 NAMESPACE = "com.anthropic.claude-code"
 
+# The note text each extensions namespace carries, pinned word
+# for word. Round 270 filed that planted inversions of both
+# texts passed every gate and test run while no shipped check
+# read either text, so a namespace can no longer rewrite its
+# own account of its standing in silence.
+EXTENSION_NOTES = {
+    "com.anthropic.claude-code": (
+        "The Claude Code native shapes live at the repo root "
+        "beside the portable package and are declared here "
+        "under the reverse domain namespace the specification "
+        "section 8 defines. Hosts that do not implement this "
+        "namespace ignore this object. The shapes are the "
+        "agent persona, the output style, the mod hooks, the "
+        "headless runbook and the fan out workflow, with the "
+        "native plugin manifest naming the install path."
+    ),
+    "com.google.antigravity": (
+        "The Antigravity native shapes live at the repo root "
+        "beside the portable package and are declared here "
+        "under a documented placeholder namespace. No primary "
+        "source names a reverse domain namespace for an "
+        "Antigravity plugin, so this key follows the section "
+        "8 reverse domain convention and is not presented as "
+        "primary. Hosts that do not implement this namespace "
+        "ignore this object. The shapes are the Antigravity "
+        "plugin manifest and the PreToolUse hook wiring."
+    ),
+}
+
 HONESTY_SENTENCE = (
     "The package does not install natively in Claude Code on "
     "current evidence"
@@ -72,6 +103,18 @@ AAIF_SENTENCE = (
     "the transfer is now recorded as primary on both halves"
 )
 STALE_AAIF = "secondary corroborated"
+
+# The glance card of the brief once stated that no live
+# install stood in it. Two live installs have since proven
+# the behaviour on two hosts, the Codex plugin probe and the
+# Qwen Code run of 2026-10-29, so the card now records both
+# and the stale wording must not come back.
+LIVE_INSTALL_SENTENCES = (
+    "stand proven on two hosts",
+    "listed it installed and enabled",
+    "installed the shipped package live and listed it enabled",
+)
+STALE_LIVE_INSTALL = "No live install of the portable package"
 
 # The digit classes are ASCII ranges on purpose, the same reason
 # scripts/check_version.py records. A backslash d class also
@@ -280,6 +323,21 @@ def manifest_problems(data, root):
             "the per platform native shapes"
         )
         return problems
+    for note_namespace, note_text in EXTENSION_NOTES.items():
+        declared = extensions.get(note_namespace)
+        if not isinstance(declared, dict):
+            problems.append(
+                "the extensions object names no %s namespace "
+                "object, so the pinned note text it must carry "
+                "stands nowhere" % note_namespace
+            )
+            continue
+        if declared.get("note") != note_text:
+            problems.append(
+                "the %s extension carries note %r, not the pinned "
+                "note text, which reads %r"
+                % (note_namespace, declared.get("note"), note_text)
+            )
     namespace = extensions.get(NAMESPACE)
     if not isinstance(namespace, dict):
         problems.append(
@@ -297,18 +355,32 @@ def manifest_problems(data, root):
     return problems
 
 
+def is_bytecode_cache(path):
+    """Whether a path is a compiled bytecode cache file.
+
+    Only a bytecode file standing inside a cache directory is
+    build state. A cache name alone excludes nothing, so a
+    manifest or plugin file wearing a cache folder name or a
+    cache suffix is counted like any other file, which is the
+    census blindness rounds 286 and 294 filed.
+    """
+    return "__pycache__" in path.parts and path.suffix == ".pyc"
+
+
 def tree_bytes(directory):
     """Map every file under a directory to its bytes.
 
     Compiled bytecode caches are build state, not skill content,
-    so a __pycache__ directory on either side is skipped. Without
+    so bytecode cache files on either side are skipped. Without
     the skip, importing the extractor during the test run would
     put a cache on the canonical side only and fail the pin for
-    no authored reason.
+    no authored reason. The exclusion is keyed on the bytecode
+    shape alone, so a file that merely wears a cache name is
+    read and compared like any other file.
     """
     found = {}
     for path in sorted(directory.rglob("*")):
-        if "__pycache__" in path.parts:
+        if is_bytecode_cache(path):
             continue
         if path.is_file() and not path.is_symlink():
             found[str(path.relative_to(directory))] = path.read_bytes()
@@ -383,7 +455,7 @@ def tree_problems(root):
     if not package.is_dir():
         return ["agent-plugins-package/ is missing"]
     for path in sorted(package.rglob("*")):
-        if "__pycache__" in path.parts:
+        if is_bytecode_cache(path):
             continue
         if path.is_dir():
             continue
@@ -436,6 +508,20 @@ def brief_problems(root):
         problems.append(
             "docs/agent-plugins-brief.md still carries the stale "
             "secondary corroborated wording for the donation transfer"
+        )
+    for sentence in LIVE_INSTALL_SENTENCES:
+        if sentence not in text:
+            problems.append(
+                "docs/agent-plugins-brief.md does not record the "
+                "live installs of the portable package, so the "
+                "glance card could fall behind the two proofs"
+            )
+            break
+    if STALE_LIVE_INSTALL in text:
+        problems.append(
+            "docs/agent-plugins-brief.md still carries the stale "
+            "no live install wording the Codex probe and the "
+            "Qwen Code run falsified"
         )
     return problems
 

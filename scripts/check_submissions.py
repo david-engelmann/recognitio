@@ -15,7 +15,13 @@ version it was written against and the date its requirements
 were read, and this gate holds both against the shipped
 manifests, so a version bump or a stale pack fails here
 instead of reaching a filing. The load bearing figures in
-the pack prose stand pinned beside the sentences.
+the pack prose stand pinned beside the sentences. The
+Claude pack tree figures, its file count and its largest
+file sizes and its credential scan count, stand pinned in
+that same style, and the gate test suite measures them
+against the tracked tree, so a tree that grows or shrinks
+past the stated figures fails instead of drifting in
+silence the way SC3 kept doing.
 
 The evidence half pins the manifest facts the packs assert.
 The Cursor marketplace file carries its required name and
@@ -78,6 +84,12 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
+        "holds 237 files",
+        "held 237 files",
+        "at 237 files against a cap of 512 files",
+        "demo recording at 607,309 bytes",
+        "tests/test_gate_scripts.py at 262,077 bytes",
+        "scan over all 237 tracked files",
     ),
     PORTABLE_PACK: (
         "six month cycle",

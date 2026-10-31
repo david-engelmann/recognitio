@@ -8,7 +8,8 @@ Plugins v1 matrix in full, the Qoder and scoped npm
 routes, the prefixed naming rule with its cancellation
 exception, the shared skills alias with its precedence,
 the conversion fidelity record with runtime invocation
-left UNVERIFIED, the bundled CLI version from the
+verified for one scoped OpenRouter shape, the bundled
+CLI version from the
 primary releases listing, and the conditional
 publication draft with no listing file shipped, all
 with derivation notes pinned by the gate at
@@ -376,16 +377,35 @@ class TestCheckQwen(unittest.TestCase):
                 problems,
             )
 
-    def test_a_dropped_runtime_unverified_pin_fails(self):
+    def test_a_dropped_runtime_proof_pin_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             problems = self.break_brief(
                 root,
-                "Runtime invocation stays UNVERIFIED",
+                "Runtime invocation stands verified for one "
+                "scoped shape",
                 "Runtime invocation is fully verified",
             )
             self.assertTrue(
-                any("runtime UNVERIFIED" in p for p in problems),
+                any("runtime scoped proof" in p for p in problems),
+                problems,
+            )
+
+    def test_the_stale_runtime_unverified_wording_fails(self):
+        # The live run of 2026-10-29 falsified the blanket
+        # UNVERIFIED wording for the one scoped shape it ran.
+        # Restoring that wording must fail by name even where
+        # the scoped proof sentences stand beside it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "No wider claim is made.",
+                "Runtime invocation stays UNVERIFIED.",
+            )
+            self.assertTrue(
+                any("stale runtime UNVERIFIED" in p
+                    for p in problems),
                 problems,
             )
 

@@ -18,7 +18,8 @@ sentences, the no page stamp discipline, the version pin and
 the docs lag caveat, the extension boundary sentence, the
 namespace placeholder sentence, the hook file with its
 one PreToolUse entry, its matcher, its three decisions and
-its mapping sentences, the documented
+its mapping sentences, the notes texts of the plugin
+manifest and the hook wiring pinned word for word, the documented
 harness contract with a derivation note on every contract
 statement, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
@@ -178,6 +179,30 @@ DECISION_STATEMENT = "Decision 4 binds"
 NAMESPACE = "com.google.antigravity"
 HOOK_DECISIONS = ("deny", "force_ask", "auto_approve")
 HOOK_MATCHER = "invoke_subagent"
+
+# The notes texts of the two Antigravity files, pinned word for
+# word. The brief states in its second packet guard that the
+# gate pins the notes, so a later edit cannot add an underived
+# statement in silence, and round 262 filed that planted
+# inversions of both texts passed every gate while the gate
+# carried no reading of either text.
+PLUGIN_NOTES = (
+    "Build 12 declared surface, not a primary shape. The "
+    "primary plugins page documents plugin.json as the "
+    "required marker with this $schema value and hooks.json "
+    "as an optional component. This build names no skill, "
+    "agent, rule, or MCP component, because the canonical "
+    "skill is already discoverable at .agents/skills/ on the "
+    "primary documented Antigravity skills discovery path."
+)
+WIRING_NOTES = (
+    "Build 12 declared mapping, not a primary shape. The "
+    "primary hooks page documents exactly six events, the "
+    "stdin and stdout JSON contract, and the required "
+    "decision field, and it names no subagent spawn event. "
+    "The matcher below is the build's declared mapping for "
+    "the review run tool call."
+)
 
 # The mapping sentences the shipped wiring carries for the
 # three decisions. Each one states the condition and the
@@ -369,9 +394,16 @@ def hook_problems(root=None):
         ]
     if not isinstance(data, dict):
         return [".antigravity/hooks.json is not a JSON object"]
+    problems = []
+    if data.get("notes") != WIRING_NOTES:
+        problems.append(
+            ".antigravity/hooks.json carries notes %r, not the "
+            "pinned notes text the brief states the gate pins, "
+            "which reads %r" % (data.get("notes"), WIRING_NOTES)
+        )
     hooks = data.get("hooks")
     if not isinstance(hooks, list) or not hooks:
-        return [
+        return problems + [
             ".antigravity/hooks.json carries no hook entries"
         ]
     entries = [
@@ -379,11 +411,10 @@ def hook_problems(root=None):
         if isinstance(entry, dict) and entry.get("event") == "PreToolUse"
     ]
     if not entries:
-        return [
+        return problems + [
             ".antigravity/hooks.json carries no PreToolUse entry, so "
             "the build's declared mapping names no event"
         ]
-    problems = []
     if len(entries) != 1:
         problems.append(
             ".antigravity/hooks.json declares %d PreToolUse entries, "
@@ -443,6 +474,37 @@ def strict_json_loads(text):
             seen[key] = value
         return seen
     return json.loads(text, object_pairs_hook=reject)
+
+
+def plugin_problems(root=None):
+    """Problems with the Antigravity plugin manifest notes.
+
+    The brief states that the gate pins the notes, so the
+    notes text of the plugin manifest itself stands pinned
+    here word for word beside the wiring notes pin in the
+    hook reading, which is the pair round 262 filed.
+    """
+    root = ROOT if root is None else root
+    path = root / ".antigravity" / "plugin.json"
+    raw = read_text(path)
+    if raw is None:
+        return [
+            ".antigravity/plugin.json is missing, so the plugin "
+            "notes the brief states the gate pins stand nowhere"
+        ]
+    try:
+        data = strict_json_loads(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
+        return [".antigravity/plugin.json does not parse, %s" % exc]
+    if not isinstance(data, dict):
+        return [".antigravity/plugin.json is not a JSON object"]
+    if data.get("notes") != PLUGIN_NOTES:
+        return [
+            ".antigravity/plugin.json carries notes %r, not the "
+            "pinned notes text the brief states the gate pins, "
+            "which reads %r" % (data.get("notes"), PLUGIN_NOTES)
+        ]
+    return []
 
 
 def manifest_problems(root=None):
@@ -507,6 +569,7 @@ def antigravity_problems(root=None):
     problems.extend(brief_problems(root))
     problems.extend(statements_problems(root))
     problems.extend(hook_problems(root))
+    problems.extend(plugin_problems(root))
     problems.extend(manifest_problems(root))
     problems.extend(decision_problems(root))
     return problems

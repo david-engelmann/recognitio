@@ -319,7 +319,7 @@
       "test_a_dropped_precedence_pin_fails",
       "test_a_dropped_qoder_activation_unverified_fails",
       "test_a_dropped_r4_qoder_path_fails",
-      "test_a_dropped_runtime_unverified_pin_fails",
+      "test_a_dropped_runtime_proof_pin_fails",
       "test_a_dropped_wrapper_exit_fails",
       "test_a_merged_exit_table_fails",
       "test_a_publication_promise_fails",

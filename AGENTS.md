@@ -317,7 +317,8 @@ not a gate.
   Qoder and scoped npm routes, the prefixed naming rule
   with its cancellation exception, the shared skills
   alias precedence, the conversion fidelity record with
-  runtime invocation left UNVERIFIED, the bundled CLI
+  runtime invocation verified for one scoped OpenRouter
+  shape, the bundled CLI
   version, and the conditional publication draft with
   no listing file shipped are pinned by the gate at
   `scripts/check_qwen.py`, so the scoped guidance cannot

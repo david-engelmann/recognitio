@@ -2,8 +2,8 @@
   "files": {
     "evals/PASS-NOTES.md": "cfd4e9f738eff6ef6ae5bd547dd9e99089e65596a0633e20698adfae7464b4ca",
     "evals/RESULTS.md": "ecac451070c97c1cb7120954163738222e360e82c08faea3fb48d1e8e3724173",
-    "evals/corpus-coverage.json": "0d343ee3cd244aab6201d9e65e23f0b7dba92240757ddeee08dea03b5f563ad8",
-    "evals/corpus.md": "1a737658d53aac44026e9055928e29bb8bcaf8e8e22b368b826480a7e594ee54",
+    "evals/corpus-coverage.json": "b3be9aac094e9da4246a987bcd399253c5fdadaaf9c711d1ca33d4be7bd14a44",
+    "evals/corpus.md": "3cde05dfe46985c15032984b04a044f0e0cbdcd3f48014d3bb07afa3241be9f5",
     "evals/source-anchors.json": "a9fbddd0cf4adb3d4b2e1b52e188a6acd35bfcbe4c031a0727b8ce9944aeec88",
     "evals/tasks/task-01/diff.patch": "a08c663e9eb0ae30c19b4ba89586db3fad9102ca9b826930eb49cdec47c8c725",
     "evals/tasks/task-01/manifest.json": "80e38c1cf061619d176d5654880ebd6a967cc01b7d68448ed3e4294830e1e967",

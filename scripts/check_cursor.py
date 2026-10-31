@@ -459,20 +459,34 @@ def rule_blocks(section):
     return [part for part in parts[1:]]
 
 
+def is_bytecode_cache(path):
+    """Whether a path is a compiled bytecode cache file.
+
+    Only a bytecode file standing inside a cache directory is
+    build state. A cache name alone excludes nothing, so a
+    manifest or plugin file wearing a cache folder name or a
+    cache suffix is counted like any other file, which is the
+    census blindness rounds 286 and 294 filed.
+    """
+    return "__pycache__" in path.parts and path.suffix == ".pyc"
+
+
 def tree_bytes(directory):
     """Map every file under a directory to its bytes.
 
     Compiled bytecode caches are build state, not skill content,
-    so they are excluded the way the portable package check
-    excludes them.
+    so bytecode cache files are excluded the way the portable
+    package check excludes them. The exclusion is keyed on the
+    bytecode shape alone, so a file that merely wears a cache
+    name is read and compared like any other file.
     """
     found = {}
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.is_symlink():
             continue
-        rel = str(path.relative_to(directory))
-        if "__pycache__" in rel or rel.endswith(".pyc"):
+        if is_bytecode_cache(path):
             continue
+        rel = str(path.relative_to(directory))
         found[rel] = path.read_bytes()
     return found
 

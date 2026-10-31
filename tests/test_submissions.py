@@ -344,6 +344,80 @@ class TestCheckSubmissions(unittest.TestCase):
         self.assertTrue(
             any("40 words" in p for p in problems), problems)
 
+    def test_a_claude_count_drift_fails(self):
+        problems = self.mutate_text(
+            CLAUDE_PACK,
+            lambda t: t.replace(
+                "holds 237 files", "holds 236 files"))
+        self.assertTrue(
+            any("237 files" in p for p in problems), problems)
+
+    def test_the_pack_figures_match_the_measured_tree(self):
+        # SC3. The Claude pack states its tree figures in the
+        # present tense, and they went stale three times while
+        # every pin held, because no check measured them
+        # against the tree. This test measures the tracked
+        # tree and holds every stated figure against the
+        # measurement, so a file added or removed, or the
+        # largest files growing, fails here until the pack is
+        # restated.
+        import re
+        import subprocess
+
+        listed = subprocess.check_output(
+            ["git", "ls-files"], cwd=ROOT, text=True,
+        ).splitlines()
+        sizes = []
+        for rel in listed:
+            path = ROOT / rel
+            size = (
+                path.lstat().st_size if path.is_symlink()
+                else path.stat().st_size
+            )
+            sizes.append((size, rel))
+        sizes.sort(reverse=True)
+        image_or_font = {
+            ".gif", ".png", ".svg", ".jpg", ".jpeg", ".webp",
+            ".ico", ".ttf", ".otf", ".woff", ".woff2",
+        }
+        largest = sizes[0]
+        largest_plain = next(
+            entry for entry in sizes
+            if Path(entry[1]).suffix.lower() not in image_or_font
+        )
+        text = re.sub(
+            r"\s+", " ",
+            (ROOT / CLAUDE_PACK).read_text(encoding="utf-8"),
+        )
+
+        def stated(pattern):
+            match = re.search(pattern, text)
+            self.assertIsNotNone(match, pattern)
+            return match.group(1)
+
+        self.assertEqual(
+            int(stated(r"holds (\d+) files")), len(listed))
+        self.assertEqual(
+            int(stated(r"held (\d+) files")), len(listed))
+        self.assertEqual(
+            int(stated(r"at (\d+) files against a cap")),
+            len(listed))
+        self.assertEqual(
+            stated(r"demo recording at ([\d,]+) bytes"),
+            format(largest[0], ","))
+        self.assertTrue(
+            largest[1].endswith("demo.gif")
+            or "demo" in largest[1], largest)
+        self.assertEqual(
+            stated(
+                r"tests/test_gate_scripts\.py at ([\d,]+) bytes"),
+            format(largest_plain[0], ","))
+        self.assertEqual(largest_plain[1],
+                         "tests/test_gate_scripts.py")
+        self.assertEqual(
+            int(stated(r"scan over all (\d+) tracked files")),
+            len(listed))
+
     def test_a_portable_figure_drift_fails(self):
         problems = self.mutate_text(
             PORTABLE_PACK,

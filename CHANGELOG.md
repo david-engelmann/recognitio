@@ -833,6 +833,16 @@ This unreleased work carries version 1.3.0.
   first once the plant or the retarget stands committed
   or staged. A link standing in the working tree alone,
   neither staged nor committed, stands outside the pin.
+- The Comate adaptation. Build 20 adds a byte identical
+  copy of the canonical skill at `.comate/skills/recognitio/`
+  for the native Comate project path, the brief at
+  `docs/comate-brief.md`, and a new gate at
+  `scripts/check_comate.py` pinning the copy and the brief
+  claims. The official Linux client at version 3.11.5 was
+  downloaded against its published hash and opened on this
+  box, and its agent surface demands a Baidu account sign
+  in, so invocation inside a live Comate session stays
+  unverified.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
@@ -2335,6 +2345,38 @@ This unreleased work carries version 1.3.0.
   unverified on the live page until the rendered checks
   named in the fix report are run. The masters and their
   geometry are unchanged.
+- A failure receipt from the extractor carries its reason
+  once. A timed out command is named by its opening parts
+  and its size in place of its full spelling, and the
+  discrepancies list of a failure receipt stands empty,
+  because a failed run built no packet for a recount to
+  disagree with.
+- The docs and minors burndown of the 300 round residuals.
+  The cache name census in the Comate and Cursor and package
+  and Codex plugin gates now counts a file that merely wears
+  a cache folder name or a cache suffix, and only a bytecode
+  file inside a cache folder stays excluded as build state.
+  The Antigravity gate pins the notes texts of its plugin
+  manifest and its hook wiring word for word, and the package
+  gate pins the note text of each extensions namespace. The
+  Claude submission pack states the tree as it stands at 237
+  files, with its largest file figures restated and the
+  figures pinned in the submissions gate and measured against
+  the tracked tree in its test suite. The Comate adaptation
+  entry stands under Added, where the addition it narrates
+  belongs, and the Comate gate pins that placement and reads
+  the README subsection heading as a heading line. The Qwen
+  brief records the live run of 2026-10-29 for its one scoped
+  shape in place of the blanket unverified wording, and the
+  Agent Plugins brief records the live installs on the two
+  hosts that proved them. A failed run leaves a failure
+  receipt that carries its reason once, with a timed out
+  command named by its opening parts and its size in a
+  message the extractor tests hold under 800 characters,
+  where the receipt for the lifetime range of this repo
+  measured 197,551 bytes before the fix. The docs index
+  test lists the Comate brief in its expected documents and
+  its expected briefs.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
@@ -2410,13 +2452,3 @@ This unreleased work carries version 1.3.0.
   the paths it needs from the root argument it is
   handed, so each gate now holds one spelling of
   each path and no dead one beside it.
-- The Comate adaptation. Build 20 adds a byte identical
-  copy of the canonical skill at `.comate/skills/recognitio/`
-  for the native Comate project path, the brief at
-  `docs/comate-brief.md`, and a new gate at
-  `scripts/check_comate.py` pinning the copy and the brief
-  claims. The official Linux client at version 3.11.5 was
-  downloaded against its published hash and opened on this
-  box, and its agent surface demands a Baidu account sign
-  in, so invocation inside a live Comate session stays
-  unverified.

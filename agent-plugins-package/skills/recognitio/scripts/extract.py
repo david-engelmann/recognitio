@@ -451,6 +451,35 @@ def scrubbed_child_env():
 PROCESS_TIMEOUT_SECONDS = 120
 
 
+COMMAND_DISPLAY_LIMIT = 512
+
+
+def command_display(argv):
+    """The spelling of a command as an error message names it.
+
+    A command whose full spelling runs past the display limit
+    is named by its opening parts and its size instead. The
+    bulk companion search carries every gathered pattern as
+    an argument, so its full spelling runs to tens of
+    thousands of characters, and a failure receipt that
+    carried that spelling in full measured 197,551 bytes on
+    the lifetime range of this repo, all but 687 bytes of it
+    the one command string. The opening parts name the call
+    and the counts name its shape, and the patterns
+    themselves stand in the change the run was reading, so
+    no evidence is lost by the bound.
+    """
+    parts = [str(part) for part in argv]
+    joined = " ".join(parts)
+    if len(joined) <= COMMAND_DISPLAY_LIMIT:
+        return joined
+    opening = joined[:COMMAND_DISPLAY_LIMIT]
+    opening = opening[:opening.rfind(" ")]
+    return "%s ... (%d arguments, %d characters in full)" % (
+        opening, len(parts), len(joined),
+    )
+
+
 def run_process(argv, cwd=None):
     env = scrubbed_child_env()
     try:
@@ -464,7 +493,7 @@ def run_process(argv, cwd=None):
             "command timed out after %d seconds: %s"
             % (
                 PROCESS_TIMEOUT_SECONDS,
-                " ".join(str(part) for part in argv),
+                command_display(argv),
             )
         ) from exc
     except OSError as exc:
@@ -3566,6 +3595,12 @@ def build_failure_manifest(argv, message, resolved=None, tiers=None,
     who keeps only the receipt can see what each tier would have
     cost. A caller that failed before any tier was measured leaves
     the tier account empty, because those costs were never known.
+    The failure reason stands in the error field alone. The
+    discrepancies list records recount disagreements on a packet
+    the run built, and a failed run built none, so the list
+    stands empty here instead of carrying a second copy of the
+    error, which is the duplication the failure manifest bloat
+    observation measured.
     """
     if budget_block is None:
         budget_block = {
@@ -3588,7 +3623,7 @@ def build_failure_manifest(argv, message, resolved=None, tiers=None,
         "exclusions": [],
         "verified": False,
         "error": message,
-        "discrepancies": [message],
+        "discrepancies": [],
     })
     return manifest
 

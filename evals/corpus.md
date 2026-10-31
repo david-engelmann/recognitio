@@ -660,7 +660,7 @@ finding in this round was declined on substance.
 | Qwen figure claims stood without their basis and scope (R33-RT-01, R33-RT-04, and R33-RT-08) | `test_every_plant_fails` and `test_the_number_normalisation_fires` and `test_a_dropped_figure_pin_fails` and `test_gate_review_split_figure_plants_fail` and `test_gate_review_unbound_figure_sentence_passes` in tests/test_qwen.py |
 | The wrapper exits and the internal verify exit stood merged (R33-RT-02) | `test_a_dropped_wrapper_exit_fails` and `test_a_dropped_internal_verify_pin_fails` and `test_a_merged_exit_table_fails` in tests/test_qwen.py |
 | A dropped activation, cancellation, precedence, or listing pin passed the Qwen brief gate (R33-RT-05 and R33-RT-06) | `test_a_dropped_not_activated_pin_fails` and `test_a_dropped_cancellation_pin_fails` and `test_a_dropped_precedence_pin_fails` and `test_a_dropped_no_listing_pin_fails` in tests/test_qwen.py |
-| A dropped runtime unverified pin and a dropped derivation note passed the Qwen brief gate | `test_a_dropped_runtime_unverified_pin_fails` and `test_a_dropped_derivation_note_fails` and `test_a_dropped_r4_qoder_path_fails` and `test_a_dropped_qoder_activation_unverified_fails` in tests/test_qwen.py |
+| A dropped runtime unverified pin and a dropped derivation note passed the Qwen brief gate | `test_a_dropped_runtime_proof_pin_fails` and `test_a_dropped_derivation_note_fails` and `test_a_dropped_r4_qoder_path_fails` and `test_a_dropped_qoder_activation_unverified_fails` in tests/test_qwen.py |
 | A publication promise passed the Qwen brief gate | `test_a_publication_promise_fails` and `test_the_three_naming_cases` in tests/test_qwen.py |
 
 The 12 against 16 figure conflict was not resolved to

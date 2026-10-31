@@ -759,6 +759,55 @@ class TestChildEnvironment(unittest.TestCase):
         finally:
             subprocess.run = original
 
+    def test_a_timeout_on_a_long_command_names_it_by_its_opening(self):
+        # The failure manifest bloat observation. The bulk
+        # companion search carries every gathered pattern as
+        # an argument, so a timeout message that spelled the
+        # command in full ran to tens of thousands of
+        # characters and the failure receipt carried it
+        # twice. The message must name the call by its
+        # opening parts and its size instead.
+        original = subprocess.run
+
+        def stalled(*args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+
+        subprocess.run = stalled
+        try:
+            argv = ["git", "grep", "-F"]
+            for index in range(400):
+                argv.extend(["-e", "pattern_number_%04d" % index])
+            argv.append("HEAD")
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.run_process(argv)
+        finally:
+            subprocess.run = original
+        message = str(caught.exception)
+        self.assertIn("command timed out after", message)
+        self.assertIn("git grep", message)
+        self.assertIn("%d arguments" % len(argv), message)
+        self.assertNotIn("pattern_number_0399", message)
+        self.assertLess(len(message), 800)
+
+    def test_a_short_timeout_command_is_spelled_in_full(self):
+        # Control. A command under the display limit keeps
+        # its full spelling in the timeout message, in both
+        # the fixed state and the state before the fix.
+        original = subprocess.run
+
+        def stalled(*args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+
+        subprocess.run = stalled
+        try:
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.run_process(
+                    ["git", "rev-parse", "HEAD"]
+                )
+        finally:
+            subprocess.run = original
+        self.assertIn("git rev-parse HEAD", str(caught.exception))
+
 
 class TestShallowAndRootCommits(unittest.TestCase):
     def test_shallow_clone_is_refused(self):
@@ -4699,6 +4748,25 @@ class TestOutputPathDiscipline(unittest.TestCase):
                     manifest["error"],
                 )
                 self.assertEqual((out / "keep.txt").read_text(), "keep\n")
+
+    def test_a_failure_receipt_carries_its_reason_once(self):
+        # The failure manifest bloat observation. The receipt
+        # once carried its failure message twice, in the error
+        # field and again as the one entry of the discrepancies
+        # list, so a long message doubled the size of the
+        # receipt a reader keeps. The discrepancies list
+        # records recount disagreements on a built packet, and
+        # a failed run built none.
+        out = Path(self.tmp.name) / "reason-once"
+        result = self.raw_run([
+            "--commit", "deadbeefdeadbeef",
+            "--out", str(out), "--repo", str(self.repo),
+        ])
+        self.assertEqual(result.returncode, 2, result.stderr)
+        manifest = read_manifest(out)
+        self.assertFalse(manifest["verified"])
+        self.assertTrue(manifest["error"])
+        self.assertEqual(manifest["discrepancies"], [])
 
     def test_budget_of_one_receipt_records_the_budget_and_tiers(self):
         out = Path(self.tmp.name) / "budget-receipt"

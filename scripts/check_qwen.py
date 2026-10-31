@@ -8,7 +8,8 @@ the internal verify exit 4, the Agent Plugins v1 support
 matrix in full, the Qoder and scoped npm routes, the
 prefixed naming rule with its cancellation exception, the
 shared skills alias with its precedence, the conversion
-fidelity record with runtime invocation left UNVERIFIED,
+fidelity record with runtime invocation verified for
+one scoped OpenRouter shape,
 the bundled CLI version from the primary releases listing,
 and the conditional publication draft with no listing file
 shipped. Decision 4 binds this build like every other
@@ -155,8 +156,14 @@ PINNED = (
      "an installer mirror of the input manifest"),
     ("the installer mirror field sets",
      "three in the round 33 input"),
-    ("the runtime UNVERIFIED",
-     "Runtime invocation stays UNVERIFIED"),
+    ("the runtime scoped proof",
+     "Runtime invocation stands verified for one scoped shape"),
+    ("the runtime proof route",
+     "through the OpenRouter third party route"),
+    ("the runtime proof model",
+     "qwen/qwen3-coder"),
+    ("the runtime proof range",
+     "11 added lines"),
     ("the scoped npm UNTESTED",
      "the scoped npm route is untested"),
     ("the hidden artifact record",
@@ -941,6 +948,12 @@ def qwen_problems(root):
     for name, fragment in PINNED:
         if re.sub(r"\s+", " ", fragment) not in flat:
             problems.append("dropped pin: " + name)
+    if "Runtime invocation stays UNVERIFIED" in flat:
+        problems.append(
+            "the brief carries the stale runtime UNVERIFIED "
+            "wording the live run of 2026-10-29 falsified for "
+            "the one scoped shape the brief now records"
+        )
     problems.extend(derivation_problems(brief))
     problems.extend(negative_problems(brief))
     decisions = read_text(root / "docs" / "decisions.md")

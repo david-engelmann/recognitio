@@ -14,7 +14,7 @@ The package shape and the byte identical skill copy are pinned by the gate on ev
 
 **What is unverified**
 
-No live install of the portable package in an implementing host stands in this brief, so host behaviour beyond the documented format stays unproven here.
+Live installs of the portable package in implementing hosts stand proven on two hosts. The Codex plugin probe installed the package on 2026-10-27 and again on 2026-10-29 and listed it installed and enabled, with the installed skill byte identical to the canonical skill. The Qwen Code run on 2026-10-29 installed the shipped package live and listed it enabled. Host behaviour beyond those installs stays unproven here.
 
 ## Summary
 
