@@ -166,6 +166,19 @@ KNOWN_EXTRACTOR_COPIES = [
 ]
 
 
+def missing_known_placements(known, found):
+    """Known placements a census result does not hold.
+
+    The floor test on the real tree and the deletion test
+    on a scratch tree both read the floor through this
+    helper, so the scratch test exercises the same pin
+    the real tree stands under instead of a floor it
+    builds for itself.
+    """
+    held = set(found)
+    return [rel for rel in known if rel not in held]
+
+
 def unreconciled_skill_copies(classified, copies):
     """Skill copies the classification and the census disagree on.
 
@@ -682,33 +695,51 @@ class TestSeverityVocabulary(unittest.TestCase):
             )
 
     def test_the_census_keeps_every_known_placement(self):
-        for rel in KNOWN_SKILL_COPIES:
-            self.assertIn(rel, SKILL_COPIES)
-        for rel in KNOWN_EXTRACTOR_COPIES:
-            self.assertIn(rel, EXTRACTOR_COPIES)
+        self.assertEqual(
+            missing_known_placements(
+                KNOWN_SKILL_COPIES, SKILL_COPIES
+            ),
+            [],
+        )
+        self.assertEqual(
+            missing_known_placements(
+                KNOWN_EXTRACTOR_COPIES, EXTRACTOR_COPIES
+            ),
+            [],
+        )
 
     def test_deleting_an_extractor_copy_breaks_the_floor(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            seat = root / ".agents" / "skills" / "recognitio"
-            (seat / "scripts").mkdir(parents=True)
-            extractor_rel = (
-                ".agents/skills/recognitio/scripts/extract.py"
-            )
-            planted = seat / "scripts" / "extract.py"
-            planted.write_text(
-                read(
-                    ".agents/skills/recognitio/scripts/extract.py"
+            for rel in KNOWN_EXTRACTOR_COPIES:
+                target = root / rel
+                target.parent.mkdir(
+                    parents=True, exist_ok=True
+                )
+                target.write_text(
+                    read(
+                        ".agents/skills/recognitio/"
+                        "scripts/extract.py"
+                    ),
+                    encoding="utf-8",
+                )
+            self.assertEqual(
+                missing_known_placements(
+                    KNOWN_EXTRACTOR_COPIES,
+                    extractor_copies(root),
                 ),
-                encoding="utf-8",
+                [],
             )
-            floor = {extractor_rel}
-            self.assertLessEqual(
-                floor, set(extractor_copies(root))
+            deleted_rel = (
+                ".comate/skills/recognitio/scripts/extract.py"
             )
-            planted.unlink()
-            self.assertFalse(
-                floor <= set(extractor_copies(root))
+            (root / deleted_rel).unlink()
+            self.assertEqual(
+                missing_known_placements(
+                    KNOWN_EXTRACTOR_COPIES,
+                    extractor_copies(root),
+                ),
+                [deleted_rel],
             )
 
     def test_a_utf16_severity_surface_is_seen_by_the_scan(self):
