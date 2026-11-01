@@ -13,10 +13,13 @@ import { test, expect, mock } from "claude-code/testing";
 const VERIFIED = JSON.stringify({ verified: true, files: [] });
 const UNVERIFIED = JSON.stringify({ verified: false, files: [] });
 
-function stubManifest(on: any, body: string) {
-  on("fs.read", ($: any, e: any) => ({
-    value: e.path.endsWith("manifest.json") ? body : "",
-  }));
+function stubManifest(on: any, body: string, dir = "/packet") {
+  on("fs.read", ($: any, e: any) => {
+    if (e.path !== dir + "/manifest.json") {
+      return { deny: "no such file" };
+    }
+    return { value: body };
+  });
 }
 
 function stubEngineSpawn(on: any) {
@@ -74,6 +77,32 @@ test("a verified flag that is not true denies the spawn", async ($, on) => {
   const result: any = await $.agent.spawn(event);
   expect(typeof result.deny).toBe("string");
   expect(result.deny).toContain("not verified");
+});
+
+test("a manifest naming one top level key twice denies the spawn", async ($, on) => {
+  mock.env(on, { RECOGNITIO_PACKET_DIR: "/packet" });
+  stubManifest(on, '{"verified": false, "verified": true}');
+  stubEngineSpawn(on);
+  const result: any = await $.agent.spawn(event);
+  expect(typeof result.deny).toBe("string");
+  expect(result.deny).toContain("not verified");
+});
+
+test("a manifest naming a key twice at any level denies the spawn", async ($, on) => {
+  mock.env(on, { RECOGNITIO_PACKET_DIR: "/packet" });
+  stubManifest(on, '{"verified": true, "meta": {"a": 1, "a": 2}}');
+  stubEngineSpawn(on);
+  const result: any = await $.agent.spawn(event);
+  expect(typeof result.deny).toBe("string");
+  expect(result.deny).toContain("not verified");
+});
+
+test("a verified packet in another directory lets the spawn through", async ($, on) => {
+  mock.env(on, { RECOGNITIO_PACKET_DIR: "/other-packet" });
+  stubManifest(on, VERIFIED, "/other-packet");
+  stubEngineSpawn(on);
+  const result: any = await $.agent.spawn(event);
+  expect(result).toEqual({ model: "stub-model" });
 });
 
 test("a packet directory with a trailing slash still gates", async ($, on) => {

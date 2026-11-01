@@ -2539,6 +2539,211 @@ This unreleased work carries version 1.3.0.
   order in a catch up written for this landing, and
   closes with this landing itself, so the chronicle
   stands current at the head it lands on.
+- The mod gate pins were hardened against the spellings
+  the red team indicted. The gate reads the hooks module
+  with its comments stripped and requires the exact
+  literal `RECOGNITIO_PACKET_DIR` at every environment
+  call site, and it refuses an options object at every
+  file read call site in the call, in one of its
+  branches, in parentheses inside the call, behind a
+  name bound to an object
+  literal in any spelling, with a top level binding
+  counting wherever it stands and a local one in its
+  written order, behind a member holding one, behind
+  the return value of a local helper, behind a member
+  of a call result, behind a getter, behind a value
+  bound by a catch clause where its try block throws an
+  object the walk traces, behind an object produced by
+  a rest destructuring of an object literal, or behind a
+  parameter its own call sites feed an object, and it
+  refuses any argument count but one at the read,
+  where spaced, commented,
+  parenthesized and indirect spellings previously
+  passed while the host refused or mishandled them.
+  The gate judges each receiver spelling as written
+  and refuses a computed or optional member access on
+  $ itself, on $.env or $.fs, or on the method, in a
+  bracket member in any key spelling, an optional
+  chain step or an optional call step, with the exact
+  literal standing in the fixture and the correct path
+  beside it, where those spellings previously passed
+  the gate while the host refused them at load. The
+  gate reads an identifier escape in a member name
+  as the plain name it spells, so an escaped noun or
+  method stands judged as that member, with a slash
+  judged by the previous significant token, by the
+  kind of the bracket it stands inside, and by the
+  wider facts the grammar decides from beyond the
+  previous token, the construct a colon stands in,
+  the number a dot closes, the position a function
+  or class word stands in, and a line terminator
+  after the return word or the yield word, in every walk
+  the gate makes, proven on a
+  division chain after a postfix step, behind a regex
+  literal after a keyword that expects an expression,
+  behind a regex literal standing as the body of a
+  control head, on a division chain headed by an
+  object literal, and on the colon, number dot,
+  expression standing, line terminator and nested
+  template positions, with every walk reading a
+  template with its interpolations as nested ranges
+  and its text inert, and an escape
+  spelling a character that cannot stand in an
+  identifier where it stands is left undecoded and
+  judged as written, and it refuses
+  a $ called on its own in a plain call or an optional
+  call spelling. The registration, catch and deny pins
+  read the stripped code structurally and judge every
+  registration in the register flow for reachability,
+  singleness and the gating handler it registers, with
+  a named catch handler judged by its binding as at
+  the registration call and every exit of it counting
+  as an outcome, so a comment
+  carrying the registration spellings and a catch
+  handler holding the deny word in a string certify
+  nothing, and a handler written as an arrow or a
+  function expression returning the deny shape passes.
+  The gate also refuses a module that
+  binds $ itself to another name, and a $ passed other
+  than as a bare
+  argument to a parameter named $, spread, returned,
+  interpolated or read as a value. A comment quoting a call
+  shape no longer trips the pins, and neither does a
+  call shape quoted inside a string, a template or a
+  regex literal. The file read pin
+  does not judge an options object the walk does not
+  trace, one produced by a branch, a call, a
+  constructor, a member walk, a container or an await
+  step, at the call itself or behind a bound name,
+  and those
+  shapes pass the pin and fail closed at runtime. The module reads a
+  manifest that names one key twice at any level as
+  unverified, matching the refusal the packet gate
+  stamps on the same bytes, and the host side manifest
+  stub now answers only the exact manifest path the
+  configured packet directory names.
+- The mod gate's divergent readings stand consolidated
+  on the disciplines the gate already held. The register
+  flow and the handler outcome walk now read one
+  completion calculus, so a registration after a flow
+  closed by an unconditional throw, by an if and an else
+  whose branches both return, by a returning catch or by
+  a switch whose clauses all return is refused, a
+  registration in a finally block after a returning try
+  and a registration in a later comma separated segment
+  of a statement stand reached, and a catch handler that
+  can only return inside an endless loop or an all
+  returning switch is no longer refused for falling off
+  the end of its body. The binding reading now counts a
+  destructuring assignment or declaration for the catch
+  handler name, the gating handler name and the deny
+  name alike, and a deny name is judged by every value
+  it can hold when the handler runs, read from the
+  bindings that run at load and in the handler in their
+  written order, never from the last assignment standing
+  anywhere in the module text. The gating calls are
+  judged as call sites in code position outside every
+  literal span in the handler's own code and the code of
+  the functions it reaches through bare local calls, so a
+  call spelling quoted in a string or a template text or
+  standing in a nested function the handler never calls
+  certifies nothing, a function invoked at the very
+  site where it stands counts as the handler's own code,
+  and a gating handler delegating
+  through two levels of helpers stands judged as gating.
+  A return followed by a line terminator reads as the
+  bare return it is, a helper chain of any depth carries
+  the deny shape where every outcome of every helper
+  denies, a computed key whose template interpolations
+  are string literals spelling the deny name counts, a
+  fallback whose first side carries the deny shape
+  counts, and the file read walk traces a rest
+  destructuring of a name bound to an object literal the
+  way it traces one of the literal itself.
+- The consolidation's own reviews found five further
+  divergences in the same families, and the lane repaired
+  them before landing. The completion calculus now reads
+  a labelled statement as the statement it labels, so a
+  registration after a labelled closing block, throw or
+  if is refused and a deny name bound after a labelled
+  return in the register function counts for nothing. A
+  function declaration now orders at its scope's
+  instantiation in the binding reading, so a rebinding
+  standing before the declaration in the module text is
+  the binding in force for the catch handler name and
+  the gating handler name alike, and a destructuring in
+  any declarator of a declaration is collected. The deny
+  name scan now counts the values the gating handler of
+  the same registration and the functions it reaches can
+  bind on the spawn path as values the name can hold,
+  runs the functions the catch handler itself reaches
+  as part of its own run, and judges a name bound by a
+  catch clause by the throws of that clause's try block.
+  A gating callee now counts only where the call that
+  reaches it stands reached in its own unit's flow, and
+  the two reads count only where they stand in a reached
+  unit with their sequence still open, so a helper called
+  only on a governed branch and calls standing after a
+  closing return certify nothing. A nullish fallback
+  whose first side carries the deny shape counts the way
+  its truthy sibling does.
+- The Codex embedding loss disclosure in the README and
+  the Codex plugin brief now states the size AGENTS.md
+  stands at on this stack and the bytes past the cap
+  that follow from it, the figures the earlier stack
+  entries left stale as the file grew.
+- The mod gate's contract stands narrowed to the
+  shipped module's structural family under the decision
+  that followed the lane 8 hard stop. A census in the
+  gate refuses a module carrying a construct outside
+  the family, a labelled statement, a loop whose
+  condition reads no state the module holds, a function
+  declaration standing after a statement no semicolon
+  ends, a handler name declared under const or let
+  inside a block, a destructuring pattern standing
+  after the first declarator of its declaration, a
+  delete operator, a write through a member of an
+  object, a call that writes into an object, or the
+  Proxy constructor, and the lane 8 unifications judge
+  the contract inside the family as before. The six
+  certification holes the lane 8 repair red team proved
+  against the broad claim stand as regression tests
+  whose required verdict is the family refusal, and two
+  tests priced under the broad claim, the labelled
+  block that falls and the catch handler returning in
+  an endless loop, stand re-priced as refusals with
+  their reasons on their faces. The brief states the
+  family in its own section and the reason the broad
+  claim was dropped.
+- The Codex embedding loss disclosure in the README and
+  the Codex plugin brief now states the size AGENTS.md
+  stands at with the family census entry in its gate
+  paragraph and the bytes past the cap that follow from
+  it.
+- The narrowed mod gate census now reads the constructs
+  its enumeration names in their sibling spellings, a
+  function declaration standing after a regex literal
+  or after a member call whose name spells a control
+  word, a handler name declared inside a class body or
+  a static block, a destructuring declarator standing
+  behind the in operator, and a deny object emptied
+  through a bracket member write, a bracket spelling
+  of a writing call, a member target in a destructuring
+  assignment or a for head, or a call to eval or the
+  Function constructor, and a method named delete or
+  Proxy now stands as the member name it is, and a
+  handler name standing alone inside brackets now
+  draws the family refusal. Seven shapes stand named
+  in the brief as residuals of the narrowed contract,
+  a loop condition constant in fact but not in
+  spelling, a bare local call that never returns, a
+  write call through a receiver whose identity the
+  census does not judge, a write standing as a
+  sequence clause in a returned value, a handler
+  standing under an export alias, a call to eval
+  reached through a member chain, and a regex spelled
+  inside a template hole, and with this landing the
+  mod gate programme closes.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

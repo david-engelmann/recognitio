@@ -71,10 +71,13 @@ and the headless gate at `scripts/check_headless.py` reads the
 whole captured envelope against the packet the manifest belongs
 to and the exit file the invocation names. The mod contract check pins
 the `hooks/` module list, the `agent.spawn` hook with its `.catch`
-deny handler, the literal environment name and the path only
+deny handler, the literal environment name, the plain dot
+receiver spelling and the path only
 file read at the module's call sites, the struck `onFailure`
 language and the withdrawn
-`--mod` flag, the mods API allowlist, and the brief's stated
+`--mod` flag, the mods API allowlist, the structural family
+census that refuses a module carrying a construct outside the
+shipped module's structural family, and the brief's stated
 limits. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
 the results file, the per pass notes and the corpus index, and
@@ -177,13 +180,14 @@ not a gate.
   marketplace listing for a setup that wants the spawn gate
   without the skill bundle. Its manifest stands at
   `plugins/recognitio-mod/.claude-plugin/plugin.json`, its
-  README stands in the folder, its icon stands under
-  `plugins/recognitio-mod/assets/` as a copy of the brand icon
-  the manifest names in its icon field, and its hooks folder carries
+  README stands in the folder, and its hooks folder carries
   byte identical copies of every file under `hooks/` beside
   a byte identical copy of the root LICENSE, pinned by the
-  gate at `scripts/check_mod.py`. The entry and the discovery fields
-  of both Claude manifests are pinned by the gate at
+  gate at `scripts/check_mod.py`. Its icon stands under
+  `plugins/recognitio-mod/assets/` as a copy of the brand icon
+  the manifest names in its icon field. The entry and the
+  discovery fields of both Claude manifests, the mod icon
+  among them, are pinned by the gate at
   `scripts/check_discovery.py`.
 - `agent-plugins-package/` holds the Build 8 portable package,
   the closed schema manifest at
@@ -1004,3 +1008,40 @@ set, restating the claims form residuals the final
 certification named and recording its own arrival here,
 so the chronicle stands current at the head it lands
 on.
+A repair pass the same day then hardened the mod gate
+against the shapes its red team had indicted. The gate
+now reads the module with its comments stripped,
+requires the exact literal RECOGNITIO_PACKET_DIR at
+every environment call site with nothing joined onto
+it, and refuses an options object at every file read
+call site in the call, in parentheses inside the call,
+or behind a name bound to an object literal in any
+spelling, with a top level binding counting wherever
+it stands and a local one in its written order, where
+the spaced, commented, parenthesized
+and indirect spellings had passed while the host
+refused or mishandled them. The gate also refuses a
+module that binds $ itself to another name, where the
+host requires the $. spelling at every call site. The
+module now reads a manifest that
+names one key twice at any level as unverified, and the
+kit manifest stub answers only the exact manifest path
+the configured packet directory names, so the
+truthiness and hardcoded path mutants both fall in
+both test suites.
+A further repair pass then closed the receiver
+spelling hole the re-review of that hardening found.
+The gate now judges each call receiver as written,
+before member spellings are normalised, and refuses
+a computed or optional member access on $ itself, on
+$.env or $.fs, or on the method, in a bracket member
+in any key spelling, an optional chain step or an
+optional call step, at the environment call and the
+file read alike, where those spellings had passed
+with the exact literal and the correct path while
+the host refused them at load. The two suite fixtures
+that had masked the hole were rebuilt so each varies
+only the receiver spelling, and the brief now
+enumerates the pins exactly, naming the provenance
+shapes the file read walk does not judge as outside
+the promise the pin makes.

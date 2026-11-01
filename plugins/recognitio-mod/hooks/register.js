@@ -4,9 +4,13 @@
 // hook reads the review packet manifest named by RECOGNITIO_PACKET_DIR
 // and denies the spawn unless the manifest reads verified. A hook
 // crash fails closed through the .catch handler, which returns the
-// deny shape for agent.spawn. Decision 4 binds the mod like every
-// other build, so the hook applies the shipped deterministic rule,
-// the manifest verified flag, and never a model judgment.
+// deny shape for agent.spawn. A manifest that names one key twice
+// at any level does not read as verified. That is the same refusal the
+// packet gate's strict reader stamps on those bytes, so a last
+// value in the file cannot win a flag an earlier value refused.
+// Decision 4 binds the mod like every other build, so the hook
+// applies the shipped deterministic rule, the manifest verified
+// flag, and never a model judgment.
 //
 // The call sites follow the shapes the host validates and runs.
 // The environment read names its variable as a string literal,
@@ -26,9 +30,55 @@
 // That second layer fail open is a recorded limit, not a surprise.
 // See docs/mod-build7.md for the full brief.
 
+function hasRepeatedKey(text) {
+  const stack = [];
+  let index = 0;
+  while (index < text.length) {
+    const char = text[index];
+    if (char === '"') {
+      const start = index;
+      index += 1;
+      while (index < text.length && text[index] !== '"') {
+        if (text[index] === "\\") {
+          index += 1;
+        }
+        index += 1;
+      }
+      index += 1;
+      let next = index;
+      while (next < text.length && /\s/.test(text[next])) {
+        next += 1;
+      }
+      if (text[next] === ":") {
+        const frame = stack[stack.length - 1];
+        if (frame instanceof Set) {
+          const key = JSON.parse(text.slice(start, index));
+          if (frame.has(key)) {
+            return true;
+          }
+          frame.add(key);
+        }
+      }
+      continue;
+    }
+    if (char === "{") {
+      stack.push(new Set());
+    } else if (char === "[") {
+      stack.push(null);
+    } else if (char === "}" || char === "]") {
+      stack.pop();
+    }
+    index += 1;
+  }
+  return false;
+}
+
 async function packetIsVerified($, packetDir) {
   const manifestPath = packetDir.replace(/\/+$/, "") + "/manifest.json";
   const text = await $.fs.read(manifestPath);
+  if (hasRepeatedKey(text)) {
+    return false;
+  }
   const manifest = JSON.parse(text);
   return (
     manifest !== null &&
