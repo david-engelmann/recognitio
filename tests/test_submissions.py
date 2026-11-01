@@ -443,10 +443,10 @@ class TestCheckSubmissions(unittest.TestCase):
             or "demo" in largest[1], largest)
         self.assertEqual(
             stated(
-                r"tests/test_gate_scripts\.py at ([\d,]+) bytes"),
+                r"scripts/check_mod\.py at ([\d,]+) bytes"),
             format(largest_plain[0], ","))
         self.assertEqual(largest_plain[1],
-                         "tests/test_gate_scripts.py")
+                         "scripts/check_mod.py")
         self.assertEqual(
             int(stated(r"scan over all (\d+) tracked files")),
             len(listed))

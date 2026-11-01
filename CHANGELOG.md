@@ -2744,6 +2744,14 @@ This unreleased work carries version 1.3.0.
   reached through a member chain, and a regex spelled
   inside a template hole, and with this landing the
   mod gate programme closes.
+- The Claude submission pack's largest plain file
+  figure is restated at its measured size on the
+  landed tree. The census growth in the mod gate
+  landing made scripts/check_mod.py the largest file
+  that is not an image or a font at 284,427 bytes,
+  past tests/test_gate_scripts.py, and the pack, its
+  gate pin and its test now name the measured file
+  and figure.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are
