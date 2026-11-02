@@ -220,6 +220,7 @@ CLASSIFIED = {
     "scripts/check_fanout.py": "validates",
     "scripts/check_headless.py": "validates",
     "scripts/merge_to_headless.py": "carries validated values only",
+    "scripts/check_submissions.py": "validates",
     "AGENTS.md": "chronicle record",
     "CHANGELOG.md": "chronicle record",
     "docs/reviews/round11-fix-review.md": "report record",

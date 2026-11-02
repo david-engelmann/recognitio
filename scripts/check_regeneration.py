@@ -1266,6 +1266,28 @@ def git(repo, *args, env_extra=None):
 
 
 def write_mapping(repo, mapping):
+    # Every key is screened before the deletion pass and before
+    # any parent directory is created, under the same rule the
+    # eval gate screens its fixture keys with, loaded from the
+    # sibling gate the way this gate already loads it for the
+    # eval class. A key that names the git directory hands the
+    # fixture its own configuration, so a planted clean filter
+    # in a sources mapping would run under the gate's own git
+    # add, and a parent segment writes outside the fixture
+    # outright. A crafted mapping therefore writes nothing at
+    # all rather than writing the safe entries and escaping on
+    # a later one.
+    try:
+        eval_gate = load_sibling("check_evals")
+    except (OSError, ValueError, ImportError) as exc:
+        raise AssertionError(
+            "the eval gate module cannot be loaded with %s, so "
+            "the proof mapping keys cannot be screened" % exc
+        )
+    for name in mapping:
+        problem = eval_gate.fixture_key_problem(name)
+        if problem is not None:
+            raise AssertionError(problem)
     for child in list(repo.iterdir()):
         if child.name == ".git":
             continue

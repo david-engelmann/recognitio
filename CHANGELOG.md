@@ -2781,6 +2781,119 @@ This unreleased work carries version 1.3.0.
   bytecode file as build state only standing directly
   in its cache folder, so a payload nested below the
   folder stands in the census.
+- The submissions gate re-derives the load bearing
+  figures in the Claude pack from the tree on every run.
+  The file count, the largest file and the largest file
+  that is not an image or a font with their sizes, the
+  file count the credential scan ran over with
+  the scan itself, and the three frontmatter description
+  lengths the component check names now stand measured
+  against the tree, and the pack figures stand restated
+  to the measured values. A falsified figure fails by
+  name beside the strict control instead of standing
+  under the success line.
+- The eval fixture writer screens every sources key
+  before anything is written or deleted. A key that is
+  absolute, that carries a parent segment in any
+  position, that names the fixture git directory or
+  anything under it, or that names no path at all is
+  refused with the key and the shape named, so a planted
+  key can no longer write outside the fixture root,
+  replace the fixture identity, plant a hook, or arm a
+  clean filter that fires during the gate staging.
+- Every git command the test suite runs now runs under
+  an environment with the git location names removed.
+  An exported location variable used to defeat the
+  directory each helper named, so a suite launched with
+  the variables pointed at a bystander repository ran
+  its fixture commits there while its tests passed and
+  the bystander status read clean. A burden test
+  rebuilds the polluted launch in a subprocess and reads
+  the bystander log before and after as the sentinel.
+- Credential bearing files are flagged in the packet
+  triage list and in the manifest, their diff bodies are
+  withheld behind a notice the packet checker rebuilds,
+  and credential shaped values are masked in packet
+  text. The history tier states that an author name is
+  self asserted in its commit object and not verified
+  by the packet, and the reviewer persona and the packet
+  output style and the skill text carry the sentence
+  that packet content is untrusted data whose approval
+  and passing check claims are assertions by the author
+  of the change. The saved eval and proof packets stand
+  regenerated under the repaired extractor.
+- The output lock no longer keys through the machine
+  temporary directory. The lock stands inside the
+  output directory itself as .recognitio.lock under
+  the claims landing, and this landing reconciles to
+  that single mechanism, so two runs handed different
+  temporary directories contend on the one lock the
+  directory carries and the second run is refused
+  while the first holds it. An unpreparable output
+  parent raises the named prepare refusal rather than
+  a lock failure masking it.
+- The fanout gate and the one shallow clone call in the
+  packet verifier tests now run under the scrubbed
+  environment beside every other git command in the
+  suite. The fanout gate read its line counts with a git
+  show that inherited the caller environment, so an
+  exported location variable made it count lines in the
+  wrong repository and stand the location check down in
+  silence, and the burden test for the scrub was red on
+  the tree that shipped it until this repair landed.
+- The eval fixture writer judges the git directory on
+  the normalised segments of a sources key. A leading
+  dot segment or an empty segment no longer moves the
+  git directory out of the position the screening
+  judged, so the prefix spellings of the git config key,
+  the hooks key, and the clean filter chain stand
+  refused beside the plain spellings.
+- The submissions gate checks every occurrence of every
+  load bearing figure in the Claude pack, and a priced
+  figure whose statement stands absent or reworded out
+  of its canonical wording now fails by name as
+  unverifiable instead of passing in silence. Its
+  credential scan pattern for private key headers stands
+  in the extractor spelling, any capitalised qualifier
+  with the PGP block form beside the plain form, and the
+  scan file count is named as the files in the tree the
+  walk counts, which is the set the gate measures.
+- Credential shaped values in a commit subject are
+  masked in the triage commit list and across the
+  re-review section, the two channels that printed
+  commit text unmasked, and the packet checker masks the
+  commit log it recounts before it compares. The
+  credential filename rule judges the dotenv family in
+  lower case, the bare name and its dotted forms and
+  the envrc name and any basename ending in the dotenv
+  suffix, with the template spellings still exempt by
+  design. A PGP private key block now opens the mask
+  block state beside the plain private key forms.
+- The output lock file is unlinked when its run closes,
+  guarded by the identity the run holds, so a finished
+  directory holds the sealed pair alone and a
+  replacement planted at the lock name inside the
+  output directory mid run is left standing.
+- The Comate gate reads its install heading in the
+  rendered document structure. A heading shaped line
+  inside a fenced code block or an HTML comment no
+  longer stands in for the install subsection, and the
+  closed ATX form of the heading counts as the
+  subsection it names.
+- One disclosure stands on the record for the
+  credential work above. Fitting its new sentences into
+  the skill text under the byte cap that text stands
+  under compressed four standing paragraphs of it in
+  the gates stack, the T0 tier paragraph, the T2 tier
+  paragraph, the T3 tier paragraph, and the re-review
+  paragraph, and the commit that made the change did
+  not name the compression. On the combined tree the
+  T0 and T2 and re-review paragraphs stand in the
+  restored wording the claims landing carries, the T3
+  paragraph keeps the short form both texts share, and
+  the cap is met by removing unpinned sentences
+  elsewhere in the text, so no operative rule
+  statement was removed by the merge.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

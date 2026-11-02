@@ -1117,6 +1117,11 @@ def recount_problems(repo, manifest, extractor):
         "hunks", "binary", "attribute_text", "binary_transition",
         "placeholder", "instruction_file",
     )
+    # The credential flag arrived after packets already stood
+    # recorded, so a record that carries it nowhere reads as
+    # false here rather than as drift, in the same legacy shape
+    # the eval gate grants the instruction flag. A record that
+    # carries it is compared in full.
     for path in sorted(set(recorded_by_path) & set(fresh_by_path)):
         mine = recorded_by_path[path]
         theirs = fresh_by_path[path]
@@ -1126,6 +1131,12 @@ def recount_problems(repo, manifest, extractor):
                     "the manifest record for %s disagrees with the "
                     "recount on %s" % (path, field)
                 )
+        if mine.get("credential_file", False) != \
+                theirs.get("credential_file", False):
+            problems.append(
+                "the manifest record for %s disagrees with the "
+                "recount on credential_file" % path
+            )
     if [entry["path"] for entry in recorded] != \
             [entry["path"] for entry in fresh_records]:
         if not problems:
@@ -1347,7 +1358,7 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
         if not line.startswith("- "):
             continue
         match = re.match(
-            r"^- (.+) \((%s)(, instruction file)?"
+            r"^- (.+) \((%s)(, instruction file)?(, credential file)?"
             r"(, (renamed|copied) from (.+))?\)$" % "|".join(STATUS_NAMES),
             line,
         )
@@ -1361,8 +1372,9 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             match.group(1),
             match.group(2),
             bool(match.group(3)),
-            match.group(5),
+            bool(match.group(4)),
             match.group(6),
+            match.group(7),
         ))
     expected = []
     for entry in manifest["files"]:
@@ -1370,6 +1382,7 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             display_path(entry["path"]),
             entry["status"],
             entry["instruction_file"],
+            entry.get("credential_file", False),
             (
                 "copied" if entry["status"] == "copied" else "renamed"
             ) if entry["old_path"] else None,
@@ -1445,6 +1458,14 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             commit_text = fresh_change["commit_log"].rstrip()
             if not commit_text:
                 commit_text = "(no commits)"
+            if hasattr(extractor, "mask_credential_text"):
+                # The triage tier masks credential shaped values
+                # in its commit list as it is built, so the
+                # recount compares against the masked spelling
+                # of the same commit log.
+                commit_text = extractor.mask_credential_text(
+                    commit_text
+                )
             if "\n".join(block) != commit_text:
                 problems.append(
                     "the triage commit list disagrees with the "
@@ -1646,6 +1667,26 @@ def change_tier_problems(packet_text, manifest, fresh_change, extractor):
                         % entry["path"]
                     )
             continue
+        if entry.get("credential_file"):
+            # A credential bearing file carries the extractor
+            # notice in place of its diff, rebuilt here through
+            # the extractor helper so the two spellings of the
+            # rule cannot drift apart. A packet that prints the
+            # diff of such a file, or a notice with counts its
+            # record does not name, fails on this reading alone
+            # and never reaches the recount comparison below.
+            expected_notice = None
+            if extractor is not None and hasattr(
+                extractor, "credential_notice"
+            ):
+                expected_notice = extractor.credential_notice(entry)
+            if expected_notice is None or inner_text != expected_notice:
+                problems.append(
+                    "the change tier body for %s is not the "
+                    "credential notice its manifest record names"
+                    % entry["path"]
+                )
+            continue
         problems.extend(diff_header_wording_problems(entry, inner))
         if "@@ " in inner_text or any(
             line.startswith("@@ ") for line in inner
@@ -1686,6 +1727,13 @@ def change_tier_problems(packet_text, manifest, fresh_change, extractor):
             expected_inner = (
                 chunk.rstrip() if chunk.strip() else "(no textual diff)"
             )
+            if hasattr(extractor, "mask_credential_text"):
+                # The change tier masks credential shaped values
+                # as it is built, so the recount compares against
+                # the masked spelling of the same chunk.
+                expected_inner = extractor.mask_credential_text(
+                    expected_inner
+                )
             if inner_text != expected_inner:
                 problems.append(
                     "the diff body for %s disagrees with the "

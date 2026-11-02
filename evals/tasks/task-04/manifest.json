@@ -4,18 +4,18 @@
   "command": [
     "extract.py",
     "--repo",
-    "/tmp/tmpvjdm3fgz/repo",
+    "/tmp/tmpl6fteenf/repo",
     "--range",
-    "36e25ec0a6d2b262bc3f51c2b66079015967918a..23fc78ec9267c4bcd8fa6d36a6973d15e0ff6e30",
+    "48e7de6a3026e7074bcc733f1b210796331d3c14..c0d80a5df82a467ba1ea35fbc3b9528511fc29d2",
     "--out",
-    "/tmp/tmpvjdm3fgz/out"
+    "/tmp/tmpl6fteenf/out"
   ],
-  "created_utc": "2026-10-28T00:07:23.631969+00:00",
+  "created_utc": "2026-10-31T00:25:12.028498+00:00",
   "mode": "range",
-  "label": "range 36e25ec0a6d2b262bc3f51c2b66079015967918a..23fc78ec9267c4bcd8fa6d36a6973d15e0ff6e30",
-  "base": "36e25ec0a6d2b262bc3f51c2b66079015967918a",
-  "head": "23fc78ec9267c4bcd8fa6d36a6973d15e0ff6e30",
-  "merge_base": "36e25ec0a6d2b262bc3f51c2b66079015967918a",
+  "label": "range 48e7de6a3026e7074bcc733f1b210796331d3c14..c0d80a5df82a467ba1ea35fbc3b9528511fc29d2",
+  "base": "48e7de6a3026e7074bcc733f1b210796331d3c14",
+  "head": "c0d80a5df82a467ba1ea35fbc3b9528511fc29d2",
+  "merge_base": "48e7de6a3026e7074bcc733f1b210796331d3c14",
   "since": null,
   "pr": null,
   "files": [
@@ -31,7 +31,8 @@
       "attribute_text": false,
       "binary_transition": false,
       "placeholder": null,
-      "instruction_file": false
+      "instruction_file": false,
+      "credential_file": false
     }
   ],
   "exclusions": [],
@@ -66,8 +67,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 337,
-      "emitted_tokens": 337,
+      "estimated_tokens": 407,
+      "emitted_tokens": 407,
       "files": 1
     }
   },
@@ -80,7 +81,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1189,
+    "estimated_tokens": 1260,
     "dropped": []
   },
   "cap_notes": [],

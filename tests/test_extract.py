@@ -106,9 +106,34 @@ def test_alpha():
 '''
 
 
+# The git location variables are scrubbed from the environment
+# every fixture command runs under. An exported GIT_DIR defeats
+# git -C, so a suite launched with the variables set would run
+# its fixture work in the repository they name instead of in
+# the fixture, writing real commits there under passing tests.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def scrubbed_git_env():
+    """The caller environment with the git location names removed."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+
 def git(repo, *args):
     result = subprocess.run(
         ["git", "-C", str(repo)] + list(args),
+        env=scrubbed_git_env(),
         capture_output=True,
         text=True,
     )
@@ -818,6 +843,7 @@ class TestShallowAndRootCommits(unittest.TestCase):
                 ["git", "clone", "-q", "--depth", "1",
                  "file://" + str(src), str(shallow)],
                 check=True, capture_output=True, text=True,
+                env=scrubbed_git_env(),
             )
             out = Path(tmp) / "out"
             result = run_extract_cli(shallow, out, "--commit", "HEAD")
@@ -4815,7 +4841,7 @@ class TestOutputPathDiscipline(unittest.TestCase):
         clone = subprocess.run(
             ["git", "clone", "--depth", "1",
              "file://%s" % self.repo, str(shallow)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         self.assertEqual(clone.returncode, 0, clone.stderr)
         out = self.make_receipt_dir("shallow-out")

@@ -1,14 +1,14 @@
-# The pericope for range 6be34155f512b258ae6997c7e37b59b075037fb5..f170c7ef2ef862e8c99454b8e9d1b7d3460d9868
+# The pericope for range bcc5630c50c8d2288132d2c3d9874ff29f0823f6..90c57f7d9b9ebc4a1a830b0fc4c01025a1b1d6fd
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 6be34155f512b258ae6997c7e37b59b075037fb5
+Base: bcc5630c50c8d2288132d2c3d9874ff29f0823f6
 
-Head: f170c7ef2ef862e8c99454b8e9d1b7d3460d9868
+Head: 90c57f7d9b9ebc4a1a830b0fc4c01025a1b1d6fd
 
-Merge base: 6be34155f512b258ae6997c7e37b59b075037fb5
+Merge base: bcc5630c50c8d2288132d2c3d9874ff29f0823f6
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-f170c7e head
+90c57f7 head
 ```
 
 ## T1 The change
@@ -114,12 +114,14 @@ No definitions of the changed names were found outside the changed files.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### book.py
 
 ```
-Eval Fixture f170c7ef lines 1
+Eval Fixture 90c57f7d lines 1
 ```
 
 ### Recent evolution of changed functions
@@ -127,7 +129,7 @@ Eval Fixture f170c7ef lines 1
 #### total in book.py
 
 ```
-commit f170c7e head
+commit 90c57f7 head
 
 diff --git a/ledger.py b/book.py
 --- a/ledger.py
@@ -137,7 +139,7 @@ diff --git a/ledger.py b/book.py
      subtotal = sum(items)
 -    return subtotal
 +    return subtotal + subtotal
-commit 6be3415 base
+commit bcc5630 base
 
 diff --git a/ledger.py b/ledger.py
 --- /dev/null
@@ -162,7 +164,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1309
+Packet estimate in tokens: 1379
 
 T0 included at about 71 tokens across 1 files
 
@@ -170,7 +172,7 @@ T1 included at about 153 tokens across 1 files
 
 T2 included at about 257 tokens across 1 files
 
-T3 included at about 353 tokens across 1 files
+T3 included at about 424 tokens across 1 files
 
 No tier was dropped.
 

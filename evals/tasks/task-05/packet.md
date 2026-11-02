@@ -1,14 +1,14 @@
-# The pericope for range 0f20f931365b5c95fad8c58a66a66480f7ee0d5d..89aa079ea476007460912101d86d92d911a18bae
+# The pericope for range ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b..6a801671813a078baa4170001acc8964cc712061
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 0f20f931365b5c95fad8c58a66a66480f7ee0d5d
+Base: ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b
 
-Head: 89aa079ea476007460912101d86d92d911a18bae
+Head: 6a801671813a078baa4170001acc8964cc712061
 
-Merge base: 0f20f931365b5c95fad8c58a66a66480f7ee0d5d
+Merge base: ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-89aa079 head
+6a80167 head
 ```
 
 ## T1 The change
@@ -145,18 +145,20 @@ No definitions of the changed names were found outside the changed files.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### page.py
 
 ```
-Eval Fixture 89aa079e lines 2
+Eval Fixture 6a801671 lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 89aa079e lines 4
+Eval Fixture 6a801671 lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -164,7 +166,7 @@ Eval Fixture 89aa079e lines 4
 #### heading_total in page.py
 
 ```
-commit 89aa079 head
+commit 6a80167 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -173,7 +175,7 @@ diff --git a/page.py b/page.py
  def heading_total(qty, rate):
 -    return add(qty, rate)
 +    return add_tax(qty, rate)
-commit 0f20f93 base
+commit ac5c2c5 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -186,7 +188,7 @@ diff --git a/page.py b/page.py
 #### add in util.py
 
 ```
-commit 89aa079 head
+commit 6a80167 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -196,7 +198,7 @@ diff --git a/util.py b/util.py
      return a + b
 +
 +
-commit 0f20f93 base
+commit ac5c2c5 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -209,7 +211,7 @@ diff --git a/util.py b/util.py
 #### add_tax in util.py
 
 ```
-commit 89aa079 head
+commit 6a80167 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -233,7 +235,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1749
+Packet estimate in tokens: 1819
 
 T0 included at about 79 tokens across 2 files
 
@@ -241,7 +243,7 @@ T1 included at about 261 tokens across 2 files
 
 T2 included at about 315 tokens across 2 files
 
-T3 included at about 619 tokens across 2 files
+T3 included at about 689 tokens across 2 files
 
 No tier was dropped.
 

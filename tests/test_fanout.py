@@ -39,9 +39,34 @@ def load_extractor():
     return module
 
 
+# The git location variables are scrubbed from the environment
+# every fixture command runs under. An exported GIT_DIR defeats
+# git -C, so a suite launched with the variables set would run
+# its fixture work in the repository they name instead of in
+# the fixture, writing real commits there under passing tests.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def scrubbed_git_env():
+    """The caller environment with the git location names removed."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+
 def git(repo, *args):
     result = subprocess.run(
         ["git", "-C", str(repo)] + list(args),
+        env=scrubbed_git_env(),
         capture_output=True,
         text=True,
     )

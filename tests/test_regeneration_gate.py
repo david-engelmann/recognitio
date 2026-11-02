@@ -92,10 +92,35 @@ HASH_A = "4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4"
 HASH_B = "46b418895ebd14a4bfe863d20154bbca0cb25e6d"
 
 
+# The git location variables are scrubbed from the environment
+# every fixture command runs under. An exported GIT_DIR defeats
+# git -C, so a suite launched with the variables set would run
+# its fixture work in the repository they name instead of in
+# the fixture, writing real commits there under passing tests.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def scrubbed_git_env():
+    """The caller environment with the git location names removed."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+
 def clone_tree(tmp):
     dest = Path(tmp) / "tree"
     result = subprocess.run(
         ["git", "clone", "-q", str(ROOT), str(dest)],
+        env=scrubbed_git_env(),
         capture_output=True,
         text=True,
     )
@@ -617,6 +642,7 @@ class ExampleTamperTest(unittest.TestCase):
             ):
                 result = subprocess.run(
                     ["git", "-C", str(tree)] + list(args),
+                    env=scrubbed_git_env(),
                     capture_output=True,
                     text=True,
                 )
@@ -780,6 +806,7 @@ class ExampleTamperTest(unittest.TestCase):
             ):
                 result = subprocess.run(
                     ["git", "-C", str(tree)] + list(args),
+                    env=scrubbed_git_env(),
                     capture_output=True,
                     text=True,
                 )
@@ -1225,6 +1252,63 @@ class EvalTamperTest(unittest.TestCase):
                 ),
                 problems,
             )
+
+
+class ProofMappingScreenTest(unittest.TestCase):
+    def proof_sources(self, base, head=None):
+        return {
+            "author_name": "A U Thor",
+            "author_email": "author@example.invalid",
+            "base_subject": "base",
+            "base_date": "2026-01-01T00:00:00 +0000",
+            "head_subject": "head",
+            "head_date": "2026-01-02T00:00:00 +0000",
+            "base": base,
+            "head": head if head is not None else dict(base),
+        }
+
+    def test_a_planted_clean_filter_in_a_proof_mapping_never_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "filter-ran"
+            config = (
+                "[core]\n\trepositoryformatversion = 0\n"
+                "\tbare = false\n"
+                "[filter \"planted\"]\n"
+                "\tclean = touch %s; cat\n"
+                "\trequired = true\n" % marker
+            )
+            sources = self.proof_sources({
+                "./.git/config": config,
+                ".gitattributes": "*.txt filter=planted\n",
+                "evil.txt": "hello\n",
+            })
+            with self.assertRaises(AssertionError):
+                GATE.build_proof_repo(Path(tmp) / "build", sources)
+            self.assertFalse(marker.exists())
+
+    def test_a_parent_segment_key_in_a_proof_mapping_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sources = self.proof_sources({
+                "ok.txt": "fine\n",
+                "../escaped.txt": "escaped\n",
+            })
+            with self.assertRaises(AssertionError):
+                GATE.build_proof_repo(Path(tmp) / "build", sources)
+            self.assertFalse((Path(tmp) / "escaped.txt").exists())
+            self.assertFalse(
+                (Path(tmp) / "build" / "repo" / "ok.txt").exists())
+
+    def test_a_git_directory_key_in_the_head_mapping_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sources = self.proof_sources(
+                {"ok.txt": "fine\n"},
+                head={".git/config": "[core]\n\tbare = true\n"})
+            with self.assertRaises(AssertionError):
+                GATE.build_proof_repo(Path(tmp) / "build", sources)
+            config = (
+                Path(tmp) / "build" / "repo" / ".git" / "config"
+            ).read_text(encoding="utf-8")
+            self.assertNotIn("bare = true", config)
 
 
 class ProofTamperTest(unittest.TestCase):

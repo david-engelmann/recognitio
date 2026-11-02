@@ -648,6 +648,545 @@ def contradiction_problems(text, surface, beside=None):
     return problems
 
 
+COMATE_HEADING_RE = re.compile(
+    r"^###[ \t]+Comate(?:[ \t]+#+)?[ \t]*$")
+FENCE_OPEN_RE = re.compile(r"(```+|~~~+)(.*)$")
+FENCE_CLOSE_RE = re.compile(r"(```+|~~~+)[ \t]*$")
+
+# Raw text elements whose content a reader never renders as
+# markdown, so a heading line inside one is literal text
+# until the closing tag stands.
+RAW_TEXT_TAGS = {"pre", "script", "style", "textarea"}
+
+# The block level tags of the rendered HTML block family.
+# A block opened by one of them runs until a blank line, and
+# its content lines are HTML rather than markdown, so no
+# heading inside one renders as a heading.
+HTML_BLOCK_TAGS = {
+    "address", "article", "aside", "base", "basefont",
+    "blockquote", "body", "caption", "center", "col",
+    "colgroup", "dd", "details", "dialog", "dir", "div",
+    "dl", "dt", "fieldset", "figcaption", "figure", "footer",
+    "form", "frame", "frameset", "h1", "h2", "h3", "h4",
+    "h5", "h6", "head", "header", "hr", "html", "iframe",
+    "search",
+    "legend", "li", "link", "main", "menu", "menuitem",
+    "nav", "noframes", "ol", "optgroup", "option", "p",
+    "param", "section", "source", "summary", "table",
+    "tbody", "td", "tfoot", "th", "thead", "title", "tr",
+    "track", "ul",
+}
+HTML_TAG_RE = re.compile(r"<(/?)([A-Za-z][A-Za-z0-9]*)\b[^>]*>")
+LIST_MARKER_RE = re.compile(
+    r"(?:[-+*]|[0-9]{1,9}[.)])[ \t]+(.*)$")
+BARE_LIST_MARKER_RE = re.compile(
+    r"([-+*]|[0-9]{1,9}[.)])[ \t]*$")
+LONE_TAG_LINE_RE = re.compile(
+    r"(?:</?[A-Za-z][A-Za-z0-9]*\b[^>]*>\s*)+$")
+
+
+def indent_columns(line):
+    """The rendered indent of a line in columns.
+
+    A space counts one column and a tab counts to the next
+    multiple of four, the reading a renderer gives them, so
+    a space and a tab together carry a line to the fourth
+    column just as four spaces do.
+    """
+    columns = 0
+    for char in line:
+        if char == " ":
+            columns += 1
+        elif char == "\t":
+            columns += 4 - (columns % 4)
+        else:
+            break
+    return columns
+
+
+def comate_subsection_stands(readme):
+    """Whether the Comate heading stands in the rendered document.
+
+    The heading is read in the structure a reader renders.
+    Lines inside a fenced code block and text inside an HTML
+    comment are not headings of the document, so neither can
+    stand in for the subsection, and the closed ATX form,
+    where a run of hash marks closes the heading after a
+    space, names the same subsection as the open form. The
+    separator after the hash marks is any run of spaces or
+    tabs, because a rendered heading allows more than one.
+    A line carried to the fourth column by its indent, by
+    spaces or by a tab or by both together, is an indented
+    code block, because an ATX heading allows at most three
+    columns of indent, and a closing fence indented that far
+    does not close its fence either. A fence line carrying an
+    info string cannot close a fenced block, and a backtick
+    fence line whose info string carries a backtick is no
+    fence at all, so a heading after one stands in the open.
+    The content of an HTML block is not markdown, whether the
+    block is a raw text element running to its closing tag or
+    a block level element running to a blank line, so a
+    heading line inside a div, a details element or a script
+    block stands in no rendered subsection either. The rest
+    of the rendered block family stands beside them. A line
+    holding one complete tag of any other element opens a
+    block running to a blank line in the rendering, as an
+    anchor line placed above a heading does, and a
+    processing instruction block, a declaration block and a
+    CDATA block each run to their own closing marks. A
+    comment block runs to its closing marks across as
+    many lines as it takes and can interrupt a paragraph,
+    and a paragraph line standing after a blockquote line
+    without the quote marker is the blockquote its own
+    paragraph continuing, its lazy continuation, so no
+    paragraph of the outer document stands open after it
+    either. A list stands open across a blank line, and a
+    paragraph line standing in its item at the item its
+    content indent after the blank line is the item its
+    paragraph, closing with the item. A line standing
+    at the fourth column or past it inside an open
+    item, short of four columns past the item its
+    content indent, is the item its content in the
+    rendering and not an indented code block, so a
+    paragraph line there arms the item its paragraph
+    fact in the same way, while a line at that deeper
+    indent inside the item is an indented code block
+    of the item and arms no paragraph fact. The item
+    its content indent is counted in columns in the
+    same way, a tab in the gap after a marker counting
+    to the next multiple of four columns and not as
+    one character, and a gap of five columns or more
+    after a marker counting as one space with the
+    content indent standing one column past the end
+    of the marker, so the window short of four
+    columns past the content indent stands where the
+    rendering puts it. A list item
+    opened by a bare marker standing alone on its line
+    holds the item its content at the marker its content
+    indent in the same way, and a marker carrying a
+    trailing space and no content opens an empty item
+    in the same way, and a block standing outside
+    an item, a comment block or a fenced block among
+    them, closes the item its lazy continuation, so a
+    paragraph line standing after one is a paragraph of
+    the outer document. The
+    start conditions are the rendered ones. The instruction,
+    declaration and CDATA blocks and a block level tag,
+    opening or closing, can interrupt a paragraph and open
+    after any line at all, and a block level tag split
+    across two lines opens on its first line. A lone tag
+    block cannot interrupt a paragraph, so it opens only
+    where no paragraph stands open, at the start of the
+    document, after a blank line, a heading, a setext
+    heading underline, a thematic break, a fence close, a
+    comment only line or a comment block, a blockquote
+    line or its lazy continuation line, a list item line
+    or its lazy continuation line or another block,
+    after the last item of a list on a line that stands
+    outside the item its indent, after a paragraph
+    standing in a list item across a blank line on a line
+    outside the item its indent, or as the first content
+    of a list item. The reader tracks whether a
+    paragraph stands open, the content indent of a
+    preceding list item line and of an open list item
+    across a blank line, whether a blockquote
+    paragraph stands open for a lazy continuation, and
+    whether a list item paragraph stands open for a lazy
+    continuation, the facts the lone tag condition
+    reads. A structure standing inside a list
+    item is read after its list marker, because the marker
+    is list syntax and the
+    fence or block after it is the item its content, while a
+    heading standing as a list item its own content renders
+    as a heading and stands.
+    """
+    visible = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    fence_item_indent = None
+    raw_tag = None
+    in_html_block = False
+    markup_end = None
+    in_comment = False
+    quote_open = False
+    item_lazy_open = False
+    open_item_indent = None
+    prev_paragraph = False
+    prev_item_indent = None
+    for line in readme.splitlines():
+        if markup_end is not None:
+            quote_open = False
+            item_lazy_open = False
+            if markup_end in line:
+                markup_end = None
+                prev_paragraph = False
+            continue
+        if in_comment:
+            # A comment block runs to its closing marks
+            # across as many lines as it takes, and every
+            # line of it is the block, the closing line
+            # with any text after the marks included, so
+            # no paragraph stands open after it.
+            quote_open = False
+            item_lazy_open = False
+            if "-->" in line:
+                in_comment = False
+                prev_paragraph = False
+                prev_item_indent = None
+            continue
+        if in_fence:
+            quote_open = False
+            item_lazy_open = False
+            if fence_item_indent is not None and \
+                    line.strip() and \
+                    indent_columns(line) < fence_item_indent:
+                # A line standing outside the item its
+                # indent ends the item and its fence in the
+                # rendering, the line standing as a line of
+                # the outer document, so the fence reading
+                # stands down and the line is read on its
+                # own below. A fence line standing at that
+                # place then opens a fence of the outer
+                # document in the same reading.
+                in_fence = False
+                fence_item_indent = None
+                open_item_indent = None
+            else:
+                close = None
+                if indent_columns(line) <= 3:
+                    close = FENCE_CLOSE_RE.match(
+                        line.lstrip(" "))
+                if close:
+                    marker = close.group(1)
+                    if marker[0] == fence_char and \
+                            len(marker) >= fence_len:
+                        in_fence = False
+                        fence_item_indent = None
+                        prev_paragraph = False
+                continue
+        if raw_tag is not None:
+            quote_open = False
+            item_lazy_open = False
+            if re.search(
+                    r"</%s\s*>" % raw_tag, line, re.IGNORECASE):
+                raw_tag = None
+                prev_paragraph = False
+            continue
+        if in_html_block:
+            quote_open = False
+            item_lazy_open = False
+            if not line.strip():
+                in_html_block = False
+                prev_paragraph = False
+                prev_item_indent = None
+                visible.append(line)
+            continue
+        if not line.strip():
+            visible.append(line)
+            prev_paragraph = False
+            prev_item_indent = open_item_indent
+            quote_open = False
+            item_lazy_open = False
+            continue
+        if indent_columns(line) >= 4 and not (
+                open_item_indent is not None
+                and open_item_indent <= indent_columns(line)
+                < open_item_indent + 4):
+            # A line at the fourth column or past it is
+            # an indented code block, except where it
+            # stands inside an open list item short of
+            # four columns past the item its content
+            # indent, where it is the item its content
+            # in the rendering and is read on its own
+            # below in the same way as any item line.
+            continue
+        content = line.lstrip(" ")
+        if open_item_indent is not None and \
+                indent_columns(line) < open_item_indent:
+            # A line standing outside the open item its
+            # indent is no part of the item, so the open
+            # item standing ends at this line. The blank
+            # line before it kept the standing only for a
+            # line that stands inside the indent.
+            open_item_indent = None
+        in_open_item = open_item_indent is not None and \
+            indent_columns(line) >= open_item_indent
+        if content.strip().startswith("<!--"):
+            # A comment block is a closed block in the
+            # rendering, not paragraph text, so no
+            # paragraph stands open after it. The block
+            # runs to its closing marks, on this line or on
+            # a later one, and it can interrupt a paragraph.
+            if "-->" not in content.strip()[4:]:
+                in_comment = True
+            prev_paragraph = False
+            prev_item_indent = None
+            quote_open = False
+            item_lazy_open = False
+            continue
+        before_paragraph = prev_paragraph
+        before_item_indent = prev_item_indent
+        prev_item_indent = None
+        line_item_indent = None
+        marker = LIST_MARKER_RE.match(content)
+        bare = None
+        if not marker and not before_paragraph:
+            # A marker standing alone on its line opens an
+            # empty item in the rendering, where a paragraph
+            # stands open no empty item can interrupt it, so
+            # the bare form is read only where no paragraph
+            # stands open before it.
+            bare = BARE_LIST_MARKER_RE.match(content)
+        if marker or bare:
+            # A structure standing inside a list item stands
+            # after the list marker, and the marker is list
+            # syntax rather than content, so the reading
+            # starts where the item its content starts. The
+            # item its first content stands where no paragraph
+            # stands open, whatever line came before the item.
+            if marker:
+                # The item its content indent is counted
+                # in columns in the same way as every
+                # other indent in this reading, a tab in
+                # the gap after the marker counting to
+                # the next multiple of four columns and
+                # not as one character, so the window
+                # short of four columns past the content
+                # indent stands where the rendering puts
+                # it. A gap of five columns or more after
+                # the marker counts as one space in the
+                # rendering, so the content indent then
+                # stands one column past the end of the
+                # marker however wide the gap counts.
+                prefix = content[
+                    :len(content) - len(marker.group(1))]
+                token = re.match(
+                    r"[-+*]|[0-9]{1,9}[.)]", prefix)
+                columns = len(line) - len(content)
+                for char in prefix[:token.end()]:
+                    columns += 1
+                marker_end = columns
+                gap = 0
+                for char in prefix[token.end():]:
+                    if char == "\t":
+                        step = 4 - (columns % 4)
+                        columns += step
+                        gap += step
+                    else:
+                        columns += 1
+                        gap += 1
+                if gap >= 5:
+                    line_item_indent = marker_end + 1
+                else:
+                    line_item_indent = columns
+                content = marker.group(1)
+            else:
+                line_item_indent = indent_columns(line) + \
+                    len(bare.group(1)) + 1
+                content = ""
+            open_item_indent = line_item_indent
+            before_paragraph = False
+            quote_open = False
+            if bare or not content.strip():
+                # The empty item carries no paragraph yet,
+                # so no paragraph stands open after it and
+                # its paragraph does not stand open for a
+                # lazy continuation until a content line
+                # stands in the item. A marker carrying a
+                # trailing space and no content opens an
+                # empty item in the rendering in the same
+                # way as a bare marker, so it takes this
+                # reading and not the paragraph reading.
+                prev_paragraph = False
+                item_lazy_open = False
+                prev_item_indent = line_item_indent
+                continue
+        fence = FENCE_OPEN_RE.match(content)
+        if fence:
+            marker = fence.group(1)
+            if marker[0] == "`" and "`" in fence.group(2):
+                # A backtick fence line whose info string
+                # carries a backtick is no fence at all, so
+                # the line is the paragraph text of the
+                # place it stands in, a list item included,
+                # and the item its paragraph stands open
+                # for a lazy continuation after it in the
+                # same way as after an ordinary paragraph
+                # line of the item.
+                visible.append(line)
+                prev_paragraph = True
+                quote_open = False
+                item_lazy_open = bool(
+                    (line_item_indent is not None
+                     or in_open_item) and prev_paragraph)
+                if line_item_indent is not None:
+                    prev_item_indent = line_item_indent
+                elif in_open_item:
+                    prev_item_indent = open_item_indent
+                continue
+            in_fence = True
+            fence_char = marker[0]
+            fence_len = len(marker)
+            fence_item_indent = line_item_indent \
+                if line_item_indent is not None else (
+                    open_item_indent if in_open_item else None)
+            prev_paragraph = False
+            quote_open = False
+            item_lazy_open = False
+            continue
+        if content.startswith("<?"):
+            if "?>" not in content[2:]:
+                markup_end = "?>"
+            prev_paragraph = False
+            quote_open = False
+            item_lazy_open = False
+            continue
+        if content.startswith("<![CDATA["):
+            if "]]>" not in content[9:]:
+                markup_end = "]]>"
+            prev_paragraph = False
+            quote_open = False
+            item_lazy_open = False
+            continue
+        if content.startswith("<!") and \
+                len(content) > 2 and content[2].isupper():
+            if ">" not in content[2:]:
+                markup_end = ">"
+            prev_paragraph = False
+            quote_open = False
+            item_lazy_open = False
+            continue
+        tag = HTML_TAG_RE.match(content)
+        if tag and not tag.group(1):
+            name = tag.group(2).lower()
+            if name in RAW_TEXT_TAGS:
+                rest = content[tag.end():]
+                if not re.search(
+                        r"</%s\s*>" % name, rest, re.IGNORECASE):
+                    raw_tag = name
+                prev_paragraph = False
+                quote_open = False
+                item_lazy_open = False
+                continue
+        if tag:
+            name = tag.group(2).lower()
+            if name in HTML_BLOCK_TAGS:
+                in_html_block = True
+                prev_paragraph = False
+                quote_open = False
+                item_lazy_open = False
+                continue
+        if not tag:
+            split = re.match(
+                r"</?([A-Za-z][A-Za-z0-9]*)\b[^>]*$", content)
+            if split and \
+                    split.group(1).lower() in HTML_BLOCK_TAGS:
+                # A block level tag split across two lines
+                # opens its block on the first line in the
+                # rendering, where the tag name stands
+                # followed by the line break.
+                in_html_block = True
+                prev_paragraph = False
+                quote_open = False
+                item_lazy_open = False
+                continue
+        lone_opens = not before_paragraph or (
+            before_item_indent is not None
+            and indent_columns(line) < before_item_indent)
+        if tag and lone_opens and \
+                LONE_TAG_LINE_RE.match(content):
+            # A line holding one complete tag of an element
+            # outside the block list opens the same kind of
+            # block in the rendering, running to a blank
+            # line, so a heading after it stands inside the
+            # block and not in the document. The block cannot
+            # interrupt a paragraph, so a lone tag standing
+            # after a paragraph line opens nothing.
+            in_html_block = True
+            prev_paragraph = False
+            quote_open = False
+            item_lazy_open = False
+            continue
+        if quote_open and line_item_indent is None and \
+                not re.match(r"#{1,6}[ \t]", content) and \
+                not content.startswith(">"):
+            # A paragraph line standing after a blockquote
+            # line without the quote marker is the
+            # blockquote its lazy continuation, the quote
+            # its own paragraph continuing, so it is no
+            # paragraph of the outer document and no
+            # paragraph stands open after it.
+            prev_paragraph = False
+            prev_item_indent = None
+            continue
+        if item_lazy_open and line_item_indent is None \
+                and not tag and not \
+                re.match(r"#{1,6}[ \t]", content) and not \
+                content.startswith(">") and not re.fullmatch(
+                    r"([-*_])([ \t]*\1){2,}[ \t]*$", content):
+            # A paragraph line standing after a list item
+            # line without the marker is the item its own
+            # paragraph continuing, its lazy continuation,
+            # so it is no paragraph of the outer document
+            # and no paragraph stands open after it, while
+            # the item paragraph stands open for a further
+            # lazy line in the same way.
+            prev_paragraph = False
+            prev_item_indent = None
+            quote_open = False
+            continue
+        visible.append(content)
+        if re.match(r"#{1,6}[ \t]", content):
+            prev_paragraph = False
+            quote_open = False
+        elif before_paragraph and re.fullmatch(
+                r"(=+|-+)[ \t]*", content):
+            # A setext heading underline under a paragraph
+            # line closes that paragraph as a heading, so no
+            # paragraph stands open after it.
+            prev_paragraph = False
+            quote_open = False
+        elif re.match(
+                r"([-*_])([ \t]*\1){2,}[ \t]*$", content):
+            prev_paragraph = False
+            quote_open = False
+        elif content.startswith(">"):
+            # A blockquote line is a closed block in the
+            # rendering once a line without the quote marker
+            # follows it, so no paragraph of the outer
+            # document stands open after it, and its
+            # paragraph stands open inside the quote for a
+            # lazy continuation line.
+            prev_paragraph = False
+            quote_open = True
+        else:
+            prev_paragraph = True
+            quote_open = False
+        item_lazy_open = bool(
+            (line_item_indent is not None or in_open_item)
+            and prev_paragraph)
+        if line_item_indent is not None:
+            prev_item_indent = line_item_indent
+        elif in_open_item:
+            # A line standing in the open item at its
+            # content indent is the item its content, so
+            # the item standing carries to the next line
+            # across this one as it does across a blank
+            # line, and a lone tag standing outside the
+            # indent after it opens its block.
+            prev_item_indent = open_item_indent
+        else:
+            prev_item_indent = None
+    text = "\n".join(visible)
+    text = re.sub(
+        r"<!--.*?(?:-->|\Z)", "", text, flags=re.DOTALL)
+    return any(
+        COMATE_HEADING_RE.match(line.strip())
+        for line in text.splitlines()
+    )
+
+
 def brief_problems(root, problems):
     """Problems with the Build 20 brief and its records."""
     raw = read_text(
@@ -761,10 +1300,15 @@ def brief_problems(root, problems):
                 "unverified negative could harden into an "
                 "existence claim"
             )
-        if not any(
-            line.strip() == "### Comate"
-            for line in readme.splitlines()
-        ):
+        if not comate_subsection_stands(readme):
+            # The heading must stand as its own line in the
+            # rendered document structure. A bare substring
+            # search is satisfied by a renamed heading that
+            # only begins with the same words, and a bare line
+            # search is satisfied by a heading shaped line
+            # inside a fenced code block or an HTML comment,
+            # so the subsection could be retitled away while
+            # the gate still certified that it stands.
             problems.append(
                 "README.md carries no Comate install subsection"
             )

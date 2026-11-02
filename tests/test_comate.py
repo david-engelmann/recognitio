@@ -773,6 +773,828 @@ class TestCheckComate(unittest.TestCase):
                 problems,
             )
 
+    def test_a_comate_heading_inside_a_code_fence_does_not_stand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n```\n### Comate\n```\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_inside_an_html_comment_does_not_stand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n<!--\n### Comate\n-->\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_in_an_indented_code_block_does_not_stand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n\n    ### Comate\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_after_an_info_string_fence_does_not_stand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n```\ncode\n``` python\n### Comate\n```\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_inside_an_html_pre_block_does_not_stand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n<pre>\n### Comate\n</pre>\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_inside_an_html_block_does_not_stand(self):
+        # The rendered HTML block family beyond pre. A heading
+        # line inside a div, a details element or a raw text
+        # element is block content or literal text in the
+        # rendered document, never a heading.
+        for plant in (
+            "\n<div>\n### Comate\n</div>\n",
+            "\n<details>\n### Comate\n</details>\n",
+            "\n<script>\n### Comate\n</script>\n",
+            "\n<style>\n### Comate\n</style>\n",
+            "\n<textarea>\n### Comate\n</textarea>\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_inside_the_remaining_block_shapes_does_not_stand(self):
+        # The rendered block family beyond the block level
+        # tags. A lone tag line of any other element, a
+        # processing instruction, a declaration and a CDATA
+        # block each open a block in the rendering, and a
+        # block or a fence standing inside a list item opens
+        # after its list marker, so a heading inside any of
+        # them stands in no rendered subsection.
+        for plant in (
+            "\n<span>\n### Comate\n",
+            "\n<br>\n### Comate\n",
+            '\n<a name="comate">\n### Comate\n',
+            "\n<search>\n### Comate\n</search>\n",
+            "\n<?pi\n### Comate\n?>\n",
+            "\n<![CDATA[\n### Comate\n]]>\n",
+            "\n<!FOO\n### Comate\n>\n",
+            "\n- <div>\n  ### Comate\n",
+            "\n- ```\n  ### Comate\n  ```\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_inside_blocks_after_any_line_does_not_stand(self):
+        # The rendered start conditions past the blank line
+        # proxy. The instruction, declaration and CDATA
+        # blocks and a closing block tag can interrupt a
+        # paragraph and open after a heading, a thematic
+        # break or a fence close, a lone tag opens wherever
+        # no paragraph stands open, including as a list item
+        # its first content, and a block tag split across two
+        # lines opens on its first line. Each plant below was
+        # checked against the CommonMark reference renderer,
+        # and none of them renders a Comate heading.
+        for plant in (
+            "\nSome closing paragraph text\n<?pi\n"
+            "### Comate\n?>\n",
+            "\nSome closing paragraph text\n<![CDATA[\n"
+            "### Comate\n]]>\n",
+            "\nSome closing paragraph text\n<!FOO\n"
+            "### Comate\n>\n",
+            "\n## A heading above\n<?pi\n### Comate\n?>\n",
+            "\n---\n<?pi\n### Comate\n?>\n",
+            "\n```\ncode\n```\n<?pi\n### Comate\n?>\n",
+            "\n## A heading above\n<![CDATA[\n"
+            "### Comate\n]]>\n",
+            "\n## A heading above\n<!FOO\n### Comate\n>\n",
+            "\n- item one\n  <?pi\n  ### Comate\n  ?>\n",
+            "\n## A heading above\n<span>\n### Comate\n",
+            '\n## A heading above\n<a name="comate">\n'
+            "### Comate\n",
+            "\n---\n<span>\n### Comate\n",
+            "\n```\ncode\n```\n<span>\n### Comate\n",
+            "\nSome closing paragraph text\n</div>\n"
+            "### Comate\n",
+            "\n## A heading above\n</div>\n### Comate\n",
+            "\n- item one\n- <span>\n  ### Comate\n",
+            "\n1. item one\n2. <span>\n   ### Comate\n",
+            '\n<div\nclass="x">\n### Comate\n',
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_in_a_paragraph_stands(self):
+        # The discharged shapes in the other direction. A
+        # lone tag block cannot interrupt a paragraph, a lone
+        # tag on a list continuation line stands inside the
+        # item its paragraph, and a tag standing after a
+        # comment closed on the same line opens nothing, so
+        # the heading after each of them renders and stands,
+        # as the reference renderer shows for all three.
+        for plant in (
+            "\nSome closing paragraph text\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n  <span>\n  ### Comate\n",
+            "\n<!-- x --> <span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_past_a_closed_block_does_not_stand(self):
+        # The lane 5 start condition shapes. A setext heading
+        # underline of equals signs, a comment only line, a
+        # blockquote line and the last item of a list on an
+        # unindented line are each closed blocks in the
+        # rendering, so a lone tag after any of them opens
+        # its block and the heading inside it renders
+        # nowhere. Each plant was checked against the
+        # CommonMark reference renderer, and none of them
+        # renders a Comate heading.
+        for plant in (
+            "\nA title\n===\n<span>\n### Comate\n",
+            "\n<!-- a comment -->\n<span>\n### Comate\n",
+            "\n> quoted text\n<span>\n### Comate\n",
+            "\n> quoted text\n> more quoted\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n- item two\n<span>\n### Comate\n",
+            "\n1. item one\n2. item two\n<span>\n"
+            "### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_past_the_lane6_blocks_does_not_stand(self):
+        # The lane 6 red team shapes on their next roots. A
+        # comment block spanning lines, a blockquote its
+        # lazy continuation line and a list item its
+        # paragraph after a blank line are each closed
+        # blocks or no paragraph of the outer document in
+        # the rendering, so a lone tag after any of them
+        # opens its block and the heading inside it renders
+        # nowhere. Each plant was checked against the
+        # CommonMark reference renderer, and none of them
+        # renders a Comate heading.
+        for plant in (
+            "\n<!-- start\nend -->\n<span>\n### Comate\n",
+            "\n<!-- start\nend --> tail\n<span>\n"
+            "### Comate\n",
+            "\n<!-- start\na middle line\nend -->\n<span>\n"
+            "### Comate\n",
+            "\nSome closing paragraph text\n<!-- start\n"
+            "end -->\n<span>\n### Comate\n",
+            "\n> quoted text\nlazy line\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n\n  para in item\n<span>\n"
+            "### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_past_a_list_lazy_line_does_not_stand(self):
+        # The lane 7 red team Minor on its new root. A
+        # list item its lazy continuation line is the item
+        # its own paragraph continuing in the rendering,
+        # so the item closes after it and a lone tag after
+        # it opens its block, with the heading inside the
+        # block. Each plant was checked against the
+        # CommonMark reference renderer, and none of them
+        # renders a Comate heading.
+        for plant in (
+            "\n- item one\nlazy line\n<span>\n### Comate\n",
+            "\n- item one\nlazy line\nsecond lazy line\n"
+            "<span>\n### Comate\n",
+            "\n1. item one\nlazy line\n<span>\n"
+            "### Comate\n",
+            "\n* item one\nlazy line\n<span>\n### Comate\n",
+            "\n- one\n- two\nlazy line\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n lazy line\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n\n  para in item\nlazy line\n"
+            "<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_past_the_lane9_item_shapes_does_not_stand(self):
+        # The lane 8 red team Minor on its new roots and
+        # the fence standing beside them. A list item its
+        # paragraph whose first line is a backtick fence
+        # line carrying a backtick in its info string is
+        # no fence in the rendering, so its lazy line is
+        # the item its continuation and the tag after it
+        # opens its block. An item opened by a bare marker
+        # holds its indented paragraph in the same way. A
+        # fence standing in an item with its content lines
+        # unindented ends at the first unindented line in
+        # the rendering and a new fence opens at the
+        # closing line, swallowing the tag and the
+        # heading. Each plant was checked against the
+        # CommonMark reference renderer, and none of them
+        # renders a Comate heading.
+        for plant in (
+            "\n- ```a`b\nlazy line\n<span>\n### Comate\n",
+            "\n- item one\n\n  ```a`b\nlazy line\n"
+            "<span>\n### Comate\n",
+            "\n-\n  para in item\n<span>\n### Comate\n",
+            "\n-\n  para in item\nlazy line\n<span>\n"
+            "### Comate\n",
+            "\n- ```\ncode\n```\nlazy line\n<span>\n"
+            "### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_past_the_lane10_item_shapes_does_not_stand(self):
+        # The lane 9 red team Minor standing on its new
+        # root. A line at the fourth column inside an
+        # open list item, short of four columns past the
+        # item its content indent, is the item its
+        # content in the rendering and not an indented
+        # code block, so a paragraph standing there arms
+        # the item its paragraph fact, the lazy line
+        # after it is the item its continuation, and the
+        # lone tag after that stands inside the item.
+        # Each plant was checked against the CommonMark
+        # reference renderer, and none of them renders a
+        # Comate heading.
+        for plant in (
+            "\n-\n    para in item\nlazy line\n<span>\n"
+            "### Comate\n",
+            "\n- item one\n\n    code block\npara line\n"
+            "<span>\n### Comate\n",
+            "\n- item one\n    para line\nlazy line\n"
+            "<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_the_lane10_item_controls_stands(self):
+        # The controls in the other direction, checked
+        # against the same renderer. A line at four
+        # columns past the item its content indent inside
+        # the item is a true indented code block of the
+        # item, so the paragraph after it is a paragraph
+        # of the outer document and the heading after the
+        # tag stands. An item opened by a marker carrying
+        # a trailing space and no content is an empty
+        # item in the rendering, the lane 9 red team Note
+        # shape, so no item paragraph stands open for the
+        # lazy line and the heading stands.
+        for plant in (
+            "\n- item one\n\n      code block\npara line\n"
+            "<span>\n### Comate\n",
+            "\n- item one\n- \nlazy line\n<span>\n"
+            "### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+        comate_doc = " ".join(
+            self.mod.comate_subsection_stands.__doc__.split())
+        for phrase in (
+            "short of four columns past the item its "
+            "content indent",
+            "a marker carrying a trailing space and no "
+            "content opens an empty item",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, comate_doc)
+
+    def test_a_comate_heading_after_a_lone_tag_past_the_lane11_tab_gap_items_does_not_stand(self):
+        # The lane 10 red team Minor 6 standing on its
+        # new root. A marker whose gap carries a tab
+        # gave the reader a content indent in characters
+        # where the renderer gives it in columns, so an
+        # item paragraph standing in the window between
+        # the two indents was skipped whole as an
+        # indented code block and the item its paragraph
+        # fact was never armed. The content indent is
+        # now counted in columns, a tab counting to the
+        # next multiple of four, on the three marker
+        # gaps that carry a tab, beside the discharged
+        # sibling whose renewal line stands inside both
+        # windows. Each plant was checked against the
+        # CommonMark reference renderer, and none of
+        # them renders a Comate heading.
+        for plant in (
+            "\n-\titem one\n\n      para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+            "\n1.\titem one\n\n       para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+            "\n- \titem one\n\n       para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+            "\n-\titem one\n\n    para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_the_lane11_tab_gap_code_block_stands(self):
+        # The control in the other direction, checked
+        # against the same renderer. With a tab in the
+        # marker gap the item its content indent stands
+        # at four columns in the rendering, so a line at
+        # eight columns, four columns past that indent,
+        # is an indented code block of the item, the
+        # paragraph after it is a paragraph of the outer
+        # document, and the heading after the tag
+        # stands.
+        for plant in (
+            "\n-\titem one\n\n        para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+        comate_doc = " ".join(
+            self.mod.comate_subsection_stands.__doc__.split())
+        for phrase in (
+            "a tab in the gap after a marker counting "
+            "to the next multiple of four columns and "
+            "not as one character",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, comate_doc)
+
+    def test_a_comate_heading_after_a_lone_tag_past_the_finisher_wide_gap_items_does_not_stand(self):
+        # The lane 11 Comate Minor standing on its new
+        # root. Two tabs in the gap after a marker count
+        # to eight columns in the reader its column walk,
+        # while the renderer gives a gap of five columns
+        # or more as one space and stands the content
+        # one column past the marker end, so renewals at
+        # two to five columns are item paragraphs in the
+        # rendering and renewals at four and at two
+        # columns escaped the reader whole as indented
+        # code. The reader now counts a wide gap the
+        # rendered way. Each plant was checked against
+        # the CommonMark reference renderer across the
+        # renewal band, renewals at two to five columns
+        # rendering no heading and renewals at six
+        # columns and past it rendering the heading, and
+        # the six column renewal stands below as the
+        # control in the other direction.
+        for plant in (
+            "\n-\t\titem one\n\n    para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+            "\n-\t\titem one\n\n  para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertTrue(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+        for plant in (
+            "\n-\t\titem one\n\n      para in item\n"
+            "lazy line\n<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+        comate_doc = " ".join(
+            self.mod.comate_subsection_stands.__doc__.split())
+        for phrase in (
+            "a gap of five columns or more after a "
+            "marker counting as one space",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, comate_doc)
+
+    def test_a_comate_heading_after_a_lone_tag_past_a_closed_block_stands(self):
+        # The lane 8 standards Note on the stale lazy fact,
+        # renderer proven in that seat. A comment block in
+        # its one line and multiline forms and a fenced
+        # block standing outside the item close the item
+        # in the rendering, so the paragraph line after
+        # one is a paragraph of the outer document, the
+        # lone tag cannot interrupt it, and the heading
+        # after it renders and stands, beside the priced
+        # lazy shape in the other direction in the lane 8
+        # list lazy test.
+        for plant in (
+            "\n- item one\n<!-- c -->\npara line\n"
+            "<span>\n### Comate\n",
+            "\n- item one\n<!-- start\nend -->\n"
+            "para line\n<span>\n### Comate\n",
+            "\n- item one\n```\ncode\n```\npara line\n"
+            "<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+        comate_doc = " ".join(
+            self.mod.comate_subsection_stands.__doc__.split())
+        self.assertIn(
+            "whether a list item paragraph stands open "
+            "for a lazy continuation", comate_doc)
+
+    def test_a_comate_heading_after_the_lane6_block_controls_stands(self):
+        # The controls in the other direction, checked
+        # against the same renderer. A paragraph standing
+        # outside the list after the item its paragraph
+        # reopens the paragraph the lone tag cannot
+        # interrupt, and a heading line standing after a
+        # blockquote line is a heading of the document and
+        # not a lazy continuation, so the heading after
+        # each of them renders and stands.
+        for plant in (
+            "\n- item one\n\n  para in item\n\n"
+            "outside para\n<span>\n### Comate\n",
+            "\n> quoted text\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_the_discharged_lone_tag_shapes_stands(self):
+        # The discharged shapes in the other direction,
+        # beside the lane 4 controls. A split lone tag is
+        # inline text in a paragraph in the rendering, and a
+        # lone tag after a table line or a link reference
+        # definition stands inside a paragraph the tag
+        # cannot interrupt, so the heading after each of
+        # them renders and stands, as the reference renderer
+        # shows for all three.
+        for plant in (
+            "\n<span\n>\n### Comate\n",
+            "\n| a | b |\n<span>\n### Comate\n",
+            "\n[ref]: /docs\n<span>\n### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_lone_tag_block_stands(self):
+        # The block a lone tag opens runs to a blank line, so
+        # a real heading after the blank line renders and
+        # stands, and a heading standing as a list item its
+        # own content renders and stands beside it.
+        for plant in (
+            '\n<a name="comate">\n\n### Comate\n',
+            "\n<?pi ?>\n\n### Comate\n",
+            "\n- ### Comate\n",
+        ):
+            with self.subTest(plant=plant):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace(
+                        "### Comate", "### Comate route")
+                    broken += plant
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_an_indented_closing_fence_does_not_stand(self):
+        # A rendered fence closes on at most three spaces of
+        # indent, so a closing line indented four spaces
+        # leaves the heading inside the fence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n```\ncode\n    ```\n### Comate\n```\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_indented_by_a_space_and_a_tab_does_not_stand(self):
+        # The tab carries the indent to the fourth column, so
+        # the rendered line is an indented code block even
+        # though only one space stands before the tab.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n\n \t### Comate\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_comate_heading_with_a_wide_separator_stands(self):
+        # The conservative sibling shapes. A rendered heading
+        # allows more than one space after the hash marks and
+        # a tab as the separator, so both spellings stand.
+        for heading in ("###  Comate\n", "###\tComate\n"):
+            with self.subTest(heading=heading):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = self.make_layout(tmp)
+                    rel = "README.md"
+                    text = self.read(root, rel)
+                    broken = text.replace("### Comate\n", heading)
+                    self.assertNotEqual(broken, text)
+                    self.write(root, rel, broken)
+                    problems = self.problems(root)
+                    self.assertFalse(
+                        any("no Comate install subsection" in p
+                            for p in problems),
+                        problems,
+                    )
+
+    def test_a_comate_heading_after_a_backtick_info_line_stands(self):
+        # A backtick fence line whose info string carries a
+        # backtick is no fence at all, so the heading after
+        # one stands in the rendered document.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate", "### Comate route")
+            broken += "\n```foo`bar\n### Comate\n"
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertFalse(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_closed_atx_comate_heading_stands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            rel = "README.md"
+            text = self.read(root, rel)
+            broken = text.replace("### Comate\n", "### Comate ##\n")
+            self.assertNotEqual(broken, text)
+            self.write(root, rel, broken)
+            problems = self.problems(root)
+            self.assertFalse(
+                any("no Comate install subsection" in p
+                    for p in problems),
+                problems,
+            )
+
     def test_rule_c8_deleted_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)

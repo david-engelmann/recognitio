@@ -412,6 +412,8 @@ No definitions of the changed names were found outside the changed files.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### scripts/check_antigravity.py
@@ -595,7 +597,7 @@ Cap note: history for semantic_problems capped.
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 5947
+Packet estimate in tokens: 6017
 
 T0 included at about 114 tokens across 2 files
 
@@ -603,7 +605,7 @@ T1 included at about 3285 tokens across 2 files
 
 T2 included at about 323 tokens across 2 files
 
-T3 included at about 1789 tokens across 2 files
+T3 included at about 1859 tokens across 2 files
 
 No tier was dropped.
 

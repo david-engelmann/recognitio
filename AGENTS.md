@@ -135,7 +135,9 @@ not a gate.
   remains the act of the owner, and each states plainly that
   nothing in it has been submitted. The gate at
   `scripts/check_submissions.py` pins the packs and the
-  manifest facts their evidence checks rest on.
+  manifest facts their evidence checks rest on, and it
+  re-derives the load bearing figures in the Claude pack
+  from the tree itself on every run.
 - `docs/reviews/` holds review reports written from the template
   in `REVIEW.md`, with their findings disposition counts.
 - `docs/brand/` holds the brand assets, the palette record at

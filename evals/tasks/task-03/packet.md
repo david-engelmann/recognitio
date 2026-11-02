@@ -1,14 +1,14 @@
-# The pericope for range 3dfd713c1966fb31dd9d586e3070db40d2827428..78056389dabb27131d1aad1343ce8258f0b5aaa9
+# The pericope for range f277a986825641bf186d57996c2697c971fc41ea..2f428a25fd7369785992f37aa026d4fe51f12f6e
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 3dfd713c1966fb31dd9d586e3070db40d2827428
+Base: f277a986825641bf186d57996c2697c971fc41ea
 
-Head: 78056389dabb27131d1aad1343ce8258f0b5aaa9
+Head: 2f428a25fd7369785992f37aa026d4fe51f12f6e
 
-Merge base: 3dfd713c1966fb31dd9d586e3070db40d2827428
+Merge base: f277a986825641bf186d57996c2697c971fc41ea
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-7805638 head
+2f428a2 head
 ```
 
 ## T1 The change
@@ -139,18 +139,20 @@ No test files mention the changed modules or functions.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### page.py
 
 ```
-Eval Fixture 78056389 lines 2
+Eval Fixture 2f428a25 lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 78056389 lines 2
+Eval Fixture 2f428a25 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -158,7 +160,7 @@ Eval Fixture 78056389 lines 2
 #### heading in page.py
 
 ```
-commit 7805638 head
+commit 2f428a2 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -167,7 +169,7 @@ diff --git a/page.py b/page.py
  def heading(text):
 -    return slugify(text)
 +    return make_slug(text)
-commit 3dfd713 base
+commit f277a98 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -180,7 +182,7 @@ diff --git a/page.py b/page.py
 #### make_slug in util.py
 
 ```
-commit 7805638 head
+commit 2f428a2 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -190,7 +192,7 @@ diff --git a/util.py b/util.py
 -    return text.lower().replace(" ", "-")
 +def make_slug(text):
 +    return text.lower().replace(" ", "")
-commit 3dfd713 base
+commit f277a98 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -214,7 +216,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1657
+Packet estimate in tokens: 1727
 
 T0 included at about 79 tokens across 2 files
 
@@ -222,7 +224,7 @@ T1 included at about 265 tokens across 2 files
 
 T2 included at about 279 tokens across 2 files
 
-T3 included at about 559 tokens across 2 files
+T3 included at about 629 tokens across 2 files
 
 No tier was dropped.
 

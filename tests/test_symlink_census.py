@@ -32,6 +32,7 @@ fails is a failure of the pin and never a skip, so no
 planted link can hide behind a failed listing there.
 """
 
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -47,6 +48,29 @@ EXPECTED = {
 }
 
 
+# The git location variables are scrubbed from the environment
+# every census command runs under. An exported GIT_DIR defeats
+# git -C, so a suite launched with the variables set would
+# census the repository they name instead of this tree.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def scrubbed_git_env():
+    """The caller environment with the git location names removed."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+
 def census_from_listing(lines, blob_index):
     # The two listings place the blob hash in different
     # fields. A tree listing names the mode and the type
@@ -61,7 +85,7 @@ def census_from_listing(lines, blob_index):
         blob = subprocess.run(
             ["git", "-C", str(ROOT), "cat-file", "-p",
              parts[blob_index]],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         census[path] = blob.stdout
     return census
@@ -76,7 +100,7 @@ class TestSymlinkCensus(unittest.TestCase):
         inside = subprocess.run(
             ["git", "-C", str(ROOT), "rev-parse",
              "--is-inside-work-tree"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         if inside.returncode != 0 or (
             inside.stdout.splitlines() != ["true"]
@@ -84,7 +108,7 @@ class TestSymlinkCensus(unittest.TestCase):
             self.skipTest("no git metadata stands over this tree")
         result = subprocess.run(
             ["git", "-C", str(ROOT), "ls-tree", "-r", "HEAD"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         if result.returncode != 0:
             self.fail("the tree listing failed inside a work tree")
@@ -92,7 +116,7 @@ class TestSymlinkCensus(unittest.TestCase):
         self.assertEqual(census, EXPECTED)
         staged = subprocess.run(
             ["git", "-C", str(ROOT), "ls-files", "--stage"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         if staged.returncode != 0:
             self.fail("the index listing failed inside a work tree")

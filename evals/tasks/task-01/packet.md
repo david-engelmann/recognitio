@@ -1,14 +1,14 @@
-# The pericope for range 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4..46b418895ebd14a4bfe863d20154bbca0cb25e6d
+# The pericope for range e38cec9e5daafb54a034552f38cb293ba5589dcf..86563f5ea20a5e2f885c07d635a087da158579fd
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4
+Base: e38cec9e5daafb54a034552f38cb293ba5589dcf
 
-Head: 46b418895ebd14a4bfe863d20154bbca0cb25e6d
+Head: 86563f5ea20a5e2f885c07d635a087da158579fd
 
-Merge base: 4bb4094c1b4586cca433e8c1b7b32e4b0bec35b4
+Merge base: e38cec9e5daafb54a034552f38cb293ba5589dcf
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-46b4188 head
+86563f5 head
 ```
 
 ## T1 The change
@@ -109,12 +109,14 @@ No definitions of the changed names were found outside the changed files.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### calc.py
 
 ```
-Eval Fixture 46b41889 lines 2
+Eval Fixture 86563f5e lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -122,7 +124,7 @@ Eval Fixture 46b41889 lines 2
 #### price in calc.py
 
 ```
-commit 46b4188 head
+commit 86563f5 head
 
 diff --git a/calc.py b/calc.py
 --- a/calc.py
@@ -132,7 +134,7 @@ diff --git a/calc.py b/calc.py
 -    return qty * rate
 +def price(qty, rate, tax):
 +    return qty * rate + tax + tax
-commit 4bb4094 base
+commit e38cec9 base
 
 diff --git a/calc.py b/calc.py
 --- /dev/null
@@ -156,7 +158,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1284
+Packet estimate in tokens: 1354
 
 T0 included at about 65 tokens across 1 files
 
@@ -164,7 +166,7 @@ T1 included at about 137 tokens across 1 files
 
 T2 included at about 249 tokens across 1 files
 
-T3 included at about 358 tokens across 1 files
+T3 included at about 428 tokens across 1 files
 
 No tier was dropped.
 

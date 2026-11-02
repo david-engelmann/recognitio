@@ -54,7 +54,13 @@ stand in no sources file, so no rebuild can reproduce the
 history lines or the token estimates that rest on them. The
 checksum record covers the saved packet instead. The sources
 and manifest files the rebuild trusts load through the same
-strict reader as the checksum record.
+strict reader as the checksum record. The fixture writer
+screens every sources key before it writes anything, refusing
+a key that is absolute, that carries a parent segment in any
+position, or that names the git directory, so a crafted
+sources file cannot write outside the fixture repository,
+rewrite the fixture configuration, or plant a hook or a
+filter definition the staging step would then run.
 
 The fifth check compares the digest of each task sources file
 against the source anchor record at evals/source-anchors.json,
@@ -166,7 +172,7 @@ DIFF_FLAGS = [
     "diff", "--histogram", "--find-renames", "--find-copies",
     "-W", "--no-ext-diff", "--no-textconv",
 ]
-LEGACY_ENTRY_KEYS = {"instruction_file"}
+LEGACY_ENTRY_KEYS = {"instruction_file", "credential_file"}
 
 
 class DuplicateKeyError(ValueError):
@@ -1337,7 +1343,85 @@ def git(repo, *args, raw=False):
     return result.stdout
 
 
+def fixture_key_problem(name):
+    """The problem with one sources key, or None when it is safe.
+
+    A sources key is a path under the fixture repository and
+    nothing else. An absolute key discards the repository
+    prefix under the path rules of the language, a parent
+    segment in any position climbs out of it, and a key that
+    names the git directory or anything under it hands the
+    fixture its own configuration, its hooks, and its identity
+    to the data file. The git directory is judged on the
+    segments as the writer resolves them, with empty segments
+    and dot segments dropped, so a prefix spelling that moves
+    the git directory out of the first raw segment is refused
+    beside the plain spelling. The writer refuses every such
+    key before any parent directory is created and before the
+    deletion pass runs, so a crafted sources file writes nothing at all
+    rather than writing the safe entries and escaping on a
+    later one.
+    """
+    if not isinstance(name, str) or not name:
+        return "a sources key %r is not a usable path" % (name,)
+    if name.startswith("/") or name.startswith("\\"):
+        return (
+            "the sources key %r is absolute and would write "
+            "outside the fixture repository" % name
+        )
+    parts = name.split("/")
+    if ".." in parts:
+        return (
+            "the sources key %r carries a parent segment and "
+            "would write outside the fixture repository" % name
+        )
+    # The segments are read normalised before the git directory
+    # is judged, because the writer resolves a leading dot
+    # segment and an empty segment away. A key that opens with
+    # one of those spellings still lands in the git directory
+    # the writer builds under, so judging the raw first segment
+    # alone would let the prefix spellings through.
+    normalised = [
+        part for part in parts if part not in ("", ".")
+    ]
+    if not normalised:
+        return (
+            "the sources key %r names no path under the "
+            "fixture repository" % name
+        )
+    if normalised[0] == ".git":
+        return (
+            "the sources key %r names the git directory and "
+            "would rewrite the fixture configuration" % name
+        )
+    if name.endswith("/"):
+        return "the sources key %r names a directory" % (name,)
+    return None
+
+
+def check_fixture_keys(sources):
+    """Refuse a sources record whose keys escape the fixture.
+
+    Both mappings are screened before either is written, so a
+    head mapping cannot escape behind a clean base mapping.
+    """
+    for label in ("base", "head"):
+        mapping = sources.get(label)
+        if not isinstance(mapping, dict):
+            raise AssertionError(
+                "the sources record carries no %s mapping" % label
+            )
+        for name in mapping:
+            problem = fixture_key_problem(name)
+            if problem is not None:
+                raise AssertionError(problem)
+
+
 def write_fixture(repo, mapping):
+    for name in mapping:
+        problem = fixture_key_problem(name)
+        if problem is not None:
+            raise AssertionError(problem)
     for child in list(repo.iterdir()):
         if child.name == ".git":
             continue
@@ -1358,6 +1442,7 @@ def build_fixture_repo(tmp, sources):
     same pins stand here as in the extractor, so a host line
     ending setting cannot drift the byte comparison.
     """
+    check_fixture_keys(sources)
     repo = Path(tmp) / "repo"
     repo.mkdir(parents=True)
     git(repo, "init", "-b", "main")

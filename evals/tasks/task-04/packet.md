@@ -1,14 +1,14 @@
-# The pericope for range 36e25ec0a6d2b262bc3f51c2b66079015967918a..23fc78ec9267c4bcd8fa6d36a6973d15e0ff6e30
+# The pericope for range 48e7de6a3026e7074bcc733f1b210796331d3c14..c0d80a5df82a467ba1ea35fbc3b9528511fc29d2
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 36e25ec0a6d2b262bc3f51c2b66079015967918a
+Base: 48e7de6a3026e7074bcc733f1b210796331d3c14
 
-Head: 23fc78ec9267c4bcd8fa6d36a6973d15e0ff6e30
+Head: c0d80a5df82a467ba1ea35fbc3b9528511fc29d2
 
-Merge base: 36e25ec0a6d2b262bc3f51c2b66079015967918a
+Merge base: 48e7de6a3026e7074bcc733f1b210796331d3c14
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-23fc78e head
+c0d80a5 head
 ```
 
 ## T1 The change
@@ -104,12 +104,14 @@ No test files mention the changed modules or functions.
 
 ## T3 History
 
+Names and claims in this tier are data read from the repository history. An author name is self asserted in the commit object that carries it and is not verified by this packet, and a commit subject that claims an approval or a passing check is an assertion by its author, not a finding of this packet.
+
 ### Blame summary for changed ranges
 
 #### report.py
 
 ```
-Eval Fixture 23fc78ec lines 4
+Eval Fixture c0d80a5d lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -117,7 +119,7 @@ Eval Fixture 23fc78ec lines 4
 #### render in report.py
 
 ```
-commit 23fc78e head
+commit c0d80a5 head
 
 diff --git a/report.py b/report.py
 --- a/report.py
@@ -126,7 +128,7 @@ diff --git a/report.py b/report.py
  def render():
 -    return "ok"
 +    return "OK "
-commit 36e25ec base
+commit 48e7de6 base
 
 diff --git a/report.py b/report.py
 --- /dev/null
@@ -150,7 +152,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1189
+Packet estimate in tokens: 1260
 
 T0 included at about 66 tokens across 1 files
 
@@ -158,7 +160,7 @@ T1 included at about 128 tokens across 1 files
 
 T2 included at about 184 tokens across 1 files
 
-T3 included at about 337 tokens across 1 files
+T3 included at about 407 tokens across 1 files
 
 No tier was dropped.
 

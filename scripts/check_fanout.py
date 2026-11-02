@@ -42,6 +42,7 @@ primary sources behind each rule.
 import argparse
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -59,6 +60,50 @@ PROOF_RUN = ROOT / "workflows" / "proof-run" / "run-record.json"
 LOCAL_MAX_CONCURRENT = 16
 MANAGED_MAX_CONCURRENT = 64
 MAX_AGENTS_PER_RUN = 1000
+
+# The same git location scrub its sibling gates run under. An
+# exported GIT_DIR defeats git -C, so a gate launched from a git
+# hook or a configured shell would otherwise read the repository
+# the environment names instead of the one it was handed, and a
+# line count read from that other repository would stand as the
+# count for the file under review. The driver and configuration
+# variables are scrubbed beside the location variables, for the
+# same reason the extractor scrubs them. Every child this gate
+# spawns runs under this environment, the direct git reading
+# and the packet check alike, because the packet check reads
+# the same repository with git children of its own.
+GIT_SCRUB_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+)
+GIT_DRIVER_ENV_VARS = (
+    "GIT_EXTERNAL_DIFF",
+    "GIT_DIFF_OPTS",
+    "GIT_PAGER",
+    "GIT_EXEC_PATH",
+)
+GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+
+
+def scrubbed_child_env():
+    """The environment a child process of this gate runs under."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_SCRUB_VARS
+        and key not in GIT_DRIVER_ENV_VARS
+        and not key.startswith(GIT_CONFIG_ENV_PREFIX)
+    }
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return env
+
 
 VERDICTS = ("confirm", "contest", "new")
 MODES = ("local", "managed")
@@ -486,6 +531,7 @@ def repo_line_problems(record, manifest, repo):
             result = subprocess.run(
                 ["git", "-C", str(repo), "show", "%s:%s" % (head, path)],
                 capture_output=True, text=True,
+                env=scrubbed_child_env(),
             )
             counts[path] = (
                 len(result.stdout.splitlines())
@@ -524,7 +570,8 @@ def repo_packet_problems(manifest_path, manifest, repo):
     if isinstance(manifest, dict) and manifest.get("merge_base"):
         command += ["--expect-merge-base", str(manifest["merge_base"])]
     result = subprocess.run(
-        command, capture_output=True, text=True
+        command, capture_output=True, text=True,
+        env=scrubbed_child_env(),
     )
     if result.returncode == 0:
         return []

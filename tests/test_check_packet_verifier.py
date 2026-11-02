@@ -74,9 +74,34 @@ class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
         self._finalizer.detach()
 
 
+# The git location variables are scrubbed from the environment
+# every fixture command runs under. An exported GIT_DIR defeats
+# git -C, so a suite launched with the variables set would run
+# its fixture work in the repository they name instead of in
+# the fixture, writing real commits there under passing tests.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def scrubbed_git_env():
+    """The caller environment with the git location names removed."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+
 def git(repo, *args):
     result = subprocess.run(
         ["git", "-C", str(repo)] + list(args),
+        env=scrubbed_git_env(),
         capture_output=True,
         text=True,
     )
@@ -747,7 +772,7 @@ class TestGenuineShapes(VerifierFixture):
         )
         clone = Path(self.tmp.name) / "rootrepo"
         subprocess.run(
-            ["git", "clone", "-q", str(self.repo), str(clone)], check=True
+            ["git", "clone", "-q", str(self.repo), str(clone)], check=True, env=scrubbed_git_env()
         )
         git(clone, "checkout", "-q", self.sha_a)
         self.assertEqual(self.check_repo_packet(clone, out), 0)
@@ -1835,6 +1860,7 @@ class TestRound27ShallowAndState(Round27Fixture):
                 "file://" + str(self.repo), str(shallow),
             ],
             check=True,
+            env=scrubbed_git_env(),
         )
         git(shallow, "config", "user.email", "test@example.com")
         out = self.clone("shallowpkt", self.full)
@@ -1855,7 +1881,7 @@ class TestRound27ShallowAndState(Round27Fixture):
         main_head = commit_all(repo, "main change")
         clean = Path(self.tmp.name) / "cleanclone"
         subprocess.run(
-            ["git", "clone", "-q", str(repo), str(clean)], check=True
+            ["git", "clone", "-q", str(repo), str(clean)], check=True, env=scrubbed_git_env()
         )
         git(clean, "checkout", "-q", main_head)
         out = extract_packet(
@@ -1865,7 +1891,7 @@ class TestRound27ShallowAndState(Round27Fixture):
         git(repo, "checkout", "-q", "side")
         result = subprocess.run(
             ["git", "-C", str(repo), "rebase", "main"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, env=scrubbed_git_env(),
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(git(repo, "rev-parse", "HEAD"), main_head)
@@ -2253,7 +2279,7 @@ class TestRound27Notes(Round27Fixture):
         )
         clone = Path(self.tmp.name) / "spellclone"
         subprocess.run(
-            ["git", "clone", "-q", str(repo), str(clone)], check=True
+            ["git", "clone", "-q", str(repo), str(clone)], check=True, env=scrubbed_git_env()
         )
         middle = git(clone, "rev-parse", "HEAD~1")
         git(clone, "checkout", "-q", "--detach", head)

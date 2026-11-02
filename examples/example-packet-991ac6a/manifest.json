@@ -5,12 +5,12 @@
     "extract.py",
     "--commit",
     "991ac6a",
-    "--repo",
-    "/home/hatch/workspace/round085-scratch/landed-tree",
     "--out",
-    "/home/hatch/workspace/round085-scratch/landed-tree/examples/example-packet-991ac6a"
+    "examples/example-packet-991ac6a",
+    "--repo",
+    "."
   ],
-  "created_utc": "2026-10-28T00:07:19.091263+00:00",
+  "created_utc": "2026-10-30T23:51:05.989193+00:00",
   "mode": "commit",
   "label": "commit 991ac6ae80d3",
   "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
@@ -31,7 +31,8 @@
       "attribute_text": false,
       "binary_transition": false,
       "placeholder": null,
-      "instruction_file": false
+      "instruction_file": false,
+      "credential_file": false
     },
     {
       "path": "scripts/check_devin.py",
@@ -45,7 +46,8 @@
       "attribute_text": false,
       "binary_transition": false,
       "placeholder": null,
-      "instruction_file": false
+      "instruction_file": false,
+      "credential_file": false
     }
   ],
   "exclusions": [],
@@ -80,8 +82,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 1789,
-      "emitted_tokens": 1789,
+      "estimated_tokens": 1859,
+      "emitted_tokens": 1859,
       "files": 2
     }
   },
@@ -94,7 +96,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 5947,
+    "estimated_tokens": 6017,
     "dropped": []
   },
   "cap_notes": [

@@ -350,6 +350,55 @@ def sanitize_packet_text(text):
     return text.replace("\x00", "[NUL]")
 
 
+# Credential shaped values are masked wherever packet text is
+# printed. A private key block, an AWS access key shape, and a
+# GitHub token shape are secrets by shape in any file that
+# carries them, so the packet names the shape and withholds the
+# value. The mask holds no newline and keeps a leading diff
+# marker, so line counts and diff structure stand unchanged.
+PRIVATE_KEY_BEGIN_RE = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----")
+PRIVATE_KEY_END_RE = re.compile(
+    r"-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----")
+AWS_KEY_RE = re.compile(r"(?:AKIA|ASIA)[0-9A-Z]{16}")
+GITHUB_TOKEN_RE = re.compile(
+    r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"
+    r"|github_pat_[A-Za-z0-9_]{20,}"
+)
+REDACTED_KEY_LINE = "[redacted private key]"
+REDACTED_VALUE = "[redacted credential]"
+
+
+def mask_credential_text(text):
+    """Mask credential shaped values in printed packet text."""
+    if not text:
+        return text
+    out = []
+    in_key_block = False
+    for line in text.split("\n"):
+        prefix = ""
+        body = line
+        if body[:1] in ("+", "-", " ") and (
+            PRIVATE_KEY_BEGIN_RE.search(body)
+            or PRIVATE_KEY_END_RE.search(body)
+            or in_key_block
+        ):
+            prefix, body = body[:1], body[1:]
+        if in_key_block:
+            if PRIVATE_KEY_END_RE.search(body):
+                in_key_block = False
+            out.append(prefix + REDACTED_KEY_LINE)
+            continue
+        if PRIVATE_KEY_BEGIN_RE.search(body):
+            in_key_block = True
+            out.append(prefix + REDACTED_KEY_LINE)
+            continue
+        body = AWS_KEY_RE.sub(REDACTED_VALUE, body)
+        body = GITHUB_TOKEN_RE.sub(REDACTED_VALUE, body)
+        out.append(prefix + body)
+    return "\n".join(out)
+
+
 def decode_bytes(data):
     """Decode subprocess bytes without ever failing.
 
@@ -1939,6 +1988,402 @@ def entry_is_instruction(entry):
         is_instruction_path(entry.get("old_path"))
 
 
+# Files whose name marks them as credential bearing. A dotenv
+# file holds the environment of a deployment, a private key
+# file holds a key outright, and the SSH key names hold one by
+# convention. The standard credential file names hold one the
+# same way, the netrc password file in its three spellings,
+# the PostgreSQL and git credential stores in their dotted
+# and bare spellings, the shared
+# credentials file of the AWS tools, the npm and PyPI
+# credential files, the credentials stem and the secret and
+# secrets stems under a data
+# extension, the conventional cloud and auth key file names,
+# the service account key spellings, the token and session
+# json names, the curl and wget rc files, the terraform
+# state file, the WireGuard interface configs and client
+# configs, the cookie stores beside their text form, and
+# the vault and session files, the Docker credential store
+# under its mount name and under its json name, the
+# WordPress configuration file, the terraform variables
+# files and the terraform CLI configuration, the bare
+# spellings of the rc and store names beside their dotted
+# forms, the Chrome cookie store under its file name, the
+# token and session stems under the data extensions, the
+# api key and private key stores in their json spellings,
+# the plain client secret, oauth and keyfile json names,
+# and the service account key under a yaml tail, the
+# Chrome password and autofill stores under their profile
+# file names in both spellings, the terraform variables
+# and CLI credential files in their json forms, the
+# kubeconfig and api key stores under their json and
+# separator free spellings, the service account names
+# under their remaining yaml and yml tails, the next
+# token, private key and cookie store spellings, the
+# bare passwd and shadow names and the bare token names,
+# and the GitHub hosts store under a json tail, the
+# Firefox password and key stores in both their key
+# database generations, the Chrome Local State file that
+# holds the profile encryption key, the browser password
+# export under its csv name, the auth token store in its
+# underscored spelling, the api key and private key and
+# client secret stores under their yaml and txt tails
+# beside their json forms, the access token store under
+# a yaml tail, the group shadow file in its bare name,
+# the Chrome cookie store under its sqlite3 tail, and
+# the terraform variables files under any name by their
+# tfvars tail, serviceaccount.json,
+# client-secret.json, client_secret.txt,
+# access_token.yaml, access_token.yml, api-key.txt,
+# apikey.txt, api_key.yml, private_key.txt and
+# refresh_token.yml beside their priced tails, the
+# legacy Firefox password
+# store signons.sqlite and the Firefox certificate
+# store cert9.db of the same
+# profile, the Chrome login data store under a json
+# tail as login_data.json, and the terraform
+# variables file in its json
+# form under the prod name as prod.tfvars.json, and
+# the lane 11 names enumerated name by name in the
+# same way, service_account.txt, client-secret.yaml,
+# access-token.txt, refresh-token.yaml,
+# private-key.txt, serviceaccount.yaml, cert8.db,
+# service-account.txt, client_secret.yml,
+# client-secret.txt, refresh_token.txt, apikeys.txt,
+# auth-token.yaml, keyfile.yaml, privatekey.yaml,
+# logins.txt, signons.json, cookies.yaml and
+# dev.tfvars.json, and the finisher names enumerated
+# name by name in the same way, serviceaccount.txt,
+# refresh-token.txt, privatekey.txt, auth_token.yaml,
+# auth-token.txt, keyfile.txt, cert7.db, logins.yaml,
+# login_data.txt, signons.txt, stage.tfvars.json and
+# staging.tfvars.json, and their
+# usual contents
+# fall outside the masked value shapes, so the name is the
+# only line of defence those files have. The OpenSSH
+# security key names stand in the same set on a narrower
+# ground, because their usual contents are a private key
+# block the mask does catch in diff shape, and for them the
+# name is the only line of defence for the flag, the warning
+# and the withholding. An editor backup of a priced name
+# carries the same body under a backup tail, the bak tail,
+# the backup tail the terraform tool writes for its state
+# file, or the tilde tail, so a name is
+# judged again with the tail stripped. The set is an
+# enumerated list of standard credential file names. It
+# flags the names it enumerates and does not claim to catch
+# credential files in general. A spelling past the
+# enumeration, the same store under a further name, a
+# further tail or a further extension, belongs to the class
+# the boundary names, a credential file under a name the
+# set does not hold, and stands outside the set by the same
+# rule. The packet flags such
+# a file in the triage list
+# and in the manifest beside the instruction flag, withholds
+# its diff body behind a named notice, and masks credential
+# shaped values in every other file, so a verified packet
+# never carries a secret value in silence. The template
+# spellings of the dotenv name are exempt, because a template
+# carries placeholder values by design and flagging it would
+# spend the flag on files that hold no secret.
+CREDENTIAL_BASENAMES = {
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_ecdsa_sk",
+    "id_ed25519_sk",
+    ".netrc",
+    "_netrc",
+    "netrc",
+    "credentials",
+    ".npmrc",
+    ".pypirc",
+    ".pgpass",
+    "pgpass",
+    ".git-credentials",
+    "git-credentials",
+    ".curlrc",
+    ".wgetrc",
+    ".htpasswd",
+    ".vault-token",
+    ".boto",
+    ".s3cfg",
+    ".my.cnf",
+    "keystore",
+    "cookies.txt",
+    "cookies.sqlite",
+    "cookies.json",
+    "auth.json",
+    "service-account.json",
+    "service_account.json",
+    "service-account-key.json",
+    "service_account_key.json",
+    "application_default_credentials.json",
+    "client_secrets.json",
+    "kubeconfig",
+    "kubeconfig.yaml",
+    "kubeconfig.yml",
+    "secrets.json",
+    "accesstokens.json",
+    "accesskeys.csv",
+    "access_keys.csv",
+    "tokens.json",
+    "token.json",
+    "access-token.json",
+    "session.json",
+    "terraform.tfstate",
+    "client.conf",
+    "openvpn.conf",
+    ".vault-password",
+    "wg0.conf",
+    ".dockerconfigjson",
+    "wp-config.php",
+    "npmrc",
+    "vault-token",
+    "cookies",
+    "pypirc",
+    "curlrc",
+    "wgetrc",
+    "htpasswd",
+    "boto",
+    "s3cfg",
+    "dockerconfig.json",
+    "application-default-credentials.json",
+    "access_token.json",
+    "refresh_token.json",
+    "refresh-token.json",
+    "api_key.json",
+    "api-key.json",
+    "apikeys.json",
+    "api_keys.json",
+    "private_key.json",
+    "client_secret.json",
+    "oauth.json",
+    "keyfile.json",
+    "terraform.tfvars",
+    ".terraformrc",
+    "service-account-key.yaml",
+    "service_account_key.yaml",
+    "login data",
+    "web data",
+    "login_data",
+    "web_data",
+    "terraform.tfvars.json",
+    "credentials.tfrc.json",
+    "kubeconfig.json",
+    "apikey.json",
+    "apikeys.yaml",
+    "service-account.yaml",
+    "service_account.yaml",
+    "service-account.yml",
+    "service_account.yml",
+    "service-account-key.yml",
+    "service_account_key.yml",
+    "privatekey.json",
+    "private-key.json",
+    "api_token.json",
+    "api-token.json",
+    "auth-token.json",
+    "access_token.txt",
+    "refresh_token.yaml",
+    "token_cache.json",
+    "access-token",
+    "refresh-token",
+    "cookies.db",
+    "keystore.json",
+    "passwd",
+    "shadow",
+    "secrets.tfvars.json",
+    "client_secrets.yaml",
+    "logins.json",
+    "key4.db",
+    "key3.db",
+    "local state",
+    "passwords.csv",
+    "auth_token.json",
+    "api_key.yaml",
+    "api-key.yaml",
+    "apikey.yaml",
+    "api_key.txt",
+    "private_key.yaml",
+    "private-key.yaml",
+    "client_secret.yaml",
+    "access-token.yaml",
+    "gshadow",
+    "cookies.sqlite3",
+    "serviceaccount.json",
+    "client-secret.json",
+    "access_token.yaml",
+    "api-key.txt",
+    "client_secret.txt",
+    "signons.sqlite",
+    "prod.tfvars.json",
+    "apikey.txt",
+    "private_key.txt",
+    "api_key.yml",
+    "access_token.yml",
+    "refresh_token.yml",
+    "login_data.json",
+    "cert9.db",
+    "service_account.txt",
+    "client-secret.yaml",
+    "access-token.txt",
+    "refresh-token.yaml",
+    "private-key.txt",
+    "serviceaccount.yaml",
+    "cert8.db",
+    "service-account.txt",
+    "client_secret.yml",
+    "client-secret.txt",
+    "refresh_token.txt",
+    "apikeys.txt",
+    "auth-token.yaml",
+    "keyfile.yaml",
+    "privatekey.yaml",
+    "logins.txt",
+    "signons.json",
+    "cookies.yaml",
+    "dev.tfvars.json",
+    "serviceaccount.txt",
+    "refresh-token.txt",
+    "privatekey.txt",
+    "auth_token.yaml",
+    "auth-token.txt",
+    "keyfile.txt",
+    "cert7.db",
+    "logins.yaml",
+    "login_data.txt",
+    "signons.txt",
+    "stage.tfvars.json",
+    "staging.tfvars.json",
+}
+CREDENTIAL_SUFFIXES = (
+    ".pem", ".key", ".p12", ".pfx", ".keystore", ".ppk",
+    ".jks", ".p8", ".kdbx", ".kdb", ".ovpn", ".gpg",
+    ".tfvars",
+)
+CREDENTIAL_STEM_SUFFIXES = (
+    ".json", ".yml", ".yaml", ".txt", ".toml", ".ini", ".cfg",
+    ".csv", ".db", ".xml", ".tfvars",
+)
+CREDENTIAL_STEMS = (
+    "credentials", "secret", "secrets", "token", "tokens",
+    "session", "sessions",
+)
+DOTENV_TEMPLATE_TAILS = {"example", "sample", "template", "dist"}
+
+
+def is_credential_path(path):
+    """Whether one path names a credential bearing file."""
+    if not path:
+        return False
+    # An editor backup tail is stripped from the whole path
+    # and the stripped path is judged again, so a credential
+    # store recognised by the shape of its whole path, the
+    # .kube/config and .config/gh/hosts.yml family, keeps
+    # the directory parts its rule needs under a backup
+    # suffix instead of being judged on its basename alone.
+    raw = str(path)
+    for tail in (".backup", ".bak"):
+        if raw.lower().endswith(tail):
+            return is_credential_path(raw[:-len(tail)])
+    if raw.endswith("~"):
+        return is_credential_path(raw[:-1])
+    name = Path(path).parts[-1] if Path(path).parts else ""
+    lowered = name.lower()
+    # The SSH key names are judged in lower case beside the
+    # suffixes and the dotenv family below, so a key file named
+    # in capitals or in mixed case cannot slip the flag on the
+    # case of its name alone.
+    parts = [part.lower() for part in Path(path).parts]
+    for first, second in zip(parts, parts[1:]):
+        if (first, second) in (
+                (".docker", "config.json"), (".kube", "config"),
+                (".kube", "config.yaml"),
+                (".kube", "config.yml"),
+                (".kube", "config.json")):
+            return True
+    for first, second, third in zip(parts, parts[1:], parts[2:]):
+        if (first, second, third) in (
+                (".config", "gh", "hosts.yml"),
+                (".config", "gh", "hosts.yaml"),
+                (".config", "gh", "hosts.json")):
+            return True
+    if lowered in CREDENTIAL_BASENAMES:
+        return True
+    if lowered.endswith(CREDENTIAL_SUFFIXES):
+        return True
+    for stem in CREDENTIAL_STEMS:
+        if lowered.startswith(stem + ".") and \
+                lowered[len(stem):] in CREDENTIAL_STEM_SUFFIXES:
+            return True
+    # A WireGuard interface config names its interface in
+    # the stem, wg with a number, so the family is read by
+    # its shape beside the priced wg0 spelling.
+    if re.fullmatch(r"wg[0-9]+\.conf", lowered):
+        return True
+    if lowered.startswith("client_secret_") and \
+            lowered.endswith(".json"):
+        return True
+    # The Firebase admin SDK download names its service
+    # account file for the project, firebase-adminsdk with a
+    # generated suffix, sometimes standing behind a prefix.
+    if lowered.endswith(".json") and (
+            lowered.startswith("firebase-adminsdk")
+            or "-firebase-adminsdk" in lowered):
+        return True
+    # The dotenv family is judged in lower case throughout, so
+    # its spellings cannot slip the flag on case alone. A name
+    # ending in the dotenv suffix, the bare name, its dotted
+    # forms, and the envrc name all carry secrets by shape,
+    # while the template tails below stay exempt by design
+    # because a template carries placeholders.
+    if lowered == ".envrc":
+        return True
+    if lowered == ".env":
+        return True
+    if lowered.endswith(".env"):
+        return True
+    if lowered.startswith(".env."):
+        tail = lowered[len(".env."):]
+        return tail not in DOTENV_TEMPLATE_TAILS
+    return False
+
+
+def entry_is_credential(entry):
+    """Whether a changed file is a credential bearing file.
+
+    The judging rule mirrors the instruction rule. A rename is
+    judged from either name, so renaming a credential file to a
+    plain name or a plain file to a credential name flags the
+    entry either way, and a copy is judged from its destination
+    alone, because its source still stands in the tree under
+    its own name with its own entry.
+    """
+    if entry.get("status") == "copied":
+        return is_credential_path(entry.get("path"))
+    return is_credential_path(entry.get("path")) or \
+        is_credential_path(entry.get("old_path"))
+
+
+def credential_notice(entry):
+    """The change tier body of a credential bearing file.
+
+    The notice stands where the diff would stand, in the same
+    shape the packet checker rebuilds when it judges the body,
+    so the withheld diff is a stated shape with its counts
+    named rather than an absence a reader must guess at.
+    """
+    return (
+        "(credential file with %d additions and %d "
+        "deletions. Its diff is not printed, because the "
+        "lines of a credential file are secrets by shape. "
+        "The counts stand in the manifest.)"
+        % (entry["additions"], entry["deletions"])
+    )
+
+
 def source_verb(entry):
     """The verb that names where an entry with an old path came from.
 
@@ -2001,10 +2446,30 @@ def build_t0(files, commit_log, pr_info):
         lines.append("")
     lines.append("Files changed: %d" % len(files))
     lines.append("")
+    credential_names = [
+        display_path(entry["path"])
+        for entry in files
+        if entry_is_credential(entry)
+    ]
+    if credential_names:
+        lines.append(
+            "This change carries credential shaped files, namely "
+            "%s. Their diff bodies are withheld in this packet and "
+            "their values stand redacted wherever they would "
+            "print, and any value that stood in them should be "
+            "treated as exposed and rotated."
+            % ", ".join(credential_names)
+        )
+        lines.append("")
     lines.append("### Files")
     lines.append("")
     for entry in files:
-        marker = ", instruction file" if entry_is_instruction(entry) else ""
+        flags = []
+        if entry_is_instruction(entry):
+            flags.append("instruction file")
+        if entry_is_credential(entry):
+            flags.append("credential file")
+        marker = ", " + ", ".join(flags) if flags else ""
         if entry.get("old_path"):
             lines.append(
                 "- %s (%s%s, %s from %s)"
@@ -2038,7 +2503,8 @@ def build_t0(files, commit_log, pr_info):
     lines.append("")
     lines.append("### Commits")
     lines.append("")
-    commit_text = commit_log.rstrip() if commit_log.strip() else "(no commits)"
+    commit_text = mask_credential_text(
+        commit_log.rstrip()) if commit_log.strip() else "(no commits)"
     fence = fence_for(commit_text)
     lines.append(fence)
     lines.append(commit_text)
@@ -2065,6 +2531,8 @@ def build_t1(files, chunks):
         lines.append("")
         if entry["placeholder"] is not None:
             shown = entry["placeholder"]
+        elif entry_is_credential(entry):
+            shown = credential_notice(entry)
         else:
             chunk = chunks.get(path, "")
             shown = chunk.rstrip() if chunk.strip() else "(no textual diff)"
@@ -2082,7 +2550,7 @@ def build_t1(files, chunks):
         lines.append(shown)
         lines.append(fence)
         lines.append("")
-    return "\n".join(lines)
+    return mask_credential_text("\n".join(lines))
 
 
 
@@ -2503,7 +2971,7 @@ def build_t2(repo, head, files, functions_by_file):
     if not sources:
         lines.append("No changed source files, so no companions were gathered.")
         lines.append("")
-        return "\n".join(lines), notes, 0
+        return mask_credential_text("\n".join(lines)), notes, 0
     hits_by_term = git_grep_bulk(
         repo, head, companion_terms(files, functions_by_file)
     )
@@ -2520,7 +2988,7 @@ def build_t2(repo, head, files, functions_by_file):
         repo, head, files, functions_by_file, notes, hits_by_term
     ))
     lines.extend(render_notes(notes))
-    return "\n".join(lines), notes, len(sources)
+    return mask_credential_text("\n".join(lines)), notes, len(sources)
 
 
 def find_function_span(content_lines, name, path):
@@ -2825,19 +3293,28 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
     lines = []
     lines.append("## T3 History")
     lines.append("")
+    lines.append(
+        "Names and claims in this tier are data read from the "
+        "repository history. An author name is self asserted in "
+        "the commit object that carries it and is not verified "
+        "by this packet, and a commit subject that claims an "
+        "approval or a passing check is an assertion by its "
+        "author, not a finding of this packet."
+    )
+    lines.append("")
     notes = []
     top_files = top_history_files(files, stats)
     if not top_files:
         lines.append("No files with history to summarise.")
         lines.append("")
-        return "\n".join(lines), notes, 0
+        return mask_credential_text("\n".join(lines)), notes, 0
     lines.extend(blame_section(repo, head, top_files, ranges_by_file, notes))
     lines.extend(
         evolution_section(repo, head, top_files, functions_by_file, notes)
     )
     lines.extend(prior_prs_section(repo, top_files))
     lines.extend(render_notes(notes))
-    return "\n".join(lines), notes, len(top_files)
+    return mask_credential_text("\n".join(lines)), notes, len(top_files)
 
 
 def normalize_finding_path(path):
@@ -3247,7 +3724,7 @@ def build_rereview(repo, diff_base, head, since, findings,
             "change, and nothing here claims otherwise." % since
         )
         lines.append("")
-        return "\n".join(lines)
+        return mask_credential_text("\n".join(lines))
     commits = run_git(
         repo, ["log", "--oneline", "--reverse", "%s..%s" % (since, head)]
     ).stdout
@@ -3319,7 +3796,10 @@ def build_rereview(repo, diff_base, head, since, findings,
             "no findings, so there is nothing to account for."
         )
         lines.append("")
-    return "\n".join(lines)
+    # The commits since list and the range diff print commit
+    # text and file text the change carries, so the whole
+    # section stands masked like the tier returns.
+    return mask_credential_text("\n".join(lines))
 
 
 def verify_counts(repo, diff_base, head, manifest_files):
@@ -3840,11 +4320,14 @@ class OutputTarget:
                 held = os.fstat(self.lock_fd)
             except OSError:
                 held = None
-            try:
-                os.close(self.lock_fd)
-            except OSError:
-                pass
-            self.lock_fd = None
+            # The standing entry is verified and unlinked while
+            # the lock is still held, never after the descriptor
+            # closes. Closing first would release the flock while
+            # the file still stands at the name, so a second run
+            # could acquire that same inode in the window, and
+            # this run's unlink would then remove the lock file
+            # the second run holds, leaving it writing under a
+            # lock no name stands over.
             if held is not None and self.dir_fd is not None:
                 try:
                     standing = os.stat(
@@ -3862,6 +4345,11 @@ class OutputTarget:
                         )
                     except OSError:
                         pass
+            try:
+                os.close(self.lock_fd)
+            except OSError:
+                pass
+            self.lock_fd = None
         if self.dir_fd is not None:
             try:
                 os.close(self.dir_fd)
@@ -4708,7 +5196,9 @@ def build_packet_text(header, tier_texts, rereview, tier_info, dropped,
             budget, packet_estimate, tier_info, dropped,
             verified, discrepancies, counts,
         )
-        packet = sanitize_packet_text("\n".join(sections + [completeness]))
+        packet = sanitize_packet_text(
+            "\n".join(sections + [completeness])
+        )
         new_estimate = estimate_tokens(packet)
         if new_estimate == packet_estimate:
             break
@@ -4731,6 +5221,7 @@ def manifest_file_records(files):
             "binary_transition": entry["binary_transition"],
             "placeholder": entry["placeholder"],
             "instruction_file": entry_is_instruction(entry),
+            "credential_file": entry_is_credential(entry),
         }
         for entry in files
     ]
