@@ -212,7 +212,8 @@ a separate statement and the declaration never runs,
 and the deny outcome is read through as many
 levels of delegation as the handler chains, so a
 handler that delegates its gating to a helper that
-delegates in turn reads as the gating handler it is. A `.catch` handler must stand on that call's
+delegates in turn reads as the gating handler it is.
+A `.catch` handler must stand on that call's
 own chain, its spaced spelling included, and the
 handler it names is judged by its binding as at the
 registration call, a rebinding before the call counting
@@ -220,7 +221,8 @@ and a rebinding after it not counting, with a binding
 by a destructuring assignment or a destructuring
 declaration counting the same way at the value
 standing at the name's own key path in the right hand
-side, in any declarator of the declaration, for the catch handler name, the gating handler
+side, in any declarator of the declaration, for the
+catch handler name, the gating handler
 name and every name the deny judgement reads alike. A
 function declaration binds when its scope is
 instantiated, before any statement of the scope runs,

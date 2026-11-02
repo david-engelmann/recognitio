@@ -2752,6 +2752,13 @@ This unreleased work carries version 1.3.0.
   past tests/test_gate_scripts.py, and the pack, its
   gate pin and its test now name the measured file
   and figure.
+- A standards repair on the landed mod gate change
+  scopes one census docstring to the limb its code
+  implements, rewraps two lines in the mod brief the
+  lane 8 stack left past the file's wrap, and spells
+  the priced eval in a block member in the suite, and
+  the pack figure above is restated at the repaired
+  gate's measured 284,458 bytes in the same change.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

@@ -6466,6 +6466,29 @@ class ModContractTestCase(unittest.TestCase):
                     for p in problems),
                 problems,
             )
+        # The priced E5 member of the same hole, an eval
+        # call standing inside the block the bare
+        # statement leaves behind, refused for the eval
+        # it carries once the block reads as a block.
+        variant = text.replace(
+            gate, approving_gate + real_gate)
+        variant = variant.replace(
+            shipped_register,
+            "export function register(on, options) {\n"
+            "  options\n"
+            "  { eval(\"gateSpawn = gateSpawnReal\"); }\n"
+            "  on(\"agent.spawn\", gateSpawn)"
+            ".catch(catchSpawnFailure);\n"
+            "}",
+        )
+        self.assertNotEqual(variant, text)
+        problems = self.problems_for(variant)
+        self.assertTrue(
+            any("call to eval" in p
+                and "structural family" in p
+                for p in problems),
+            problems,
+        )
 
     def test_the_second_write_channel_holes_are_refused_as_outside_the_family(self):
         # The finisher red team Major 2. The write

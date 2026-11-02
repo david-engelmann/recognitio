@@ -6549,12 +6549,13 @@ def _family_member_name(tokens, index, frames):
     word itself stands at an element boundary in the
     class body, behind its opening brace, a closing
     brace, a semicolon or a modifier word standing at
-    one, by the class element that follows it. A word
-    standing behind an assignment sign names no field,
-    since a field initialiser's expressions stand
-    behind one and their constructs are constructs
-    still. In those places the word is a name, never
-    the construct it spells.
+    one, by the class element that follows it. The
+    boundary spelling asks for the boundary because a
+    word standing behind an assignment sign stands
+    inside a field initialiser's expression, where
+    its constructs are constructs still. In those
+    places the word is a name, never the construct
+    it spells.
     """
     following = tokens[index + 1] \
         if index + 1 < len(tokens) else None
