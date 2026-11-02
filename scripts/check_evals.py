@@ -983,6 +983,114 @@ def corpus_problems(root):
     return []
 
 
+def backtick_spans(text):
+    """Split a prose text into the contents of its code spans.
+
+    A span opens with a run of backticks and closes with a
+    run of the same length, the pairing Markdown itself
+    uses. A fenced block therefore reads as the one span it
+    is, where a blind pairing of single backticks starts a
+    phantom span at the fence and silences every citation
+    standing after it in the file. A run with no closing run
+    of its length opens nothing.
+    """
+    runs = [
+        (match.start(), match.end())
+        for match in re.finditer(r"`+", text)
+    ]
+    spans = []
+    index = 0
+    while index < len(runs):
+        start, end = runs[index]
+        length = end - start
+        closing = None
+        for ahead in range(index + 1, len(runs)):
+            if runs[ahead][1] - runs[ahead][0] == length:
+                closing = ahead
+                break
+        if closing is None:
+            index += 1
+            continue
+        spans.append(text[end:runs[closing][0]])
+        index = closing + 1
+    return spans
+
+
+def prose_cited_test_names(text):
+    """Collect the test names a prose text cites in backticks.
+
+    Prose cites a name in the spellings a writer reaches for,
+    the bare name, the call spelling with its parentheses,
+    and the node id spelling that names the file first. Every
+    code span is read for the name tokens it carries, and a
+    token spelled as a file stem, closed by the .py suffix
+    at a word break, is a file mention and not a name
+    citation.
+    """
+    names = set()
+    for span in backtick_spans(text):
+        for match in re.finditer(r"test_[a-z0-9_]+", span):
+            after = span[match.end():]
+            if after.startswith(".py") and (
+                len(after) == 3
+                or after[3]
+                not in "abcdefghijklmnopqrstuvwxyz0123456789_"
+            ):
+                continue
+            names.add(match.group(0))
+    return names
+
+
+def eval_prose_problems(root):
+    """Name every test the eval prose cites that the suite lacks.
+
+    The corpus index is not the only eval artefact that cites
+    suite tests by name. The results file and the per pass
+    notes standing beside it are authored prose of the same
+    record, and a name cited there goes stale in the same way
+    when a test is renamed, while the checksum refresh alone
+    would bless the stale name because the refresh re-records
+    bytes without reading citations. Every Markdown artefact
+    at the evals root beside the index is read for the names
+    its backtick spans carry, against the same suite census
+    the corpus check uses. The root artefacts are held to the
+    corpus discipline without exception, so a fixture test or
+    a former name is spelled with its file or in plain words
+    there, never as a bare citation. The task packets under
+    evals/tasks stand outside this check, because their text
+    is rebuilt from the fixture sources it quotes, where a
+    test name belongs to the fixture and not to this suite.
+    """
+    evals = root / "evals"
+    if not evals.is_dir():
+        return ["no evals directory stands in the tree"]
+    suite = suite_test_names(root)
+    paths = sorted(
+        path
+        for path in evals.iterdir()
+        if path.is_file() and path.suffix.lower() == ".md"
+    )
+    problems = []
+    for path in paths:
+        if path.name == "corpus.md":
+            continue
+        try:
+            text = guarded_read_text(path, encoding="utf-8")
+        except OSError:
+            problems.append(
+                "the eval artefact %s cannot be read" % path.name
+            )
+            continue
+        missing = sorted(prose_cited_test_names(text) - suite)
+        if missing:
+            problems.append(
+                "the eval artefact %s cites test names the suite "
+                "does not hold, namely %s"
+                % (path.name, " and ".join(missing))
+            )
+    return problems
+
+
 def corpus_sections(text):
     """Map each incidents section title to its cited test names."""
     sections = {}
@@ -1475,6 +1583,7 @@ def all_problems(root):
         problems.extend(task_anchor_problems(root, task_name))
     problems.extend(source_anchor_problems(root))
     problems.extend(corpus_problems(root))
+    problems.extend(eval_prose_problems(root))
     problems.extend(corpus_coverage_problems(root))
     problems.extend(corpus_scope_problems(root))
     problems.extend(packet_problems(root))
@@ -1548,11 +1657,12 @@ def main(argv=None):
         "re-derive from its transcripts and every planted defect "
         "still stands in its rebuilt head and every task rebuilds "
         "from its sources and every task sources file matches its "
-        "anchor and every corpus name stands in the suite and the "
-        "corpus coverage record matches the index and the corpus "
-        "scope sentence names the highest round section the index "
-        "carries and the README paired eval claim carries "
-        "the construction caveat the results file states"
+        "anchor and every corpus name and every eval prose name "
+        "stands in the suite and the corpus coverage record "
+        "matches the index and the corpus scope sentence names "
+        "the highest round section the index carries and the "
+        "README paired eval claim carries the construction "
+        "caveat the results file states"
     )
     return 0
 

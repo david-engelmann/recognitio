@@ -32,8 +32,8 @@ live session is the only surface that exercises the skill.
 Codex embeds at most 32,768 bytes of a repo AGENTS.md
 into first turn instructions, under the
 `project_doc_max_bytes` value the Codex review brief
-records. This repo AGENTS.md stands at 54,755 bytes, so
-its last 21,987 bytes never reach a Codex session. The
+records. This repo AGENTS.md stands at 54,852 bytes, so
+its last 22,084 bytes never reach a Codex session. The
 lost bytes are the greater part of the Current state
 chronicle at the foot of the file. Every operative
 section stands inside the cap, so a Codex session holds

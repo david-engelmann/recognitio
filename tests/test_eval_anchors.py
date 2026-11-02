@@ -201,5 +201,223 @@ class TestAgreementPin(unittest.TestCase):
             )
 
 
+class TestEvalProseNames(unittest.TestCase):
+    """The eval prose beside the index is read for cited names.
+
+    The burn-down red team re-check filed the blind spot as a
+    note. A stale test name planted in the per pass notes
+    survived every gate, because the corpus check read the
+    index alone and the checksum refresh re-records bytes
+    without reading citations. Each test below fails when the
+    prose check is reverted.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_evals")
+
+    def test_a_live_name_cited_in_the_pass_notes_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA note citing "
+                "`test_the_real_skill_package_is_valid` in the "
+                "gate script suite.\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.mod.eval_prose_problems(root), [])
+
+    def test_a_renamed_test_cited_in_the_pass_notes_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA note citing "
+                "`test_the_real_skill_package_is_valid` in the "
+                "gate script suite.\n",
+                encoding="utf-8",
+            )
+            suite_file = root / "tests" / "test_gate_scripts.py"
+            suite_text = suite_file.read_text(encoding="utf-8")
+            suite_text = suite_text.replace(
+                "def test_the_real_skill_package_is_valid",
+                "def test_the_real_skill_package_stays_valid",
+            )
+            self.assertIn(
+                "test_the_real_skill_package_stays_valid", suite_text
+            )
+            suite_file.write_text(suite_text, encoding="utf-8")
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("PASS-NOTES.md", problems[0])
+            self.assertIn(
+                "test_the_real_skill_package_is_valid", problems[0]
+            )
+
+    def test_a_name_that_never_existed_in_the_results_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "RESULTS.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA row citing "
+                "`test_a_name_that_never_existed` in the gate "
+                "script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("RESULTS.md", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_a_call_spelling_citation_in_the_pass_notes_fails(self):
+        # Red team re-review of the burndown stack. The call
+        # spelling, the name with its parentheses, is a
+        # citation a reader reads as one, so it is read as one.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA note citing "
+                "`test_a_name_that_never_existed()` in the "
+                "gate script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("PASS-NOTES.md", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_a_node_id_citation_in_the_results_fails(self):
+        # Red team re-review of the burndown stack. The node
+        # id spelling names the file first and the test after
+        # the colons, and it is read as the citation it is.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "RESULTS.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA row citing "
+                "`tests/test_qwen.py::"
+                "test_a_name_that_never_existed` in the gate "
+                "script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("RESULTS.md", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_two_names_in_one_span_with_a_stale_name_fails(self):
+        # Red team re-review of the burndown stack. One span
+        # can carry two citations, and every name in the span
+        # is read, so the stale one is named beside the live
+        # one passing.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA note citing "
+                "`test_a_name_that_never_existed and "
+                "test_the_real_skill_package_is_valid` in "
+                "the gate script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("PASS-NOTES.md", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_a_stale_name_in_an_uppercase_extension_artefact_fails(self):
+        # Red team re-review of the burndown stack. An
+        # artefact under an uppercase Markdown extension
+        # stands at the evals root all the same, and the
+        # check reads it with the rest.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "NEW-NOTES.MD"
+            target.write_text(
+                "A note citing "
+                "`test_a_name_that_never_existed` in the "
+                "gate script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("NEW-NOTES.MD", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_a_stale_name_after_a_code_fence_in_the_pass_notes_fails(self):
+        # Red team re-check of the burndown stack. A fenced
+        # block standing before a citation must not silence
+        # it. The span reader pairs backtick runs by their
+        # length, so the fence reads as one span and the
+        # citation after it is read as a citation.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\n```\npytest -q tests\n```\n\n"
+                "A note citing "
+                "`test_a_name_that_never_existed` in the "
+                "gate script suite.\n",
+                encoding="utf-8",
+            )
+            problems = self.mod.eval_prose_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn("PASS-NOTES.md", problems[0])
+            self.assertIn(
+                "test_a_name_that_never_existed", problems[0]
+            )
+
+    def test_a_live_name_after_a_code_fence_in_the_pass_notes_passes(self):
+        # Control. A live name cited after a fence passes
+        # in both states, before the fix because the
+        # silenced reader saw no citation at all and after
+        # it because the citation it reads is live.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\n```\npytest -q tests\n```\n\n"
+                "A note citing "
+                "`test_the_real_skill_package_is_valid` in "
+                "the gate script suite.\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.mod.eval_prose_problems(root), [])
+
+    def test_a_file_mention_in_the_pass_notes_passes(self):
+        # Control. A test file spelled with its suffix is a
+        # file mention, not a name citation, in both the
+        # fixed state and the state before the fix.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = copy_fixture(tmp)
+            target = root / "evals" / "PASS-NOTES.md"
+            text = target.read_text(encoding="utf-8")
+            target.write_text(
+                text + "\nA note naming the file "
+                "`tests/test_qwen.py` beside the suite.\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(self.mod.eval_prose_problems(root), [])
+
+
 if __name__ == "__main__":
     unittest.main()

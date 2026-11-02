@@ -2353,20 +2353,27 @@ This unreleased work carries version 1.3.0.
   geometry are unchanged.
 - A failure receipt from the extractor carries its reason
   once. A timed out command is named by its opening parts
-  and its size in place of its full spelling, and the
+  and its size in place of its full spelling, in a message
+  the extractor tests hold under 800 characters, and the
   discrepancies list of a failure receipt stands empty,
   because a failed run built no packet for a recount to
-  disagree with.
+  disagree with. The receipt for the lifetime range of
+  this repo measured 197,551 bytes before the fix. The
+  skill text names the failure receipt only as the end of
+  a failed run and states nothing of its contents, so no
+  skill sentence moved with this fix.
 - The docs and minors burndown of the 300 round residuals.
   The cache name census in the Comate and Cursor and package
   and Codex plugin gates now counts a file that merely wears
   a cache folder name or a cache suffix, and only a bytecode
-  file inside a cache folder stays excluded as build state.
-  The Antigravity gate pins the notes texts of its plugin
-  manifest and its hook wiring word for word, and the package
-  gate pins the note text of each extensions namespace. The
-  Claude submission pack states the tree as it stands at 237
-  files, with its largest file figures restated and the
+  file standing directly in a cache folder stays excluded
+  as build state.
+  The Antigravity manifest carries exactly its three
+  schema keys and no notes field, and its gate forbids a
+  notes key outright, and the package gate pins the note
+  text of each extensions namespace. The Claude submission
+  pack states the tree as it stands at 239 files, with its
+  largest file figures restated and the
   figures pinned in the submissions gate and measured against
   the tracked tree in its test suite. The Comate adaptation
   entry stands under Added, where the addition it narrates
@@ -2375,14 +2382,9 @@ This unreleased work carries version 1.3.0.
   brief records the live run of 2026-10-29 for its one scoped
   shape in place of the blanket unverified wording, and the
   Agent Plugins brief records the live installs on the two
-  hosts that proved them. A failed run leaves a failure
-  receipt that carries its reason once, with a timed out
-  command named by its opening parts and its size in a
-  message the extractor tests hold under 800 characters,
-  where the receipt for the lifetime range of this repo
-  measured 197,551 bytes before the fix. The docs index
-  test lists the Comate brief in its expected documents and
-  its expected briefs.
+  hosts that proved them. The docs index test lists the
+  Comate brief in its expected documents and its expected
+  briefs.
 - The Antigravity plugin manifest now carries only the
   keys its primary schema permits, the name and the
   description beside the `$schema` key. The version and
@@ -2759,6 +2761,26 @@ This unreleased work carries version 1.3.0.
   the priced eval in a block member in the suite, and
   the pack figure above is restated at the repaired
   gate's measured 284,458 bytes in the same change.
+- The eval gate now reads the Markdown artefacts at the
+  evals root beside the corpus index for the test names
+  they cite, and names any the suite does not hold, so a
+  stale citation standing in the per pass notes or the
+  results file fails the gate instead of passing on a
+  checksum refresh alone.
+- The re-review repairs of this stack. The eval prose
+  check now reads a cited name in the bare spelling, the
+  call spelling, and the node id spelling that names the
+  file first, and reads an artefact under an uppercase
+  Markdown extension with the rest. Its reader pairs
+  backtick runs by their length, so a fenced block
+  standing before a citation no longer silences it or
+  any citation after it. The root artefacts are held to
+  the corpus discipline without exception, so a fixture
+  test or a former name is spelled with its file or in
+  plain words there. The four copy censuses now count a
+  bytecode file as build state only standing directly
+  in its cache folder, so a payload nested below the
+  folder stands in the census.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

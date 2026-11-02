@@ -320,9 +320,16 @@ def is_bytecode_cache(path):
     build state. A cache name alone excludes nothing, so a
     manifest or plugin file wearing a cache folder name or a
     cache suffix is counted like any other file, which is the
-    census blindness rounds 286 and 294 filed.
+    census blindness rounds 286 and 294 filed. The bytecode
+    file must stand directly in the cache directory, the one
+    shape an interpreter writes, so a payload nested below a
+    cache directory is counted like any other file.
     """
-    return "__pycache__" in path.parts and path.suffix == ".pyc"
+    return (
+        len(path.parts) >= 2
+        and path.parts[-2] == "__pycache__"
+        and path.suffix == ".pyc"
+    )
 
 
 def tree_bytes(directory):

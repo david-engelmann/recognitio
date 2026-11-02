@@ -713,6 +713,44 @@ class TestCheckPackage(unittest.TestCase):
                 b"\x42\x0d\x0d\x0a cache bytes")
             self.assertEqual(self.problems(root), [])
 
+    def test_a_bytecode_file_nested_below_a_cache_folder_fails(self):
+        # Red team re-review of the burndown stack. A bytecode
+        # file nested one folder below a cache folder is not
+        # the shape an interpreter writes, so it stands in the
+        # census like any other file and the gate names it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            nested = (root / "agent-plugins-package" / "skills"
+                      / "recognitio" / "scripts" / "__pycache__"
+                      / "nested")
+            nested.mkdir(parents=True)
+            (nested / "payload.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a payload bytes")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("file set" in problem for problem in problems),
+                problems,
+            )
+
+    def test_a_nested_bytecode_file_at_the_package_root_fails(self):
+        # Red team re-review of the burndown stack. The same
+        # nested shape at the package root stands in the tree
+        # census and is named inside the portable core.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            nested = (root / "agent-plugins-package"
+                      / "__pycache__" / "nested")
+            nested.mkdir(parents=True)
+            (nested / "payload.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a payload bytes")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("payload.pyc" in problem
+                    and "portable core" in problem
+                    for problem in problems),
+                problems,
+            )
+
     def test_an_inverted_antigravity_extension_note_fails(self):
         # Round 270. The Antigravity extension note states that
         # no primary source names a namespace for the platform.

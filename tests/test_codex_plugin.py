@@ -199,6 +199,24 @@ class TestCheckCodexPlugin(unittest.TestCase):
                 b"\x42\x0d\x0d\x0a cache bytes")
             self.assertEqual(self.problems(root), [])
 
+    def test_a_bytecode_file_nested_below_a_cache_folder_fails(self):
+        # Red team re-review of the burndown stack. A bytecode
+        # file nested one folder below a cache folder is not
+        # the shape an interpreter writes, so it stands in the
+        # census like any other file and the gate names it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            nested = (root / "agent-plugins-package/assets"
+                      / "__pycache__" / "nested")
+            nested.mkdir(parents=True)
+            (nested / "payload.pyc").write_bytes(
+                b"\x42\x0d\x0d\x0a payload bytes")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("single icon-512.png" in p for p in problems),
+                problems,
+            )
+
     def test_a_codex_plugin_overlay_beside_the_extension_fails(self):
         # The extension replaces the overlay whole, so an overlay
         # directory is dead configuration and fails.

@@ -90,7 +90,9 @@ grading rule, runs a planted defect anchor for each of tasks 01 to
 task-05, compares each task sources file against the source
 anchor record at `evals/source-anchors.json`, and compares each
 corpus section against the coverage record at
-`evals/corpus-coverage.json`, and checks that the scope sentence
+`evals/corpus-coverage.json`, and names every test the Markdown
+artefacts at the evals root cite that the suite does not hold,
+and checks that the scope sentence
 at the head of the index names the highest round section the
 index carries, so a complete index reads apart from one
 abandoned mid program. The anchor and coverage records stand
