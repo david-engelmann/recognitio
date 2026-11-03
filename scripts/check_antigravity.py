@@ -577,7 +577,15 @@ def plugin_manifest_problems(root=None):
             ".antigravity/plugin.json names %r, not %r"
             % (data.get("name"), MANIFEST_NAME)
         )
-    if "description" in data and not data.get("description"):
+    if "description" in data and not isinstance(
+        data.get("description"), str
+    ):
+        problems.append(
+            ".antigravity/plugin.json carries description %r, "
+            "which is not the string the primary manifest "
+            "schema names" % (data.get("description"),)
+        )
+    elif "description" in data and not data.get("description"):
         problems.append(
             ".antigravity/plugin.json carries no description"
         )

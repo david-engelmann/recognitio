@@ -14,7 +14,7 @@ Every rule carries a derivation note naming its skill section or primary citatio
 
 **What is unverified**
 
-No live Kimi run stands in this brief, so the rule set rests on the primary pages cited here and live plugin behaviour stays unverified.
+A live Kimi run now stands outside this brief. On 2026-11-02 a Kimi Code CLI session carried by the Moonshot Platform API loaded the skill through the CLI skills directory and reviewed a planted change from a verified packet. This repo ships no Kimi plugin manifest and the managed plugin path went unexercised, so live plugin behaviour stays unverified and the rule set rests on the primary pages cited here.
 
 ## Summary
 

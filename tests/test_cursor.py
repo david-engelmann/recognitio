@@ -129,6 +129,97 @@ class TestCheckCursor(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def _discover(self, base, values):
+        """One reading of the plugin files, listing what it finds.
+
+        Every value resolves from the one base the reading
+        names, and a component counts as discovered only when
+        the path it resolves to stands on disk, with a skill
+        directory holding its SKILL.md beside the listing.
+        """
+        found = []
+        for kind, value in values:
+            shown = value[2:] if value.startswith("./") else value
+            shown = shown.rstrip("/")
+            target = base / value
+            if kind == "skills":
+                holds = (target / "SKILL.md").is_file()
+            else:
+                holds = target.is_file()
+            found.append((kind, shown, holds))
+        return sorted(found)
+
+    def test_both_documented_readings_discover_the_same_components(self):
+        # Round 39 priced a scripted two reading proof for the
+        # Cursor mixed path bases fix, and the burn-down spec
+        # review recorded the absence of that proof as a
+        # verification gap. The marketplace reading takes the
+        # entry source as the plugin root and reads the
+        # manifest under it, resolving the manifest values and
+        # the entry values from that one base. The local
+        # reading copies the repository folder, as the
+        # documented route does, and reads the manifest nested
+        # inside the copy with the copy as the plugin root.
+        # Both readings must discover the same components, and
+        # every discovered component must stand on disk.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = json.loads(
+                (root / ".cursor-plugin" / "marketplace.json")
+                .read_text(encoding="utf-8"))
+            entry = market["plugins"][0]
+            base = root / entry["source"]
+            manifest = json.loads(
+                (base / ".cursor-plugin" / "plugin.json")
+                .read_text(encoding="utf-8"))
+            manifest_values = (
+                [("skills", v) for v in manifest["skills"]]
+                + [("rules", v) for v in manifest["rules"]]
+                + [("logo", manifest["logo"])]
+            )
+            entry_values = (
+                [("skills", v) for v in entry["skills"]]
+                + [("logo", entry["logo"])]
+            )
+            marketplace = self._discover(base, manifest_values)
+            entry_found = self._discover(base, entry_values)
+            copied = Path(tmp) / "copied-repository"
+            shutil.copytree(root, copied)
+            local_manifest = json.loads(
+                (copied / ".cursor-plugin" / "plugin.json")
+                .read_text(encoding="utf-8"))
+            local_values = (
+                [("skills", v) for v in local_manifest["skills"]]
+                + [("rules", v) for v in local_manifest["rules"]]
+                + [("logo", local_manifest["logo"])]
+            )
+            local = self._discover(copied, local_values)
+            self.assertEqual(marketplace, local)
+            self.assertTrue(
+                all(holds for _kind, _value, holds in local),
+                local,
+            )
+            # The entry reading must agree with the other
+            # two readings on the components it carries, not
+            # merely stand on disk, so an entry skills or
+            # logo drift to another standing target fails
+            # this proof as well as the gate.
+            self.assertEqual(
+                entry_found,
+                [
+                    item for item in local
+                    if item[0] in ("skills", "logo")
+                ],
+            )
+            self.assertEqual(
+                [value for _kind, value, _holds in local],
+                [
+                    "docs/brand/recognitio-icon.svg",
+                    ".cursor-plugin/rules/recognitio.mdc",
+                    ".cursor-plugin/skills/recognitio",
+                ],
+            )
+
     def test_a_manifest_inside_a_cache_folder_in_the_copy_fails(self):
         # Rounds 286 and 294. A manifest wearing a cache folder
         # name inside the skill copy must stand in the copy
@@ -842,6 +933,679 @@ class TestCheckCursor(unittest.TestCase):
             self.assertTrue(
                 any(
                     "'invented'" in p and "unexamined" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_manifest_agents_component_fails(self):
+        # Burn-down re-review. The brief states the shipped
+        # shape in plain words, it ships no agents, no
+        # commands, no MCP servers, and the gate enforced
+        # only the MCP limb. A manifest that gains an agents
+        # component pointing at a real file certified a
+        # plugin the brief says does not ship, so the
+        # absence itself is now pinned.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["agents"] = ["./agents/reviewer.md"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "carries agents" in p
+                    and "shipping no agents" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_manifest_commands_component_fails(self):
+        # Burn-down re-review. The commands limb of the
+        # same absence pin.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["commands"] = ["./docs"]
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "carries commands" in p
+                    and "shipping no commands" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_joint_agents_component_fails(self):
+        # Burn-down re-review. The joint plant, manifest
+        # and entry gaining the same agents value together,
+        # passed every gate before the absence pins, because
+        # agreement and resolution were the only readings.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["agents"] = ["./agents/reviewer.md"]
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["agents"] = [
+                "./agents/reviewer.md"
+            ]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "shipping no agents" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_a_commands_key_fails(
+        self,
+    ):
+        # Burn-down re-review, second round. The entry
+        # absence loop refuses agents and commands, and the
+        # agents iteration carried a plant while the
+        # commands iteration carried none, so narrowing the
+        # loop to agents alone passed the whole suite. The
+        # commands limb is planted here beside it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["commands"] = ["./docs"]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "entry carries commands" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_owner_with_an_extra_key_fails(self):
+        # Burn-down re-review, second round. The owner
+        # object was the marketplace file's remaining
+        # unexamined corner, so an invented owner key rode
+        # in silence. Its key set is closed the same way.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["owner"]["agents"] = ["./agents/x.md"]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "owner carries the 'agents' key" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_owner_naming_another_person_fails(
+        self,
+    ):
+        # Burn-down re-review, second round. The owner name
+        # and email drifted to another person while every
+        # gate passed, because no reading compared them with
+        # the manifest author they restate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["owner"]["name"] = "Someone Else"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "owner carries name" in p
+                    and "different owner" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_metadata_description_drift_fails(
+        self,
+    ):
+        # Burn-down re-review, second round. The metadata
+        # description is the listing's second display text,
+        # and its value was the one metadata field no
+        # reading examined once the key set closed.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["metadata"]["description"] = (
+                "A completely different listing."
+            )
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "metadata carries description" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_joint_non_string_description_fails(self):
+        # Burn-down re-review, second round. The Cursor
+        # manifest description was read for truthiness only,
+        # the gap the Antigravity repair closed one surface
+        # over, so a manifest and an entry jointly carrying
+        # a non-string description agreed with each other
+        # and certified. The value is typed now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["description"] = 12345
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["description"] = 12345
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "not the string the primary manifest "
+                    "schema names" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_joint_description_drift_fails(self):
+        # Burn-down re-review, second round. The manifest,
+        # entry, and metadata descriptions drifted together
+        # to a different text while every agreement check
+        # still passed, so the manifest description itself
+        # is pinned as a value.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["description"] = "A completely different plugin."
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["description"] = (
+                "A completely different plugin."
+            )
+            market["metadata"]["description"] = (
+                "A completely different plugin."
+            )
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "the shipped description is" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_metadata_in_string_form_fails(self):
+        # Burn-down re-review, third round. The metadata
+        # block was guarded by an isinstance check with no
+        # refusal behind it, so a metadata standing as a
+        # string skipped its closed key set, its version
+        # pin, and its description pin at once, where the
+        # owner block beside it refuses a non-object owner
+        # outright.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["metadata"] = "recognitio"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "carries metadata 'recognitio'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_joint_author_and_owner_drift_fails(self):
+        # Burn-down re-review, third round. The owner
+        # values were pinned against the manifest author,
+        # and the author itself was pinned nowhere as a
+        # value, so the two drifted together to another
+        # name and email while the agreement between them
+        # held. The author now stands pinned as a value.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["author"] = {
+                "name": "Someone Else",
+                "email": "someone@example.invalid",
+            }
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["owner"] = {
+                "name": "Someone Else",
+                "email": "someone@example.invalid",
+            }
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "the shipped author is" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_name_drift_fails(self):
+        # Burn-down re-review, third round. The marketplace
+        # file's top level key set was closed while the
+        # value of the file's own name was read by no gate,
+        # so the listing renamed itself in silence.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["name"] = "another-marketplace"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "the shipped marketplace name is" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_manifest_author_with_an_extra_key_fails(self):
+        # Burn-down re-review, fourth round. The author
+        # object was pinned as a value and left without a
+        # key set, the one object in the pair of files with
+        # none, so an invented author key rode in the very
+        # object the anchor stands in.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["author"]["url"] = "https://example.invalid"
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "author carries the 'url' key" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_joint_plugin_rename_fails(self):
+        # Burn-down re-review, fourth round. The manifest
+        # name was read only for its kebab-case shape and
+        # the entry name only against the manifest, so the
+        # pair renamed the plugin together while their
+        # agreement held. The manifest name now stands
+        # pinned as a value.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["name"] = "another-plugin"
+            self.write_manifest(root, data)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["name"] = "another-plugin"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "the shipped plugin name is" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_variables_entry_in_bare_value_form_fails(self):
+        # Burn-down re-review, fifth round, with its
+        # rationale corrected in the sixth. The variables
+        # object was read for exactly one forbidden key,
+        # so an entry standing as a bare value rode
+        # unexamined in a schema the host reads as plugin
+        # configuration. The gate pins each entry's shape
+        # as a schema object. The plant carries the
+        # correspondence the sixth round requires, an
+        # mcp.json using the name, whose own presence the
+        # gate separately refuses, so the shape limb is
+        # the one this test prices.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["variables"] = {"RECOGNITIO_X": "x"}
+            self.write_manifest(root, data)
+            (root / ".cursor-plugin" / "mcp.json").write_text(
+                '{"mcpServers": {"s": {"env": '
+                '{"A": "${RECOGNITIO_X}"}}}}',
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "variable 'RECOGNITIO_X' standing as" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_variables_name_with_no_correspondence_fails(
+        self,
+    ):
+        # Burn-down re-review, sixth round. The brief
+        # ties every declared name to a variable the
+        # plugin own mcp.json uses, and the user set
+        # values it names are the values a user sets for
+        # a variable the plugin declares, not a licence
+        # to invent declaration names. An invented name
+        # in schema object form rode through the shape
+        # pin, so the gate now refuses a declared name
+        # no mcp.json variable corresponds to.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            data = self.read_manifest(root)
+            data["variables"] = {
+                "RECOGNITIO_EXTRA": {"type": "string"}
+            }
+            self.write_manifest(root, data)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "variable 'RECOGNITIO_EXTRA', which no "
+                    "variable in the plugin mcp.json "
+                    "corresponds to" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_variables_correspondence_reads_uses(self):
+        # Burn-down re-review, seventh round. The
+        # correspondence extractor read the mcp.json as
+        # raw text, so a mention inside a description
+        # earned a correspondence no use stands behind,
+        # a file that is not JSON at all earned one the
+        # same way, and the default value, braceless,
+        # and spaced brace spellings of a real use earned
+        # none. The extractor now reads the file as the
+        # structure it is, from its string values with
+        # descriptions excepted, in the spellings the
+        # hosts substitute.
+        refused = (
+            '{"mcpServers": {"s": {"description": '
+            '"set ${RECOGNITIO_X} in your shell"}}}',
+            "note ${RECOGNITIO_X} note",
+        )
+        for text in refused:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    text, encoding="utf-8"
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "variable 'RECOGNITIO_X', which no "
+                        "variable in the plugin mcp.json "
+                        "corresponds to" in p
+                        for p in problems
+                    ),
+                    (text, problems),
+                )
+        earned = (
+            "${RECOGNITIO_X:-fallback}",
+            "$RECOGNITIO_X",
+            "${ RECOGNITIO_X }",
+        )
+        for spelling in earned:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    '{"mcpServers": {"s": {"env": '
+                    '{"A": "%s"}}}}' % spelling,
+                    encoding="utf-8",
+                )
+                problems = self.problems(root)
+                self.assertFalse(
+                    any(
+                        "corresponds to" in p for p in problems
+                    ),
+                    (spelling, problems),
+                )
+
+    def test_the_variables_correspondence_operators(self):
+        # Burn-down re-review, ninth round. The braced
+        # default slot read the dash and equals
+        # operators and stopped there, while the
+        # substitution grammar the hosts mirror carries
+        # the plus and question operators in the same
+        # slot, and the percent and slash expansion
+        # forms beside them. The slot now reads the
+        # operator set of that grammar, and each
+        # spelling below earns the correspondence.
+        earned = (
+            "${RECOGNITIO_X:+fallback}",
+            "${RECOGNITIO_X+fallback}",
+            "${RECOGNITIO_X:?fallback}",
+            "${RECOGNITIO_X?fallback}",
+            "${RECOGNITIO_X%fallback}",
+            "${RECOGNITIO_X/fallback}",
+        )
+        for spelling in earned:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    '{"mcpServers": {"s": {"env": '
+                    '{"A": "%s"}}}}' % spelling,
+                    encoding="utf-8",
+                )
+                problems = self.problems(root)
+                self.assertFalse(
+                    any(
+                        "corresponds to" in p for p in problems
+                    ),
+                    (spelling, problems),
+                )
+
+    def test_the_variables_correspondence_grammar(self):
+        # Burn-down re-review, tenth round. The braced
+        # operator slot read one operator family and
+        # stopped short of the grammar its comment
+        # names, while the shell style substitution the
+        # hosts mirror carries the prefix removal and
+        # case and substring operators in the same
+        # slot, and the length and indirect prefix
+        # forms at the name's other side. The slot now
+        # reads the grammar whole, and each spelling
+        # below earns the correspondence.
+        earned = (
+            "${RECOGNITIO_X#fallback}",
+            "${RECOGNITIO_X##fallback}",
+            "${RECOGNITIO_X@Q}",
+            "${RECOGNITIO_X@a}",
+            "${RECOGNITIO_X^fallback}",
+            "${RECOGNITIO_X^^fallback}",
+            "${RECOGNITIO_X,fallback}",
+            "${RECOGNITIO_X,,fallback}",
+            "${RECOGNITIO_X:1}",
+            "${RECOGNITIO_X: -1}",
+            "${RECOGNITIO_X:0:1}",
+            "${#RECOGNITIO_X}",
+            "${!RECOGNITIO_X}",
+            "${RECOGNITIO_X:fallback}",
+        )
+        for spelling in earned:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    '{"mcpServers": {"s": {"env": '
+                    '{"A": "%s"}}}}' % spelling,
+                    encoding="utf-8",
+                )
+                problems = self.problems(root)
+                self.assertFalse(
+                    any(
+                        "corresponds to" in p for p in problems
+                    ),
+                    (spelling, problems),
+                )
+
+    def test_the_variables_correspondence_at_depth(self):
+        # Burn-down re-review, eighth round. The walk
+        # excepted a description only at the leaf it
+        # stood on, so a mention inside a description
+        # standing as an object earned the correspondence
+        # its exception was built to refuse, and the
+        # braced default spellings past the colon dash
+        # form earned none. The exception now follows the
+        # description at any depth, and the default slot
+        # reads the dash and equals forms beside it.
+        refused = (
+            '{"mcpServers": {"s": {"description": '
+            '{"text": "set ${RECOGNITIO_X} in your '
+            'shell"}}}}',
+        )
+        for text in refused:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    text, encoding="utf-8"
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "variable 'RECOGNITIO_X', which no "
+                        "variable in the plugin mcp.json "
+                        "corresponds to" in p
+                        for p in problems
+                    ),
+                    (text, problems),
+                )
+        earned = (
+            "${RECOGNITIO_X-fallback}",
+            "${RECOGNITIO_X:=fallback}",
+        )
+        for spelling in earned:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_manifest(root)
+                data["variables"] = {
+                    "RECOGNITIO_X": {"type": "string"}
+                }
+                self.write_manifest(root, data)
+                (root / ".cursor-plugin" / "mcp.json").write_text(
+                    '{"mcpServers": {"s": {"env": '
+                    '{"A": "%s"}}}}' % spelling,
+                    encoding="utf-8",
+                )
+                problems = self.problems(root)
+                self.assertFalse(
+                    any(
+                        "corresponds to" in p for p in problems
+                    ),
+                    (spelling, problems),
+                )
+
+    def test_a_marketplace_top_level_key_fails(self):
+        # Burn-down re-review. The repair closed the entry
+        # key set and left the marketplace file's own key
+        # set unexamined, so an extra top level key rode in
+        # silence in a file the gate claims to pin.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["hooks"] = {}
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "'hooks'" in p and "unexamined" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_metadata_key_fails(self):
+        # Burn-down re-review. The metadata object inside
+        # the marketplace file carries the same closed set
+        # discipline as the file itself.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["metadata"]["extra"] = "x"
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "'extra'" in p and "unexamined" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_without_a_description_fails(
+        self,
+    ):
+        # Burn-down re-review. The entry description was an
+        # allowed entry key whose value no gate read, so
+        # deleting it passed in silence where entry name,
+        # version, skills, and logo are all pinned to the
+        # manifest.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            del market["plugins"][0]["description"]
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "entry carries description" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_marketplace_entry_with_a_drifted_description_fails(
+        self,
+    ):
+        # Burn-down re-review. A drifted entry description
+        # is the same unexamined value in its standing form.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            market = self.read_marketplace(root)
+            market["plugins"][0]["description"] = (
+                "A completely different plugin that does "
+                "other things."
+            )
+            self.write_marketplace(root, market)
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "entry carries description" in p
                     for p in problems
                 ),
                 problems,

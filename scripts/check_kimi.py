@@ -616,6 +616,127 @@ def numbering_problems(root=None):
     return problems
 
 
+# The shared slots of the hook scan and its negation
+# guard. One determiner phrase and one object set serve
+# every pattern that reads them, in the scan and in the
+# guard alike, because a paradigm completed in one place
+# and not in the place beside it leaves the two
+# disagreeing on ordinary forms, and each disagreement
+# is an escape in the scan or a false refusal in the
+# guard. The determiner phrase composes a determiner
+# head with a modifier run that admits words the phrase
+# does not list, because the adjectives of the language
+# are an open class and a closed list cannot close the
+# slot. The run stands lazy, so the object that ends the
+# phrase is the first object word the phrase can end on,
+# and it crosses neither a coordinating joint nor one of
+# the scan's own verb forms, so a phrase in one segment
+# cannot reach across a joint and take its object from
+# the segment after it.
+_CLAIM_OBJECTS = (
+    r"(?:turns?|sessions?|tasks?|main flow"
+    r"|operations?|tool calls?)"
+)
+_VERB_STEMS = (
+    r"(?:veto|reject|abort|cancel|refus|end|den"
+    r"|stop|block|halt|prevent|gat)"
+)
+_MODIFIER_WORD = (
+    r"(?:(?!(?:and|or|but|yet|while)\b)"
+    r"(?!(?:no|not|never)\b)"
+    r"(?!" + _VERB_STEMS + r"\w*)"
+    r"[\w-]+\s+)"
+)
+_PARTICIPIAL_WORD = _VERB_STEMS + r"\w*\s+"
+_PARTICIPIAL_TOKEN = _VERB_STEMS + r"[\w-]*?(?:ed|en)\s+"
+_PRESENT_TOKEN = _VERB_STEMS + r"\w*ing\s+"
+_PARTICIPIAL_GROUP = (
+    _PARTICIPIAL_TOKEN
+    + r"(?:(?:and|or)\s+"
+    + _PARTICIPIAL_TOKEN
+    + r")*"
+    + r"(?:(?:and|or)\s+)?"
+)
+_MODIFIER_RUN = (
+    r"(?:(?:"
+    + _MODIFIER_WORD
+    + r"|"
+    + _PARTICIPIAL_GROUP
+    + r"|"
+    + _PRESENT_TOKEN
+    + r")*?)"
+)
+_DETERMINER_PHRASE = (
+    r"(?:(?:all|some|any)\s+of\s+the\s+"
+    r"|(?:any and all|each and every)\s+"
+    r"|(?:the|a|an|this|that|these|those|each|every"
+    r"|all|any|some|another|both)\s+"
+    r"(?:the\s+)?)?"
+    + _MODIFIER_RUN
+    + r"(?:" + _VERB_STEMS + r"\w*\s+)?"
+)
+_OBJECT_PHRASE = (
+    _DETERMINER_PHRASE
+    + _CLAIM_OBJECTS
+    + r"(?:\s+and\s+"
+    + _CLAIM_OBJECTS
+    + r")?"
+)
+_ADVERB_LINK = (
+    r"(?:[\w-]+ly\s+|often\s+|always\s+|already\s+)?"
+)
+_FINITE_FORMS = (
+    r"(?:vetoes|rejects|aborts|cancels|refuses|ends"
+    r"|denies|stops|blocks|halts|prevents|gates)"
+)
+_NOMINAL_TOKEN = (
+    r"(?!" + _FINITE_FORMS + r"\b)"
+    r"(?!(?:no|not|never|or|but|yet|while)\b)"
+    r"[\w-]+"
+)
+# The passive auxiliary chain, composed by the slots of
+# the construction itself, a modal slot, a perfect slot,
+# a copula slot, and the progressive and infinitive
+# links that stand between the copula and the
+# participle, with the get passive standing as its own
+# head. The slots compose in their own order inside the
+# chain. The heads the chain reads are the heads the
+# tested families name, and the adverb link reads one
+# adverb in the spellings the link names at the one
+# position the link stands, behind the chain's last
+# auxiliary, so the compositions past those heads and
+# that link, and an adverb standing anywhere in the
+# chain but that position, stand in the bounded
+# remainder the scan docstring names beside the
+# round 34 residual.
+_PASSIVE_AUX = (
+    r"(?:(?:will|shall|should|can|could|may|might"
+    r"|must|would)\s+"
+    r"(?:have\s+)?(?:been\s+)?(?:be\s+)?"
+    r"(?:being\s+)?(?:getting\s+)?(?:get\s+)?"
+    r"|(?:has|have|had)\s+(?:been\s+)?"
+    r"(?:being\s+)?(?:getting\s+)?"
+    r"|(?:is|are|was|were)\s+"
+    r"(?:being\s+|getting\s+|to\s+be\s+)?"
+    r"|(?:is|are|was|were)\s+"
+    r"(?:going\s+to\s+be\s+|about\s+to\s+be\s+"
+    r"|due\s+to\s+be\s+)"
+    r"|(?:is|are|was|were)\s+to\s+"
+    r"(?:have\s+been\s+|be\s+)"
+    r"|ought\s+to\s+(?:have\s+been\s+|be\s+)"
+    r"|(?:has|have|had)\s+to\s+be\s+"
+    r"|(?:needs?|needed)\s+to\s+be\s+"
+    r"|used\s+to\s+be\s+"
+    r"|gets\s+|got\s+|be\s+)"
+    + _ADVERB_LINK
+)
+_PARTICIPLES = (
+    r"(?:vetoed|rejected|aborted|cancelled|canceled"
+    r"|refused|ended|denied|blocked|stopped|halted"
+    r"|prevented|gated)"
+)
+
+
 def _negated_before(clause, index, words):
     """Whether a negation in the match's own segment precedes it.
 
@@ -627,13 +748,253 @@ def _negated_before(clause, index, words):
     claim a later segment states. A hook that carries no
     state in one segment and vetoes the turn in the next
     states the veto plainly, however the first segment
-    reads.
+    reads. The joint set is the full set the gate's other
+    guards split at, and, but, yet, or, and while, because
+    a negation before any of them belongs to the earlier
+    segment alone. One joint is not a boundary, the yet
+    of not yet, because that yet is an adverb inside the
+    negated segment and splitting there would move the
+    segment start past the negation that guards the claim.
+    The or joint carries its own care, because a negation
+    distributes over a coordinated claim, so an or that
+    follows a blocking verb in the earlier segment is not
+    a boundary, while an or that follows an unrelated
+    negated statement is one. The hook does not block or
+    veto the turn states one negated claim, and the hook
+    carries no state or vetoes the turn states a plain
+    veto beside an unrelated negation. The third
+    re-review extended the same care to the and joint,
+    which distributes a negation the same way, to the
+    serial list, whose comma joints separate the items
+    of one coordinated claim and so are not boundaries
+    either, and to the wider adverb forms of not yet.
+    The sixth re-review read the guard object phrase and
+    the scan determiner phrase as one shared fragment,
+    so the two read the same composed phrase, and taught
+    the verb search the nominal reading, because a verb
+    form standing behind a determiner is a noun in that
+    place, in the ends and the stops, and states no
+    claim the test can read.
     """
     before = clause[:index]
-    start = 0
-    for joint in re.finditer(
-        r",?\s+(?:and|but)\s+|,\s+", before
+    joints = list(
+        re.finditer(
+            r",?\s+(?:and|but|yet|or|while)\s+|,\s+", before
+        )
+    )
+    clause_joints = list(
+        re.finditer(
+            r",?\s+(?:and|but|yet|or|while)\s+|,\s+", clause
+        )
+    )
+    verb_forms = (
+        r"(?:veto(?:es|ed|ing)?|reject(?:s|ed|ing)?"
+        r"|abort(?:s|ed|ing)?"
+        r"|cancel(?:s|ed|led|ing|ling)?"
+        r"|refus(?:e|es|ed|ing)|end(?:s|ed|ing)?"
+        r"|den(?:y|ies|ied|ying)"
+        r"|stop(?:s|ped|ping)?|block(?:s|ed|ing)?"
+        r"|halt(?:s|ed|ing)?|prevent(?:s|ed|ing)?"
+        r"|gat(?:e|es|ed|ing)|blocking)"
+    )
+    object_phrase = _OBJECT_PHRASE
+    if re.match(
+        _VERB_STEMS + r"\w*(?:ed|en)\s+"
+        + object_phrase
+        + r"(?:\s+(?:in|on|at|for|of)\s+"
+        r"(?:the|a|an|this|that)\s+"
+        r"(?:[\w-]+\s+)*?[\w-]+)?"
+        + r"\s+(?:(?:is|are|was|were|has|have|had"
+        r"|gets?|got)\s+(?:been\s+|being\s+)?"
+        r"|(?:will|would|can|could|shall|should"
+        r"|may|might|must)\s+"
+        r"(?:have\s+been\s+|be\s+))",
+        clause[index:],
     ):
+        # A past participle standing at the match heads
+        # no claim of its own when a finite auxiliary
+        # stands behind its object, behind a locative
+        # phrase standing inside the subject or behind
+        # the object itself, because the participle
+        # then reads as a modifier inside a subject the
+        # auxiliary governs, and a joint inside that
+        # subject does not bound the negation standing
+        # before the subject.
+        return bool(re.search(words, before))
+    start = 0
+    for position, joint in enumerate(joints):
+        text = joint.group(0)
+        if "yet" in text and re.search(
+            r"(?:\bnot\b|\w+n't\b|\bnever\b)"
+            r"(?:\s+(?:quite|just|even|really|as|at all"
+            r"|entirely|actually|fully))*\s*$",
+            before[:joint.start()],
+        ):
+            continue
+        if re.search(r"\b(?:or|and)\b", text):
+            # A negation distributes over a coordinated
+            # claim, so the joint is no boundary when the
+            # segment's own last scan verb states a claim
+            # of the family, either bare, carrying one of
+            # the shared object phrases, or followed only
+            # by an adverbial the claim itself carries. A
+            # verb carrying an object outside the shared
+            # set states no claim the scan recognises, and
+            # the joint after it stays a boundary. The
+            # verb search reads the family's inflected
+            # forms, so a noun built on a verb stem at the
+            # segment's end is not the claim the test
+            # requires.
+            earlier = before[:joint.start()]
+            if re.search(
+                r"(?:the|a|an|this|that|these|those"
+                r"|each|every|all|any|some|another"
+                r"|both)\s+(?:"
+                + _MODIFIER_RUN
+                + r")\S+\s*$",
+                earlier,
+            ) and re.match(
+                r"(?:"
+                + _PARTICIPIAL_GROUP
+                + r"|"
+                + _PRESENT_TOKEN
+                + r"|(?:(?!(?:the|a|an|this|that|these"
+                r"|those|each|every|all|any|some"
+                r"|another|both)\b)(?!"
+                + _VERB_STEMS
+                + r"\w*)[\w-]+\s+)+)"
+                + r"(?:"
+                + _MODIFIER_RUN
+                + r")?"
+                + _CLAIM_OBJECTS
+                + r"\b",
+                clause[joint.end():],
+            ):
+                # The joint stands inside the object
+                # phrase the earlier segment opened, where
+                # the segment ends on a determiner and its
+                # modifiers and the words after the joint
+                # complete the phrase with its object, so
+                # the joint coordinates the modifiers of
+                # one claim and is no boundary either.
+                continue
+            verbs = [
+                verb
+                for verb in re.finditer(
+                    r"\b" + verb_forms, earlier
+                )
+                if verb.group(0) != "blocking"
+                and not (
+                    re.search(
+                        r"(?:^|\s)(?:the|a|an|this|that"
+                        r"|these|those|each|every|all"
+                        r"|any|some|another|both|its"
+                        r"|his|her|their|our|your|my)\s+"
+                        r"(?:(?:"
+                        + _NOMINAL_TOKEN
+                        + r"|"
+                        + _FINITE_FORMS
+                        + r")\s+)*?$",
+                        earlier[:verb.start()],
+                    )
+                    and not re.match(
+                        r"(?:(?:the|a|an|this|that|these"
+                        r"|those|each|every|all|any|some"
+                        r"|another|both)\s+|"
+                        + _CLAIM_OBJECTS
+                        + r"\b)",
+                        earlier[verb.end():].lstrip(),
+                    )
+                )
+            ]
+            if verbs:
+                # The negation distributes only over the
+                # bare forms of its own construction, so a
+                # first verb form standing after the joint
+                # in finite form, a finite scan verb or a
+                # finite auxiliary, states its own claim
+                # and the joint after the earlier segment
+                # stays a boundary, however the earlier
+                # segment's gap reads. The rule reads only
+                # where the earlier segment completes its
+                # own claim, a verb with a remainder
+                # standing after it, because a bare verb
+                # before the joint shares the later
+                # segment's object and the negation scopes
+                # over both verbs, never blocks and vetoes
+                # the turn.
+                head = re.search(
+                    r"\b(?:"
+                    + verb_forms
+                    + r"|is|are|was|were|has|have|had"
+                    r"|will|would|can|could|must|shall"
+                    r"|should|may|might|does|did)\b",
+                    clause[joint.end():],
+                )
+                if (
+                    head
+                    and earlier[verbs[-1].end():].strip()
+                    and (
+                        head.group(0)
+                        in (
+                            "is", "are", "was", "were",
+                            "has", "have", "had", "will",
+                            "would", "can", "could", "must",
+                            "shall", "should", "may",
+                            "might", "does", "did",
+                        )
+                        or re.fullmatch(
+                            _FINITE_FORMS, head.group(0)
+                        )
+                    )
+                ):
+                    verbs = []
+            if verbs:
+                gap = earlier[verbs[-1].end():].strip()
+                if (
+                    not gap
+                    or gap == "at all"
+                    or re.fullmatch(object_phrase, gap)
+                    or re.fullmatch(
+                        object_phrase
+                        + r"(?:\s+at all"
+                        r"|\s+(?:in|for|at|under|by|on|with"
+                        r"|through|via|against|despite)"
+                        r" any (?:\w+ ){0,2}\w+"
+                        r"|\s+(?:at|in|on|near|before|after"
+                        r"|within)\s+"
+                        r"(?:the|a|an)\s+(?:"
+                        + _NOMINAL_TOKEN
+                        + r"\s+)*?(?:"
+                        + _VERB_STEMS
+                        + r"\w*|"
+                        + _CLAIM_OBJECTS
+                        + r")(?:\s+of\s+(?:the|a|an)\s+(?:"
+                        + _NOMINAL_TOKEN
+                        + r"\s+)*?(?:"
+                        + _CLAIM_OBJECTS
+                        + r"|[\w-]+)"
+                        + r")?)?",
+                        gap,
+                    )
+                ):
+                    continue
+        if text.strip() == ",":
+            # The serial item stands after the joint and
+            # can be the match itself, so the peek reads
+            # the clause up to the next joint in it.
+            following = (
+                clause_joints[position + 1].start()
+                if position + 1 < len(clause_joints)
+                else len(clause)
+            )
+            item = clause[joint.end():following].strip()
+            if re.fullmatch(
+                verb_forms
+                + r"(?:\s+" + object_phrase + r")?",
+                item,
+            ):
+                continue
         start = joint.end()
     segment = before[start:]
     return bool(re.search(words, segment))
@@ -669,6 +1030,88 @@ def _blocking_scan(clauses, phrase):
     escape, and the round 34 residual accepts that
     remainder, so the scan widens the family and states the
     limit rather than pretending to a meaning check.
+
+    The burn-down re-review widened the families inside
+    their own lemmas, because ordinary inflected and modal
+    forms of the tested verbs are the tested family in
+    other spellings, not fresh synonyms. Each verb now
+    stands in its bare, third person, past, and progressive
+    forms, the nouns in singular and plural, the waits for
+    construction with a modal or progressive between the
+    subject and the verb, and the deny verb beside the deny
+    returns, each under the same subject scope and
+    negation guard. The second re-review completed the
+    paradigm in every pattern of the scan rather than in
+    the wide pattern alone, so the stop verbs carry their
+    past and progressive forms, the passive constructions
+    carry every participle of the family behind the full
+    auxiliary set and the turn, session, and task subjects,
+    the waits for construction carries its past form and
+    the wider auxiliary set, the pronoun subject reading
+    carries its auxiliaries and the plural pronoun, and the
+    object slots carry the plural and quantified forms.
+    The third re-review found the completion still
+    asymmetric between the patterns, so the slots now
+    stand shared rather than copied, one object set, one
+    determiner set, one passive construction, and one
+    negation word set serve every pattern that reads
+    them, and the negation words carry their contraction
+    spellings. The fourth re-review completed the shared
+    slots themselves, the passive auxiliaries and the
+    determiner allomorphs and the waits for and pronoun
+    auxiliary compositions, and gave the passive
+    construction the negation care its subject carries
+    and the distribution care the object test its first
+    joint's claim must pass. The fifth re-review
+    composed the slots rather than enumerating them, so
+    the passive auxiliaries, the determiner phrase, the
+    pronoun auxiliaries, and the waits for auxiliaries
+    each stand as a small grammar of their family, and
+    the distribution care reads its verbs in their
+    inflected forms. The sixth re-review found the
+    grammars capping each slot one composition deep, so
+    the passive auxiliaries now compose by the slots of
+    the construction itself, the determiner phrase admits the
+    unlisted modifiers of an open class, the pronoun
+    and waits for readings carry their ought to and
+    going to and perfect forms, the passive care reads
+    its construction as one composed unit so an
+    unrelated negated phrase no longer licenses its
+    claim, and the scan and the guard read one shared
+    determiner phrase from one place. The seventh
+    re-review gave the chains the remaining heads of
+    their constructions, the going to and ought to and
+    have to and used to heads and the bare infinitive
+    get, and the adverb link that stands between an
+    auxiliary and its verb, and taught the passive care
+    to read every passive in its clause rather than the
+    first alone. The eighth re-review priced the reach
+    past those heads and that link, and the bound
+    stands named here where the claim lives. The chains
+    read the heads the tested families name, in the
+    forms this account records, and the adverb link
+    reads one adverb whose spelling ends in ly, or one
+    of often and always and already. A claim carrying
+    a head past that set, a stacked adverb, or an
+    adverb in another spelling stands in the bounded
+    remainder of the tested families, accepted the way
+    the decision 24 record pin accepts its finite list,
+    beside the round 34 residual above. The ninth
+    re-review priced one more dimension of that link,
+    its position, and the bound names it here as well.
+    The link reads its one adverb at the end of its
+    chain, behind the chain's last auxiliary, so an
+    adverb in a spelling the link reads standing
+    anywhere in the chain but that position, between
+    the subject and the chain, between two auxiliaries,
+    or inside a head the chain reads whole, stands in
+    the same bounded remainder. The tenth re-review
+    priced the one gap the waits for construction
+    carries past its chain, the adverb standing
+    between the verb and its for particle, and that
+    gap now stands read by the same link, so it
+    stands outside the remainder this paragraph
+    names.
     """
     problems = []
     blocking_problem = (
@@ -676,12 +1119,58 @@ def _blocking_scan(clauses, phrase):
         "observation only hook events, which the primary "
         "hooks page denies" % phrase
     )
+    # The slots stand shared across the scan's patterns
+    # and its guard, from the module level definitions
+    # above, because a paradigm completed in one pattern
+    # and not in the pattern beside it leaves the two
+    # disagreeing on ordinary forms, and each
+    # disagreement is an escape. One object set, one
+    # determiner phrase, one passive auxiliary chain,
+    # and one participle set serve every pattern that
+    # reads them.
+    objects = _CLAIM_OBJECTS
+    determiners = _DETERMINER_PHRASE
+    passive = re.compile(
+        r"\b" + objects + r"\s+"
+        + _PASSIVE_AUX
+        + _PARTICIPLES + r"\b"
+    )
+    negated_passive = re.compile(
+        r"\b(?:none of the|not any of the"
+        r"|neither of the|not a single one of the"
+        r"|not all of the|not every|not all"
+        r"|not a single|no single|not one|not a"
+        r"|not any|neither|no)\s+"
+        + _MODIFIER_RUN
+        + r"(?:" + _VERB_STEMS + r"\w*\s+)?"
+        + objects
+        + r"(?:(?:,\s+(?:and|or|nor)\s+|,\s+"
+        r"|\s+(?:and|or|nor)\s+)"
+        + r"(?:an?\s+|the\s+)?"
+        + _MODIFIER_RUN
+        + r"(?:" + _VERB_STEMS + r"\w*\s+)?"
+        + objects
+        + r")*"
+        + r"\s+"
+        + _PASSIVE_AUX
+        + _PARTICIPLES + r"\b"
+    )
+    negation_words = (
+        r"no|not|never|neither|cannot|can't|doesn't|don't"
+        r"|won't|isn't|aren't|wasn't|weren't|didn't"
+        r"|hasn't|haven't|hadn't|couldn't|wouldn't"
+        r"|shouldn't|mustn't|needn't"
+    )
+    negation = r"\b(" + negation_words + r")\b"
+    negation_or_non = r"\b(" + negation_words + r"|non)\b"
     stop_verb = re.compile(
-        r"\b(stops?|blocks?|halts?|prevents?|gates?)\b"
-        r"\s+(the\s+|a\s+|each\s+|every\s+)?"
-        r"(turn|session|main flow|operation)\b"
+        r"\b(stop(?:s|ped|ping)?|block(?:s|ed|ing)?"
+        r"|halt(?:s|ed|ing)?|prevent(?:s|ed|ing)?"
+        r"|gat(?:e|es|ed|ing))\b"
+        r"\s+" + determiners + objects + r"\b"
     )
     event_names = tuple(name.lower() for name in HOOK_EVENTS)
+    previous_subject = False
     for clause in clauses:
         if "notification only" in clause:
             problems.append(
@@ -697,11 +1186,43 @@ def _blocking_scan(clauses, phrase):
         # The subject words match on word boundaries, so
         # the word checkpoint inside a sentence about the
         # scan itself does not make the scan its own
-        # subject.
-        subject = (
-            re.search(r"\b(hook|check|event|four)\b", clause)
+        # subject. A clause that opens with the pronoun it
+        # and one of the scan verbs carries the subject of
+        # the clause before it, because the clauses of one
+        # sentence split at its semicolons and the split
+        # half states its claim of the same hook the first
+        # half named, in the pronoun the split leaves it.
+        own_subject = (
+            re.search(
+                r"\b(hook|hooks|check|checks|event|events"
+                r"|four)\b",
+                clause,
+            )
             or any(name in clause for name in event_names)
         )
+        pronoun = re.match(
+            r"(it|they)\s+"
+            r"(?:(?:can|could|will|would|shall|should|may"
+            r"|might|must)\s+"
+            r"(?:have\s+(?:been\s+)?|be\s+)?"
+            r"|(?:is|are|was|were)\s+(?:being\s+)?"
+            r"|has been\s+|have been\s+|had been\s+"
+            r"|ought\s+to\s+"
+            r"(?:have\s+(?:been\s+)?|be\s+)?"
+            r"|(?:is|are|was|were)\s+going\s+to\s+"
+            r"(?:have\s+)?"
+            r"|(?:has|have|had)\s+had\s+to\s+"
+            r"|has\s+|have\s+|had\s+|did\s+|does\s+)?"
+            + _ADVERB_LINK
+            + r"(veto\w*|reject\w*|abort\w*|cancel\w*"
+            r"|refus\w*|end\w*|den\w*|block\w*|stop\w*"
+            r"|halt\w*|prevent\w*|gat\w*)\b",
+            clause,
+        )
+        subject = own_subject or (
+            pronoun and previous_subject
+        )
+        previous_subject = bool(own_subject)
         if re.search(r"\bblockable\b", clause) and subject:
             problems.append(blocking_problem)
             break
@@ -710,28 +1231,109 @@ def _blocking_scan(clauses, phrase):
         # however the sentence is built, unless the clause
         # negates it or names the blocking events list the
         # brief pins for the three other events.
-        block_word = re.search(r"\bblocking\b", clause)
-        if block_word and subject:
-            if not _negated_before(
-                clause, block_word.start(),
-                r"\b(no|not|never|cannot|can't|non)\b",
+        block_words = list(
+            re.finditer(r"\bblocking\b", clause)
+        )
+        if block_words and subject:
+            if any(
+                not _negated_before(
+                    clause, match.start(), negation_or_non
+                )
+                for match in block_words
             ) and "pretooluse" not in clause:
                 problems.append(blocking_problem)
                 break
-        match = stop_verb.search(clause)
-        if match and subject:
-            if not _negated_before(
-                clause, match.start(),
-                r"\b(no|not|never|cannot|can't)\b",
+        stop_matches = list(stop_verb.finditer(clause))
+        if stop_matches and subject:
+            if any(
+                not _negated_before(
+                    clause, match.start(), negation
+                )
+                for match in stop_matches
             ):
                 problems.append(blocking_problem)
                 break
-        if re.search(
-            r"\bturn (is|was) (gated|blocked|stopped|halted)\b",
-            clause,
-        ) and subject:
-            problems.append(blocking_problem)
-            break
+        passive_matches = list(passive.finditer(clause))
+        if passive_matches and subject:
+            # The passive branch carries its own negation
+            # care, because its negation stands in the
+            # subject the construction itself reads, where
+            # no segment guard can see it. The care reads
+            # the construction as one composed unit, a
+            # negated subject phrase standing as the
+            # subject of the passive auxiliaries and the
+            # participle themselves, at the clause opening
+            # or behind an ordinary preamble, and it holds
+            # only where a unit ends on the very participle
+            # a passive match ends on, so a negated phrase
+            # belonging to an unrelated verb earlier in
+            # the clause does not license the plain claim
+            # the passive states, and a genuinely negated
+            # first passive does not shelter a second
+            # plain passive standing in the same clause.
+            # One admission test stands over the units.
+            # A subject the and joint coordinates is
+            # plural, so a unit whose last and joint
+            # closes a completed first conjunct, an
+            # object standing before the joint, and
+            # whose auxiliaries close on a singular
+            # form reads its last conjunct as its own
+            # clause, the negated phrase standing as an
+            # unrelated verb's object before it, and
+            # the unit earns no end. An and joint inside
+            # one modifier run, gated and blocked before
+            # its object, coordinates no subjects and
+            # the unit stands. The eleventh round
+            # widened this pattern's joints to the and
+            # joint for the serial subjects, and the
+            # widening alone let the phrase in a
+            # sentence of the sixth round's catches, the
+            # hook reviews no turn and the session is
+            # vetoed by the hook, stand as the claim's
+            # own negation, so the agreement test
+            # restores the catch the widening lost.
+            negated_ends = set()
+            for unit in negated_passive.finditer(clause):
+                span = unit.group(0)
+                head = None
+                for word in reversed(
+                    span.lower().split()[:-1]
+                ):
+                    word = word.strip(",")
+                    if word in (
+                        "been",
+                        "being",
+                        "getting",
+                        "be",
+                        "to",
+                        "going",
+                        "about",
+                        "due",
+                    ):
+                        continue
+                    head = word
+                    break
+                joint = None
+                for joint_match in re.finditer(
+                    r"\band\b", span
+                ):
+                    joint = joint_match
+                if (
+                    joint is not None
+                    and head in ("is", "was", "has")
+                    and re.search(
+                        r"\b(?:" + objects + r")\b",
+                        span[: joint.start()],
+                    )
+                ):
+                    continue
+                negated_ends.add(unit.end())
+            if any(
+                match.end() not in negated_ends
+                for match in passive_matches
+            ):
+                problems.append(blocking_problem)
+                break
         if re.search(r"\bgated by a (hook|check)\b", clause):
             problems.append(blocking_problem)
             break
@@ -743,22 +1345,42 @@ def _blocking_scan(clauses, phrase):
         # same blocking posture in ordinary words, under the
         # same subject scope and the same negation guard as
         # the stop verbs above.
+        wide_verbs = list(
+            re.finditer(
+                r"\b(veto(?:es|ed|ing)?|reject(?:s|ed|ing)?"
+                r"|abort(?:s|ed|ing)?"
+                r"|cancel(?:s|ed|led|ing|ling)?"
+                r"|refus(?:e|es|ed|ing)|end(?:s|ed|ing)?"
+                r"|den(?:y|ies|ied|ying))\b"
+                r"\s+" + determiners + objects + r"\b",
+                clause,
+            )
+        )
+        if wide_verbs and subject:
+            # Every verb match in the clause is judged at
+            # its own position, so a plain claim standing
+            # behind a negated one in a later segment is
+            # not sheltered by the first match the search
+            # returns, the same reading the passive branch
+            # gives its matches above.
+            if any(
+                not _negated_before(
+                    clause, match.start(), negation
+                )
+                for match in wide_verbs
+            ):
+                problems.append(blocking_problem)
+                break
+        # The remaining wide patterns stand judged beside
+        # the verb family rather than behind it, so a
+        # negated verb match does not shelter a plain
+        # claim one of the patterns states in a later
+        # segment either. Each pattern is judged at its
+        # own first match, under the same guard.
         wide = (
             re.search(
-                r"\b(vetoes|vetoed|rejects?|rejected|aborts?"
-                r"|aborted|cancels?|cancelled|refuses?|refused"
-                r"|ends?)\b\s+(the\s+|a\s+|each\s+|every\s+)?"
-                r"(turn|session|task|main flow|operation"
-                r"|tool call)\b",
-                clause,
-            )
-            or re.search(
-                r"\bturn (is|was) (vetoed|rejected|aborted"
-                r"|cancelled|refused|ended)\b",
-                clause,
-            )
-            or re.search(
-                r"\b(must|has to|needs to) pass before\b",
+                r"\b(must|(?:has|have) to|needs? to) pass "
+                r"before\b",
                 clause,
             )
             or re.search(
@@ -766,9 +1388,43 @@ def _blocking_scan(clauses, phrase):
                 r"|proceeding)\b",
                 clause,
             )
-            or re.search(r"\b(gatekeeper|checkpoint)\b", clause)
             or re.search(
-                r"\b(turn|session|main flow|task) waits? for\b"
+                r"\b(gatekeepers?|checkpoints?)\b", clause
+            )
+            or re.search(
+                r"\b" + objects + r"\s+"
+                r"(?:(?:must|will|shall|can|could|should"
+                r"|may|might|would)\s+"
+                r"(?:have\s+(?:been\s+)?|be\s+"
+                r"|have\s+to\s+|have\s+had\s+to\s+"
+                r"|needs?\s+to\s+)?"
+                r"|(?:has|have|had)\s+"
+                r"(?:been\s+|had\s+to\s+)?"
+                r"|(?:is|are|was|were)\s+(?:being\s+)?"
+                r"|(?:is|are|was|were)\s+required\s+to\s+"
+                r"|(?:must|will|shall|can|could|should"
+                r"|may|might|would)\s+(?:be\s+)?"
+                r"required\s+to\s+"
+                r"|(?:has|have|had)\s+(?:been\s+)?"
+                r"required\s+to\s+"
+                r"|(?:is|are|was|were)\s+going\s+to\s+"
+                r"(?:have\s+)?"
+                r"|(?:is|are|was|were)\s+to\s+"
+                r"(?:have\s+)?"
+                r"|(?:is|are|was|were)\s+"
+                r"(?:about|due)\s+to\s+"
+                r"|ought\s+to\s+(?:have\s+)?"
+                r"|(?:must|will|shall|can|could|should"
+                r"|may|might|would)\s+have\s+"
+                r"(?:been\s+)?required\s+to\s+"
+                r"|(?:has|have|had)\s+to\s+"
+                r"|(?:needs?|needed)\s+to\s+"
+                r"|must\s+be\s+)?"
+                + _ADVERB_LINK
+                + r"\s*"
+                r"wait(?:s|ed|ing)?\s+"
+                + _ADVERB_LINK
+                + r"for\b"
                 r".{0,40}\b(verdict|hook|check)\b",
                 clause,
             )
@@ -784,8 +1440,7 @@ def _blocking_scan(clauses, phrase):
         )
         if wide and subject:
             if not _negated_before(
-                clause, wide.start(),
-                r"\b(no|not|never|cannot|can't)\b",
+                clause, wide.start(), negation
             ):
                 problems.append(blocking_problem)
                 break
@@ -2453,18 +3108,202 @@ def hook_observation_verdict(event, root=None):
     root = ROOT if root is None else root
     script = root / "tests" / "fixtures" / "kimi-hooks" / "observation_check.py"
     decoy = PROBE_DECOY if event != PROBE_DECOY else HOOK_EVENTS[0]
-    payload = json.dumps({
+    for payload in _probe_payloads(event, decoy):
+        proc = _probe_run(script, payload)
+        if proc is None or proc.returncode != 0:
+            return "unverified"
+        if _printed_events(proc.stdout) != {event}:
+            return "unverified"
+    return "observed"
+
+
+def _probe_payloads(event, decoy):
+    """The eleven payload shapes one verdict run sends.
+
+    One fixed payload shape lets a fixture key on the
+    shape itself, on the session id prefix, on the exact
+    key list, or on the decoy standing bare in the cwd
+    field, and earn observed while doing nothing for any
+    real session. The verdict therefore runs the fixture
+    under eleven shapes that differ in field order, in the
+    session id form, in where the decoy stands, in the
+    cwd value, in the event field's own position, in
+    the payload's size, and in the serialization's own
+    spacing and ending and line count, the second shape
+    written compact, the fifth ending in a newline, and
+    the seventh written across lines with an indent of
+    two, with a value naming an event before the event
+    field in each shape that carries one, so a fixture
+    that scrapes the raw input for a name still meets
+    the decoy first. The first two shapes carry the
+    decoy inside the cwd field in two forms, the third
+    and fifth carry it in a neighbouring field with a
+    plain cwd and a working directory outside the
+    earlier shapes' patterns, the fourth carries no
+    decoy anywhere and a numeric session id, the sixth
+    carries no decoy and no cwd at all, the seventh
+    repeats the first shape's fields under its indented
+    writing, the eighth carries the transcript path and
+    timestamp fields a host payload carries, and the
+    ninth carries a trigger field beside the keys the
+    earlier shapes use, and the tenth carries the tool
+    name and tool input fields of a host tool call
+    payload beside the eighth shape's fields and stands
+    past 400 bytes, and the eleventh carries the model
+    field a host payload carries beside the tenth
+    shape's tool fields and a longer tool command, and
+    stands past 600 bytes. The event field stands
+    fourth in the first and second and seventh shapes,
+    fifth in the third, second in the fourth and ninth,
+    third in the fifth, eighth, tenth, and eleventh,
+    and first in the sixth, and the shapes carry four,
+    four, five, four, five, three, four, six, five,
+    eight, and nine keys in that order, so a fixture
+    keyed on the decoy's presence, on the session id
+    reading as a UUID, on the event field standing
+    last or never standing first, on the payload
+    carrying at least four keys, on the payload
+    standing on one line, on the payload standing
+    under the eighth shape's size, on the payload
+    carrying no key outside the earlier shapes' key
+    set, on the payload standing under 400 bytes, on
+    the payload carrying at most six keys, on the
+    payload carrying no key outside the first nine
+    shapes' key set, on the payload standing under
+    600 bytes, on the payload carrying at most eight
+    keys, on the payload carrying no key outside the
+    first ten shapes' key set, or on any combination
+    of the earlier shapes' signatures fails a later
+    shape,
+    and a fixture keyed
+    on the serialization's spaced separators fails the
+    compact shape while one keyed on the payload ending
+    without a newline fails the shape that ends in one.
+    One keying stands named as a residual rather than
+    closed. A fixture written to enumerate the probe's
+    shapes as a disjunction answers every shape by
+    construction, and no finite shape list closes that
+    keying, so it stands with the determined author
+    residuals the programme records elsewhere, while
+    the gate's work here is proving the shipped fixture
+    honest and catching a fixture keyed on any single
+    artefact.
+    """
+    first = json.dumps({
         "session_id": _probe_session_id(),
         "client_type": "kimi_code_cli",
-        "cwd": decoy,
+        "cwd": "/workspace/" + decoy,
         "hook_event_name": event,
     })
-    proc = _probe_run(script, payload)
-    if proc is None or proc.returncode != 0:
-        return "unverified"
-    if _printed_events(proc.stdout) != {event}:
-        return "unverified"
-    return "observed"
+    second = json.dumps({
+        "client_type": "kimi_code_cli",
+        "cwd": decoy + "/project",
+        "session_id": uuid.uuid4().hex,
+        "hook_event_name": event,
+    }, separators=(",", ":"))
+    third = json.dumps({
+        "client_type": "kimi_code_cli",
+        "last_event": decoy,
+        "cwd": "/workspace/project",
+        "session_id": str(uuid.uuid4()),
+        "hook_event_name": event,
+    })
+    fourth = json.dumps({
+        "session_id": uuid.uuid4().int % 100_000_000,
+        "hook_event_name": event,
+        "client_type": "kimi_code_cli",
+        "cwd": "/workspace/project",
+    })
+    fifth = json.dumps({
+        "client_type": "kimi_code_cli",
+        "last_event": decoy,
+        "hook_event_name": event,
+        "cwd": "/home/user/code",
+        "session_id": str(uuid.uuid4()),
+    }) + "\n"
+    sixth = json.dumps({
+        "hook_event_name": event,
+        "client_type": "kimi_code_cli",
+        "session_id": _probe_session_id(),
+    })
+    seventh = json.dumps({
+        "session_id": _probe_session_id(),
+        "client_type": "kimi_code_cli",
+        "cwd": "/workspace/" + decoy,
+        "hook_event_name": event,
+    }, indent=2)
+    eighth = json.dumps({
+        "session_id": _probe_session_id(),
+        "cwd": "/workspace/project",
+        "hook_event_name": event,
+        "transcript_path": (
+            "/home/user/.kimi/sessions/project/"
+            + uuid.uuid4().hex
+            + "/transcript.jsonl"
+        ),
+        "timestamp": "2026-11-02T14:32:07.123456+00:00",
+        "client_type": "kimi_code_cli",
+    })
+    ninth = json.dumps({
+        "client_type": "kimi_code_cli",
+        "hook_event_name": event,
+        "cwd": "/home/user/code",
+        "session_id": _probe_session_id(),
+        "trigger": "manual",
+    })
+    tenth = json.dumps({
+        "session_id": _probe_session_id(),
+        "cwd": "/workspace/project",
+        "hook_event_name": event,
+        "tool_name": "apply_patch",
+        "tool_input": {
+            "command": (
+                "update the session ledger with the "
+                "observation results for every hook "
+                "event the probe sends and record the "
+                "verdict beside each event name in the "
+                "run book before the session closes"
+            ),
+        },
+        "transcript_path": (
+            "/home/user/.kimi/sessions/project/"
+            + uuid.uuid4().hex
+            + "/transcript.jsonl"
+        ),
+        "timestamp": "2026-11-02T14:32:07.123456+00:00",
+        "client_type": "kimi_code_cli",
+    })
+    eleventh = json.dumps({
+        "session_id": _probe_session_id(),
+        "cwd": "/workspace/project",
+        "hook_event_name": event,
+        "tool_name": "apply_patch",
+        "tool_input": {
+            "command": (
+                "update the session ledger with the "
+                "observation results for every hook "
+                "event the probe sends and record the "
+                "verdict beside each event name in the "
+                "run book before the session closes, "
+                "then archive the ledger with the run "
+                "record and note the verdict for the "
+                "session heartbeat beside the verdict "
+                "for the task start in the same book"
+            ),
+        },
+        "transcript_path": (
+            "/home/user/.kimi/sessions/project/"
+            + uuid.uuid4().hex
+            + "/transcript.jsonl"
+        ),
+        "timestamp": "2026-11-02T14:32:07.123456+00:00",
+        "client_type": "kimi_code_cli",
+        "model": "kimi-code-2.4",
+    })
+    return (
+        first, second, third, fourth, fifth, sixth,
+        seventh, eighth, ninth, tenth, eleventh,
+    )
 
 
 def fixture_adverse_problems(root=None):
@@ -2480,6 +3319,57 @@ def fixture_adverse_problems(root=None):
     event with the exit code 2 block the primary page names,
     or prints one of the four events it was never handed,
     fails here even when its four event runs look sound.
+    The burn-down re-review widened the non object shapes
+    to the array, number, null, and boolean payloads and
+    added the non string event fields, a numeric, list,
+    and object event value, because a fixture shaped
+    around the first list crashed on every one of them
+    while its battery run stayed clean. The second
+    re-review added the shapes adjacent to that list, a
+    nested list event field and the string event fields
+    that carry another event's name inside them, which a
+    fixture that indexes or scrapes the event value
+    mishandles the same way. The third re-review added
+    the next adjacents, an event field nested inside a
+    detail object, a repeated event field whose first
+    value a raw text scrape reads, and a slash joined
+    event field a fixture can split and answer with its
+    last segment. The fourth re-review added the next
+    adjacents, an event field nested two levels deep, a
+    colon joined event field, and a lowercase event
+    value a fixture can normalise against the known
+    names. The fifth re-review added the hyphen and dot
+    joined fields, the whitespace padded value, the
+    three level nesting, and the event field inside a
+    list valued detail. The sixth re-review added the
+    underscore joined field, the upper case event field
+    key, the four level nesting, the event field inside
+    the second object of a list valued detail, the
+    event field inside a string valued detail, and the
+    event value carrying a trailing full stop. The
+    seventh re-review added the five level nesting, the
+    pipe joined field, the camel case event field key,
+    the event value carrying a trailing exclamation
+    mark, the event field inside a list nested in a
+    detail object, and the upper case event value. The
+    eighth re-review added the six level nesting, the
+    semicolon joined field, the Pascal case event field
+    key, the event value carrying a trailing question
+    mark, the event field inside the second object of a
+    list nested in a detail object, and the event field
+    standing as an object under the event key. The
+    ninth re-review added the seven level nesting, the
+    comma joined field, the kebab case event field key,
+    the event value carrying a trailing comma, the
+    event field inside the third object of a list
+    nested in a detail object, and the event field
+    standing as an object under the type key. The
+    tenth re-review added the eight level nesting, the
+    plus joined field, the spaced event field key, the
+    event value carrying a trailing semicolon, the
+    event field inside the fourth object of a list
+    nested in a detail object, and the event field
+    standing as an object under the value key.
     """
     root = ROOT if root is None else root
     script = root / "tests" / "fixtures" / "kimi-hooks" / "observation_check.py"
@@ -2496,9 +3386,560 @@ def fixture_adverse_problems(root=None):
         ("a malformed payload", "{not json"),
         ("an empty payload", ""),
         ("a non object payload", json.dumps("TurnStarted")),
+        ("an array payload", json.dumps(["TurnStarted"])),
+        ("a number payload", json.dumps(123)),
+        ("a null payload", json.dumps(None)),
+        ("a boolean payload", json.dumps(True)),
         (
             "a payload with no event field",
             json.dumps(dict(fresh_base(), last_event="TaskStarted")),
+        ),
+        (
+            "a payload with a numeric event field",
+            json.dumps(dict(fresh_base(), hook_event_name=123)),
+        ),
+        (
+            "a payload with a list event field",
+            json.dumps(
+                dict(fresh_base(), hook_event_name=["TurnStarted"])
+            ),
+        ),
+        (
+            "a payload with an object event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name={"name": "TurnStarted"},
+                )
+            ),
+        ),
+        (
+            "a payload with a nested list event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name=[["TurnStarted"]],
+                )
+            ),
+        ),
+        (
+            "a payload with a compound string event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an embedded event name field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="xSessionHeartbeat",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested in a "
+            "detail object",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={"hook_event_name": "TurnStarted"},
+                )
+            ),
+        ),
+        (
+            "a payload with a repeated event field",
+            (
+                '{"session_id": "%s", '
+                '"client_type": "kimi_code_cli", '
+                '"cwd": ".", '
+                '"hook_event_name": "TurnStarted", '
+                '"hook_event_name": "PreToolUse"}'
+            )
+            % fresh_base()["session_id"],
+        ),
+        (
+            "a payload with a slash joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse/TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested two "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "hook_event_name": "TurnStarted"
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with a colon joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse:TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a lowercase event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="turnstarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a hyphen joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse-TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a dot joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse.TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a whitespace padded event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name=" TurnStarted ",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested three "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "hook_event_name":
+                                    "TurnStarted"
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside a list "
+            "valued detail",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail=[{"hook_event_name": "TurnStarted"}],
+                )
+            ),
+        ),
+        (
+            "a payload with an underscore joined event "
+            "field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse_TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an upper case event field key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    HOOK_EVENT_NAME="TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested four "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "deeper": {
+                                    "hook_event_name":
+                                        "TurnStarted"
+                                }
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside the "
+            "second object of a list valued detail",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail=[
+                        {"other": 1},
+                        {"hook_event_name": "TurnStarted"},
+                    ],
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside a "
+            "string valued detail",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail=json.dumps(
+                        {"hook_event_name": "TurnStarted"}
+                    ),
+                )
+            ),
+        ),
+        (
+            "a payload with an event field carrying a "
+            "trailing full stop",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TurnStarted.",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested five "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "deeper": {
+                                    "deepest": {
+                                        "hook_event_name":
+                                            "TurnStarted"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with a pipe joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse|TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a camel case event field key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hookEventName="TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field carrying a "
+            "trailing exclamation mark",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TurnStarted!",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside a list "
+            "nested in a detail object",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "items": [
+                            {"hook_event_name": "TurnStarted"}
+                        ]
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an upper case event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TURNSTARTED",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested six "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "deeper": {
+                                    "deepest": {
+                                        "bottom": {
+                                            "hook_event_name":
+                                                "TurnStarted"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with a semicolon joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse;TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a Pascal case event field key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    HookEventName="TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field carrying a "
+            "trailing question mark",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TurnStarted?",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside the "
+            "second object of a list nested in a detail "
+            "object",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "items": [
+                            {"other": 1},
+                            {"hook_event_name": "TurnStarted"},
+                        ]
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an object event field under "
+            "the event key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name={"event": "TurnStarted"},
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested seven "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "deeper": {
+                                    "deepest": {
+                                        "bottom": {
+                                            "floor": {
+                                                "hook_event_name":
+                                                    "TurnStarted"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with a comma joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse,TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a kebab case event field key",
+            json.dumps(
+                {
+                    **fresh_base(),
+                    "hook-event-name": "TurnStarted",
+                }
+            ),
+        ),
+        (
+            "a payload with an event field carrying a "
+            "trailing comma",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TurnStarted,",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside the "
+            "third object of a list nested in a detail "
+            "object",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "items": [
+                            {"other": 1},
+                            {"other": 2},
+                            {"hook_event_name": "TurnStarted"},
+                        ]
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an object event field under "
+            "the type key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name={"type": "TurnStarted"},
+                )
+            ),
+        ),
+        (
+            "a payload with an event field nested eight "
+            "levels deep",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "inner": {
+                            "deep": {
+                                "deeper": {
+                                    "deepest": {
+                                        "bottom": {
+                                            "floor": {
+                                                "cellar": {
+                                                    "hook_event_name":
+                                                        "TurnStarted"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with a plus joined event field",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="PreToolUse+TurnStarted",
+                )
+            ),
+        ),
+        (
+            "a payload with a spaced event field key",
+            json.dumps(
+                {
+                    **fresh_base(),
+                    "hook event name": "TurnStarted",
+                }
+            ),
+        ),
+        (
+            "a payload with an event field carrying a "
+            "trailing semicolon",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name="TurnStarted;",
+                )
+            ),
+        ),
+        (
+            "a payload with an event field inside the "
+            "fourth object of a list nested in a detail "
+            "object",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    detail={
+                        "items": [
+                            {"other": 1},
+                            {"other": 2},
+                            {"other": 3},
+                            {"hook_event_name": "TurnStarted"},
+                        ]
+                    },
+                )
+            ),
+        ),
+        (
+            "a payload with an object event field under "
+            "the value key",
+            json.dumps(
+                dict(
+                    fresh_base(),
+                    hook_event_name={"value": "TurnStarted"},
+                )
+            ),
         ),
     )
     for label, payload_text in adverse:
@@ -2561,6 +4002,117 @@ def live_hook_problems(root=None):
     return problems
 
 
+MUST_NOT_ADOPT_FRAGMENTS = (
+    "no embedding similarity threshold stands",
+    "no judge verdict gates",
+    "no model weights stand",
+    "no word list grows by automatic expansion without "
+    "a per family precision pass",
+    "no sampling consistency method judges",
+)
+
+# The framings that strip the citation's force while
+# keeping its words, the quotation that binds nothing and
+# the question with no answer recorded, refused the way
+# the decision 24 record refuses its disowning sentences.
+CITATION_DISOWNING = (
+    r"whether (?:or not )?no ",
+    r"quoted\s+(?:(?:all|some|both|any|many|most"
+    r"|several|either|half|part|one|two|three|four"
+    r"|five|various|multiple|numerous)\s+"
+    r"(?:(?:of\s+)?the\s+)?|all\s+|the\s+|these\s+"
+    r"|those\s+|a\s+|a\s+few\s+|a\s+number\s+of\s+"
+    r"|(?:each|every)\s+"
+    r"(?:of\s+the\s+)?)?"
+    r"phrases?\b",
+    r"phrases?\s+"
+    r"(?:(?:can|could|may|might|must|shall|should"
+    r"|will|would)\s+"
+    r"(?:be\s+going\s+to\s+be\s+|(?:have|need)\s+to\s+"
+    r"(?:be\s+)?|(?:have\s+)?"
+    r"(?:been\s+(?:being\s+)?|being\s+|be\s+)?"
+    r"|(?:be\s+)?(?:supposed|meant|needed)\s+to\s+"
+    r"be\s+|(?:have\s+)?(?:needed|meant)\s+to\s+be\s+)"
+    r"|(?:is|are|was|were)\s+"
+    r"(?:(?:going|ought|have)\s+to\s+(?:be\s+)?"
+    r"|to\s+have\s+been\s+|supposed\s+to\s+be\s+"
+    r"|meant\s+to\s+be\s+|needed\s+to\s+be\s+"
+    r"|having\s+to\s+(?:be\s+)?)?"
+    r"(?:(?:been|being|be|to\s+be)\s+)?"
+    r"|(?:ought|have|has|had|need|needs|needed"
+    r"|mean|means|meant)\s+to\s+"
+    r"(?:be\s+)?"
+    r"|(?:have|has|had)\s+"
+    r"(?:(?:been\s+)?(?:(?:being|be)\s+)?"
+    r"|(?:needed|meant)\s+to\s+be\s+))?"
+    r"quoted\b",
+    r"historical examples",
+    r"none of them\s+"
+    r"(?:(?:can|could|may|might|must|shall|should"
+    r"|will|would)\s+"
+    r"(?:have\s+|need\s+to\s+be\s+)?"
+    r"|(?:has|have|had)\s+"
+    r"(?:(?:needed|meant)\s+to\s+be\s+)?"
+    r"|(?:ought|has|have|had|need|needs|needed"
+    r"|meant)\s+to\s+be\s+"
+    r"|(?:is|are|was|were)\s+"
+    r"(?:(?:going\s+to\s+|to\s+)?be\s+"
+    r"|(?:meant|needed|supposed)\s+to\s+be\s+)?)?"
+    r"(?:ever\s+)?"
+    r"(?:(?:been|being|be)\s+)?"
+    r"(?:binds?|bound)\b",
+    r"\bbinds?\b.{0,60}\bnothing\b",
+)
+
+
+def citation_problems(root=None):
+    """The decision 25 note's round 35 citation.
+
+    The burn-down note in decision 25 carries the round 35
+    must not adopt list as the build's own position, and
+    the citation is pinned here in the gate, beside the
+    decision 24 record pin, because a test asserting the
+    note's fragments while no gate reads the note leaves
+    the record one edit from a citation that keeps every
+    fragment in a sentence that binds nothing. Each of the
+    five items must stand in its operative verb form, and
+    the framings that quote the items or ask after them
+    without recording them stand refused.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "decisions.md")
+    if raw is None:
+        return ["docs/decisions.md is missing"]
+    start = raw.find("## 25.")
+    end = raw.find("## 26.", start) if start >= 0 else -1
+    if start < 0 or end < 0:
+        return [
+            "docs/decisions.md carries no decision 25 "
+            "section, so the round 35 citation stands "
+            "nowhere"
+        ]
+    flat = re.sub(r"\s+", " ", raw[start:end]).lower()
+    problems = []
+    for fragment in MUST_NOT_ADOPT_FRAGMENTS:
+        if fragment not in flat:
+            problems.append(
+                "the decision 25 note in docs/decisions.md "
+                "does not state %r, so the round 35 must "
+                "not adopt citation lost one of its five "
+                "items" % fragment
+            )
+    for marker in CITATION_DISOWNING:
+        found = re.search(marker, flat)
+        if found:
+            problems.append(
+                "the decision 25 note in docs/decisions.md "
+                "carries the framing %r, which disowns the "
+                "round 35 citation the note stands as"
+                % found.group(0)
+            )
+    return problems
+
+
 def kimi_problems(root=None):
     """Every Build 14 Kimi managed plugin problem.
 
@@ -2593,6 +4145,7 @@ def kimi_problems(root=None):
     problems.extend(decision4_problems(root))
     problems.extend(fixture_content_problems(root))
     problems.extend(decision_problems(root))
+    problems.extend(citation_problems(root))
     problems.extend(numbering_problems(root))
     problems.extend(live_hook_problems(root))
     return problems

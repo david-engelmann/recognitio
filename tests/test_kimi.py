@@ -748,6 +748,3352 @@ class TestCheckKimi(unittest.TestCase):
                 problems,
             )
 
+    def test_the_scan_catches_the_full_paradigm_in_every_pattern(self):
+        # Burn-down re-review, second round. The first
+        # widening completed the wide pattern's paradigm and
+        # left the sibling patterns in their old forms, so
+        # the passive constructions beyond the is and was
+        # auxiliaries and without the deny participle, the
+        # stop verbs in their past and progressive forms,
+        # the waits for construction beyond its modal list,
+        # the pronoun reading beyond the bare verb, and the
+        # plural and quantified objects all escaped on both
+        # surfaces. Each sentence below is a tested family
+        # member in another spelling and must fail the hook
+        # scan by name.
+        sentences = (
+            "The turn was denied by the hook.",
+            "The turn will be vetoed by the hook.",
+            "The turn has been rejected by the hook.",
+            "The turn is being vetoed by the hook.",
+            "The session is vetoed by the hook.",
+            "The task was rejected by the hook check.",
+            "The hook blocked the turn.",
+            "The hook stopped the turn.",
+            "The hook gated the turn.",
+            "The hook is stopping the turn.",
+            "The hook is preventing the turn.",
+            "The turn waited for the hook verdict.",
+            "The turn would wait for the hook verdict.",
+            "The turn has to wait for the hook verdict.",
+            "The turn needs to wait for the hook verdict.",
+            "The turns wait for the hook verdict.",
+            "The hook carries no state; it is vetoing "
+            "the turn.",
+            "The hook carries no state; it can veto "
+            "the turn.",
+            "The hooks carry no state; they veto the turn.",
+            "The hook vetoes all turns.",
+            "The hook vetoes turns.",
+            "The hook rejects sessions.",
+            "The hook denies tool calls.",
+            "The hook vetoes the turns.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_true_posture_beside_the_paradigm(self):
+        # Control, the same round in the other direction.
+        # The or care in the negation guard omitted the end
+        # lemma its own scan tests, so a negation
+        # distributing over an end claim reset the segment
+        # and the claim after the joint stood unguarded, and
+        # the not yet care admitted no adverb between the
+        # negation and the joint. These true posture
+        # sentences must pass.
+        sentences = (
+            "The hook never ends or vetoes the turn.",
+            "The hook does not end or deny the turn.",
+            "The hook does not quite yet veto the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_a_fixture_keyed_on_the_probe_shapes_jointly_fails(self):
+        # Burn-down re-review, second round. Two payload
+        # shapes raise the keying cost only to a disjunction
+        # of them or a shared artefact of them, so the probe
+        # grew a third shape, carrying the decoy in a
+        # neighbouring field with a plain cwd and a dashed
+        # session id. A fixture answering only the first two
+        # shapes, only a 32 hex character session id core,
+        # or only the decoy standing inside the cwd earns
+        # unverified now.
+        fixtures = (
+            (
+                "disjunction of two shapes",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict):\n"
+                "    sid = str(payload.get('session_id', ''))\n"
+                "    cwd = str(payload.get('cwd', ''))\n"
+                "    shape_a = sid.startswith('session_') "
+                "and cwd.startswith('/workspace/')\n"
+                "    shape_b = not sid.startswith('session_') "
+                "and cwd.endswith('/project') and "
+                "'last_event' not in payload\n"
+                "    if shape_a or shape_b:\n"
+                "        event = payload.get("
+                "'hook_event_name')\n"
+                "        if event:\n"
+                "            print('hook event ' + event)\n",
+            ),
+            (
+                "hex core session id",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict):\n"
+                "    sid = str(payload.get('session_id', ''))\n"
+                "    core = sid[len('session_'):] if sid."
+                "startswith('session_') else sid\n"
+                "    if len(core) == 32 and all(c in "
+                "'0123456789abcdef' for c in core):\n"
+                "        event = payload.get("
+                "'hook_event_name')\n"
+                "        if event:\n"
+                "            print('hook event ' + event)\n",
+            ),
+            (
+                "decoy inside the cwd",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict) and payload."
+                "get('client_type') == 'kimi_code_cli' and "
+                "'SessionHeartbeat' in str(payload.get("
+                "'cwd', '')):\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        (label, event),
+                    )
+
+    def test_the_battery_covers_the_adjacent_event_shapes(self):
+        # Burn-down re-review, second round. The widened
+        # battery left two adjacent shapes unsent, a nested
+        # list event field a fixture can index into and
+        # crash on, and the string event fields carrying
+        # another event's name inside them, which a fixture
+        # scraping the event value answers with an event
+        # the payload never named as its own. The battery
+        # now sends both.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n"
+                "elif isinstance(event, list):\n"
+                "    print('hook event ' + event[0][0])\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "nested list event field" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    for name in ('TurnStarted', "
+                "'UserPromptQueued', 'TaskStarted', "
+                "'SessionHeartbeat'):\n"
+                "        if name in event:\n"
+                "            print('hook event ' + name)\n"
+                "            break\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "compound string event field" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_gate_refuses_a_disowned_round_35_citation(self):
+        # Burn-down re-review, second round. The citation
+        # pin moved into the gate because a test asserting
+        # the note's fragments while no gate read the note
+        # left the record one edit from a citation that
+        # keeps every fragment in a sentence that binds
+        # nothing. The gate must refuse the quotation
+        # framing and the thinned mention on a planted
+        # record, and hold the shipped record clean.
+        self.assertEqual(self.mod.citation_problems(ROOT), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "docs" / "decisions.md"
+            text = path.read_text(encoding="utf-8")
+            start = text.find(
+                "The round 35 must not adopt list"
+            )
+            end = text.find("makes no network calls.", start)
+            self.assertGreater(start, 0)
+            self.assertGreater(end, start)
+            end += len("makes no network calls.")
+            quoted = (
+                "An earlier draft quoted the phrases no "
+                "embedding similarity threshold stands, no "
+                "judge verdict gates, no model weights stand, "
+                "no word list grows by automatic expansion "
+                "without a per family precision pass, and no "
+                "sampling consistency method judges as "
+                "historical examples, and none of them binds "
+                "this build."
+            )
+            path.write_text(
+                text[:start] + quoted + text[end:],
+                encoding="utf-8",
+            )
+            problems = self.mod.citation_problems(root)
+            self.assertTrue(
+                any(
+                    "disowns the round 35" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            path.write_text(
+                text[:start]
+                + "The list mentions an embedding threshold, "
+                  "a judge, some weights, a word list, and a "
+                  "sampling method."
+                + text[end:],
+                encoding="utf-8",
+            )
+            problems = self.mod.citation_problems(root)
+            self.assertTrue(
+                any(
+                    "lost one of its five" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+
+    def test_the_scan_catches_the_shared_paradigm_forms(self):
+        # Burn-down re-review, third round. The paradigm
+        # completion was still asymmetric, so the patterns
+        # disagreed with each other. The stop verbs' object
+        # slot omitted the task and tool call objects, the
+        # passives admitted only the singular subjects and
+        # different auxiliary sets per pattern, the pronoun
+        # reading omitted the perfect and emphatic
+        # auxiliaries, the waits for construction omitted
+        # the plural agreement and perfect forms of its own
+        # auxiliaries and the operation subject, and the
+        # determiner slots omitted the demonstratives. The
+        # slots now stand shared, and each sentence below
+        # must fail the hook scan by name.
+        sentences = (
+            "The hook stopped the task.",
+            "The hook gated the tool call.",
+            "The turns were vetoed by the hook.",
+            "The sessions are blocked by the hook.",
+            "The operation was vetoed by the hook.",
+            "The tool call was denied by the hook.",
+            "The turn can be blocked by the hook.",
+            "The turn should be vetoed by the hook.",
+            "The turn had been vetoed by the hook.",
+            "The turn gets vetoed by the hook.",
+            "The hook carries no state; it has vetoed "
+            "the turn.",
+            "The hook carries no state; it did veto "
+            "the turn.",
+            "The hooks carry no state; they have rejected "
+            "the turn.",
+            "The turns need to wait for the hook verdict.",
+            "The tasks are required to wait for the hook "
+            "verdict.",
+            "The turn has waited for the hook verdict.",
+            "The operation waits for the hook verdict.",
+            "The hook vetoes these turns.",
+            "The hook vetoes both turns.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_contraction_controls(self):
+        # Control, the same round in the other direction.
+        # The completed paradigm over-refused the
+        # contraction spellings of the scan's own negation,
+        # the and and serial distributions of a negation
+        # over coordinated claims, and the remaining not
+        # yet adverb forms. These true posture sentences
+        # must pass.
+        sentences = (
+            "The hook doesn't veto the turn.",
+            "The hook doesn't block the turn.",
+            "The hooks don't reject the turn.",
+            "The hook won't veto the turn.",
+            "The hook isn't blocking the turn.",
+            "The hook never blocks and vetoes the turn.",
+            "The hook does not veto and reject the turn.",
+            "The hook does not block, veto, or reject "
+            "the turn.",
+            "The hook does not really yet veto the turn.",
+            "The hook does not as yet veto the turn.",
+            "The hook does not even quite yet veto "
+            "the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_a_fixture_keyed_on_the_shared_artefacts_fails(self):
+        # Burn-down re-review, third round. Every shape the
+        # probe sent planted a decoy event name somewhere
+        # and built its session id from a UUID, so the
+        # decoy's presence and the id's UUID form were
+        # artefacts all shapes shared, and the second
+        # round's two shape disjunction still answered the
+        # third shape through its cwd. The probe now sends
+        # a decoy free shape with a numeric id and a shape
+        # whose working directory stands outside the
+        # earlier patterns, and each fixture below keys on
+        # one shared artefact and must fail a later shape.
+        fixtures = (
+            (
+                "decoy presence",
+                "import json\n"
+                "import sys\n"
+                "raw = sys.stdin.read()\n"
+                "names = [n for n in ('TurnStarted', "
+                "'UserPromptQueued', 'TaskStarted', "
+                "'SessionHeartbeat') if n in raw]\n"
+                "if len(names) >= 2:\n"
+                "    payload = json.loads(raw)\n"
+                "    print('hook event ' + payload.get("
+                "'hook_event_name'))\n",
+            ),
+            (
+                "uuid session id",
+                "import json\n"
+                "import sys\n"
+                "import uuid\n"
+                "payload = json.loads(sys.stdin.read())\n"
+                "sid = str(payload.get('session_id', ''))\n"
+                "core = sid[len('session_'):] if sid."
+                "startswith('session_') else sid\n"
+                "try:\n"
+                "    uuid.UUID(core)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "print('hook event ' + payload.get("
+                "'hook_event_name'))\n",
+            ),
+            (
+                "two shape disjunction",
+                "import json\n"
+                "import sys\n"
+                "payload = json.loads(sys.stdin.read())\n"
+                "sid = str(payload.get('session_id', ''))\n"
+                "cwd = str(payload.get('cwd', ''))\n"
+                "first = sid.startswith('session_') and "
+                "cwd.startswith('/workspace/')\n"
+                "second = not sid.startswith('session_') "
+                "and cwd.endswith('/project')\n"
+                "if first or second:\n"
+                "    print('hook event ' + payload.get("
+                "'hook_event_name'))\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        (label, event),
+                    )
+
+    def test_the_battery_covers_the_next_adjacent_shapes(self):
+        # Burn-down re-review, third round. Three shapes
+        # adjacent to the battery's widened list were still
+        # unsent, an event field nested in a detail object
+        # a fixture can search for, a repeated event field
+        # whose first value a raw text scrape reads, and a
+        # slash joined event field a fixture can split.
+        # The battery now sends all three.
+        fixtures = (
+            (
+                "event field nested in a detail object",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    for value in payload.values():\n"
+                "        if isinstance(value, dict) and "
+                "'hook_event_name' in value:\n"
+                "            event = value["
+                "'hook_event_name']\n"
+                "            break\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "repeated event field",
+                "import re\n"
+                "import sys\n"
+                "raw = sys.stdin.read()\n"
+                "found = re.search(r'\"hook_event_name\""
+                r"\\s*:\\s*\"([^\"]+)\"', raw)\n"
+                "if found:\n"
+                "    print('hook event ' + found.group(1))\n",
+            ),
+            (
+                "slash joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.split("
+                "'/')[-1])\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_gate_refuses_the_inflected_disowning_framings(
+        self,
+    ):
+        # Burn-down re-review, third round. The citation
+        # gate's named disowning markers were exact strings,
+        # so the plural verb form of one, the word order
+        # variant of another, and the passive voice of the
+        # third passed while every operative fragment stood
+        # verbatim. The markers now read as the stems of
+        # their framings.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        closings = (
+            "And none of them bind this build.",
+            "These sentences bind nothing.",
+            "The phrases are quoted in this paragraph for "
+            "the record. ",
+        )
+        for closing in closings:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                note = (
+                    closing + items
+                    if closing.startswith("The phrases")
+                    else items + closing
+                )
+                path.write_text(
+                    text[:start] + note + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (closing, problems),
+                )
+
+    def test_the_scan_catches_the_completed_shared_slots(self):
+        # Burn-down re-review, fourth round. The slots
+        # stood shared and the shared paradigm was still
+        # incomplete, so every pattern missed the same
+        # remaining forms together, the would and plural
+        # progressive and get passives, the an and this and
+        # that and any determiners, the modal perfect and
+        # future progressive pronoun forms, and the past
+        # and perfect waits for forms. Two further
+        # sentences state the distribution care's limit.
+        # A negated verb aimed at an object outside the
+        # shared set states no claim, so the plain claim
+        # after its joint must still fail.
+        sentences = (
+            "The turn would be vetoed by the hook.",
+            "The turns are being vetoed by the hook.",
+            "The turn got vetoed by the hook.",
+            "The hook vetoes this turn.",
+            "The hook blocks an operation.",
+            "The hook vetoes any turn.",
+            "The hook carries no state; it could have "
+            "vetoed the turn.",
+            "The hook carries no state; it will be "
+            "vetoing the turn.",
+            "The turn was required to wait for the hook "
+            "verdict.",
+            "The turn needed to wait for the hook "
+            "verdict.",
+            "The turn has been waiting for the hook "
+            "verdict.",
+            "The turn will have to wait for the hook "
+            "verdict.",
+            "The hook does not block the user and vetoes "
+            "the turn.",
+            "The hook never blocks spam or vetoes "
+            "the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_negated_passive_and_cares(self):
+        # Control, the same round in the other direction.
+        # The passive construction carried no negation
+        # care at all, the contraction set omitted its
+        # past forms, the distribution care's verb list
+        # omitted the progressive forms, the serial care
+        # admitted only bare verb items, and the not yet
+        # care omitted at all. These true posture
+        # sentences must pass.
+        sentences = (
+            "No turn is vetoed by the hook.",
+            "No turns are blocked by the hook.",
+            "Not one turn is gated by the hook.",
+            "The hook wasn't blocking the turn.",
+            "The hooks weren't vetoing the turn.",
+            "The hook mustn't veto the turn.",
+            "The hook neither blocks nor vetoes the turn.",
+            "The hook is not stopping or vetoing "
+            "the turn.",
+            "The hook is not halting or denying the turn.",
+            "The hook does not block the turn, veto the "
+            "session, or reject the task.",
+            "The hook does not at all yet veto the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_a_fixture_keyed_on_the_event_field_standing_last(
+        self,
+    ):
+        # Burn-down re-review, fourth round. Every probe
+        # shape stood the event field last, so its final
+        # position was a single artefact no shape varied.
+        # The fifth shape now stands the event field in
+        # the middle of the payload, and a fixture that
+        # answers only a payload ending with the event
+        # field earns unverified.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import re\n"
+                "import sys\n"
+                "raw = sys.stdin.read()\n"
+                "found = re.search(\n"
+                "    r'\"hook_event_name\":\\s*\""
+                "([A-Za-z]+)\"}$', raw.strip())\n"
+                "if found:\n"
+                "    print('hook event ' + found.group(1))\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(
+                        event, root
+                    ),
+                    "unverified",
+                    event,
+                )
+
+    def test_the_battery_covers_the_fourth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, fourth round. The shapes
+        # adjacent to the third round's additions were a
+        # deeper nesting, the colon as the joined shape's
+        # separator, and a lowercase event value a fixture
+        # can normalise against the known names. The
+        # battery now sends all three.
+        fixtures = (
+            (
+                "event field nested two levels deep",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, dict):\n"
+                "        inner = detail.get('inner')\n"
+                "        if isinstance(inner, dict):\n"
+                "            event = inner.get("
+                "'hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "colon joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.split("
+                "':')[-1])\n",
+            ),
+            (
+                "lowercase event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    for name in ('TurnStarted', "
+                "'UserPromptQueued', 'TaskStarted', "
+                "'SessionHeartbeat'):\n"
+                "        if event.lower() == name.lower():\n"
+                "            print('hook event ' + name)\n"
+                "            break\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_gate_refuses_the_next_disowning_inflections(
+        self,
+    ):
+        # Burn-down re-review, fourth round. The stemmed
+        # markers still fell to the past tense of the
+        # quoted framing, the irregular past of bind, the
+        # singular of phrases, the or not insertion in the
+        # question framing, and an object standing between
+        # bind and nothing. The stems now read those forms.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            items + "The phrases were quoted in this "
+            "paragraph for the record.",
+            items + "And none of them bound this build.",
+            "This note quoted the phrase in this "
+            "paragraph for the record. " + items,
+            "The review asked whether or not no embedding "
+            "similarity threshold stands, and recorded no "
+            "answer. " + items,
+            items + "These sentences bind us to nothing.",
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_catches_the_composed_slot_forms(self):
+        # Burn-down re-review, fifth round. Each shared
+        # slot stopped one composition short, the modal
+        # perfect and progressive get passives, the two
+        # word and adjective carrying determiners, the
+        # modal perfect progressive pronoun forms and
+        # ought to, and the future and perfect waits for
+        # compositions. The slots now stand as small
+        # grammars of their families, and each sentence
+        # below must fail the hook scan by name.
+        sentences = (
+            "The turn could have been vetoed by the hook.",
+            "The turn will have been vetoed by the hook.",
+            "The turn is getting vetoed by the hook.",
+            "The turn is to be vetoed by the hook.",
+            "The hook blocks some turns.",
+            "The hook blocks another turn.",
+            "The hook blocks all the turns.",
+            "The hook blocks the next turn.",
+            "The hook vetoes every single turn.",
+            "The hook blocks some of the turns.",
+            "The hook carries no state; it could have "
+            "been vetoing the turn.",
+            "The hook carries no state; it ought to veto "
+            "the turn.",
+            "The turn will be waiting for the hook "
+            "verdict.",
+            "The turn will have been waiting for the "
+            "hook verdict.",
+            "The turn should have waited for the hook "
+            "verdict.",
+            "The turn would have to wait for the hook "
+            "verdict.",
+            "The turn will need to wait for the hook "
+            "verdict.",
+            "The turn has had to wait for the hook "
+            "verdict.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_composed_negation_forms(self):
+        # Control, the same round in the other direction.
+        # The distribution care's exact gap test, the
+        # serial care's exact item, the not yet care's
+        # literal not, the passive care's clause opening,
+        # and the missing needn't each refused a true
+        # sentence, and the stem reading of the
+        # distribution care's verbs let a stem noun
+        # license a plain claim behind a negated non
+        # claim, which the two catches at the end state.
+        sentences = (
+            "The hook does not block turns or veto "
+            "sessions.",
+            "The hook does not block the turn at all or "
+            "veto the session.",
+            "The hook does not block the next turn or "
+            "veto the session.",
+            "The hook does not block at all or veto "
+            "the turn.",
+            "The hook does not block the turn, veto "
+            "sessions, or reject the task.",
+            "The hook hasn't yet vetoed the turn.",
+            "The hook doesn't yet veto the turn.",
+            "The hook has never yet vetoed the turn.",
+            "The hook does not entirely yet veto "
+            "the turn.",
+            "None of the turns are blocked by the hook.",
+            "No single turn is vetoed by the hook.",
+            "Neither turn is vetoed by the hook.",
+            "By design, no turn is vetoed by the hook.",
+            "The hook needn't veto the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+        catches = (
+            "The hook does not block the user at the "
+            "endpoints and vetoes the turn.",
+            "The hook does not block spam during the "
+            "gathering and vetoes the turn.",
+        )
+        for sentence in catches:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_a_fixture_keyed_on_the_event_fields_position(
+        self,
+    ):
+        # Burn-down re-review, fifth round. No shape stood
+        # the event field first or second, so its minimum
+        # position was the one ordering fact left
+        # unvaried. The decoy free shape now stands the
+        # event field second, and a fixture that answers
+        # only a payload whose event field stands at index
+        # two or later earns unverified.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "payload = json.load(sys.stdin)\n"
+                "if list(payload).index("
+                "'hook_event_name') >= 2:\n"
+                "    print('hook event ' + payload.get("
+                "'hook_event_name'))\n",
+            )
+            for event in self.mod.HOOK_EVENTS:
+                self.assertEqual(
+                    self.mod.hook_observation_verdict(
+                        event, root
+                    ),
+                    "unverified",
+                    event,
+                )
+
+    def test_the_battery_covers_the_fifth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, fifth round. The hyphen and
+        # dot joined fields beside the slash and colon,
+        # the whitespace padded value, the three level
+        # nesting, and the event field inside a list
+        # valued detail were the battery's next adjacent
+        # shapes. It now sends all five.
+        fixtures = (
+            (
+                "hyphen joined event field",
+                "PreToolUse-TurnStarted",
+            ),
+            (
+                "dot joined event field",
+                "PreToolUse.TurnStarted",
+            ),
+        )
+        for label, value in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(
+                    root,
+                    "import json\n"
+                    "import sys\n"
+                    "try:\n"
+                    "    payload = json.load(sys.stdin)\n"
+                    "except ValueError:\n"
+                    "    sys.exit(0)\n"
+                    "if not isinstance(payload, dict):\n"
+                    "    sys.exit(0)\n"
+                    "event = payload.get('hook_event_name')\n"
+                    "if isinstance(event, str):\n"
+                    "    print('hook event ' + event.split("
+                    "'%s')[-1])\n"
+                    % ("-" if "hyphen" in label else "."),
+                )
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.strip())\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "whitespace padded event field" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "nested three levels deep" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, list):\n"
+                "        for item in detail:\n"
+                "            if isinstance(item, dict) "
+                "and 'hook_event_name' in item:\n"
+                "                event = item["
+                "'hook_event_name']\n"
+                "                break\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "inside a list valued detail" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_gate_refuses_the_composed_disowning_forms(
+        self,
+    ):
+        # Burn-down re-review, fifth round. The widened
+        # stems fell to the quoted framing's remaining
+        # tenses, an auxiliary inside the none of them
+        # marker, a longer object between bind and
+        # nothing, and the active framing's quantifier
+        # and dropped article. The markers now read those
+        # compositions.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            items + "The phrase was quoted in this "
+            "paragraph for the record.",
+            items + "The phrases had been quoted in this "
+            "paragraph for the record.",
+            items + "And none of them has bound this "
+            "build.",
+            items + "And none of them will bind this "
+            "build.",
+            items + "These sentences bind the "
+            "signatories of this note to nothing.",
+            "This note quoted all the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted phrases in this paragraph "
+            "for the record. " + items,
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_catches_the_slot_chain_compositions(
+        self,
+    ):
+        # Burn-down re-review, sixth round. The composed
+        # grammars capped each slot one composition deep,
+        # the progressive layer behind the copula, the
+        # adjective of the open class past the closed
+        # list, ought to bare of its own auxiliaries, and
+        # required to bare behind a modal. The slots now
+        # compose by the slots of their constructions,
+        # the auxiliary chain in its slot order and the
+        # determiner phrase admitting the
+        # unlisted modifiers of its open class, and each
+        # sentence below must fail the hook scan by name.
+        sentences = (
+            "The turn will be being vetoed by the hook.",
+            "The turn could have been being vetoed by "
+            "the hook.",
+            "The turn has been being vetoed by the hook.",
+            "The turn will be getting vetoed by the hook.",
+            "The turn has been getting vetoed by the "
+            "hook.",
+            "The hook blocks the final turn.",
+            "The hook blocks the second turn.",
+            "The hook blocks the upcoming turn.",
+            "The hook blocks a new turn.",
+            "The hook blocks the current turn.",
+            "The hook blocks the next single turn.",
+            "The hook blocks the very next turn.",
+            "The hook blocks the first two turns.",
+            "The hook blocks some of the next turns.",
+            "The hook blocks all of the next turns.",
+            "The hook blocks any and all turns.",
+            "The hook blocks each and every turn.",
+            "The hook carries no state; it ought to have "
+            "vetoed the turn.",
+            "The hook carries no state; it ought to be "
+            "vetoing the turn.",
+            "The hook carries no state; it is going to "
+            "veto the turn.",
+            "The hook carries no state; it has had to "
+            "veto the turn.",
+            "The turn ought to wait for the hook verdict.",
+            "The turn is going to wait for the hook "
+            "verdict.",
+            "The turn will be required to wait for the "
+            "hook verdict.",
+            "The turn must be required to wait for the "
+            "hook verdict.",
+            "The turn has been required to wait for the "
+            "hook verdict.",
+            "The turn will have had to wait for the hook "
+            "verdict.",
+            "The turn was to wait for the hook verdict.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_widened_care_forms(self):
+        # Control and catch, the sixth round in both
+        # directions. The distribution and serial cares
+        # read the same shared phrase the scan reads, and
+        # the passive care reads the shared run inside
+        # its own unit, so a true distribution
+        # or serial item or negated passive subject one
+        # word past the old tests stays clean, while a
+        # negated phrase belonging to an unrelated verb
+        # no longer licenses a plain passive claim, and
+        # a noun carrying a whole verb form at a
+        # segment's end states no claim the distribution
+        # care can read.
+        sentences = (
+            "The hook does not block the final turn or "
+            "veto the session.",
+            "The hook does not block some of the next "
+            "turns or veto the session.",
+            "The hook does not block the next two turns "
+            "or veto the session.",
+            "The hook does not block turns and sessions "
+            "or veto the task.",
+            "The hook does not block the turn in any "
+            "case or veto the session.",
+            "The hook does not block the turn for any "
+            "reason or veto the session.",
+            "The hook does not block the turn, veto the "
+            "final session, or reject the task.",
+            "The hook does not fully yet veto the turn.",
+            "Neither of the turns is vetoed by the hook.",
+            "Not any of the turns are vetoed by the "
+            "hook.",
+            "Not a single one of the turns is vetoed by "
+            "the hook.",
+            "No queued turn is vetoed by the hook.",
+            "No new turn is vetoed by the hook.",
+            "Not a queued turn is vetoed by the hook.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+        catches = (
+            "The hook reviews no turn and the session is "
+            "vetoed by the hook.",
+            "No turn is left unreviewed and every "
+            "session is blocked by the hook.",
+            "The checklist names no task and the turn is "
+            "vetoed by the hook.",
+            "The hook does not block the user at the "
+            "ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "stops and vetoes the turn.",
+            "The hook does not veto the user at the ends "
+            "and blocks the turn.",
+        )
+        for sentence in catches:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_a_fixture_keyed_on_the_first_position_or_size(
+        self,
+    ):
+        # Burn-down re-review, sixth round. The shapes
+        # stood the event field second at their earliest
+        # and carried four keys at their fewest, so a
+        # fixture keyed on the event field never standing
+        # first, or on the payload carrying at least four
+        # keys, still earned observed. The sixth shape
+        # stands the event field first and carries three
+        # keys, and each fixture below earns unverified.
+        fixtures = (
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if list(payload).index("
+            "'hook_event_name') >= 1:\n"
+            "    print('hook event ' + payload.get("
+            "'hook_event_name'))\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if len(payload) >= 4:\n"
+            "    print('hook event ' + payload.get("
+            "'hook_event_name'))\n",
+        )
+        for fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        event,
+                    )
+
+    def test_the_battery_covers_the_sixth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, sixth round. The
+        # underscore joined field beside its four
+        # separated siblings, the upper case event field
+        # key, the four level nesting, the event field
+        # in the second object of a list valued detail,
+        # the event field inside a string valued detail,
+        # and the event value carrying a trailing full
+        # stop were the battery's next adjacent shapes.
+        # It now sends all six.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.split("
+                "'_')[-1])\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "underscore joined event field" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = None\n"
+                "for key, value in payload.items():\n"
+                "    if key.lower() == 'hook_event_name':\n"
+                "        event = value\n"
+                "        break\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "upper case event field key" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['deeper']"
+                "['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "nested four levels deep" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, list):\n"
+                "        for item in detail:\n"
+                "            if isinstance(item, dict) "
+                "and 'hook_event_name' in item:\n"
+                "                event = item["
+                "'hook_event_name']\n"
+                "                break\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "second object of a list valued "
+                    "detail" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, str):\n"
+                "        try:\n"
+                "            inner = json.loads(detail)\n"
+                "        except ValueError:\n"
+                "            inner = {}\n"
+                "        if isinstance(inner, dict):\n"
+                "            event = inner.get("
+                "'hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "string valued detail" in p
+                    for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.rstrip("
+                "'.'))\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "trailing full stop" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_gate_refuses_the_slot_chain_disowning_forms(
+        self,
+    ):
+        # Burn-down re-review, sixth round. The composed
+        # markers admitted one auxiliary where the
+        # framings compose two, no modal where the
+        # framings carry one, and the article where the
+        # active framing carries its next quantifiers.
+        # The markers now compose their auxiliaries by
+        # slot, and each variant below stands refused.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            items + "The phrases could be quoted in this "
+            "paragraph for the record.",
+            items + "The phrases will have been quoted "
+            "in this paragraph for the record.",
+            items + "The phrases are to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases have been being quoted "
+            "in this paragraph for the record.",
+            items + "The phrases might be quoted in this "
+            "paragraph for the record.",
+            items + "And none of them could have bound "
+            "this build.",
+            items + "And none of them will have bound "
+            "this build.",
+            "This note quoted some of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted these phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted both phrases in this "
+            "paragraph for the record. " + items,
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_catches_the_remaining_heads_and_link(
+        self,
+    ):
+        # Burn-down re-review, seventh round. The slot
+        # chains composed the slots they carried and
+        # omitted whole heads of their constructions, the
+        # going to and ought to and have to and used to
+        # heads, the bare infinitive get behind a modal,
+        # and the adverb link ordinary prose puts between
+        # an auxiliary and its verb. The chains now carry
+        # those heads and that link, and each sentence
+        # below must fail the hook scan by name.
+        sentences = (
+            "The turn will get vetoed by the hook.",
+            "The session could get blocked by the hook.",
+            "The turn is going to be vetoed by the hook.",
+            "The turn ought to be vetoed by the hook.",
+            "The turn has to be vetoed by the hook.",
+            "The turn needs to be vetoed by the hook.",
+            "The turn used to be vetoed by the hook.",
+            "The turn is to have been vetoed by the hook.",
+            "The hook requires that the turn be vetoed.",
+            "The hook carries no state; it ought to have "
+            "been vetoing the turn.",
+            "The hook carries no state; it is going to "
+            "have vetoed the turn.",
+            "The turn ought to have waited for the hook "
+            "verdict.",
+            "The turn must have been required to wait "
+            "for the hook verdict.",
+            "The turn was to have waited for the hook "
+            "verdict.",
+            "The turn is about to wait for the hook "
+            "verdict.",
+            "The turn is due to wait for the hook "
+            "verdict.",
+            "The turn is going to have waited for the "
+            "hook verdict.",
+            "The turn is often vetoed by the hook.",
+            "The turn will be already vetoed by the "
+            "hook.",
+            "The turn is always vetoed by the hook.",
+            "The session will be immediately blocked by "
+            "the hook.",
+            "The turn has been repeatedly vetoed by the "
+            "hook.",
+            "The hook carries no state; it will promptly "
+            "veto the turn.",
+            "The turn will promptly wait for the hook "
+            "verdict.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_seventh_care_forms(self):
+        # Control and catch, the seventh round in both
+        # directions. A participial adjective inside the
+        # guard's object phrase, a negated subject past
+        # the old three word bound or quantified by
+        # every or all, and the next adverbial remainders
+        # all state the true posture and stay clean,
+        # while a second plain passive behind a negated
+        # first passive in one clause, and a noun verb
+        # form behind a quantifier determiner or a
+        # modifier, state plain claims and fail.
+        sentences = (
+            "The hook does not block the gated turn or "
+            "veto the session.",
+            "The hook does not veto the denied session "
+            "or block the turn.",
+            "The hook does not block the turn, veto the "
+            "gated session, or reject the task.",
+            "No very long queued pending turn is vetoed "
+            "by the hook.",
+            "None of the very long queued pending turns "
+            "are vetoed by the hook.",
+            "Not every turn is vetoed by the hook.",
+            "Not all of the turns are vetoed by the "
+            "hook.",
+            "The hook does not block the turn at any "
+            "point or veto the session.",
+            "The hook does not block the turn at any "
+            "time or veto the session.",
+            "The hook does not block the turn under any "
+            "circumstances or veto the session.",
+            "No turn is often vetoed by the hook.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+        catches = (
+            "No turn is vetoed by the hook and the "
+            "session is blocked by the hook.",
+            "No session is blocked by the hook, and "
+            "every turn is vetoed by the hook.",
+            "The hook does not block the user at both "
+            "ends and vetoes the turn.",
+            "The hook does not block the user at each "
+            "end and vetoes the turn.",
+            "The hook does not block the user at the "
+            "final ends and vetoes the turn.",
+        )
+        for sentence in catches:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_a_fixture_keyed_on_the_serialization(self):
+        # Burn-down re-review, seventh round. The shapes
+        # all stood written by one dumps call with its
+        # default separators and no ending newline, so a
+        # fixture keyed on the spaced separator, or on
+        # the payload ending without a newline, still
+        # earned observed. The second shape now stands
+        # written compact and the fifth ends in a
+        # newline, and each fixture below earns
+        # unverified.
+        fixtures = (
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if '\": \"' in raw:\n"
+            "    payload = json.loads(raw)\n"
+            "    print('hook event ' + payload.get("
+            "'hook_event_name'))\n",
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if not raw.endswith('\\n'):\n"
+            "    payload = json.loads(raw)\n"
+            "    print('hook event ' + payload.get("
+            "'hook_event_name'))\n",
+        )
+        for fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        event,
+                    )
+
+    def test_the_battery_covers_the_seventh_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, seventh round. The five
+        # level nesting, the pipe joined field, the camel
+        # case event field key, the event value carrying
+        # a trailing exclamation mark, the event field
+        # inside a list nested in a detail object, and
+        # the upper case event value were the battery's
+        # next adjacent shapes. It now sends all six.
+        fixtures = (
+            (
+                "nested five levels deep",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['deeper']['deepest']"
+                "['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "pipe joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.split("
+                "'|')[-1])\n",
+            ),
+            (
+                "camel case event field key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    event = payload.get('hookEventName')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "trailing exclamation mark",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.rstrip("
+                "'!'))\n",
+            ),
+            (
+                "list nested in a detail object",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, dict):\n"
+                "        items = detail.get('items')\n"
+                "        if isinstance(items, list):\n"
+                "            for item in items:\n"
+                "                if isinstance(item, dict) "
+                "and 'hook_event_name' in item:\n"
+                "                    event = item["
+                "'hook_event_name']\n"
+                "                    break\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "upper case event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    for name in ('TurnStarted', "
+                "'UserPromptQueued', 'TaskStarted', "
+                "'SessionHeartbeat'):\n"
+                "        if event.upper() == name.upper():\n"
+                "            print('hook event ' + name)\n"
+                "            break\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_gate_refuses_the_head_disowning_forms(self):
+        # Burn-down re-review, seventh round. The slot
+        # markers admitted the quantifiers and links of
+        # the last round and omitted the next ones, and
+        # the rewrite of the active framing dropped its
+        # plain article form, which stands restored
+        # here beside the new forms. Each variant below
+        # stands refused.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            "This note quoted the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted any of the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted each phrase in this "
+            "paragraph for the record. " + items,
+            "This note quoted every phrase in this "
+            "paragraph for the record. " + items,
+            items + "The phrases could have been being "
+            "quoted in this paragraph for the record.",
+            items + "The phrases are going to be quoted "
+            "in this paragraph for the record.",
+            items + "The phrases ought to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases have to be quoted in "
+            "this paragraph for the record.",
+            items + "And none of them has been bound "
+            "this build.",
+            items + "And none of them is bound this "
+            "build.",
+            items + "And none of them was bound this "
+            "build.",
+            items + "And none of them could have been "
+            "bound this build.",
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_holds_the_eighth_care_forms(self):
+        # Control, the eighth round. A participial
+        # adjective standing before the last modifier of
+        # its phrase, a coordinated subject under one
+        # negation, the by any and on any remainders,
+        # and a bare verb sharing its object behind a
+        # completed claim gate all state the true
+        # posture and stay clean.
+        sentences = (
+            "The hook does not block the gated long turn "
+            "or veto the session.",
+            "The hook does not block the blocked queued "
+            "session or veto the turn.",
+            "The hook does not veto the denied pending "
+            "session or block the turn.",
+            "The hook does not block the turn, veto the "
+            "gated pending session, or reject the task.",
+            "No gated long turn is vetoed by the hook.",
+            "No blocked queued session is vetoed by the "
+            "hook.",
+            "No turn or session is vetoed by the hook.",
+            "Not a turn or a session is vetoed by the "
+            "hook.",
+            "The hook does not block the turn by any "
+            "means or veto the session.",
+            "The hook does not block the turn on any "
+            "grounds or veto the session.",
+            "The hook never blocks and vetoes the turn.",
+            "The hook never ends or vetoes the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.problems(root)
+                self.assertFalse(
+                    any(
+                        "claims blocking" in p
+                        for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_catches_the_finite_and_nominal_forms(
+        self,
+    ):
+        # Catch, the eighth round. The participial slot
+        # let the distribution care hold an and joint
+        # open for a finite second claim no negation can
+        # govern, where the earlier segment completes
+        # its own claim first, and the nominal reading's
+        # window barred
+        # the very modifiers a noun phrase about the
+        # family's own objects carries, so a noun verb
+        # form behind one licensed the plain claim after
+        # it. Each sentence below must fail the hook
+        # scan by name.
+        sentences = (
+            "The hook does not block the gated turn and "
+            "vetoes the session.",
+            "The hook does not block the blocked turn "
+            "and vetoes the session.",
+            "The hook does not block the turn and vetoes "
+            "the session.",
+            "The hook does not block the gated turn and "
+            "the session is vetoed by the hook.",
+            "The hook does not block the user at the "
+            "blocked ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "gated ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "vetoed ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "long blocked ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "pre vetoed ends and vetoes the turn.",
+            "The hook does not block the user at the "
+            "turn and session ends and vetoes the task.",
+            "The hook does not block the user at the "
+            "very long queued pending final ends and "
+            "vetoes the turn.",
+            "The hook does not block at all and vetoes "
+            "the session.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p
+                        for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_ninth_care_forms(self):
+        # Control, the ninth round. Two participial
+        # adjectives in one phrase, a participial
+        # standing on a coordinated subject's second
+        # member, a subject coordinated past one joint,
+        # and the gap remainders with a two word tail
+        # and the with preposition the earlier remainder
+        # list carried no form of all state the true
+        # posture and stay clean.
+        sentences = (
+            "The hook does not block the gated blocked "
+            "long turn or veto the session.",
+            "The hook does not block the long gated "
+            "blocked queued turn or veto the session.",
+            "No gated blocked denied turn is vetoed by "
+            "the hook.",
+            "No long gated blocked denied session is "
+            "vetoed by the hook.",
+            "No turn or gated session is vetoed by the "
+            "hook.",
+            "No session or gated turn is vetoed by the "
+            "hook.",
+            "No turn or blocked session is vetoed by "
+            "the hook.",
+            "No turn or the gated session is vetoed by "
+            "the hook.",
+            "No turn or session or task is vetoed by "
+            "the hook.",
+            "No turn, session or task is vetoed by the "
+            "hook.",
+            "Neither turn, session nor task is vetoed "
+            "by the hook.",
+            "The hook does not block the turn with any "
+            "effect or veto the session.",
+            "The hook does not block the turn by any "
+            "possible means or veto the session.",
+            "The hook does not block the turn in any "
+            "possible way or veto the session.",
+            "The hook does not block the turn for any "
+            "good reason or veto the session.",
+            "The hook does not block the turn on any "
+            "conceivable grounds or veto the session.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_the_scan_catches_the_sheltered_forms(self):
+        # Catch, the ninth round. A plain claim standing
+        # in a third segment behind a bare second claim
+        # was sheltered by the first match the scan
+        # judged, and a noun verb form behind a seventh
+        # modifier or before an of phrase ate the wide
+        # match that would have judged the claim behind
+        # it. Every match in the clause now stands
+        # judged at its own position and the nominal
+        # window reads the noun phrase whole, and each
+        # sentence below must fail the hook scan by name.
+        sentences = (
+            "The hook does not block the gated turn and "
+            "veto the session and vetoes the task.",
+            "The hook does not block the gated turn or "
+            "veto the session and vetoes the task.",
+            "The hook does not block the turn, veto the "
+            "session, and vetoes the task.",
+            "The hook does not block and veto the turn "
+            "and vetoes the session.",
+            "The hook does not veto the turn and block "
+            "the session and denies the task.",
+            "The hook does not block the gated turn and "
+            "veto the session and blocks the task.",
+            "The hook does not block the user at the one "
+            "two three four five six seven ends and "
+            "vetoes the turn.",
+            "The hook does not block the user at the "
+            "ends of the session and vetoes the turn.",
+            "The hook does not block the user near the "
+            "ends of the session and vetoes the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p
+                        for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_a_fixture_keyed_on_the_line_size_or_key_set(
+        self,
+    ):
+        # Burn-down re-review, eighth round. The six
+        # shapes all stood on one line, inside one narrow
+        # size band, and inside one closed key set, so a
+        # fixture keyed on any of the three still earned
+        # observed. The seventh shape now stands written
+        # across lines, the eighth stands past the band
+        # with the host payload fields, and the ninth
+        # carries a key outside the earlier set, and each
+        # fixture below earns unverified.
+        fixtures = (
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if '\\n' not in raw.strip():\n"
+            "    payload = json.loads(raw)\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if len(raw.encode('utf-8')) < 200:\n"
+            "    payload = json.loads(raw)\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if set(payload) <= {'session_id', "
+            "'client_type', 'cwd', 'hook_event_name', "
+            "'last_event'}:\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+        )
+        for fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        event,
+                    )
+
+    def test_a_fixture_keyed_on_the_raised_bands(self):
+        # Burn-down re-review, ninth round. The ninth
+        # shape broke the 200 byte band the eighth round
+        # planted at, and the fixtures keyed one band up,
+        # on the size under 400 bytes, on the payload
+        # carrying at most six keys, and on the key set
+        # standing inside the nine shapes' union, still
+        # earned observed. The tenth shape now carries
+        # the tool call fields of a host payload at 546
+        # bytes with eight keys, and each fixture below
+        # earns unverified.
+        fixtures = (
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if len(raw.encode('utf-8')) < 400:\n"
+            "    payload = json.loads(raw)\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if len(payload) <= 6:\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if set(payload) <= {'session_id', "
+            "'client_type', 'cwd', 'hook_event_name', "
+            "'last_event', 'transcript_path', "
+            "'timestamp', 'trigger'}:\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+        )
+        for fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        event,
+                    )
+
+    def test_the_battery_covers_the_eighth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, eighth round. The six
+        # level nesting, the semicolon joined field, the
+        # Pascal case event field key, the event value
+        # carrying a trailing question mark, the event
+        # field inside the second object of a list nested
+        # in a detail object, and the event field standing
+        # as an object under the event key were the
+        # battery's next adjacent shapes. It now sends
+        # all six.
+        fixtures = (
+            (
+                "nested six levels deep",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['deeper']['deepest']"
+                "['bottom']['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "semicolon joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.split("
+                "';')[-1])\n",
+            ),
+            (
+                "Pascal case event field key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    event = payload.get('HookEventName')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "trailing question mark",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event.rstrip("
+                "'?'))\n",
+            ),
+            (
+                "second object of a list nested in a "
+                "detail object",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    detail = payload.get('detail')\n"
+                "    if isinstance(detail, dict):\n"
+                "        items = detail.get('items')\n"
+                "        if isinstance(items, list) "
+                "and len(items) > 1:\n"
+                "            second = items[1]\n"
+                "            if isinstance(second, dict):\n"
+                "                event = second.get("
+                "'hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "object event field under the event key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, dict):\n"
+                "    event = event.get('event')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_battery_covers_the_ninth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, ninth round. The seven
+        # level nesting, the comma joined field, the
+        # kebab case event field key, the event value
+        # carrying a trailing comma, the event field
+        # inside the third object of a list nested in a
+        # detail object, and the event field standing
+        # as an object under the type key were the
+        # battery's next adjacent shapes. It now sends
+        # all six.
+        fixtures = (
+            (
+                "nested seven levels deep",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['deeper']['deepest']"
+                "['bottom']['floor']"
+                "['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "comma joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str) and ',' in event:\n"
+                "    event = event.split(',')[-1]\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "kebab case event field key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    event = payload.get("
+                "'hook-event-name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "trailing comma",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    event = event.rstrip(',')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "third object of a list nested in a "
+                "detail object",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['items'][2]['hook_event_name']\n"
+                "    except (KeyError, TypeError, "
+                "IndexError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "object event field under the type key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, dict):\n"
+                "    event = event.get('type')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_gate_refuses_the_composition_disowning(
+        self,
+    ):
+        # Burn-down re-review, eighth round. The slot
+        # markers admitted the compositions of the last
+        # round and omitted the next quantifiers of the
+        # active framing, the next heads of the quoted
+        # framing, and the progressive and infinitive
+        # heads of the none of them marker, beside the
+        # each of the tail and the adverb the spec seat
+        # planted. Each variant below stands refused.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            "This note quoted many of the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted most of the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted several phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted a phrase in this paragraph "
+            "for the record. " + items,
+            "This note quoted either of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted each of the phrases in this "
+            "paragraph for the record. " + items,
+            items + "The phrases will be going to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrases could be going to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrase has to be quoted in this "
+            "paragraph for the record.",
+            items + "The phrases had to be quoted in this "
+            "paragraph for the record.",
+            items + "The phrases need to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases are to have been quoted "
+            "in this paragraph for the record.",
+            items + "The phrases are supposed to be "
+            "quoted in this paragraph for the record.",
+            items + "And none of them is being bound "
+            "this build.",
+            items + "And none of them was being bound "
+            "this build.",
+            items + "And none of them ought to be bound "
+            "this build.",
+            items + "And none of them has to be bound "
+            "this build.",
+            items + "And none of them is going to be "
+            "bound this build.",
+            items + "And none of them is to be bound "
+            "this build.",
+            items + "And none of them ever binds this "
+            "build.",
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_gate_refuses_the_next_disowning(
+        self,
+    ):
+        # Burn-down re-review, ninth round. The widened
+        # markers admitted the eighth round compositions
+        # and omitted the numeral and part quantifiers
+        # of the active framing, the inflected and modal
+        # need and meant heads of the quoted framing,
+        # and the need heads of the none of them marker.
+        # Each variant below stands refused.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            "This note quoted half of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted part of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted one phrase in this "
+            "paragraph for the record. " + items,
+            "This note quoted one of the phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted two phrases in this "
+            "paragraph for the record. " + items,
+            items + "The phrase needs to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases needed to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases are meant to be quoted "
+            "in this paragraph for the record.",
+            items + "The phrases will have to be quoted "
+            "in this paragraph for the record.",
+            items + "The phrases will need to be quoted "
+            "in this paragraph for the record.",
+            items + "And none of them need to be bound "
+            "this build.",
+            items + "And none of them needs to be bound "
+            "this build.",
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_catches_the_verb_particle_adverbs(
+        self,
+    ):
+        # Catch, the tenth round. The named bound priced
+        # the adverb link's position inside the
+        # auxiliary chain, and an adverb in a spelling
+        # the link reads standing between the waits for
+        # verb and its for particle stood outside the
+        # naming's examples in every auxiliary form of
+        # the construction. The waits for reading now
+        # carries the same link at that gap, and each
+        # sentence below must fail the hook scan by
+        # name.
+        sentences = (
+            "The turn waits promptly for the hook "
+            "verdict.",
+            "The turn will wait promptly for the hook "
+            "verdict.",
+            "The turn waited promptly for the hook "
+            "verdict.",
+            "The turn has waited promptly for the hook "
+            "verdict.",
+            "The turn waits patiently for the hook "
+            "verdict.",
+            "The turn is waiting patiently for the hook "
+            "verdict.",
+            "The turn waits often for the hook verdict.",
+            "The turn will wait often for the hook "
+            "verdict.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p
+                        for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_the_scan_holds_the_tenth_care_forms(self):
+        # Control, the tenth round. A present participle
+        # in a non final modifier position, two stem
+        # participles coordinated or hyphenated in one
+        # phrase, a governed subject behind a perfect
+        # or modal or get auxiliary or behind an
+        # intervening phrase, a serial subject closed
+        # by an and joint, the gap remainders with a
+        # three word tail and the prepositions and
+        # locative forms past the admitted sets, and a
+        # bare verb standing as the verb of a long
+        # subject all state the true posture and stay
+        # clean.
+        sentences = (
+            "The hook does not block the gating "
+            "blocking turn or veto the session.",
+            "The hook does not block the gating long "
+            "turn or veto the session.",
+            "The hook does not block the vetoing long "
+            "turn or veto the session.",
+            "No gating blocked turn is vetoed by the "
+            "hook.",
+            "No gating long turn is vetoed by the "
+            "hook.",
+            "The hook does not block the gated and "
+            "blocked turn or veto the session.",
+            "No gated and blocked turn is vetoed by "
+            "the hook.",
+            "No gated-blocked turn is vetoed by the "
+            "hook.",
+            "No turn or gated session has been vetoed "
+            "by the hook.",
+            "No turn or gated session will be vetoed "
+            "by the hook.",
+            "No turn or blocked session has been "
+            "vetoed by the hook.",
+            "No turn or gated session gets vetoed by "
+            "the hook.",
+            "No turn or gated session in the queue is "
+            "vetoed by the hook.",
+            "No turn, session, and task are vetoed by "
+            "the hook.",
+            "No turn, session and task are vetoed by "
+            "the hook.",
+            "No turn and session are vetoed by the "
+            "hook.",
+            "The hook does not block the turn in any "
+            "really possible way or veto the session.",
+            "The hook does not block the turn by any "
+            "reasonable possible means or veto the "
+            "session.",
+            "The hook does not block the turn with any "
+            "very great effect or veto the session.",
+            "The hook does not block the turn through "
+            "any means or veto the session.",
+            "The hook does not block the turn via any "
+            "channel or veto the session.",
+            "The hook does not block the turn against "
+            "any rule or veto the session.",
+            "The hook does not block the turn despite "
+            "any objection or veto the session.",
+            "The hook does not block the turn before "
+            "the ends of the session or veto the task.",
+            "The hook does not block the turn after "
+            "the ends of the session or veto the task.",
+            "The hook does not block the turn within "
+            "the ends of the session or veto the task.",
+            "The hook does not block the turn at the "
+            "ends of the working day or veto the task.",
+            "The hook does not let the long queued "
+            "pending final outer scheduled review "
+            "sessions veto the turn or veto the task.",
+            "The hook does not let the long queued "
+            "pending final outer scheduled review "
+            "sessions block the turn or block the "
+            "task.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_the_scan_catches_the_unsheltered_forms(self):
+        # Catch, the tenth round. The blocking word
+        # branch judged only its first match and the
+        # wide patterns stood behind the verb family in
+        # an else arm, so a plain blocking word or a
+        # plain wide pattern standing behind a negated
+        # first match in a later segment was sheltered,
+        # and a noun verb whose phrase carries a finite
+        # spelled noun still licensed a plain claim
+        # behind it. Every branch now stands judged
+        # beside the verb families, and the nominal run
+        # reads a finite spelled noun inside the phrase,
+        # and each sentence below must fail the hook
+        # scan by name.
+        sentences = (
+            "The hook is not blocking by design, and "
+            "the four events are blocking.",
+            "The hook does not claim blocking, and the "
+            "session event is blocking.",
+            "The hook carries no blocking, and the "
+            "four events are blocking.",
+            "The hook is not a blocking design, and "
+            "the hook is a blocking presence.",
+            "The hook is not blocking by design, while "
+            "the four events are blocking.",
+            "The hook carries no blocking, while the "
+            "session event is blocking.",
+            "The hook does not veto the turn, while "
+            "the session must pass before the hook "
+            "verdict.",
+            "The hook does not veto the turn, while "
+            "the turn waits for the hook verdict.",
+            "The hook does not veto the turn, while "
+            "the hook returns exit code 2.",
+            "The hook does not veto the turn, while "
+            "the hook acts as a gatekeeper.",
+            "The hook does not veto the turn, while "
+            "the hook fails closed.",
+            "The hook does not veto the turn, while "
+            "the hook keeps the session from running.",
+            "The hook does not veto the turn, while "
+            "the hook returns a deny decision.",
+            "The hook does not block the user at the "
+            "session stops ends and veto the task.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p
+                        for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_a_fixture_keyed_on_the_widest_bands(self):
+        # Burn-down re-review, tenth round. The ten
+        # shapes stood between 119 and 546 bytes with
+        # at most eight keys and one closed key union,
+        # so a fixture keyed on the size under 600
+        # bytes, on the payload carrying at most eight
+        # keys, or on the key set standing inside the
+        # ten shapes' union still earned observed. The
+        # eleventh shape now carries the model field
+        # beside the tool call fields at 719 bytes with
+        # nine keys, and each fixture below earns
+        # unverified.
+        fixtures = (
+            "import json\n"
+            "import sys\n"
+            "raw = sys.stdin.read()\n"
+            "if len(raw.encode('utf-8')) < 600:\n"
+            "    payload = json.loads(raw)\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if len(payload) <= 8:\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+            "import json\n"
+            "import sys\n"
+            "payload = json.load(sys.stdin)\n"
+            "if set(payload) <= {'session_id', "
+            "'client_type', 'cwd', 'hook_event_name', "
+            "'last_event', 'transcript_path', "
+            "'timestamp', 'trigger', 'tool_name', "
+            "'tool_input'}:\n"
+            "    event = payload.get('hook_event_name')\n"
+            "    if isinstance(event, str):\n"
+            "        print('hook event ' + event)\n",
+        )
+        for fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        event,
+                    )
+
+    def test_the_battery_covers_the_tenth_adjacent_shapes(
+        self,
+    ):
+        # Burn-down re-review, tenth round. The eight
+        # level nesting, the plus joined field, the
+        # spaced event field key, the event value
+        # carrying a trailing semicolon, the event
+        # field inside the fourth object of a list
+        # nested in a detail object, and the event
+        # field standing as an object under the value
+        # key were the battery's next adjacent shapes.
+        # It now sends all six.
+        fixtures = (
+            (
+                "nested eight levels deep",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['inner']['deep']['deeper']['deepest']"
+                "['bottom']['floor']['cellar']"
+                "['hook_event_name']\n"
+                "    except (KeyError, TypeError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "plus joined event field",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str) and '+' in event:\n"
+                "    event = event.split('+')[-1]\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "spaced event field key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    event = payload.get("
+                "'hook event name')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "trailing semicolon",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, str):\n"
+                "    event = event.rstrip(';')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "fourth object of a list nested in a "
+                "detail object",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event is None:\n"
+                "    try:\n"
+                "        event = payload['detail']"
+                "['items'][3]['hook_event_name']\n"
+                "    except (KeyError, TypeError, "
+                "IndexError):\n"
+                "        event = None\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+            (
+                "object event field under the value key",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if not isinstance(payload, dict):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if isinstance(event, dict):\n"
+                "    event = event.get('value')\n"
+                "if isinstance(event, str):\n"
+                "    print('hook event ' + event)\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                problems = self.mod.live_hook_problems(root)
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (label, problems),
+                )
+
+    def test_the_gate_refuses_the_tenth_disowning(
+        self,
+    ):
+        # Burn-down re-review, tenth round. The widened
+        # markers admitted the ninth round compositions
+        # and omitted the next quantifiers of the
+        # active framing, the mean and needed and
+        # perfect and progressive compositions of the
+        # quoted framing, and the had and needed and
+        # meant heads of the none of them marker. Each
+        # variant below stands refused.
+        items = (
+            "No embedding similarity threshold stands as a "
+            "verdict. No judge verdict gates a result. No "
+            "model weights stand in the tree. No word list "
+            "grows by automatic expansion without a per "
+            "family precision pass. No sampling consistency "
+            "method judges the text. "
+        )
+        variants = (
+            "This note quoted three phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted three of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted four phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted five of the phrases in "
+            "this paragraph for the record. " + items,
+            "This note quoted a few phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted various phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted multiple phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted numerous phrases in this "
+            "paragraph for the record. " + items,
+            "This note quoted a number of phrases in "
+            "this paragraph for the record. " + items,
+            items + "The phrase means to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases mean to be quoted in "
+            "this paragraph for the record.",
+            items + "The phrases are needed to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrases will be supposed to "
+            "be quoted in this paragraph for the record.",
+            items + "The phrases will be meant to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrases have needed to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrases have meant to be "
+            "quoted in this paragraph for the record.",
+            items + "The phrases will have needed to "
+            "be quoted in this paragraph for the record.",
+            items + "The phrases are having to be "
+            "quoted in this paragraph for the record.",
+            items + "And none of them had to be bound "
+            "this build.",
+            items + "And none of them needed to be "
+            "bound this build.",
+            items + "And none of them meant to be "
+            "bound this build.",
+            items + "And none of them will need to be "
+            "bound this build.",
+            items + "And none of them are meant to be "
+            "bound this build.",
+            items + "And none of them has needed to be "
+            "bound this build.",
+        )
+        for variant in variants:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                path = root / "docs" / "decisions.md"
+                text = path.read_text(encoding="utf-8")
+                start = text.find(
+                    "The round 35 must not adopt list"
+                )
+                end = text.find(
+                    "makes no network calls.", start
+                )
+                self.assertGreater(start, 0)
+                self.assertGreater(end, start)
+                end += len("makes no network calls.")
+                path.write_text(
+                    text[:start] + variant + text[end:],
+                    encoding="utf-8",
+                )
+                problems = self.mod.citation_problems(root)
+                self.assertTrue(
+                    any(
+                        "disowns the round 35" in p
+                        for p in problems
+                    ),
+                    (variant[:40], problems),
+                )
+
+    def test_the_scan_states_its_bounded_remainder(self):
+        # Burn-down re-review, eighth round. The red
+        # team priced the heads and the adverb spellings
+        # past the chains' sets at Major weight with two
+        # closes, deepen the grammars again or name the
+        # bound where the claim lives. The scan widens
+        # its families round by round and states the
+        # limit beside them, so the naming stands in the
+        # scan's own account, and this test fails if the
+        # naming leaves it.
+        doc = self.mod._blocking_scan.__doc__
+        for fragment in (
+            "bounded\n    remainder of the tested families",
+            "one adverb whose spelling ends in ly",
+            "a head past that set, a stacked adverb",
+            "anywhere in the chain but that "
+            "position, between",
+        ):
+            self.assertIn(fragment, doc)
+
+    def test_the_burn_down_note_cites_every_must_not_adopt_item(self):
+        # Burn-down provider spec review, Note 3. The decision
+        # 25 burn-down note summarised the round 35 must not
+        # adopt list incompletely, naming four items where the
+        # list carries five and dropping the per family
+        # precision pass qualifier on the word list item. A
+        # reader who trusts the summary inherits a weaker list
+        # than the one that binds the method, so the note must
+        # cite all five items in full.
+        raw = (ROOT / "docs" / "decisions.md").read_text(
+            encoding="utf-8")
+        start = raw.index("## 25.")
+        end = raw.index("## 26.", start)
+        flat = re.sub(r"\s+", " ", raw[start:end]).lower()
+        # The fragments carry the operative verbs of each
+        # prohibition sentence, not the nouns alone, because
+        # a citation thinned to a mention keeps the nouns
+        # and drops the force, and the burn-down re-review
+        # proved a mention passes a noun only pin.
+        for fragment in (
+            "no embedding similarity threshold stands",
+            "no judge verdict gates",
+            "no model weights stand",
+            "no word list grows by automatic expansion "
+            "without a per family precision pass",
+            "no sampling consistency method judges",
+        ):
+            self.assertIn(fragment, flat)
+
     def test_a_swapped_fixture_pair_fails(self):
         # R28-RT-10. Swapping the fixture contents inverts the
         # example while the directory names still resolve.
@@ -1067,7 +4413,16 @@ class TestCheckKimi(unittest.TestCase):
         # one session id across events, and none may carry
         # the old fixed probe id. A fixture that records
         # the ids it was sent proves the variation directly
-        # while serving every event honestly.
+        # while serving every event honestly. Since the
+        # burn-down re-review each event runs under
+        # eleven payload shapes, so the log holds eleven
+        # ids per event, the later re-reviews adding the
+        # shapes that stand the event field first, stand
+        # written across lines, carry the host payload
+        # fields, carry a trigger field, carry the tool
+        # call fields of a host payload past 400 bytes,
+        # and carry a model field beside the tool call
+        # fields past 600 bytes.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             self.write_fixture(
@@ -1100,7 +4455,12 @@ class TestCheckKimi(unittest.TestCase):
                 / "session-ids.log"
             )
             ids = log.read_text(encoding="utf-8").splitlines()
-            self.assertEqual(len(ids), len(self.mod.HOOK_EVENTS))
+            # Eleven payload shapes run per event, so
+            # the log holds eleven ids per event, every
+            # one of them distinct.
+            self.assertEqual(
+                len(ids), 11 * len(self.mod.HOOK_EVENTS)
+            )
             self.assertEqual(len(set(ids)), len(ids))
             self.assertNotIn("session_probe", ids)
 
@@ -1171,6 +4531,247 @@ class TestCheckKimi(unittest.TestCase):
                 self.assertEqual(
                     self.mod.hook_problems(root), [], sentence
                 )
+
+    def test_the_inflected_blocking_shapes_fail(self):
+        # Burn-down re-review. The widened families listed
+        # their verbs by lemma, but several patterns carried
+        # only the third person and passive forms, so the
+        # tested verbs in ordinary inflected and modal forms
+        # escaped, and the negation guard split its segments
+        # at three joints only, so an unrelated negation
+        # before a yet, or, while, or semicolon joint still
+        # guarded a veto in the next segment. Each sentence
+        # below is a tested family member in another
+        # spelling and must fail the hook scan by name.
+        sentences = (
+            "The hook can veto the turn.",
+            "The hook will veto the turn.",
+            "The hook is vetoing the turn.",
+            "A failed hook check is rejecting the turn.",
+            "The hook is refusing the turn.",
+            "The hook ended the turn.",
+            "The hook canceled the turn.",
+            "The hooks act as checkpoints before each turn.",
+            "The turn must wait for the hook verdict.",
+            "The hook denies the turn.",
+            "The hook carries no state yet vetoes the turn.",
+            "The hook carries no state or vetoes the turn.",
+            "The hook carries no state while it vetoes "
+            "the turn.",
+            "The hook carries no state; it vetoes the turn.",
+            "The hook is never a gatekeeper yet it vetoes "
+            "the turn.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                problems = self.mod.hook_problems(root)
+                self.assertTrue(
+                    any(
+                        "claims blocking" in p for p in problems
+                    ),
+                    (sentence, problems),
+                )
+
+    def test_negated_inflected_sentences_pass_the_hook_scan(self):
+        # Control. The inflection widening must not widen
+        # past the negation guard. A negated bare or modal
+        # form states the true posture, a negation still
+        # distributes over a coordinated claim, and the yet
+        # of not yet stays inside the negated segment.
+        sentences = (
+            "The hook does not veto the turn.",
+            "The hook does not block or veto the turn.",
+            "The hook does not yet veto the turn.",
+            "The hook carries no state and never vetoes "
+            "the turn.",
+            "The hooks are observation only and never act "
+            "as checkpoints.",
+        )
+        for sentence in sentences:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                text = self.read_brief(root)
+                anchor = "### R7. The size limits"
+                self.assertIn(anchor, text)
+                self.write_brief(
+                    root,
+                    text.replace(
+                        anchor, sentence + "\n\n" + anchor, 1
+                    ),
+                )
+                self.assertEqual(
+                    self.mod.hook_problems(root), [], sentence
+                )
+
+    def test_an_inflected_blocking_sentence_in_the_record_fails(self):
+        # Burn-down re-review. The decision record scan
+        # shares the widened scan, so an inflected member
+        # planted in the decision 24 record fails there the
+        # same way it fails in the brief.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            path = root / "docs" / "decisions.md"
+            text = path.read_text(encoding="utf-8")
+            marker = "## 25."
+            self.assertIn(marker, text)
+            path.write_text(
+                text.replace(
+                    marker,
+                    "The hook can veto the turn.\n\n" + marker,
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            problems = self.mod.decision_problems(root)
+            self.assertTrue(
+                any(
+                    "decision 24 record" in p
+                    and "claims blocking" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_shape_keyed_fixture_fails_the_probe(self):
+        # Burn-down re-review. Randomising the session id
+        # value closed the one field the first probe repair
+        # planted, but every other probe invariant stayed
+        # fixed, so a fixture keyed on the session id
+        # prefix, on the decoy standing bare in the cwd
+        # field, or on the exact payload key list still
+        # earned observed. The verdict now runs two payload
+        # shapes differing in field order, session id form,
+        # and decoy form, and each fixture below keys on
+        # one shape's invariant and must fail the other.
+        fixtures = (
+            (
+                "session prefix",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict) and str(\n"
+                "        payload.get('session_id', '')\n"
+                "        ).startswith('session_'):\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            ),
+            (
+                "bare decoy cwd",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict) and payload.get(\n"
+                "        'cwd') in ('SessionHeartbeat',\n"
+                "                  'TurnStarted'):\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            ),
+            (
+                "exact key list",
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict) and list(\n"
+                "        payload) == ['session_id',\n"
+                "                     'client_type', 'cwd',\n"
+                "                     'hook_event_name']:\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            ),
+        )
+        for label, fixture in fixtures:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                self.write_fixture(root, fixture)
+                for event in self.mod.HOOK_EVENTS:
+                    self.assertEqual(
+                        self.mod.hook_observation_verdict(
+                            event, root
+                        ),
+                        "unverified",
+                        (label, event),
+                    )
+
+    def test_a_fixture_crashing_on_an_array_payload_fails(self):
+        # Burn-down re-review. The adverse battery sent one
+        # non object shape, a JSON string, so a fixture that
+        # special cased the string and then called .get on
+        # the payload crashed on an array payload the
+        # battery never sent, while its battery run stayed
+        # clean. The battery now sends the array shape.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, str):\n"
+                "    sys.exit(0)\n"
+                "event = payload.get('hook_event_name')\n"
+                "if event:\n"
+                "    print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any("array payload" in p for p in problems),
+                problems,
+            )
+
+    def test_a_fixture_crashing_on_a_numeric_event_field_fails(self):
+        # Burn-down re-review. A fixture that concatenates
+        # the event value into its printed line crashes on
+        # a numeric event field, a shape the battery never
+        # sent, because a host can hand a hook a malformed
+        # event of any JSON type. The battery now sends the
+        # non string event fields.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.write_fixture(
+                root,
+                "import json\n"
+                "import sys\n"
+                "try:\n"
+                "    payload = json.load(sys.stdin)\n"
+                "except ValueError:\n"
+                "    sys.exit(0)\n"
+                "if isinstance(payload, dict):\n"
+                "    event = payload.get('hook_event_name')\n"
+                "    if event:\n"
+                "        print('hook event ' + event)\n",
+            )
+            problems = self.mod.live_hook_problems(root)
+            self.assertTrue(
+                any(
+                    "numeric event field" in p for p in problems
+                ),
+                problems,
+            )
 
     def test_a_blocking_sentence_in_the_decision_record_fails(self):
         # Round 36 F4. The negative once read the brief

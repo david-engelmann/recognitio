@@ -2894,6 +2894,478 @@ This unreleased work carries version 1.3.0.
   the cap is met by removing unpinned sentences
   elsewhere in the text, so no operative rule
   statement was removed by the merge.
+- The decision 25 burn-down note now cites all five
+  items of the round 35 must not adopt list. It once
+  named four items, dropping the embedding similarity
+  threshold item and the sampling consistency item and
+  the per family precision pass qualifier on the word
+  list item, so a reader of the note inherited a weaker
+  list than the one that binds the method.
+- The Cursor suite now carries the scripted two reading
+  proof round 39 priced. It runs the documented
+  marketplace reading and the documented local reading
+  over the shipped files and lists the components each
+  reading discovers, and the two lists must agree with
+  every component standing on disk.
+- The Cursor gate now pins the absence the brief
+  states. The brief says the plugin ships no agents, no
+  commands, and no MCP servers, and the gate once
+  enforced only the MCP limb, so a manifest or a
+  marketplace entry gaining an agents or commands
+  component certified a plugin the brief says does not
+  ship. Both files now refuse either component by name.
+- The Cursor gate now closes the marketplace file's
+  own key set and its metadata key set and pins the
+  entry description to the manifest description. An
+  extra top level or metadata key rode unexamined in a
+  file the gate claims to pin, and the entry
+  description could be deleted or drifted in silence.
+- The Antigravity gate now pins the manifest
+  description as a string. It once read the value for
+  truthiness only, so a numeric, list, or boolean
+  description certified against the manifest's own
+  schema, which names the description as a string.
+- The Kimi blocking scan now reads its tested verbs
+  and nouns in their ordinary inflected forms, the
+  bare, third person, past, and progressive spellings,
+  the plural nouns, the modal waits for construction,
+  and the deny verb beside the deny returns, and its
+  negation guard now splits at the full joint set with
+  a pronoun subject reading for the clause after a
+  split. Inflected members of the tested families and
+  claims behind a yet, or, while, or semicolon joint
+  escaped the scan while negated controls still pass.
+- The Kimi probe now runs each verdict under two
+  payload shapes differing in field order, session id
+  form, and decoy form, and its adverse battery now
+  sends the array, number, null, and boolean payloads
+  and the numeric, list, and object event fields. A
+  fixture keyed on the one fixed probe shape, or
+  crashing on a shape the battery never sent, once
+  earned observed with a clean battery run.
+- The decision 25 citation test now pins the
+  operative verbs of each must not adopt prohibition,
+  not the nouns alone. A citation thinned to a mention
+  keeps the nouns and drops the force, and it passed
+  the noun fragment pin the test first carried.
+- The Cursor two reading proof now holds the entry
+  reading to agreement with the other two readings on
+  the components it carries, not only to standing on
+  disk, so an entry skills or logo drift to another
+  standing target fails the proof as well as the gate.
+- The Kimi hook scan patterns that still carried only
+  part of their verb family's forms, being the stop
+  verbs without their past and progressive forms, the
+  passive constructions without the deny participle or
+  the wider auxiliaries, the waits for construction
+  without its past form and wider auxiliaries, the
+  pronoun subject reading without its auxiliaries and
+  plural pronoun, and the object slots without the
+  plural and quantified forms, so tested verbs in
+  ordinary spellings escaped on both certified
+  surfaces while the wide pattern alone held.
+- Two true posture sentences the Kimi negation guard
+  refused, because its distributed negation care omitted
+  the end lemma the scan itself tests and its not yet
+  care admitted no adverb between the negation and the
+  joint, so a negation over an end claim left the claim
+  after the joint unguarded.
+- The Kimi observation probe's two payload shapes,
+  which a fixture could still key on as a disjunction,
+  on the session id's hex core, or on the decoy standing
+  inside the cwd field, so the probe now sends a third
+  shape carrying the decoy in a neighbouring field with
+  a plain cwd and a dashed session id.
+- The Kimi adverse battery's missing adjacent shapes,
+  being a nested list event field and the string event
+  fields carrying another event's name inside them,
+  which a fixture indexing or scraping the event value
+  mishandled while its battery run stayed clean.
+- The round 35 citation in the decision 25 note, which
+  only a test pinned while no gate read the note, so a
+  citation keeping every fragment in a sentence that
+  binds nothing passed, and the gate now pins the five
+  items and refuses the disowning framings itself.
+- The Cursor marketplace owner object and metadata
+  description, which no gate read, so an invented owner
+  key and a drifted owner or listing text certified in
+  silence, and the Cursor manifest description, which
+  was read for truthiness only and could drift jointly
+  with the entry and metadata texts it is compared
+  against, so it is now pinned as a string and as a
+  value.
+- The Kimi hook scan patterns' remaining asymmetries,
+  where the stop verbs' object slot omitted the task
+  and tool call objects, the two passive patterns
+  carried different subjects and auxiliary sets, the
+  pronoun reading omitted the perfect and emphatic
+  auxiliaries, the waits for construction omitted the
+  agreement and perfect forms of its own auxiliaries,
+  and the determiner slots omitted the demonstratives,
+  so the patterns now share one object set, one
+  determiner set, one passive construction, and one
+  negation word set instead of carrying copies.
+- The true posture sentences the Kimi negation guard
+  refused in their contraction spellings, in the and
+  and serial distributions of a negation over
+  coordinated claims, and in the remaining not yet
+  adverb forms, so the guard's word set and joint
+  cares now read the negation in the spellings the
+  posture itself is stated in.
+- The Kimi probe artefacts every earlier shape shared,
+  being a decoy event name standing somewhere in the
+  payload and a session id built from a UUID, and the
+  working directory patterns the earlier shapes'
+  signatures covered, so the probe now also sends a
+  decoy free shape with a numeric session id and a
+  shape whose working directory stands outside those
+  patterns, and the battery also sends an event field
+  nested in a detail object, a repeated event field,
+  and a slash joined event field.
+- The round 35 citation gate's exact string disowning
+  markers, whose plural, word order, and passive voice
+  variants passed while every operative fragment stood
+  verbatim, so the markers now read as the stems of
+  their framings.
+- The Cursor marketplace metadata standing as a
+  non-object, which skipped its key set, version, and
+  description pins at once, the manifest author
+  standing pinned nowhere as a value, so the owner
+  agreement had no anchor and the two could drift
+  together, and the marketplace file's own name, whose
+  value no gate read.
+- The Kimi hook scan's shared slots standing
+  incomplete in their own paradigms, being the would
+  and plural progressive and get passives, the an and
+  this and that and any determiners, the modal perfect
+  and future progressive pronoun forms, and the past
+  and perfect waits for forms, so every pattern missed
+  the same ordinary forms together.
+- The Kimi passive construction carrying no negation
+  care, the negation word set omitting its past
+  contraction forms, the distribution care reading a
+  bare verb with no object as a claim, and the serial
+  care admitting only bare verb items, so true posture
+  sentences in those forms stood refused while a plain
+  claim behind a negated non-claim escaped.
+- The Kimi probe's event field standing last in every
+  shape, a single artefact no shape varied, and the
+  adverse battery's next adjacent shapes, an event
+  field nested two levels deep, a colon joined event
+  field, and a lowercase event value.
+- The round 35 citation gate's stemmed markers in
+  their next inflections, being the past tense of the
+  quoted framing, the irregular past of bind, the
+  singular of phrases, the or not insertion, and an
+  object standing between bind and nothing.
+- The Cursor manifest author carrying no key set and
+  the manifest name standing read only for its shape,
+  so an invented author key rode in the anchored
+  object and the manifest and entry renamed the
+  plugin together while their agreement held.
+- The Kimi hook scan's shared slots standing one
+  composition short in each, being the modal perfect
+  and progressive get passives, the two word and
+  adjective carrying determiner phrases, the modal
+  perfect progressive pronoun forms, and the future
+  and perfect waits for compositions, so the slots
+  now stand as small grammars of their families
+  rather than lists of their forms.
+- The Kimi negation cares testing their shapes
+  exactly, so a bare plural or adjective carrying
+  object in a distribution or a serial item, a
+  contracted or never form of not yet, a negated
+  passive subject behind a preamble, and the missing
+  needn't all stood refused, and a stem noun at a
+  segment's end licensed a plain claim behind a
+  negated non-claim through the distribution care.
+- The Kimi probe's event field never standing first
+  or second in any shape, and the adverse battery's
+  next adjacent shapes, a hyphen and a dot joined
+  event field, a whitespace padded event value, an
+  event field nested three levels deep, and one
+  inside a list valued detail.
+- The round 35 citation markers in their composed
+  forms, being the quoted framing's remaining tenses,
+  an auxiliary inside the none of them marker, a
+  longer object between bind and nothing, and the
+  active framing with a quantifier or a dropped
+  article.
+- The Cursor variables object read for exactly one
+  forbidden key, so an entry standing as a bare value
+  rode unexamined, and each entry now stands pinned
+  as a schema object.
+- The Kimi hook scan's composed slots capping each
+  slot one composition deep, being the progressive
+  layer behind the copula, the closed adjective list
+  in a phrase of an open class, ought to bare of its
+  own auxiliaries, and required to bare behind a
+  modal, so the auxiliaries now compose by the slots
+  of their constructions and the determiner phrase
+  admits the unlisted modifiers of its class, and
+  the scan and the guard read that phrase from one
+  shared place instead of two copies.
+- The Kimi negation cares in their widened forms,
+  being the passive care licensing a plain claim
+  behind an unrelated negated phrase anywhere before
+  its participle, a noun carrying a whole verb form
+  at a segment's end licensing a claim through the
+  distribution care, and the true distributions and
+  serial items and negated subjects one word past
+  the composed phrase standing refused.
+- The Kimi probe's event field never standing first
+  in any shape, and the payload never carrying fewer
+  than four keys, so the probe now sends a sixth
+  shape standing the event field first with three
+  keys and no decoy.
+- The Kimi adverse battery's next adjacent shapes,
+  an underscore joined event field, an upper case
+  event field key, an event field nested four levels
+  deep, one inside the second object of a list
+  valued detail, one inside a string valued detail,
+  and an event value carrying a trailing full stop.
+- The round 35 citation markers admitting one
+  auxiliary where their framings compose two, no
+  modal where their framings carry one, and the
+  article where the active framing carries its next
+  quantifiers, so the markers now compose their
+  auxiliaries by slot.
+- The Cursor variables names standing open beside
+  the entry shape pin, so an invented name in schema
+  object form rode unexamined, and a declared name
+  now stands refused unless a variable in the plugin
+  mcp.json corresponds to it, as the brief's
+  checklist discipline names.
+- The Kimi hook scan's slot chains omitting whole
+  heads of their constructions, being the going to
+  and ought to and have to and used to heads, the
+  bare infinitive get behind a modal, and the adverb
+  link between an auxiliary and its verb, so the
+  chains now carry those heads and that link.
+- The round 35 citation gate's active framing
+  standing rewritten without its plain article form,
+  a closure an earlier round had pinned, and the
+  markers' next compositions beside it, being the
+  any and each and every quantifiers, the perfect
+  progressive and infinitive heads of the quoted
+  framing, and the passive forms of the none of them
+  marker.
+- The Kimi passive care sheltering a second plain
+  passive in the same clause behind a genuinely
+  negated first one, so the care now reads every
+  passive in its clause.
+- The Kimi negation cares in their next forms, being
+  a participial adjective inside the guard's object
+  phrase, a negated subject past the three word
+  bound or quantified by every or all, the at any
+  and under any gap remainders, and a noun verb form
+  behind a quantifier determiner or a modifier
+  licensing a claim through the distribution care.
+- The Kimi probe's shapes all standing written with
+  one serialization's spaced separators and no
+  ending newline, so the second shape now stands
+  written compact and the fifth ends in a newline.
+- The Kimi adverse battery's next adjacent shapes,
+  an event field nested five levels deep, a pipe
+  joined event field, a camel case event field key,
+  an event value carrying a trailing exclamation
+  mark, an event field inside a list nested in a
+  detail object, and an upper case event value.
+- The Cursor variables correspondence reading the
+  mcp.json as raw text, so a mention inside a
+  description earned a correspondence no use stands
+  behind and three use spellings earned none, and
+  the extractor now reads the file's string values
+  as the structure it is.
+- The Kimi hook scan's negation guard let its
+  participial slot hold a coordinated joint open for
+  a finite second claim no negation can govern, and
+  its nominal reading barred the modifiers a noun
+  phrase about the family's own objects carries, so
+  the distribution care now reads the later segment's
+  first verb form before it holds a joint and the
+  nominal window reads the noun phrase whole.
+- The Kimi hook scan's cares refused a participial
+  adjective standing before the last modifier of its
+  phrase, a subject coordinated under one negation,
+  and the by any and on any remainders, and the
+  shared phrase now admits the participial in any
+  modifier position, the passive care reads a
+  coordinated subject, and the remainders stand
+  admitted.
+- The Kimi hook scan states the bound of its head
+  set and its adverb link where the claim lives, in
+  the scan's own account, as a bounded remainder of
+  the tested families accepted beside the round 34
+  residual, and its chain comment and test comments
+  no longer claim a reach past that bound.
+- The Kimi fixture probe sent six shapes that all
+  stood on one line, inside one narrow size band,
+  and inside one closed key set, and it now sends
+  nine, the seventh written across lines, the eighth
+  carrying the transcript path and timestamp fields
+  past the band, and the ninth carrying a trigger
+  field outside the earlier key set.
+- The Kimi adverse battery did not send the shapes
+  adjacent to its eighth round list, and it now
+  sends the six level nesting, the semicolon joined
+  field, the Pascal case event field key, the event
+  value carrying a trailing question mark, the event
+  field inside the second object of a list nested in
+  a detail object, and the event field standing as
+  an object under the event key.
+- The round 35 citation gate's slot markers omitted
+  the next quantifiers of the active framing, the
+  next heads of the quoted framing, and the
+  progressive and infinitive heads of the none of
+  them marker, and the markers now refuse the many
+  and most and several and either quantifiers and
+  the bare article, the each and every forms with
+  their of the tail, the going to compositions and
+  the has and had and need and supposed heads and
+  the be to perfect infinitive of the quoted
+  framing, and the being and ought to and has to and
+  going to and be to forms and the ever adverb of
+  the none of them marker.
+- The Cursor plugin gate's variables correspondence
+  walk excepted a description only at the leaf it
+  stood on, so a mention inside a description
+  standing as an object earned a correspondence, and
+  its braced default slot read only the colon dash
+  spelling, and the exception now follows the
+  description at any depth and the slot reads the
+  dash and equals default spellings beside it.
+- The Kimi gate script spelled the scan verb stem
+  list in three places and the adverb link in three
+  places, and both now stand in one shared fragment
+  each that every reader reads.
+- The Kimi hook scan's bounded remainder named the
+  adverb link's spellings and count and the chains'
+  head set, and an adverb in a spelling the link
+  reads standing anywhere in its chain but the
+  link's own position stood outside the naming, and
+  the scan's account and the chain comment now name
+  the link's position as part of the bound.
+- The Kimi hook scan judged only the first match of
+  its verb families in a clause, so a plain claim
+  standing behind a negated one in a later segment
+  stood sheltered, and its nominal window read at
+  most six tokens of a noun phrase, and every match
+  now stands judged at its own position and the
+  window carries no token count.
+- The Kimi hook scan's cares refused two
+  participial adjectives in one phrase, a
+  participial standing on a coordinated subject's
+  second member, a subject coordinated past one
+  joint, and the gap remainders carrying a two word
+  tail or the with preposition the earlier remainder
+  list carried no form of, and the shared run now
+  reads a past participle in any modifier position,
+  the guard reads a participle inside a governed
+  subject, the passive care reads a list of
+  coordinated subjects, and the remainders admit
+  the tail and the preposition.
+- The Kimi fixture probe's nine shapes stood under
+  400 bytes, carried at most six keys, and inside
+  one key union, and it now sends a tenth shape
+  carrying the tool name and tool input fields of a
+  host tool call payload at 546 bytes with eight
+  keys.
+- The Kimi adverse battery did not send the shapes
+  adjacent to its ninth round list, and it now
+  sends the seven level nesting, the comma joined
+  field, the kebab case event field key, the event
+  value carrying a trailing comma, the event field
+  inside the third object of a list nested in a
+  detail object, and the event field standing as an
+  object under the type key.
+- The round 35 citation gate's slot markers omitted
+  the numeral and part quantifiers of the active
+  framing, the inflected and modal need and meant
+  heads of the quoted framing, and the need heads
+  of the none of them marker, and the markers now
+  refuse those forms.
+- The Cursor plugin gate's braced default slot read
+  the dash and equals operators of the substitution
+  grammar and stopped there, and the slot now reads
+  the plus and question operators and the percent
+  and slash expansion forms of the same grammar.
+- The Kimi negative family's named bound priced the
+  adverb link's position inside the auxiliary
+  chain, and an adverb in a spelling the link reads
+  standing between the waits for verb and its for
+  particle escaped in every auxiliary form of the
+  construction, and the waits for reading now
+  carries the same link at that gap, and the scan's
+  account names the subject side position among the
+  bound's examples.
+- The Kimi hook scan's cares refused a present
+  participle in a non final modifier position, two
+  stem participles coordinated or hyphenated in one
+  phrase, a governed subject behind a perfect or
+  modal or get auxiliary or behind an intervening
+  phrase, a serial subject closed by an and joint,
+  and the gap remainders carrying a three word tail
+  or a preposition or locative form past the
+  admitted sets, and the shared run now reads the
+  present participle form and the coordinated and
+  hyphenated participles, the guard reads the wider
+  auxiliary set and the intervening phrase, the
+  passive care reads the and joint, and the
+  remainders admit the tail and the forms.
+- The Kimi hook scan judged only the first match of
+  its blocking word and stood its remaining wide
+  patterns behind its verb family, so a plain
+  blocking word or wide pattern standing behind a
+  negated first match in a later segment stood
+  sheltered, and a noun verb whose phrase carries a
+  finite spelled noun still licensed the claim
+  behind it, and every branch now stands judged
+  beside the verb families and the nominal run
+  reads the finite spelled noun inside the phrase
+  and no longer drops a verb carrying its own
+  object.
+- The Kimi fixture probe's ten shapes stood under
+  600 bytes, carried at most eight keys, and inside
+  one key union, and it now sends an eleventh shape
+  carrying the model field beside the tool call
+  fields of a host payload at 719 bytes with nine
+  keys, and the probe's account drops the size
+  superlative its eighth shape no longer holds.
+- The Kimi adverse battery did not send the shapes
+  adjacent to its tenth round list, and it now
+  sends the eight level nesting, the plus joined
+  field, the spaced event field key, the event
+  value carrying a trailing semicolon, the event
+  field inside the fourth object of a list nested
+  in a detail object, and the event field standing
+  as an object under the value key.
+- The round 35 citation gate's slot markers omitted
+  the next quantifiers of the active framing, the
+  mean and needed and perfect and progressive
+  compositions of the quoted framing, and the had
+  and needed and meant heads of the none of them
+  marker, and the markers now refuse those forms.
+- The Cursor plugin gate's braced operator slot
+  read one operator family of the substitution
+  grammar and stopped there, and the slot now reads
+  the prefix removal and case and substring
+  operators of the same grammar and the length and
+  indirect prefix forms at the name's other side.
+- One widening of this round is narrowed again on
+  the Kimi gate. The passive care's negated subject
+  pattern took the and joint for the serial
+  subjects, and the wider joint let a negated
+  phrase belonging to an unrelated verb license a
+  plain passive claim behind the joint, the
+  regression the widened care forms test caught on
+  the sixth round's catches when the whole suite
+  ran. A unit whose last and joint closes a
+  completed first conjunct and whose auxiliaries
+  close on a singular form now earns no end under
+  the care, and an and joint inside one modifier
+  run coordinates no subjects, so the serial
+  subjects and the modifier coordinations stand.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

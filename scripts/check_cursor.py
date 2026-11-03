@@ -83,6 +83,26 @@ SHIPPED_SKILLS = ["./.cursor-plugin/skills/recognitio/"]
 SHIPPED_RULES = ["./.cursor-plugin/rules/recognitio.mdc"]
 SHIPPED_LOGO = "docs/brand/recognitio-icon.svg"
 
+# The shipped manifest description, pinned as a value so the
+# entry and metadata descriptions the marketplace checks
+# compare against it cannot drift as one body with it.
+SHIPPED_DESCRIPTION = (
+    "Pulls the relevant changes from a pull request or a "
+    "commit range, with the context a reviewer needs, into "
+    "one verified review packet."
+)
+
+# The shipped manifest author and marketplace name, pinned
+# as values so the marketplace owner agreement the gate
+# checks has an anchor of its own instead of two texts
+# that can drift together.
+SHIPPED_AUTHOR_NAME = "David Engelmann"
+SHIPPED_AUTHOR_EMAIL = (
+    "81196676+david-engelmann@users.noreply.github.com"
+)
+SHIPPED_MARKETPLACE_NAME = "recognitio-marketplace"
+SHIPPED_PLUGIN_NAME = "recognitio"
+
 # Manifest top level keys the shipped manifest may carry. The
 # list is closed on purpose, so an invented manifest key fails
 # the gate instead of riding along unexamined.
@@ -585,6 +605,14 @@ def manifest_problems(root=None):
             ".cursor-plugin/plugin.json names %r, which is not "
             "lowercase kebab-case" % (name,)
         )
+    elif name != SHIPPED_PLUGIN_NAME:
+        problems.append(
+            ".cursor-plugin/plugin.json names %r and the "
+            "shipped plugin name is %r, so the plugin "
+            "renamed itself while every name agreement "
+            "check still passed"
+            % (name, SHIPPED_PLUGIN_NAME)
+        )
     version = data.get("version")
     claude_raw = read_text(root / ".claude-plugin" / "plugin.json")
     claude_version = None
@@ -611,6 +639,40 @@ def manifest_problems(root=None):
         problems.append(
             ".cursor-plugin/plugin.json carries no description"
         )
+    elif not isinstance(data.get("description"), str):
+        problems.append(
+            ".cursor-plugin/plugin.json carries description %r, "
+            "which is not the string the primary manifest schema "
+            "names" % (data.get("description"),)
+        )
+    elif data.get("description") != SHIPPED_DESCRIPTION:
+        problems.append(
+            ".cursor-plugin/plugin.json carries description %r "
+            "and the shipped description is %r, so the manifest "
+            "text moved while every agreement check would still "
+            "pass" % (data.get("description"), SHIPPED_DESCRIPTION)
+        )
+    author = data.get("author")
+    if isinstance(author, dict):
+        for key in sorted(set(author) - {"name", "email"}):
+            problems.append(
+                ".cursor-plugin/plugin.json author carries "
+                "the %r key, which is not an author key the "
+                "agreement pins, so it stands unexamined"
+                % key
+            )
+    if not isinstance(author, dict) or (
+        author.get("name") != SHIPPED_AUTHOR_NAME
+        or author.get("email") != SHIPPED_AUTHOR_EMAIL
+    ):
+        problems.append(
+            ".cursor-plugin/plugin.json carries author %r and "
+            "the shipped author is %s at %s, so the agreement "
+            "the marketplace owner is checked against has no "
+            "anchor" % (
+                author, SHIPPED_AUTHOR_NAME, SHIPPED_AUTHOR_EMAIL
+            )
+        )
     for field, expected in DISCOVERY_FIELDS.items():
         if data.get(field) != expected:
             problems.append(
@@ -632,6 +694,20 @@ def manifest_problems(root=None):
             "does not carry the component path the brief pins"
             % (data.get("rules"), SHIPPED_RULES)
         )
+    # The brief pins the shipped shape as carrying no
+    # agents and no commands, the same sentence whose MCP
+    # limb the mcp.json absence check below enforces. A
+    # manifest that gains either component key certifies a
+    # plugin the brief says does not ship, however well its
+    # paths resolve, so the absence itself is pinned here.
+    for key in ("agents", "commands"):
+        if key in data:
+            problems.append(
+                ".cursor-plugin/plugin.json carries %s %r, "
+                "and the brief pins the plugin as shipping "
+                "no %s, so the component stands refused"
+                % (key, data.get(key), key)
+            )
     logo = data.get("logo")
     if logo is not None:
         if logo != SHIPPED_LOGO:
@@ -745,7 +821,96 @@ def manifest_problems(root=None):
             ".cursor-plugin/plugin.json carries a non object "
             "variables schema"
         )
-    elif "CURSOR_PLUGIN_ROOT" in variables:
+    elif variables:
+        # The brief ties every declared name to a variable
+        # the plugin own mcp.json uses, in the checklist
+        # sentence that requires declaring every such
+        # variable, and its decision permits only non
+        # platform variables there. The user set values the
+        # brief names are the values a user sets for a
+        # variable the plugin declares, not a licence to
+        # invent declaration names, so a declared name with
+        # no such correspondence is refused, and an entry
+        # standing as a bare value is no schema at all. The
+        # plugin ships no mcp.json today and the absence
+        # check below refuses one, so the correspondence
+        # set stands empty on the shipped tree, and the
+        # lane that adds an mcp.json widens it by the file
+        # it adds.
+        used = set()
+        mcp_path = plugin_dir / "mcp.json"
+        if mcp_path.is_file():
+            # The correspondence reads the file as the
+            # structure it is, not as raw text, so a
+            # mention inside a description string earns
+            # nothing and a file that does not parse
+            # earns nothing. The names are read from the
+            # file's string values, with a description
+            # excepted at any depth and in any shape, in
+            # the spellings the hosts substitute, the
+            # braced form with its operator value and
+            # spacing spellings and the braceless form
+            # beside it.
+            try:
+                mcp_data = json.loads(
+                    mcp_path.read_text(encoding="utf-8")
+                )
+            except ValueError:
+                mcp_data = None
+            values = []
+
+            def collect(node, key=None, suppressed=False):
+                suppressed = (
+                    suppressed or key == "description"
+                )
+                if isinstance(node, dict):
+                    for name, value in node.items():
+                        collect(value, name, suppressed)
+                elif isinstance(node, list):
+                    for value in node:
+                        collect(value, key, suppressed)
+                elif isinstance(node, str) and (
+                    not suppressed
+                ):
+                    values.append(node)
+
+            if mcp_data is not None:
+                collect(mcp_data)
+            for value in values:
+                used.update(
+                    re.findall(
+                        r"\$\{\s*(?:#|!)?\s*"
+                        r"([A-Za-z_][A-Za-z0-9_]*)"
+                        r"(?:[:]?[-=+?%/#@^,:][^}]*)?\s*\}"
+                        r"|\$([A-Za-z_][A-Za-z0-9_]*)",
+                        value,
+                    )
+                )
+            used = {
+                name
+                for pair in used
+                for name in pair
+                if name
+            }
+        for key in sorted(variables):
+            if key not in used:
+                problems.append(
+                    ".cursor-plugin/plugin.json declares "
+                    "variable %r, which no variable in the "
+                    "plugin mcp.json corresponds to"
+                    % (key,)
+                )
+            elif not isinstance(variables[key], dict):
+                problems.append(
+                    ".cursor-plugin/plugin.json carries "
+                    "variable %r standing as %r, which is "
+                    "not the schema object the variables "
+                    "decision names"
+                    % (key, variables[key])
+                )
+    if isinstance(variables, dict) and (
+        "CURSOR_PLUGIN_ROOT" in variables
+    ):
         problems.append(
             ".cursor-plugin/plugin.json declares "
             "CURSOR_PLUGIN_ROOT in its variables schema, but the "
@@ -781,9 +946,30 @@ def marketplace_problems(root=None):
     if not isinstance(data, dict):
         return [".cursor-plugin/marketplace.json is not an object"]
     problems = []
+    if data.get("name") != SHIPPED_MARKETPLACE_NAME:
+        problems.append(
+            ".cursor-plugin/marketplace.json names %r and the "
+            "shipped marketplace name is %r, so the file's own "
+            "name moved while its key set stayed closed"
+            % (data.get("name"), SHIPPED_MARKETPLACE_NAME)
+        )
+    # The marketplace file's own key set is closed, the way
+    # the entry key set below is closed, because a key no
+    # reading examines can carry a component or a claim the
+    # gate never sees in a file the gate claims to pin.
+    for key in sorted(
+        set(data) - {"name", "owner", "metadata", "plugins"}
+    ):
+        problems.append(
+            ".cursor-plugin/marketplace.json carries the %r "
+            "key, which is not a key of the marketplace file "
+            "the agreement pins, so it stands unexamined"
+            % key
+        )
     manifest_raw = read_text(root / ".cursor-plugin" / "plugin.json")
     name = version = None
     manifest_skills = manifest_logo = None
+    manifest_description = None
     manifest_components = {}
     if manifest_raw is not None:
         try:
@@ -792,6 +978,7 @@ def marketplace_problems(root=None):
             version = manifest.get("version")
             manifest_skills = manifest.get("skills")
             manifest_logo = manifest.get("logo")
+            manifest_description = manifest.get("description")
             for key in COMPONENT_KEYS:
                 manifest_components[key] = manifest.get(key)
         except (ValueError, DuplicateKeyError):
@@ -814,6 +1001,14 @@ def marketplace_problems(root=None):
                 ".cursor-plugin/marketplace.json is at version %r "
                 "while the manifest is at %r"
                 % (entry.get("version"), version)
+            )
+        if entry.get("description") != manifest_description:
+            problems.append(
+                ".cursor-plugin/marketplace.json entry carries "
+                "description %r while the manifest carries %r, "
+                "so the listing text a reader meets is not the "
+                "manifest text the gate pins"
+                % (entry.get("description"), manifest_description)
             )
         # The entry paths resolve from the entry source, and
         # the entry source names the plugin root, so the entry
@@ -859,7 +1054,21 @@ def marketplace_problems(root=None):
                 "agreement pins, so it stands unexamined"
                 % key
             )
-        for key in ("rules", "agents", "commands"):
+        # The agents and commands absence the manifest pin
+        # holds stands on the entry as well, because an entry
+        # carrying either component certifies the same plugin
+        # the brief says does not ship, whether or not the
+        # manifest agrees with it.
+        for key in ("agents", "commands"):
+            if key in entry:
+                problems.append(
+                    ".cursor-plugin/marketplace.json entry "
+                    "carries %s %r, and the brief pins the "
+                    "plugin as shipping no %s, so the "
+                    "component stands refused"
+                    % (key, entry.get(key), key)
+                )
+        for key in ("rules",):
             if key not in entry:
                 continue
             if entry.get(key) != manifest_components.get(key):
@@ -886,13 +1095,79 @@ def marketplace_problems(root=None):
                         "from the plugin root" % (key, item)
                     )
     metadata = data.get("metadata", {})
-    if isinstance(metadata, dict) and metadata.get("version") \
-            != version:
+    if not isinstance(metadata, dict):
         problems.append(
-            ".cursor-plugin/marketplace.json metadata is at version "
-            "%r while the manifest is at %r"
-            % (metadata.get("version"), version)
+            ".cursor-plugin/marketplace.json carries metadata "
+            "%r, which is not the object the entry format "
+            "names, so its key set, version, and description "
+            "stand unexamined" % (metadata,)
         )
+    if isinstance(metadata, dict):
+        for key in sorted(
+            set(metadata) - {"description", "version"}
+        ):
+            problems.append(
+                ".cursor-plugin/marketplace.json metadata "
+                "carries the %r key, which is not a metadata "
+                "key the agreement pins, so it stands "
+                "unexamined" % key
+            )
+        if metadata.get("version") != version:
+            problems.append(
+                ".cursor-plugin/marketplace.json metadata is at "
+                "version %r while the manifest is at %r"
+                % (metadata.get("version"), version)
+            )
+        if (
+            manifest_description is not None
+            and metadata.get("description") != manifest_description
+        ):
+            problems.append(
+                ".cursor-plugin/marketplace.json metadata "
+                "carries description %r while the manifest "
+                "carries %r, so the listing's second display "
+                "text disagrees with the manifest"
+                % (
+                    metadata.get("description"),
+                    manifest_description,
+                )
+            )
+    owner = data.get("owner")
+    if not isinstance(owner, dict):
+        problems.append(
+            ".cursor-plugin/marketplace.json carries owner %r, "
+            "which is not the object the entry format names"
+            % (owner,)
+        )
+    else:
+        for key in sorted(set(owner) - {"name", "email"}):
+            problems.append(
+                ".cursor-plugin/marketplace.json owner carries "
+                "the %r key, which is not an owner key the "
+                "agreement pins, so it stands unexamined" % key
+            )
+        manifest_author = None
+        if manifest_raw is not None:
+            try:
+                manifest_author = strict_json_loads(
+                    manifest_raw
+                ).get("author")
+            except (ValueError, DuplicateKeyError):
+                manifest_author = None
+        if isinstance(manifest_author, dict):
+            for field in ("name", "email"):
+                if owner.get(field) != manifest_author.get(field):
+                    problems.append(
+                        ".cursor-plugin/marketplace.json owner "
+                        "carries %s %r while the manifest author "
+                        "carries %r, so the listing names a "
+                        "different owner than the plugin"
+                        % (
+                            field,
+                            owner.get(field),
+                            manifest_author.get(field),
+                        )
+                    )
     return problems
 
 

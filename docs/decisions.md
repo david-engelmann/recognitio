@@ -981,10 +981,14 @@ escape, that single synonym paraphrase residual stands
 accepted, and the gate states the limit in the brief
 beside the posture rather than claiming a meaning check
 it does not run. The round 35 must not adopt list binds
-the method throughout, so the gate stays inside the
-standard library with no model weights, no network
-calls, no judge verdicts, and no automatic word list
-expansion.
+the method throughout, and its five items stand as
+follows. No embedding similarity threshold stands as a
+verdict. No judge verdict gates a result. No model
+weights stand in the tree. No word list grows by
+automatic expansion without a per family precision
+pass. No sampling consistency method judges the text.
+The gate also stays inside the standard library and
+makes no network calls.
 
 ## 26. Build 15 deferral, round 29
 

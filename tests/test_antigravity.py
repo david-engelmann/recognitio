@@ -797,6 +797,28 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
+    def test_a_manifest_with_a_non_string_description_fails(self):
+        # Burn-down re-review. The gate read the
+        # description for truthiness only, so a numeric, a
+        # list, or a boolean description certified against
+        # the manifest's own schema, which names the
+        # description as a string property. The name value
+        # was already pinned by equality, so the blindness
+        # was specific to this one field.
+        for value in (12345, ["x"], True):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = self.make_layout(tmp)
+                data = self.read_plugin(root)
+                data["description"] = value
+                self.write_plugin(root, data)
+                problems = self.problems(root)
+                self.assertTrue(
+                    any(
+                        "not the string" in p for p in problems
+                    ),
+                    (value, problems),
+                )
+
     def test_a_directory_at_the_hook_path_fails_by_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
