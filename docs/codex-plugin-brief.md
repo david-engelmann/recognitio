@@ -20,12 +20,22 @@ listed the plugin with its source at the portable package,
 and installed it into a scratch home cache with the package
 files inside, and the manifest, the marketplace, and the
 skill folder file are pinned by the gate in this repo.
+The companion Codex review rules then changed a live
+review in the paired run of 2026-10-29 that the Codex
+review brief records. The WP2 session on 2026-11-03
+installed the plugin from this tree and listed it
+installed and enabled at version 1.3.0, and its live
+session over the hero range built a packet whose check
+passed and whose manifest read verified true, as the
+capture record in docs/images states.
 
 **What is unverified**
 
-Invocation inside a live Codex session stays unverified,
-because no signed in Codex session stands on this box and a
-live session is the only surface that exercises the skill.
+Invocation of the installed plugin copy inside a live
+Codex session stays unverified, and implicit invocation
+stays untested, because the WP2 session executed the
+workspace skill copy after an explicit invocation by its
+dollar name, as its capture record names in the open.
 
 **What a Codex session never sees**
 
@@ -224,9 +234,14 @@ with its `agents/openai.yaml` and its extractor. The first
 probe stopped at an unrecognized install subcommand and
 reported installation unverified, and the review of this
 build corrected that sentence, because the install
-subcommand is named add. Invocation inside a live Codex
-session stays unverified. No claim in this brief rests on a
-live session.
+subcommand is named add. Invocation of the installed
+plugin copy inside a live Codex session stays unverified,
+and implicit invocation stays untested, because the WP2
+session of 2026-11-03 executed the workspace skill copy
+after an explicit invocation by its dollar name. The
+claims in this brief that rest on that live session are
+the ones its capture record names, and they rest on the
+workspace copy it executed.
 
 ## The Build 19 decision record
 

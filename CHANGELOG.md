@@ -849,6 +849,86 @@ This unreleased work carries version 1.3.0.
   box, and its agent surface demands a Baidu account sign
   in, so invocation inside a live Comate session stays
   unverified.
+- The Claude Code hero assets under docs/images. One real
+  interactive session of Claude Code 2.1.314 ran with the
+  recognitio mod installed and was recorded through the
+  deny then proceed arc over the round 36 range, the
+  first spawn denied with no packet standing, the packet
+  built and checked, and the session proceeding through
+  a provider failure on the second spawn's first
+  completion, parallel partial reports and a third
+  targeted reviewer pass to a consolidated presentation
+  of 15 findings with a verdict of Not blocking. The landing
+  carries the captioned hero recording, its poster
+  still, its short cut and its phone crop, all rendered
+  from the recorded byte stream of that session, and
+  the capture record section in
+  docs/images/capture-record.md documenting the
+  session, the verbatim prompt with its shaping clauses
+  disclosed, the OpenRouter route the take used after
+  the native route refused it, the rehearsals, the edit
+  and the frame checks. With the new hero and crop
+  standing in the slots the Cursor hero and crop hold,
+  the weighed page total stood at 678,897 bytes under
+  the 750,000 ceiling the gate suite pinned at that
+  stage of the landing.
+- The Codex and Qwen proof strip stills under
+  docs/images. Two live sessions on 2026-11-03, one in
+  Codex CLI 0.164.0-alpha.9 and one in Qwen Code 0.26.4,
+  each worked the hero range over OpenRouter, built a
+  packet with the skill, and had that packet pass the
+  repo packet check with its manifest verified true, and
+  one frame from each recorded session stands in the
+  tree at 36,754 and 32,418 bytes, with the limits of each
+  session named in its capture record section.
+- The README rebuilt around the Claude Code hero. The
+  hero slot now carries the deny then proceed session,
+  a proof strip of four real frames stands under it with
+  one frame per harness over the same range and a
+  capture record section behind each frame, and the
+  paired eval proof follows the strip, with the page
+  held at its prior word count by the stated method and
+  the weighed page total stood at 814,836 bytes under
+  a ceiling moved once to 850,000 in the open for the
+  four harness frames at that stage of the landing.
+  The recognitio-mod README gains the same story with
+  a denial frame rendered from the hero cast, the
+  provider brief At a glance cards stand
+  restated to the current live evidence, and the 1.3.0
+  release notes and tag checklist stand regenerated at
+  docs/release-1.3.0.md with the tag itself held for the
+  owner.
+- The storefront repair round, closing the findings of
+  the three WP3 reviews and the four WP4 cold eyes
+  panels. The hero recording stands re-encoded from
+  the same cast at 21 frames and 549,840 bytes with a
+  seventh caption segment over the provider failure
+  and a caption truth assertion in its builder, and
+  its poster stands re-rendered under a widened glyph
+  fallback at 75,268 bytes. The proof strip now shows
+  the denial moment for Claude Code and the summary
+  screen for Qwen Code, each strip frame carries a
+  phone band with the full frame one click away, and
+  the two retired Cursor assets and the two replaced
+  strip stills leave the tree, which now holds 254
+  files. The never install both rule stands in the
+  marketplace entries and both plugin manifests
+  themselves, the Codex category aligns on
+  developer-tools, the portable package keywords stand
+  restored to the canonical set, and the ZCode
+  manifest carries the full discovery fields. The
+  Codex plugin brief body states the scoped live
+  session truth its card already carried, the capture
+  record carries dated repair notes, and the mod
+  README leads with its contract over its filming log
+  with the denial still under its assets folder. The
+  README word count stands at 4,557 words by the
+  stated method, up from 4,167 at the landing head,
+  and the growth is stated here in the open under the
+  charter rule, because the evidence obligations in
+  the review reports required the added sentences.
+  The weighed page total stands at 820,122 bytes
+  under the 850,000 ceiling, which does not move.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation

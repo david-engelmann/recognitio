@@ -99,12 +99,12 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 243 files",
-        "held 243 files",
-        "at 243 files against a cap of 512 files",
+        "holds 254 files",
+        "held 254 files",
+        "at 254 files against a cap of 512 files",
         "demo recording at 607,309 bytes",
         "scripts/check_mod.py at 284,458 bytes",
-        "scan over all 243 files in the tree",
+        "scan over all 254 files in the tree",
     ),
     PORTABLE_PACK: (
         "six month cycle",
@@ -2992,8 +2992,9 @@ def portable_problems(root, problems):
             "%s carries repository %r and the host listing "
             "files against the public repo"
             % (PORTABLE, data.get("repository")))
-    expected_keywords = ["review-packet", "agent-skill",
-                         "pull-request"]
+    expected_keywords = ["agent-skills", "code-review",
+                         "diff", "git", "pull-request",
+                         "review-packet"]
     if data.get("keywords") != expected_keywords:
         problems.append(
             "%s carries keywords %r and the pack states the "

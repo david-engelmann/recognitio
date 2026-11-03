@@ -84,7 +84,9 @@ MOD_ICON_PATH = "plugins/recognitio-mod/assets/icon-512.png"
 MOD_DESCRIPTION = (
     "Gates reviewer spawns in Claude Code on the verified "
     "review packet manifest, and denies a spawn whose packet "
-    "is missing, unreadable or unverified."
+    "is missing, unreadable or unverified. The full recognitio "
+    "plugin already includes this gate, so install one entry "
+    "or the other and never both."
 )
 
 # The component fields a marketplace entry may name. Only

@@ -267,7 +267,7 @@ class TestCheckCodexPlugin(unittest.TestCase):
             root = self.make_layout(tmp)
             text = self.read(root, ".agents/plugins/marketplace.json")
             broken = text.replace(
-                '"Productivity"', '"Developer Tools"'
+                '"developer-tools"', '"Productivity"'
             )
             self.assertNotEqual(broken, text)
             self.write(root, ".agents/plugins/marketplace.json", broken)

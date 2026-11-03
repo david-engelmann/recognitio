@@ -196,6 +196,30 @@ class TestCheckZcode(unittest.TestCase):
                 problems,
             )
 
+    def test_a_dropped_manifest_homepage_fails(self):
+        # The repair round completed the thin manifest with
+        # the discovery fields the other manifests carry, so
+        # dropping one of them must fail the gate.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            manifest = root / ".zcode-plugin" / "plugin.json"
+            text = manifest.read_text(encoding="utf-8")
+            self.assertIn('"homepage"', text)
+            manifest.write_text(
+                text.replace(
+                    '  "homepage": '
+                    '"https://github.com/david-engelmann/recognitio",\n',
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("homepage" in p for p in problems),
+                problems,
+            )
+
     def test_a_dropped_derivation_url_fails(self):
         # R31-SP-02. The ZCode derivation notes carry the
         # two retrievable zcode.z.ai page URLs, so a

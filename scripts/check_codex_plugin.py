@@ -56,7 +56,7 @@ LONG_DESCRIPTION = (
 )
 DISPLAY_NAME = "Recognitio"
 DEVELOPER_NAME = "David Engelmann"
-CATEGORY = "Productivity"
+CATEGORY = "developer-tools"
 CAPABILITIES = ["Read", "Write"]
 DEFAULT_PROMPT = [
     "Use recognitio to build a verified review packet for this change."
@@ -119,7 +119,13 @@ BRIEF_SENTENCES = (
     ),
     (
         "the unverified remainder",
-        "Invocation inside a live Codex session stays unverified",
+        "Invocation of the installed plugin copy inside a live "
+        "Codex session stays unverified",
+    ),
+    (
+        "the implicit invocation limit",
+        "implicit invocation stays untested, because the WP2 "
+        "session of 2026-11-03 executed the workspace skill copy",
     ),
     (
         "the CLI probe version",
@@ -152,6 +158,8 @@ RULES_HEADING = "## The Codex plugin rules"
 # surface is a contradiction and not a restatement.
 CONTRADICTION_STEMS = (
     "invoked inside a live Codex session",
+    "Invocation inside a live Codex session stays unverified",
+    "No claim in this brief rests on a live session",
     "desktop app stands verified",
     "universal plugin directory listing has been submitted",
     "a universal plugin directory listing exists for recognitio",

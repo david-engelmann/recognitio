@@ -208,6 +208,41 @@ def manifest_problems(root=None):
                 ".zcode-plugin/plugin.json carries no %s field"
                 % field
             )
+    # The discovery fields the other manifests carry stand
+    # here too, at the values the tree pins elsewhere, so
+    # the thin manifest cannot drift from them in silence.
+    expected_author = {
+        "name": "David Engelmann",
+        "email": "81196676+david-engelmann@users.noreply.github.com",
+    }
+    if data.get("author") != expected_author:
+        problems.append(
+            ".zcode-plugin/plugin.json carries author %r and "
+            "the pinned author is %r"
+            % (data.get("author"), expected_author)
+        )
+    for field in ("homepage", "repository"):
+        if data.get(field) != "https://github.com/david-engelmann/recognitio":
+            problems.append(
+                ".zcode-plugin/plugin.json carries %s %r and "
+                "the pinned value is the public repo"
+                % (field, data.get(field))
+            )
+    if data.get("license") != "MIT":
+        problems.append(
+            ".zcode-plugin/plugin.json carries license %r and "
+            "the pinned value is MIT" % data.get("license")
+        )
+    expected_keywords = [
+        "agent-skills", "code-review", "diff", "git",
+        "pull-request", "review-packet",
+    ]
+    if data.get("keywords") != expected_keywords:
+        problems.append(
+            ".zcode-plugin/plugin.json carries keywords %r and "
+            "the pinned set is %r"
+            % (data.get("keywords"), expected_keywords)
+        )
     if "description" in data:
         if len(data["description"]) > DESCRIPTION_LIMIT:
             problems.append(

@@ -2025,6 +2025,21 @@ class TestDescriptionPins(unittest.TestCase):
         "Pulls the relevant changes from a pull request or a commit range, "
         "with the context a reviewer needs, into one verified review packet."
     )
+    # The storefront repair round. The two Claude listing
+    # surfaces carry one further sentence the other surfaces
+    # do not, because the never install both rule belongs to
+    # the listing a reader chooses between, and the two
+    # Claude entries are the only pair a single listing
+    # offers side by side. The canonical sentence above
+    # still opens the spelling and still stands alone on
+    # every other surface.
+    CLAUDE_DESCRIPTION = (
+        MANIFEST_DESCRIPTION
+        + " The marketplace also offers recognitio-mod, the "
+        "spawn gate on its own, and this plugin already "
+        "includes that gate, so install one entry or the "
+        "other and never both."
+    )
     ANTIGRAVITY_DESCRIPTION = (
         MANIFEST_DESCRIPTION
         + " Antigravity native hook wiring serves the review run gate."
@@ -2086,13 +2101,13 @@ class TestDescriptionPins(unittest.TestCase):
     def test_plugin_manifest_description_is_pinned(self):
         self.assertEqual(
             self.manifest_description("plugin.json"),
-            self.MANIFEST_DESCRIPTION,
+            self.CLAUDE_DESCRIPTION,
         )
 
     def test_marketplace_entry_description_is_pinned(self):
         self.assertEqual(
             self.marketplace_entry_description(),
-            self.MANIFEST_DESCRIPTION,
+            self.CLAUDE_DESCRIPTION,
         )
 
     def test_marketplace_metadata_description_is_pinned(self):
@@ -2192,10 +2207,14 @@ class TestReadmeStorefront(unittest.TestCase):
             "For reviewers and the agents who assist them",
             "[What it does](#what-it-does)",
             "[![CI passing]",
-            "docs/images/recognitio-cursor-agent-demo.gif",
+            "docs/images/recognitio-claude-code-demo.gif",
+            "docs/images/recognitio-session-claude-code-denial.png",
+            "docs/images/recognitio-session-codex-verified.png",
+            "docs/images/recognitio-cursor-agent-poster.png",
+            "docs/images/recognitio-session-qwen-summary.png",
             "docs/images/eval-chart.svg",
             "Eight planted defects across four fixture tasks",
-            "New here. Start with the [Install](#install) section",
+            "New here. Start with the sixty second quickstart",
             "**Sixty second quickstart**",
             "--commit 991ac6a",
             "## What it does",
@@ -2382,26 +2401,26 @@ class TestReadmePhoneWidth(unittest.TestCase):
         self.assertIn(
             '<source media="(max-width: 480px)" '
             'srcset="docs/images/'
-            'recognitio-cursor-agent-verified-crop.png">',
+            'recognitio-claude-code-verified-crop.png">',
             block,
         )
         self.assertIn(
-            'src="docs/images/recognitio-cursor-agent-demo.gif" '
+            'src="docs/images/recognitio-claude-code-demo.gif" '
             'width="792">',
             block,
         )
-        # The shared alt names the verified packet as well as
-        # the verdict, because the phone composition shows
-        # both moments and the desktop recording shows the
-        # verified packet during its play and ends on the
-        # verdict. The alt stood unpinned before this pin,
-        # and a tree with the alt reverted to its earlier
-        # wording passed every gate test, so the pin stands
-        # here beside the source and fallback pins.
+        # The shared alt names the denial as well as the
+        # verified packet and the verdict, because the phone
+        # crop shows the verified moment and the desktop
+        # recording carries the denial during its play and
+        # ends on the verdict. The alt stood unpinned before
+        # this pin, and a tree with the alt reverted to its
+        # earlier wording passed every gate test, so the pin
+        # stands here beside the source and fallback pins.
         self.assertIn(
-            'alt="A Cursor agent session using recognitio on a '
-            "28 file change, its packet verified in full, "
-            'ending on a verdict of Approve."',
+            'alt="A Claude Code session denied a reviewer '
+            "spawn, then verified its packet and ended on a "
+            'verdict of Not blocking."',
             block,
         )
         # The hero image declares its width and no height.
@@ -2421,7 +2440,7 @@ class TestReadmePhoneWidth(unittest.TestCase):
             self.assertIn('width="', tag)
             if "wordmark" in tag:
                 self.assertIn('height="', tag)
-            if "cursor-agent-demo" in tag:
+            if "claude-code-demo" in tag:
                 self.assertNotIn('height="', tag)
 
     def test_the_worked_example_lines_fit_phone_width(self):
@@ -2581,17 +2600,56 @@ class TestReadmeRound9(unittest.TestCase):
         )
 
     def test_the_demo_lead_in_carries_its_receipt(self):
-        # The money shot landing after the visual program.
-        # The recording changed from the retired chat capture
-        # to a live Cursor agent session over the same change,
-        # so the receipt sentence names the session and the
-        # new capture record in place of the old one.
+        # The storefront WP3 landing. The hero recording
+        # changed from the Cursor money shot to a live Claude
+        # Code session with the mod installed over the same
+        # change, so the receipt sentences name the new
+        # session, its deny then proceed arc and its capture
+        # record in place of the old ones. The Cursor session
+        # stands in the proof strip below the hero.
+        # The storefront repair round then moved the receipt
+        # paragraph below the hero and restated the arc, after
+        # the red team found the landing wording credited the
+        # second spawn itself with the 15 findings its session
+        # only reached through a provider failure, parallel
+        # partial reports and a third targeted pass. The pins
+        # below hold the restated arc.
         first_screen = self.flat.split("## What it does", 1)[0]
         self.assertIn(
-            "A session in the Cursor agent uses the recognitio "
-            "skill to review the change from `365da81e` to "
-            "`ecdda4c8` in this repository, 28 files and 3,233 "
-            "lines of diff, and its capture record stands at "
+            "A session in Claude Code 2.1.314 with the "
+            "recognitio mod installed reviews the change from "
+            "`365da81e` to `ecdda4c8` in this repository, 28 "
+            "files and 3,233 lines of diff.",
+            first_screen,
+        )
+        self.assertIn(
+            "Its first reviewer spawn is denied because no "
+            "verified packet stands, and the packet is then "
+            "built and its manifest verified flag confirmed "
+            "true.",
+            first_screen,
+        )
+        self.assertIn(
+            "The second spawn proceeds against the verified "
+            "packet and its first completion fails on a "
+            "provider credit error, two reviewer reports come "
+            "back in parallel over part of the range, and a "
+            "third targeted reviewer pass fills the gap they "
+            "left.",
+            first_screen,
+        )
+        self.assertIn(
+            "The session ends on a consolidated presentation "
+            "of 15 findings with a verdict of Not blocking.",
+            first_screen,
+        )
+        self.assertIn(
+            "over OpenRouter with the model "
+            "anthropic/claude-sonnet-5",
+            first_screen,
+        )
+        self.assertIn(
+            "Its capture record stands at "
             "[docs/images/capture-record.md]"
             "(docs/images/capture-record.md).",
             first_screen,
@@ -3010,6 +3068,7 @@ class TestDocsIndex(unittest.TestCase):
         "mod-build7.md",
         "principles.md",
         "qwen-code-brief.md",
+        "release-1.3.0.md",
         "reviewer-persona.md",
         "submission-agent-plugins.md",
         "submission-claude.md",
@@ -3234,11 +3293,17 @@ class TestDemoAssets(unittest.TestCase):
     as. The clipped band check retires for the same reason,
     because the band geometry belonged to the retired chat
     card header and this recording has no such header.
+    The storefront WP3 landing then moves the hero slot to
+    the Claude Code session with the mod installed, filmed
+    over the same range, and the pins below move to that
+    set in the same change. The Cursor set stays in the
+    tree, and its poster stands in the proof strip under
+    the pins of TestProofStrip.
     """
 
     IMAGES = ROOT / "docs" / "images"
-    HERO = IMAGES / "recognitio-cursor-agent-demo.gif"
-    POSTER = "recognitio-cursor-agent-poster.png"
+    HERO = IMAGES / "recognitio-claude-code-demo.gif"
+    POSTER = "recognitio-claude-code-poster.png"
     RETIRED = (
         "recognitio-demo-chat.gif",
         "recognitio-demo-poster.png",
@@ -3246,17 +3311,20 @@ class TestDemoAssets(unittest.TestCase):
         "recognitio-demo-still-diff.png",
         "recognitio-demo-still-verified.png",
         "recognitio-demo-still-verdict.png",
+        "recognitio-cursor-agent-demo-short.gif",
+        "recognitio-cursor-agent-verified-crop.png",
     )
     POSTER_GEOMETRY = (792, 570)
     POSTER_SHA256 = (
-        "b63dd2f84835319d71ad13d4ab91860b3bb807e8a013c3632406bb954e9"
-        "c684d"
+        "be23a2ef5dd00540ba12670db155da81fdd25acb2f2fcb0842f7c00ada691935"
     )
     # The byte budget moved down for WP1 in the open. The
     # work order set a 700,000 byte target for the captioned
-    # re-encode, and the shipped file weighs 646,314 bytes,
-    # so the budget now stands at that target rather than
-    # the 1,400,000 the first money shot landing set.
+    # re-encode, and the budget now stands at that target
+    # rather than the 1,400,000 the first money shot landing
+    # set. The Claude Code hero that WP3 moves into the
+    # hero slot weighs 546,582 bytes, under the same budget,
+    # so the budget does not move.
     BYTE_BUDGET = 700000
 
     def test_the_hero_dimensions_and_byte_budget_are_pinned(self):
@@ -3266,46 +3334,53 @@ class TestDemoAssets(unittest.TestCase):
 
     def test_frame_zero_carries_content(self):
         _w, _h, frames, _delays = _gif_frames(self.HERO)
-        self.assertGreater(_bright_fraction(frames[0]), 0.05)
+        # The WP1 hero opens on the Claude Code welcome
+        # screen, sparse bright text on the dark terminal
+        # ground. The repair round re-encode opens on the
+        # same screen with the prompt standing in it, whose
+        # composited bright share measures 0.0498. The floor
+        # stands at 0.04, four fifths of that measure and
+        # well above a blank frame.
+        self.assertGreater(_bright_fraction(frames[0]), 0.04)
 
     def test_the_verdict_rest_frame_is_present_and_clean(self):
         _w, _h, frames, delays = _gif_frames(self.HERO)
-        # The visual fix re-encode pins, re-derived from
-        # the shipped file. It carries 20 frames over
-        # 27,580 ms in total, with the closing verdict
-        # frame held for 2,400 ms.
-        self.assertEqual(len(frames), 20)
-        self.assertEqual(sum(delays), 27580)
+        # The hero encode pins, re-derived from the shipped
+        # file after the repair round re-encode. It carries
+        # 21 frames over 28,770 ms in total, with the
+        # closing verdict frame held for 2,400 ms.
+        self.assertEqual(len(frames), 21)
+        self.assertEqual(sum(delays), 28770)
         self.assertEqual(delays[-1], 2400)
         last = frames[-1]
         # The brightness floor is re-derived from this last
         # frame, whose composited bright share measures
-        # 0.0925. The floor stands at 0.08, under that
+        # 0.1238. The floor stands at 0.08, under that
         # measure and well above a dark field.
         self.assertGreater(_bright_fraction(last), 0.08)
 
     def test_the_short_cut_geometry_and_timing_are_pinned(self):
-        path = self.IMAGES / "recognitio-cursor-agent-demo-short.gif"
+        path = self.IMAGES / "recognitio-claude-code-demo-short.gif"
         self.assertTrue(path.is_file())
         width, height, frames, delays = _gif_frames(path)
         self.assertEqual((width, height), (792, 608))
-        self.assertEqual(len(frames), 11)
-        self.assertEqual(sum(delays), 7350)
-        self.assertEqual(path.stat().st_size, 256870)
+        self.assertEqual(len(frames), 10)
+        self.assertEqual(sum(delays), 4600)
+        self.assertEqual(path.stat().st_size, 187062)
 
     def test_the_phone_crop_geometry_and_hash_are_pinned(self):
         path = (
             self.IMAGES
-            / "recognitio-cursor-agent-verified-crop.png"
+            / "recognitio-claude-code-verified-crop.png"
         )
         self.assertTrue(path.is_file())
         width, height, _rows = _png_pixels_any(path)
-        self.assertEqual((width, height), (544, 143))
+        self.assertEqual((width, height), (544, 95))
         found = hashlib.sha256(path.read_bytes()).hexdigest()
         self.assertEqual(
             found,
-            "af31a648f57571a2d4f16ede4130ad60"
-            "ef76b6ad156af80e0f3059d6f488754f",
+            "82d3a849233b8ac0af3d0c1ee35d2ebd3"
+            "eeff21fe89c09305082984ebb12edb6",
         )
 
     def test_the_poster_exists_as_a_png_frame(self):
@@ -3348,11 +3423,23 @@ class TestDemoAssets(unittest.TestCase):
             refs,
             [
                 "docs/images/capture-record.md",
-                "docs/images/recognitio-cursor-agent-poster.png",
-                "docs/images/recognitio-cursor-agent-demo-short.gif",
+                "docs/images/recognitio-claude-code-poster.png",
+                "docs/images/recognitio-claude-code-demo-short.gif",
                 "docs/images/capture-record.md",
-                "docs/images/recognitio-cursor-agent-verified-crop.png",
-                "docs/images/recognitio-cursor-agent-demo.gif",
+                "docs/images/capture-record.md",
+                "docs/images/capture-record.md",
+                "docs/images/capture-record.md",
+                "docs/images/capture-record.md",
+                "docs/images/recognitio-claude-code-verified-crop.png",
+                "docs/images/recognitio-claude-code-demo.gif",
+                "docs/images/recognitio-session-claude-code-denial-phone.png",
+                "docs/images/recognitio-session-claude-code-denial.png",
+                "docs/images/recognitio-session-codex-verified-phone.png",
+                "docs/images/recognitio-session-codex-verified.png",
+                "docs/images/recognitio-cursor-agent-poster-phone.png",
+                "docs/images/recognitio-cursor-agent-poster.png",
+                "docs/images/recognitio-session-qwen-summary-phone.png",
+                "docs/images/recognitio-session-qwen-summary.png",
                 "docs/images/eval-chart.svg",
                 "docs/images/recognitio-session-style-tiers-phone.png",
                 "docs/images/recognitio-session-style-tiers.png",
@@ -3369,29 +3456,199 @@ class TestDemoAssets(unittest.TestCase):
         self.assertNotIn("recognitio-demo-terminal", readme)
 
 
+class TestProofStrip(unittest.TestCase):
+    """The storefront WP3 proof strip gate.
+
+    Four frames stand under the hero, one per harness over
+    the same range, each under its harness name with a line
+    tying it to its capture record section. The repair
+    round rebuilt the strip on uniform 792 by 570 frames.
+    The Claude Code frame is the denial moment of the WP1
+    cast, the Qwen frame is the summary screen of its WP2
+    session, and the Codex still and the Cursor money shot
+    poster stand as they were. Each frame also carries a
+    phone band cut from the same frame as its narrow
+    screen source. The mod denial still rendered from the
+    same cast stands in the mod plugin assets folder.
+
+    The hash is the single strong pin for each still, so
+    the byte size pins the first form carried stand
+    retired, because a hash over the bytes already fails
+    on any size or content change. The geometry pin stays,
+    read through the suite PNG decoder, because the
+    uniform strip geometry is a claim of the rebuild
+    itself and not a restatement of the bytes.
+    """
+
+    IMAGES = ROOT / "docs" / "images"
+    STILLS = {
+        "recognitio-session-claude-code-denial.png": (
+            (792, 570),
+            "e55d704ab35e1dbbb1f6c98614c94c3c61973c64965a6f96b5c969fdc55cfd54",
+        ),
+        "recognitio-session-codex-verified.png": (
+            (792, 728),
+            "56374c93662a6e662bcdbb3ff691470261a8866e75bef7fbf8fac8c7d002f7fd",
+        ),
+        "recognitio-cursor-agent-poster.png": (
+            (792, 570),
+            "b63dd2f84835319d71ad13d4ab91860b3bb807e8a013c3632406bb954e9c684d",
+        ),
+        "recognitio-session-qwen-summary.png": (
+            (792, 570),
+            "5bc379354fe3fadd8adb0f904c0ee0f3177edeb0b9cb75ba8c44d61a049b1bc4",
+        ),
+    }
+    BANDS = {
+        "recognitio-session-claude-code-denial-phone.png":
+            "a8e7252fa4b882bf2cd0fbe2b5fd0fe4d9cdd237ba9bc2d0b5bb03590f58ad50",
+        "recognitio-session-codex-verified-phone.png":
+            "d3f56411bbfcef4b26abc57d149dc479fc04573641f071499328f9da06600891",
+        "recognitio-cursor-agent-poster-phone.png":
+            "4c38aab3db340513060b483e81169fbab4f0ac80759cec62f815df88f0ccdcd6",
+        "recognitio-session-qwen-summary-phone.png":
+            "26f9eba0ec31707a9072c6dcc80531207f4b307f0f3226f01a180c317561ad21",
+    }
+    ORDER = (
+        ("**Claude Code**",
+         "recognitio-session-claude-code-denial.png",
+         "under the Claude Code hero session"),
+        ("**Codex**",
+         "recognitio-session-codex-verified.png",
+         "under the Codex proof strip session"),
+        ("**Cursor**",
+         "recognitio-cursor-agent-poster.png",
+         "under the Cursor agent money shot"),
+        ("**Qwen Code**",
+         "recognitio-session-qwen-summary.png",
+         "under the Qwen proof strip session"),
+    )
+    # The capture record section each still stands behind,
+    # named by a fragment of its heading. The tie is
+    # structural, because a still named in the wrong
+    # section of the record is a broken tie even when the
+    # name stands somewhere in the file.
+    RECORD_SECTIONS = {
+        "recognitio-session-claude-code-denial.png":
+            "The Claude Code proof strip still",
+        "recognitio-session-codex-verified.png":
+            "Capture record for the Codex proof strip session",
+        "recognitio-cursor-agent-poster.png":
+            "Capture record for the Cursor agent money shot",
+        "recognitio-session-qwen-summary.png":
+            "Capture record for the Qwen proof strip session",
+    }
+
+    def test_the_strip_stills_are_pinned(self):
+        for name, (geometry, digest) in self.STILLS.items():
+            path = self.IMAGES / name
+            self.assertTrue(path.is_file(), name)
+            width, height, _rows = _png_pixels_any(path)
+            self.assertEqual((width, height), geometry, name)
+            found = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertEqual(found, digest, name)
+
+    def test_the_strip_bands_are_pinned(self):
+        for name, digest in self.BANDS.items():
+            path = self.IMAGES / name
+            self.assertTrue(path.is_file(), name)
+            width, height, _rows = _png_pixels_any(path)
+            self.assertEqual((width, height), (544, 95), name)
+            found = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertEqual(found, digest, name)
+
+    def test_the_strip_order_and_record_ties_are_pinned(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        strip = readme.split("**Four harnesses, one range**", 1)[1]
+        strip = strip.split("eval-chart.svg", 1)[0]
+        positions = []
+        for heading, name, record_name in self.ORDER:
+            self.assertIn(heading, strip)
+            self.assertIn("docs/images/" + name, strip)
+            self.assertIn(record_name, strip)
+            positions.append(strip.index(heading))
+            positions.append(strip.index("docs/images/" + name))
+        self.assertEqual(positions, sorted(positions))
+
+    def test_the_capture_record_names_every_strip_still(self):
+        record = (
+            self.IMAGES / "capture-record.md"
+        ).read_text(encoding="utf-8")
+        headings = [
+            "Capture record for the Cursor agent money shot",
+            "Capture record for the Claude Code hero session",
+            "Capture record for the Codex proof strip session",
+            "Capture record for the Qwen proof strip session",
+            "The Claude Code proof strip still",
+        ]
+        starts = []
+        for heading in headings:
+            self.assertIn(heading, record, heading)
+            starts.append(record.index(heading))
+        self.assertEqual(starts, sorted(starts))
+        spans = {}
+        for i, heading in enumerate(headings):
+            end = (
+                starts[i + 1] if i + 1 < len(starts)
+                else len(record)
+            )
+            spans[heading] = record[starts[i]:end]
+        for name, heading in self.RECORD_SECTIONS.items():
+            self.assertIn(name, spans[heading], name)
+
+    def test_the_mod_denial_still_is_pinned(self):
+        path = (
+            ROOT / "plugins" / "recognitio-mod" / "assets"
+            / "recognitio-mod-denial.png"
+        )
+        self.assertTrue(path.is_file())
+        found = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(
+            found,
+            "e55d704ab35e1dbbb1f6c98614c94c3c61973c64965a6f96b5c969f"
+            "dc55cfd54",
+        )
+        mod_readme = (
+            ROOT / "plugins" / "recognitio-mod" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("assets/recognitio-mod-denial.png", mod_readme)
+
+
 def _png_pixels_any(path):
     """Return width and height and RGB rows for one PNG file.
 
     The decoder uses the standard library only and supports
     the 8 bit RGB and RGBA forms the brand exports ship in
-    with no interlace and anything else fails here rather
-    than passing unexamined.
+    and the 8 bit palette form the quantized session stills
+    ship in, with no interlace and anything else fails here
+    rather than passing unexamined. The repair round grew
+    the palette arm so the proof strip pins could read
+    their stills through this helper instead of a raw
+    header unpack.
     """
     raw = path.read_bytes()
     assert raw[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG file"
     width, height, depth, color = struct.unpack(">IIBB", raw[16:26])
-    assert depth == 8 and color in (2, 6) and raw[28] == 0, (
+    assert depth == 8 and color in (2, 3, 6) and raw[28] == 0, (
         "unexpected PNG form"
     )
-    channels = 3 if color == 2 else 4
+    channels = {2: 3, 3: 1, 6: 4}[color]
     idat = bytearray()
+    palette = []
     pos = 8
     while pos < len(raw):
         size = int.from_bytes(raw[pos:pos + 4], "big")
         kind = raw[pos + 4:pos + 8]
         if kind == b"IDAT":
             idat += raw[pos + 8:pos + 8 + size]
+        elif kind == b"PLTE":
+            palette = [
+                tuple(raw[pos + 8 + 3 * i:pos + 11 + 3 * i])
+                for i in range(size // 3)
+            ]
         pos += size + 12
+    if color == 3:
+        assert palette, "palette PNG without a PLTE chunk"
     data = zlib.decompress(bytes(idat))
     stride = width * channels
     rows = []
@@ -3425,9 +3682,13 @@ def _png_pixels_any(path):
                 line[x] = (line[x] + pred) & 0xFF
             elif filt != 0:
                 raise AssertionError("unexpected PNG filter %r" % filt)
-        rows.append(
-            [tuple(line[i:i + 3]) for i in range(0, stride, channels)]
-        )
+        if color == 3:
+            rows.append([palette[idx] for idx in line])
+        else:
+            rows.append(
+                [tuple(line[i:i + 3])
+                 for i in range(0, stride, channels)]
+            )
         prev = line
     return width, height, rows
 
@@ -3677,7 +3938,37 @@ class TestBrandAssets(unittest.TestCase):
     # open. The ceiling does not move, because 750,000
     # still holds the new ledger with 9,099 of headroom
     # over it.
-    PAGE_CEILING = 750000
+    # The storefront WP3 landing then moves the hero
+    # slot to the Claude Code recording at 546,582 with
+    # its phone crop at 11,580, replacing the Cursor
+    # recording at 607,309 and its crop at 12,857, and
+    # adds the four proof strip stills at 21,878 for
+    # Claude Code plus 36,754 for Codex plus 44,889 for
+    # Cursor plus 32,418 for Qwen, which moves the total
+    # from 740,901 to 814,836 in the open. The ceiling
+    # moves once, from 750,000 to 850,000, to hold the
+    # new ledger with 35,164 of headroom over it,
+    # because real session frames from four harnesses
+    # stand on the page the ceiling guards. The full
+    # ledger stands at 3,556 for the dark wordmark plus
+    # 3,556 for the light wordmark plus 546,582 for the
+    # hero recording plus 11,580 for its phone crop plus
+    # 21,878 plus 36,754 plus 44,889 plus 32,418 for the
+    # four strip stills plus 2,999 for the eval chart
+    # plus 18,972 plus 29,838 plus 22,297 for the three
+    # style stills plus 14,455 plus 13,487 plus 11,575
+    # for their phone width variants.
+    # The storefront repair round then re-encodes the
+    # hero recording at 549,840, replaces the Claude
+    # Code strip still with the denial frame at 20,342
+    # and the Qwen strip still with the summary frame
+    # at 20,157, and adds one phone band per strip
+    # frame at 4,134 plus 3,838 plus 3,568 plus 4,285,
+    # which moves the total from 814,836 to 820,122 in
+    # the open. The ceiling does not move, because
+    # 850,000 still holds the new ledger with 29,878
+    # of headroom over it.
+    PAGE_CEILING = 850000
 
     def test_the_brand_files_exist(self):
         for name in list(self.SHA256) + ["palette.json", "build_brand.py"]:
@@ -3737,18 +4028,19 @@ class TestBrandAssets(unittest.TestCase):
     def test_the_wordmark_theme_fragment_form_is_pinned(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         # The wordmark lockup stands on the GitHub theme
-        # fragments since the theme fix landing. Four
-        # picture elements remain in the README, the hero
+        # fragments since the theme fix landing. Eight
+        # picture elements stand in the README, the hero
         # recording picture, pinned in TestReadmePhoneWidth,
-        # and one picture per output style still from the
-        # visual fix pass, each carrying a phone width
-        # source. The picture form keyed to
+        # one picture per output style still from the
+        # visual fix pass, and one picture per proof strip
+        # frame from the storefront repair round, each
+        # carrying a phone width source. The picture form keyed to
         # prefers-color-scheme is refused, because the
         # media feature follows the system scheme and a
         # reader who forces a GitHub theme against their
         # system scheme was served the master drawn for
         # the other ground.
-        self.assertEqual(readme.count("<picture>"), 4)
+        self.assertEqual(readme.count("<picture>"), 8)
         self.assertNotIn("prefers-color-scheme", readme)
         dark = '<img alt="recognitio" src="docs/brand/wordmark-dark.svg#gh-dark-mode-only" width="300" height="72">'
         light = '<img alt="recognitio" src="docs/brand/wordmark-light.svg#gh-light-mode-only" width="300" height="72">'
@@ -3876,7 +4168,7 @@ class TestBrandAssets(unittest.TestCase):
         )
         total = sum((ROOT / ref).stat().st_size for ref in unique)
         self.assertLessEqual(total, self.PAGE_CEILING)
-        self.assertEqual(total, 740901)
+        self.assertEqual(total, 820122)
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

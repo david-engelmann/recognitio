@@ -10,11 +10,11 @@ A conditional draft and nothing more, because no listing file ships in this repo
 
 **What was proven**
 
-The conversion tests recorded in this brief ran against scratch installs and prove file carriage and conversion fidelity for the shapes they name.
+The conversion tests recorded in this brief ran against scratch installs and prove file carriage and conversion fidelity for the shapes they name. The runtime proof this brief records is one scoped shape, a live Qwen Code session on 2026-10-29 through the OpenRouter route that invoked the installed skill, ran the installed extractor and read the verified packet it produced. A second live session on 2026-11-03 over the hero range built a packet whose check passed twice, with the executed extractor standing as the subject workspace copy, as the capture record in docs/images states.
 
 **What is unverified**
 
-The conditional publication decision stays with David, and the brief records in its own sections the routes and shapes that stay unverified rather than borrowing strength for them here.
+The conditional publication decision stays with David, and the brief records in its own sections the routes and shapes that stay unverified rather than borrowing strength for them here. No listing stands verified as published, because no listing file ships and the publication decision has not been taken.
 
 ## Summary
 

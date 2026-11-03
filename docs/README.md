@@ -67,6 +67,13 @@ capture record, so no document in this set stands unlisted.
   project path beside the canonical folder, with no manifest
   evidenced and the live session standing unverified.
 
+## The release
+
+- [The 1.3.0 release notes and tag checklist](release-1.3.0.md) (held) states
+  what the 1.3.0 release carries, names its tag candidate
+  head on its face, and records the checklist the owner
+  follows to cut a tag that stays held until the owner acts.
+
 ## The submission packs
 
 - [The Cursor Marketplace submission pack](submission-cursor.md) (ready) holds
@@ -92,9 +99,10 @@ capture record, so no document in this set stands unlisted.
 ## The filed records
 
 - [The demo capture record](images/capture-record.md) (record) states how
-  the hero recording was captured from one real Cursor agent
-  session, with its prompt, its range and its disclosed
-  shaping choice.
+  the hero recordings and proof frames were captured from
+  four real agent sessions, in Claude Code and Codex and
+  Cursor and Qwen Code, with their prompts, their ranges
+  and their disclosed shaping choices.
 - [The round 4 fix review](reviews/round4-fix-review.md) (record) closes the
   round 4 findings, covering the renamed module search, the
   YAML fence scope and the findings path spelling.

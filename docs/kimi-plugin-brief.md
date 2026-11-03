@@ -10,11 +10,11 @@ The derivation noted Kimi managed plugin rule set in this brief, covering the ma
 
 **What was proven**
 
-Every rule carries a derivation note naming its skill section or primary citation, and the gate pins the notes against silent drift.
+Every rule carries a derivation note naming its skill section or primary citation, and the gate pins the notes against silent drift. A live Kimi session on 2026-11-02 then closed the run question on the Platform API surface, where the skill loaded through the CLI skills directory, the session built a verified packet over a planted defect change, and the planted defect was caught on both axes, as the provider run record filed in the perfection programme records states. The proof is one scratch change of one file and one line each way, with the planted defect in plain sight, on one model, kimi-k3, under Kimi Code CLI 2.4.0.
 
 **What is unverified**
 
-A live Kimi run now stands outside this brief. On 2026-11-02 a Kimi Code CLI session carried by the Moonshot Platform API loaded the skill through the CLI skills directory and reviewed a planted change from a verified packet. This repo ships no Kimi plugin manifest and the managed plugin path went unexercised, so live plugin behaviour stays unverified and the rule set rests on the primary pages cited here.
+A live Kimi run now stands outside this brief. On 2026-11-02 a Kimi Code CLI session carried by the Moonshot Platform API loaded the skill through the CLI skills directory and reviewed a planted change from a verified packet. That run ran through the Platform API rather than the managed sign in service, and this repo ships no Kimi plugin manifest and the managed plugin path went unexercised, so live plugin behaviour stays unverified and the rule set rests on the primary pages cited here.
 
 ## Summary
 

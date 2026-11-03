@@ -16,8 +16,9 @@ ahead on the decision of the owner without further research.
 
 Every requirement the primary pages state was checked against
 the shipped manifests and files on 2026-10-27, apart from the
-size limits item, which was restated on 2026-10-31 against the
-tree that then held 243 files. The gate at
+size limits item, which was restated on 2026-11-03 against the
+tree that then held 254 files, following an earlier
+restatement on 2026-10-31. The gate at
 scripts/check_submissions.py pins the manifest facts the
 check rests on and the few figures in this pack its pin
 list names, so drift in a pinned fact or a pinned figure
@@ -153,12 +154,12 @@ would name. The root README runs to thousands of words, far
 past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
-**Partly met, the size limits.** The repo holds 243 files and a
-few megabytes in total, as restated on 2026-10-31 against
+**Partly met, the size limits.** The repo holds 254 files and a
+few megabytes in total, as restated on 2026-11-03 against
 the tree that then held that count. Its largest file is the
 demo recording at 607,309 bytes, well under the 5 MiB file
 limit. The file count also holds under the cap the
-checklist holds for a reviewer, at 243 files against a cap
+checklist holds for a reviewer, at 254 files against a cap
 of 512 files. Its largest file that is not an image or a
 font is scripts/check_mod.py at 284,458 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
@@ -219,10 +220,10 @@ entry, all resolve inside the repo root on relative paths.
 The three component files carry frontmatter descriptions
 as single text values, the skill at 548 characters and the
 reviewer agent at 122 characters and the output style at
-172 characters. A credential pattern scan over all 243
+172 characters. A credential pattern scan over all 254
 files in the tree, for private key headers and AWS key shapes
-and GitHub token shapes, returned zero hits, so no real
-credential stands in the folder. No package.json ships
+and GitHub token shapes, rerun on 2026-11-03, returned zero
+hits, so no real credential stands in the folder. No package.json ships
 anywhere in the tree and the shipped manifest carries no
 launcher field, so the launcher pinning row has nothing to
 engage. The terms of service URL field stands absent from
