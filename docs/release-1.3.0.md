@@ -5,11 +5,17 @@
 This file holds the release notes and the tag checklist for
 recognitio 1.3.0, the first release of the skill and its plugin
 packaging. The tag candidate head for this release is
-`ec5e166c16ef1de2c739f5fe0bf54b723e325e29`, the head of the
-storefront programme landing stack on main. This file names
-it in the landing change itself, whose final commit carries
-this restatement directly on that head, and the full gate
-runs on the tree this restatement completes. No tag
+`3a2f7adf3e8cf0d7f35b24db1f91fb6ddebc9372`, the head of
+main this landing stands on. The head this file named
+before, `ec5e166c16ef1de2c739f5fe0bf54b723e325e29`, was
+the local head of the storefront programme landing
+stack, and the tree it carries,
+`5bd54e64ceec144b9408e9ee5a61730d735abce4`, is the tree
+of the storefront landing head
+`357ba2d43d74f295c8e1953fe3dadd3406c2eb63` on main, so
+these notes describe the tree the storefront landing
+carried onto main, and the candidate named here is the
+current head of main. No tag
 has been cut, and the tag itself stays held. Cutting the tag
 is the owner's act alone, and this file records the notes the
 release carries and the checklist that act follows.

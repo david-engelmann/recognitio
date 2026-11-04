@@ -3485,7 +3485,21 @@ This unreleased work carries version 1.3.0.
   step and the head it ran on carried no verdict at all.
   The check job timeout now stands at thirty minutes. The
   gate command the job runs stands unchanged.
-
+- The 1.3.0 release file named a local landing stack
+  head as its tag candidate, a head no reader of the
+  landed main could reach, and it now names the head
+  of main itself, `3a2f7adf`, with the tree identity
+  chain of the heads it replaces stated on its face.
+  The commit convention
+  in the agent guidance stated one round of review
+  fixes as one commit without qualification, and it
+  now states the practice as it stands, one commit per
+  work unit in the local fix stack with a landing free
+  to consolidate a reviewed stack into the commits its
+  landing record names. The Codex embedding loss
+  figures that measure the guidance file stand
+  restated to its new size in the README and the
+  Codex plugin brief.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

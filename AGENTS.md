@@ -382,8 +382,10 @@ not a gate.
   to `main`, including the machine-made mode-only follow-ups the
   Data API path needs. Content commits take `fix:`, `feat:`,
   `docs:` or `test:` as fits, post-gate repair commits take `fix:`,
-  and mode-only follow-ups take `chore:`. One round of review
-  fixes lands as one commit on `main`.
+  and mode-only follow-ups take `chore:`. The local fix stack
+  keeps one commit per work unit, and a landing may
+  consolidate a reviewed stack into the commits its landing
+  record names.
 - Every human commit carries a `Signed-off-by` trailer with the
   exact identity of David Engelmann. Sign commits with
   `git commit -s`. The CI DCO job enforces the trailer on pull
