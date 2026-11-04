@@ -3145,6 +3145,380 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
     return lines
 
 
+# The extended header lines a line history entry can carry
+# between its diff --git line and its --- line, in the shapes
+# the line history reader emits. A range diff entry can carry
+# further shapes such as the similarity and rename lines of a
+# rename or copy entry, and the line history reader prints
+# none of those, so the set below holds the shapes this
+# reader can meet and no others. The line history reader
+# below judges these lines by shape alone and only inside
+# that header block, so a hunk body line that happens to read
+# the same way stands untouched because every hunk body line
+# carries its diff marker and the header block ends at the
+# --- line.
+LOG_L_HEADER_LINE = re.compile(
+    r"^(index [0-9a-f]+\.\.[0-9a-f]+( [0-9]+)?"
+    r"|new file mode [0-9]+"
+    r"|deleted file mode [0-9]+"
+    r"|old mode [0-9]+"
+    r"|new mode [0-9]+)$"
+)
+
+
+HUNK_HEADER_LINE = re.compile(
+    r"^(@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@)(?: .*)?$"
+)
+
+
+def canonical_history_text(text):
+    """Drop the extended diff headers from line history output.
+
+    Older git builds printed a line history diff with no extended
+    header lines at all, because the line history reader used its
+    own output path and that path never emitted them. Git 2.54
+    reworked the reader onto the standard diff pipeline, and from
+    that release the same command prints the index line and the
+    file mode lines of every entry and the function name tail on
+    its hunk headers, so one packet built under two git releases
+    differed in those lines alone and the shipped packets failed
+    their own regeneration check on the newer git while passing
+    on the older one. The packet shape cannot rest on which git
+    release happens to run, so the history text is canonicalised
+    here to the shape with no extended headers and no hunk header
+    tails, the shape every shipped packet already carries. The
+    blob hashes and modes those lines record stand in the change
+    tier of the same packet, read from the range diff itself, so
+    no evidence leaves the packet. Only lines inside a diff
+    header block are judged for the header drop, and the block
+    runs from a diff --git line to the --- line that closes it.
+    A hunk header line is judged by its own shape alone, because
+    every hunk body line carries its diff marker and cannot
+    stand at the head of a line in that shape. The text is split
+    on the newline character alone, so a carriage return or a
+    form feed inside a body line stands as content there and
+    never as a line break the canonicalisation invents.
+    """
+    out = []
+    in_header = False
+    lines = text.split("\n")
+    if text.endswith("\n"):
+        lines.pop()
+    for line in lines:
+        if line.startswith("diff --git "):
+            in_header = True
+            out.append(line)
+            continue
+        if line.startswith("commit "):
+            in_header = False
+            out.append(line)
+            continue
+        if in_header and line.startswith("--- "):
+            in_header = False
+            out.append(line)
+            continue
+        if in_header and LOG_L_HEADER_LINE.match(line):
+            continue
+        hunk = HUNK_HEADER_LINE.match(line)
+        if hunk is not None:
+            in_header = False
+            out.append(hunk.group(1))
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+# Three patterns in this part of the file restate the one hunk
+# header grammar for three readers with different tail needs.
+# HUNK_HEADER_LINE above serves the canonicalisation pass and
+# tolerates a tail because stripping that tail is its work.
+# HISTORY_HUNK_LINE below serves the anchoring pass and admits
+# no tail because its input already stands canonicalised.
+# DIFF_HUNK_START further below serves the deletion evidence
+# reader over a raw commit diff and matches a prefix because
+# that diff is never canonicalised. A grammar change lands in
+# all three or in none.
+HISTORY_HUNK_LINE = re.compile(
+    r"^@@ -(\d+)(?:,(\d+))? \+(\d+(?:,\d+)?) @@$"
+)
+ENTRY_COMMIT_LINE = re.compile(r"^commit ([0-9a-f]+)(?: |$)")
+DIFF_HUNK_START = re.compile(
+    r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@"
+)
+
+
+def commit_deleted_lines(repo, commit, path):
+    """Map the old line numbers one commit deletes in one file.
+
+    The map reads the commit against its parent under a zero
+    context diff, so every deleted line stands in it under its
+    own old line number. A commit with no parent, or a file the
+    commit does not touch, gives an empty map, and a caller
+    that needs a deletion at one named line then finds none
+    and leaves its text alone. Every line opening with a minus
+    sign while a hunk stands open counts as a deletion, with
+    no exception for a line that opens with three minus signs.
+    The file header line of the diff reads that way too, and
+    it stands before the first hunk while the line counter
+    still stands unset, so it never reaches the count. A
+    deleted content line that itself opens with two hyphens
+    renders with three and counts like any other deletion,
+    because comment lines in several languages open with two
+    hyphens and their deletion is evidence like any other.
+    """
+    result = run_git(
+        repo,
+        ["diff", "--histogram", "-U0"] + DIFF_FLAGS
+        + [commit + "^", commit, "--", path],
+        check=False,
+        global_flags=["--attr-source=" + commit],
+    )
+    if result.returncode != 0:
+        return {}
+    deleted = {}
+    old_lineno = None
+    for line in result.stdout.split("\n"):
+        hunk = DIFF_HUNK_START.match(line)
+        if hunk is not None:
+            old_lineno = int(hunk.group(1))
+            continue
+        if old_lineno is None:
+            continue
+        if line.startswith("-"):
+            deleted[old_lineno] = line[1:]
+            old_lineno += 1
+        elif line.startswith(" "):
+            old_lineno += 1
+    return deleted
+
+
+FULL_COMMIT_ID = re.compile(r"^[0-9a-f]{40}$")
+NAME_STATUS_TOKEN = re.compile(r"^[A-Z][0-9]{0,3}$")
+
+
+def follow_file_names(repo, start, path):
+    """Map each commit that touched one file to the names it held.
+
+    The walk follows renames backward from the newest history
+    entry, so every commit in it maps to a pair of the name the
+    file carried in the parent revision and the name it carries
+    in that commit, with None standing for the parent name of
+    the commit that created the file. A history entry for one
+    commit speaks of the file under the names of its own time,
+    and a file renamed after the entry was written answers to
+    its current name nowhere inside that entry, so evidence
+    about the entry must be read under its own names or it
+    reads as silence. A walk that fails or finds nothing gives
+    an empty map, and the caller then falls back to the current
+    name for every entry, which is the pre rename behaviour.
+    """
+    result = run_git(
+        repo,
+        ["log", "--follow", "--name-status", "-z",
+         "--format=%H", start, "--", path],
+        check=False,
+    )
+    if result.returncode != 0:
+        return {}
+    fields = result.stdout.split("\0")
+    names = {}
+    commit = None
+    index = 0
+    while index < len(fields):
+        field = fields[index]
+        index += 1
+        if not field:
+            continue
+        token = field[1:] if field.startswith("\n") else field
+        if FULL_COMMIT_ID.match(token):
+            commit = token
+            continue
+        if commit is None or not NAME_STATUS_TOKEN.match(token):
+            continue
+        letter = token[0]
+        if letter in ("R", "C"):
+            if index + 1 >= len(fields):
+                break
+            names[commit] = (fields[index], fields[index + 1])
+            index += 2
+        else:
+            if index >= len(fields):
+                break
+            if letter == "A":
+                names[commit] = (None, fields[index])
+            else:
+                names[commit] = (fields[index], fields[index])
+            index += 1
+    return names
+
+
+def anchor_history_insertions(repo, text, path):
+    """Anchor a wrapped line hunk on the line the range came from.
+
+    The standard diff pipeline prints a history entry whose new
+    lines wrap one line the traced range already held without
+    that held line. Where the wrapped line stands alone in its
+    span the entry prints as a pure insertion with an old side
+    count of zero, and where the span carries any line beyond
+    the wrapped one, a trailing blank separator being enough,
+    the entry prints as a hunk whose old side holds only the
+    context lines of the span. The older line history reader
+    anchored both shapes on that one held line, printing it as
+    a deletion ahead of the added lines, so the two readers
+    differ in the hunk header and in that one line whenever
+    either shape appears. This pass restores the anchored
+    shape only where two marks stand together. The line before
+    the hunk old side, read from the parent revision of the
+    file, must stand among the lines the hunk adds with its
+    indentation set aside, because
+    a held line that moved inside a new block in the same
+    change carries new indentation. And that same line must
+    stand deleted at its own old line number in the diff of
+    the entry commit itself, which is the mark that the commit
+    took the line out of its old place as the range moved. A
+    line the commit merely kept, however often a new function
+    beside it repeats its text, is context in that diff and
+    never an anchor, and an empty line never counts as held.
+    The restored deletion stands where the older reader
+    printed it, ahead of every line the hunk body carries,
+    because the held line is the earliest old line of the
+    widened hunk. A pure insertion hunk must carry added lines
+    alone, and a context bearing hunk must carry the context
+    lines its old side counts, short only by the trailing
+    context the caller strip can take from a hunk standing
+    last in the text, and no deletion line, because a hunk
+    that already carries a deletion already stands in the
+    anchored shape. A pure insertion of lines
+    the range never held, such as a wholly new function, keeps
+    the count of zero on both git releases and stands untouched
+    here. Both evidence reads run under the names the file
+    carried at the entry itself, followed backward through any
+    rename that landed after the entry, because under the
+    current name the entry commit answers with silence and a
+    wrap that predates a rename would stand unrestored.
+    The input must already stand canonicalised by
+    canonical_history_text, and the one caller in
+    evolution_section passes it in that order.
+    """
+    lines = text.split("\n")
+    if text.endswith("\n"):
+        lines.pop()
+    out = []
+    commit = None
+    parent_lines = None
+    parent_read = False
+    deleted = None
+    names_by_commit = None
+    entry_names = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        entry = ENTRY_COMMIT_LINE.match(line)
+        if entry is not None:
+            commit = entry.group(1)
+            parent_lines = None
+            parent_read = False
+            deleted = None
+            entry_names = None
+            out.append(line)
+            index += 1
+            continue
+        hunk = HISTORY_HUNK_LINE.match(line)
+        if hunk is None or commit is None:
+            out.append(line)
+            index += 1
+            continue
+        start = int(hunk.group(1))
+        old_count = (
+            int(hunk.group(2)) if hunk.group(2) is not None else 1
+        )
+        new_spec = hunk.group(3)
+        new_count = (
+            int(new_spec.split(",")[1])
+            if "," in new_spec
+            else int(new_spec)
+        )
+        if start < 2:
+            out.append(line)
+            index += 1
+            continue
+        body = []
+        scan = index + 1
+        while scan < len(lines):
+            row = lines[scan]
+            if (
+                row.startswith("@@ -")
+                or row.startswith("diff --git ")
+                or row.startswith("commit ")
+            ):
+                break
+            body.append(row)
+            scan += 1
+        if entry_names is None:
+            if names_by_commit is None:
+                names_by_commit = follow_file_names(repo, commit, path)
+            entry_names = (path, path)
+            for full_id, pair in names_by_commit.items():
+                if full_id.startswith(commit):
+                    entry_names = pair
+                    break
+        added = [row[1:] for row in body if row.startswith("+")]
+        context = [row for row in body if row.startswith(" ")]
+        if old_count == 0:
+            body_shape_holds = bool(body) and len(added) == len(body)
+        else:
+            # The caller strips trailing whitespace from the log
+            # text as a whole, so a hunk standing last in the text
+            # can arrive short of trailing context lines, and a
+            # context line counts on both sides of the header, so
+            # the shortfall is equal on both sides. Any other
+            # shortfall means the body is not the shape it claims.
+            old_deficit = old_count - len(context)
+            new_deficit = new_count - (len(added) + len(context))
+            body_shape_holds = (
+                bool(added)
+                and len(added) + len(context) == len(body)
+                and old_deficit == new_deficit
+                and 0 <= old_deficit
+                and (old_deficit == 0 or scan >= len(lines))
+            )
+        if not body_shape_holds:
+            out.append(line)
+            index += 1
+            continue
+        if not parent_read:
+            parent_read = True
+            content = None
+            if entry_names[0] is not None:
+                content = show_file(repo, commit + "^", entry_names[0])
+            if content is not None:
+                parent_lines = content.split("\n")
+        anchor = None
+        if parent_lines is not None and start - 2 < len(parent_lines):
+            candidate = parent_lines[start - 2]
+            if candidate.strip() and any(
+                row.strip() == candidate.strip() for row in added
+            ):
+                anchor = candidate
+        if anchor is not None:
+            if deleted is None:
+                deleted = commit_deleted_lines(
+                    repo, commit, entry_names[1] or entry_names[0]
+                )
+            if deleted.get(start - 1) != anchor:
+                anchor = None
+        if anchor is None:
+            out.append(line)
+            index += 1
+            continue
+        out.append(
+            "@@ -%d,%d +%s @@" % (start - 1, old_count + 1, new_spec)
+        )
+        out.append("-" + anchor)
+        index += 1
+    return "\n".join(out)
+
+
 def evolution_section(repo, head, top_files, functions_by_file, notes):
     lines = []
     lines.append("### Recent evolution of changed functions")
@@ -3180,7 +3554,12 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
                 lines.append("")
                 continue
             text, capped = cap_text(
-                result.stdout.rstrip(), MAX_LOG_L_CHARS,
+                anchor_history_insertions(
+                    repo,
+                    canonical_history_text(result.stdout.rstrip()),
+                    path,
+                ),
+                MAX_LOG_L_CHARS,
                 "history for %s" % name, mark=False,
             )
             if capped:

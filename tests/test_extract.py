@@ -460,6 +460,568 @@ class TestPinnedOutputFormats(unittest.TestCase):
             self.assertNotIn("HIDDEN", packet)
 
 
+class TestHistoryHeaderCanonicalisation(unittest.TestCase):
+    """The history tier must not rest on the git release in use.
+
+    Git 2.54 moved the line history reader onto the standard diff
+    pipeline, and the same log command then printed the index and
+    file mode lines of every history entry where older builds
+    printed none. A packet built under the newer git differed
+    from the shipped packets in those lines alone, so the
+    regeneration gate failed on the newer git while passing on
+    the older one. The extractor canonicalises the history text
+    to the header free shape, and these tests feed both shapes
+    through and demand one byte identical section.
+    """
+
+    OLD_SHAPE = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def alpha():\n"
+        "-    return 1\n"
+        "+    return 2\n"
+        "+index 0000000..1111111\n"
+        "commit def5678 base\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "--- /dev/null\n"
+        "+++ b/mod.py\n"
+        "@@ -0,0 +1,2 @@\n"
+        "+def alpha():\n"
+        "+    return 1\n"
+    )
+
+    NEW_SHAPE = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "index 1111111..2222222 100644\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " def alpha():\n"
+        "-    return 1\n"
+        "+    return 2\n"
+        "+index 0000000..1111111\n"
+        "commit def5678 base\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "new file mode 100644\n"
+        "index 0000000..1111111\n"
+        "--- /dev/null\n"
+        "+++ b/mod.py\n"
+        "@@ -0,0 +1,2 @@\n"
+        "+def alpha():\n"
+        "+    return 1\n"
+    )
+
+    def test_new_shape_canonicalises_to_the_old_shape(self):
+        self.assertEqual(
+            extract_mod.canonical_history_text(self.NEW_SHAPE),
+            self.OLD_SHAPE.rstrip("\n"),
+        )
+
+    def test_old_shape_passes_through_unchanged(self):
+        self.assertEqual(
+            extract_mod.canonical_history_text(self.OLD_SHAPE),
+            self.OLD_SHAPE.rstrip("\n"),
+        )
+
+    def test_mode_change_headers_are_canonicalised(self):
+        text = (
+            "diff --git a/run.py b/run.py\n"
+            "old mode 100755\n"
+            "new mode 100644\n"
+            "index 1111111..2222222\n"
+            "--- a/run.py\n"
+            "+++ b/run.py\n"
+        )
+        self.assertEqual(
+            extract_mod.canonical_history_text(text),
+            "diff --git a/run.py b/run.py\n"
+            "--- a/run.py\n"
+            "+++ b/run.py",
+        )
+
+    def test_hunk_header_tail_is_canonicalised(self):
+        text = (
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -1,2 +1,2 @@ def alpha():\n"
+            " def alpha():\n"
+        )
+        self.assertEqual(
+            extract_mod.canonical_history_text(text),
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " def alpha():",
+        )
+
+    DELETED_ALPHA_DIFF = (
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -2,1 +2,0 @@\n"
+        "-    return alpha()\n"
+    )
+
+    def anchor_for(self, text, parent, diff_text):
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            return extract_mod.Proc(0, diff_text, "")
+
+        with mock.patch.object(
+            extract_mod, "show_file", return_value=parent
+        ), mock.patch.object(extract_mod, "run_git", fake_run_git):
+            return extract_mod.anchor_history_insertions(
+                Path("."), text, "mod.py"
+            )
+
+    def test_insertion_anchored_on_a_held_line_is_rewritten(self):
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -3,0 +7,5 @@\n"
+            "+def beta():\n"
+            "+    try:\n"
+            "+        return alpha()\n"
+            "+    except Exception:\n"
+            "+        pass\n"
+        )
+        parent = "def alpha():\n    return alpha()\n"
+        out = self.anchor_for(text, parent, self.DELETED_ALPHA_DIFF)
+        self.assertIn("@@ -2,1 +7,5 @@", out)
+        self.assertIn("-    return alpha()\n+def beta():", out)
+
+    def test_insertion_of_unheld_lines_stands_untouched(self):
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -3,0 +5,2 @@\n"
+            "+def beta(a, b):\n"
+            "+    return alpha(a, b)\n"
+        )
+        parent = "def alpha():\n    return 1\n"
+        out = self.anchor_for(text, parent, "")
+        self.assertEqual(out, text.rstrip("\n"))
+
+    def test_a_repeated_kept_line_is_not_an_anchor(self):
+        # A new function beside a kept one can repeat the kept
+        # function last line word for word. The commit diff holds
+        # that line as context rather than as a deletion, so the
+        # insertion stands as the pure insertion both git
+        # releases print and no deletion is invented for it.
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -3,0 +3,2 @@\n"
+            "+def gamma():\n"
+            "+    return 1\n"
+        )
+        parent = "def alpha():\n    return 1\n"
+        kept_diff = (
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -2,0 +3,2 @@\n"
+            "+def gamma():\n"
+            "+    return 1\n"
+        )
+        out = self.anchor_for(text, parent, kept_diff)
+        self.assertEqual(out, text.rstrip("\n"))
+
+    def test_an_insertion_hunk_with_context_stands_untouched(self):
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -3,0 +7,5 @@\n"
+            " def alpha():\n"
+            "+def beta():\n"
+            "+        return alpha()\n"
+        )
+        parent = "def alpha():\n    return alpha()\n"
+        out = self.anchor_for(text, parent, self.DELETED_ALPHA_DIFF)
+        self.assertEqual(out, text.rstrip("\n"))
+
+    def test_a_held_line_starting_with_plus_marks_can_anchor(self):
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -3,0 +3,1 @@\n"
+            "+++tally\n"
+        )
+        parent = "def alpha():\n++tally\n"
+        diff_text = (
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -2,1 +2,0 @@\n"
+            "-++tally\n"
+        )
+        out = self.anchor_for(text, parent, diff_text)
+        self.assertIn("@@ -2,1 +3,1 @@", out)
+        self.assertIn("-++tally\n+++tally", out)
+
+    def test_deleted_file_mode_header_is_canonicalised(self):
+        text = (
+            "diff --git a/mod.py b/mod.py\n"
+            "deleted file mode 100644\n"
+            "index 1111111..0000000\n"
+            "--- a/mod.py\n"
+            "+++ /dev/null\n"
+        )
+        self.assertEqual(
+            extract_mod.canonical_history_text(text),
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ /dev/null",
+        )
+
+    CTX_WRAPPED_NEW = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -3,1 +4,6 @@\n"
+        "+def beta():\n"
+        "+    try:\n"
+        "+        return 1\n"
+        "+    except Exception:\n"
+        "+        pass\n"
+        " \n"
+    )
+
+    CTX_WRAPPED_PARENT = "def alpha():\n    return 1\n\n"
+
+    def test_a_context_carrying_wrap_hunk_is_anchored(self):
+        # The traced span of the wrapped function carries a
+        # trailing blank separator, so the newer reader prints
+        # that separator as context and the hunk old side counts
+        # one line instead of zero. The older reader anchored
+        # the same entry on the held return line, and the pass
+        # must restore that shape here too or the section rests
+        # on the git release in use for this shape.
+        out = self.anchor_for(
+            self.CTX_WRAPPED_NEW,
+            self.CTX_WRAPPED_PARENT,
+            self.WRAPPED_DIFF,
+        )
+        self.assertIn("@@ -2,2 +4,6 @@", out)
+        self.assertIn(
+            "-    return 1\n+def beta():", out
+        )
+        self.assertTrue(out.endswith("+        pass\n "))
+
+    def test_a_context_carrying_hunk_with_a_kept_line_stands(self):
+        # The same context bearing shape with the line before
+        # the hunk standing kept in the entry commit diff earns
+        # no anchor, because the deletion evidence mark fails.
+        out = self.anchor_for(
+            self.CTX_WRAPPED_NEW,
+            self.CTX_WRAPPED_PARENT,
+            (
+                "diff --git a/mod.py b/mod.py\n"
+                "--- a/mod.py\n"
+                "+++ b/mod.py\n"
+                "@@ -3,1 +4,6 @@\n"
+                "     return 1\n"
+                "+def beta():\n"
+            ),
+        )
+        self.assertEqual(out, self.CTX_WRAPPED_NEW.rstrip("\n"))
+
+    def test_deletion_map_counts_a_line_opening_with_two_hyphens(self):
+        diff_text = (
+            "diff --git a/q.py b/q.py\n"
+            "--- a/q.py\n"
+            "+++ b/q.py\n"
+            "@@ -2,2 +1,0 @@\n"
+            "--- separator comment\n"
+            "-    return 1\n"
+        )
+
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            return extract_mod.Proc(0, diff_text, "")
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git):
+            deleted = extract_mod.commit_deleted_lines(
+                Path("."), "a" * 40, "q.py"
+            )
+        self.assertEqual(
+            deleted,
+            {2: "-- separator comment", 3: "    return 1"},
+        )
+
+    def test_deletion_map_reads_the_parent_diff_at_zero_context(self):
+        seen = []
+
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            seen.append(args)
+            return extract_mod.Proc(0, "", "")
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git):
+            extract_mod.commit_deleted_lines(
+                Path("."), "b" * 40, "q.py"
+            )
+        self.assertEqual(len(seen), 1)
+        args = seen[0]
+        self.assertEqual(args[0], "diff")
+        self.assertIn("-U0", args)
+        self.assertIn("b" * 40 + "^", args)
+        self.assertIn("b" * 40, args)
+
+    def test_an_anchor_survives_a_hyphen_line_deleted_before_it(self):
+        # The entry commit deletes a hyphen opening comment on
+        # the line above the held line in the same stroke. The
+        # evidence map must hold the held line at its own number
+        # or the anchor check reads the map one line early and
+        # the wrap stays unrestored.
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -4,0 +5,5 @@\n"
+            "+def beta():\n"
+            "+    try:\n"
+            "+        return 1\n"
+            "+    except Exception:\n"
+            "+        pass\n"
+        )
+        parent = "def alpha():\n-- separator\n    return 1\n"
+        diff_text = (
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -2,2 +2,0 @@\n"
+            "--- separator\n"
+            "-    return 1\n"
+        )
+        out = self.anchor_for(text, parent, diff_text)
+        self.assertIn("@@ -3,1 +5,5 @@", out)
+        self.assertIn("-    return 1\n+def beta():", out)
+
+    def test_body_marks_inside_lines_survive_canonicalisation(self):
+        text = (
+            "commit abc1234 head\n"
+            "\n"
+            "diff --git a/mod.py b/mod.py\n"
+            "--- a/mod.py\n"
+            "+++ b/mod.py\n"
+            "@@ -1,2 +1,2 @@\n"
+            " line one\r\n"
+            "+a\x0cb\n"
+        )
+        out = extract_mod.canonical_history_text(text)
+        self.assertIn(" line one\r", out)
+        self.assertIn("+a\x0cb", out)
+        self.assertEqual(
+            out.count("\n"), text.rstrip("\n").count("\n")
+        )
+
+    def test_header_shaped_lines_outside_a_header_block_stand(self):
+        text = (
+            "index 1111111..2222222 100644\n"
+            "new file mode 100644\n"
+        )
+        self.assertEqual(
+            extract_mod.canonical_history_text(text),
+            text.rstrip("\n"),
+        )
+
+    def section_for(self, history_text):
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            return extract_mod.Proc(0, history_text, "")
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git), \
+                mock.patch.object(
+                    extract_mod, "show_file",
+                    return_value="def alpha():\n    return 2\n",
+                ):
+            return extract_mod.evolution_section(
+                Path("."), "a" * 40, [{"path": "mod.py"}],
+                {"mod.py": ["alpha"]}, [],
+            )
+
+    def test_evolution_section_is_byte_identical_across_shapes(self):
+        old_section = self.section_for(self.OLD_SHAPE)
+        new_section = self.section_for(self.NEW_SHAPE)
+        self.assertEqual(old_section, new_section)
+        joined = "\n".join(new_section)
+        self.assertNotIn("new file mode", joined)
+        self.assertNotIn("index 1111111..2222222", joined)
+        self.assertIn("+index 0000000..1111111", joined)
+
+    WRAPPED_OLD = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -2,1 +3,5 @@\n"
+        "-    return 1\n"
+        "+def beta():\n"
+        "+    try:\n"
+        "+        return 1\n"
+        "+    except Exception:\n"
+        "+        pass\n"
+    )
+
+    WRAPPED_NEW = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "index 1111111..2222222 100644\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -3,0 +3,5 @@ def alpha():\n"
+        "+def beta():\n"
+        "+    try:\n"
+        "+        return 1\n"
+        "+    except Exception:\n"
+        "+        pass\n"
+    )
+
+    WRAPPED_DIFF = (
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -2,1 +2,0 @@\n"
+        "-    return 1\n"
+    )
+
+    HEAD_CONTENT = (
+        "def alpha():\n"
+        "    return 1\n"
+        "def beta():\n"
+        "    try:\n"
+        "        return 1\n"
+        "    except Exception:\n"
+        "        pass\n"
+    )
+
+    def wrapped_section_for(self, history_text):
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            if args[0] == "log":
+                return extract_mod.Proc(0, history_text, "")
+            if args[0] == "diff":
+                return extract_mod.Proc(0, self.WRAPPED_DIFF, "")
+            return extract_mod.Proc(1, "", "unexpected call")
+
+        def fake_show_file(repo, ref, path):
+            if ref.endswith("^"):
+                return "def alpha():\n    return 1\n"
+            return self.HEAD_CONTENT
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git), \
+                mock.patch.object(
+                    extract_mod, "show_file", fake_show_file
+                ):
+            return extract_mod.evolution_section(
+                Path("."), "a" * 40, [{"path": "mod.py"}],
+                {"mod.py": ["beta"]}, [],
+            )
+
+    def test_wrapped_insertion_section_is_identical_across_shapes(self):
+        old_section = self.wrapped_section_for(self.WRAPPED_OLD)
+        new_section = self.wrapped_section_for(self.WRAPPED_NEW)
+        self.assertEqual(old_section, new_section)
+        joined = "\n".join(new_section)
+        self.assertIn("@@ -2,1 +3,5 @@", joined)
+        self.assertIn("-    return 1", joined)
+
+    CTX_WRAPPED_OLD = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -2,2 +4,6 @@\n"
+        "-    return 1\n"
+        "+def beta():\n"
+        "+    try:\n"
+        "+        return 1\n"
+        "+    except Exception:\n"
+        "+        pass\n"
+        " \n"
+    )
+
+    CTX_WRAPPED_NEW_SHAPE = (
+        "commit abc1234 head\n"
+        "\n"
+        "diff --git a/mod.py b/mod.py\n"
+        "index 1111111..2222222 100644\n"
+        "--- a/mod.py\n"
+        "+++ b/mod.py\n"
+        "@@ -3,1 +4,6 @@ def beta():\n"
+        "+def beta():\n"
+        "+    try:\n"
+        "+        return 1\n"
+        "+    except Exception:\n"
+        "+        pass\n"
+        " \n"
+    )
+
+    def ctx_wrapped_section_for(self, history_text):
+        def fake_run_git(repo, args, check=True, global_flags=()):
+            if args[0] == "log":
+                return extract_mod.Proc(0, history_text, "")
+            if args[0] == "diff":
+                return extract_mod.Proc(0, self.WRAPPED_DIFF, "")
+            return extract_mod.Proc(1, "", "unexpected call")
+
+        def fake_show_file(repo, ref, path):
+            if ref.endswith("^"):
+                return "def alpha():\n    return 1\n\n"
+            return self.HEAD_CONTENT + "\n"
+
+        with mock.patch.object(extract_mod, "run_git", fake_run_git), \
+                mock.patch.object(
+                    extract_mod, "show_file", fake_show_file
+                ):
+            return extract_mod.evolution_section(
+                Path("."), "a" * 40, [{"path": "mod.py"}],
+                {"mod.py": ["beta"]}, [],
+            )
+
+    def test_wrapped_context_section_is_identical_across_shapes(self):
+        # The span the extractor traces for beta ends on the
+        # blank separator after it, so the newer reader carries
+        # that separator as context inside the wrap hunk. The
+        # whole section must still come out byte identical.
+        old_section = self.ctx_wrapped_section_for(self.CTX_WRAPPED_OLD)
+        new_section = self.ctx_wrapped_section_for(
+            self.CTX_WRAPPED_NEW_SHAPE
+        )
+        self.assertEqual(old_section, new_section)
+        joined = "\n".join(new_section)
+        self.assertIn("@@ -2,2 +4,6 @@", joined)
+        self.assertIn("-    return 1", joined)
+
+
 class TestBlameTextconv(unittest.TestCase):
     """Blame must not run a configured textconv driver (round 7 F4).
 
