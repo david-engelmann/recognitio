@@ -3446,6 +3446,46 @@ This unreleased work carries version 1.3.0.
   the care, and an and joint inside one modifier
   run coordinates no subjects, so the serial
   subjects and the modifier coordinations stand.
+- The history tier of the packet rested on the git release
+  in use. Git 2.54 moved the line history reader onto the
+  standard diff pipeline, and the history diffs then carried
+  the index line and the file mode lines of every entry and
+  the function name tail on their hunk headers where older
+  builds carried none, and an entry whose new lines wrap a
+  line the traced range already held then printed as a pure
+  insertion where the older reader anchored it on that held
+  line, so a packet built under the newer git differed from
+  the shipped packets in those shapes and the regeneration
+  check failed on the runner while passing locally. The
+  extractor now canonicalises the line history text before
+  the history tier is built, dropping the extended diff
+  headers and the hunk header tails and restoring the
+  anchored form of a wrapped insertion where the held line
+  stands among the added lines, which is the shape every
+  shipped packet already carries, and regression tests feed
+  both shapes through the history tier and demand one byte
+  identical section. The blob hashes and modes the dropped
+  lines record stand in the change tier of the same packet.
+  The manifest budget and tiers fields that differed on the
+  example packet and the proof run packet under the newer
+  git price the history text, so they follow the text and
+  stand restored with it, and no packet or manifest was
+  re-recorded for this fix. The anchor restoration covers a
+  wrap whose span carries context lines beyond the wrapped
+  line as well as the pure insertion shape, reads its
+  evidence under the names the file carried at the entry,
+  and counts a deleted line that opens with two hyphens at
+  its own number in that evidence.
+- The CI check job timeout of ten minutes could no longer
+  hold the gate it runs. The test discover alone took 380
+  seconds on the runner at 2,344 tests in run 302 and the
+  suite now stands at 2,450 tests by the loader count on
+  this tree with two dozen gate scripts behind
+  the discover, so the job was cancelled inside the gate
+  step and the head it ran on carried no verdict at all.
+  The check job timeout now stands at thirty minutes. The
+  gate command the job runs stands unchanged.
+
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

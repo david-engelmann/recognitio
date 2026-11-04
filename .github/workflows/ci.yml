@@ -19,8 +19,16 @@ jobs:
   check:
     # The gate. This job runs the same command an agent runs locally
     # before pushing, word for word. CI is a backstop, not a gate.
+    # The timeout holds the whole gate with room to spare. The test
+    # discover alone took 380 seconds on the runner at 2,344 tests
+    # in run 302, the suite now stands at 2,450 tests by the loader
+    # count on this tree, and two dozen gate scripts run behind the
+    # discover, so the old ten minutes cancelled the job inside the
+    # gate step before any verdict could stand. Thirty minutes is
+    # several times the extrapolated discover run of about 400
+    # seconds and still bounds a hung job.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       matrix:
         python-version: ["3.10", "3.12"]

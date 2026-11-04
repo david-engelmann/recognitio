@@ -1049,3 +1049,43 @@ only the receiver spelling, and the brief now
 enumerates the pins exactly, naming the provenance
 shapes the file read walk does not judge as outside
 the promise the pin makes.
+The rounds 100 programme input one fix then closed the
+CI badge discrepancy at its root. Git 2.54 moved the
+line history reader onto the standard diff pipeline, so
+the history diffs in the packet history tier gained the
+index line and the file mode lines of every entry and
+the function name tail on their hunk headers on the
+runner git while the local git printed none, and an
+entry whose new lines wrap a line the traced range
+already held printed as a pure insertion there where
+the older reader anchored it on that held line, and the
+regeneration check failed on the runner across successive
+landings while every local gate read it green. The
+extractor now canonicalises the line history text before
+the history tier is built, dropping the extended diff
+headers and the hunk header tails and restoring the
+anchored form of a wrapped insertion where the held line
+stands among the added lines, pinned by regression tests
+that feed both git shapes through the tier and demand
+one byte identical section, and the shipped packets stand
+unchanged because they already carry the canonical shape.
+The manifest budget and tiers fields that differed on
+two of the packets under the runner git price the history
+text, so they follow the text and stand restored with it.
+A repair round before landing then widened the anchor
+restoration to a wrap whose traced span carries context
+lines beyond the wrapped line, a trailing blank separator
+being enough to split the two readers before the repair,
+followed the file through any later rename when reading
+the evidence for an entry, and taught the deletion
+evidence reader to count a deleted line that opens with
+two hyphens at its own number, each widening pinned by
+tests that fail when it is reverted. The same landing
+raised the CI check job timeout from
+ten minutes to thirty, on the measured basis that the
+test discover alone took 380 seconds on the runner at
+2,344 tests in run 302 with the suite since grown to
+2,450 tests by the loader count on the final tree
+and two dozen gate scripts behind the discover, where
+the old timeout had cancelled the job inside the gate
+step and left the landed head with no CI verdict at all.

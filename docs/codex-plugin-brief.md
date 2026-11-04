@@ -42,8 +42,8 @@ dollar name, as its capture record names in the open.
 Codex embeds at most 32,768 bytes of a repo AGENTS.md
 into first turn instructions, under the
 `project_doc_max_bytes` value the Codex review brief
-records. This repo AGENTS.md stands at 54,953 bytes, so
-its last 22,185 bytes never reach a Codex session. The
+records. This repo AGENTS.md stands at 57,127 bytes, so
+its last 24,359 bytes never reach a Codex session. The
 lost bytes are the greater part of the Current state
 chronicle at the foot of the file. Every operative
 section stands inside the cap, so a Codex session holds
