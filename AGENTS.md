@@ -12,7 +12,10 @@ skill lives in `.agents/skills/recognitio/` and its extractor is
 the script at `.agents/skills/recognitio/scripts/extract.py`. A
 symlink at `.claude/skills/recognitio` points at the canonical
 skill for the home platform, so the two spellings are one skill
-and the canonical is the only spelling that ever changes.
+and the canonical is the only spelling that ever changes. Byte
+identical copies of the skill stand in the portable package, the
+Cursor plugin and the Comate seat, each pinned by its gate, and
+the layout map below names every spelling.
 
 The skill assembles evidence and nothing more. Judgement about the
 code belongs to the review skill that reads the packet downstream.

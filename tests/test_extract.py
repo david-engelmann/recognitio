@@ -3723,7 +3723,7 @@ class TestRound2CompanionScaling(unittest.TestCase):
         finally:
             extract_mod.run_git = original
 
-    def test_build_t2_runs_one_grep_however_many_files(self):
+    def test_build_t2_runs_one_grep_for_terms_within_one_batch(self):
         with RetryingTemporaryDirectory() as tmp:
             commits = []
             base = {}
@@ -3894,6 +3894,398 @@ class TestRound3BulkBoundaries(unittest.TestCase):
                     set(bulk.get(term, [])), per_term, term
                 )
                 self.assertTrue(per_term, term)
+
+
+class TestPerfectionRound2Companion(unittest.TestCase):
+    """Round 2 perfection fixes. Newline terms, batching, staging."""
+
+    # The red team differential set. Eighteen adversarial stems,
+    # each with a line it truly word matches standing in the
+    # corpus beside fragment lines for the newline stems, so a
+    # path that credits a fragment fails against a live haystack
+    # and a path that finds nothing at all fails on the true lines.
+    ADVERSARIAL_TERMS = [
+        "nl\nname", "a\n", "\nb", "caf\u00e9\nx",
+        "-lead", ".hidden", "foo.", "a b", "x;y", "a+b", "a*b",
+        "a|b", "a$b", "a^b", "[ab]", "util", "x" * 200, "plain",
+    ]
+
+    def adversarial_corpus(self):
+        lines = [
+            "nl name apart",
+            "a = 1",
+            "b = 2",
+            "x alone here",
+            "caf\u00e9 split x",
+        ]
+        for term in self.ADVERSARIAL_TERMS:
+            if "\n" not in term:
+                lines.append("pre %s post" % term)
+        return "\n".join(lines) + "\n"
+
+    def test_bulk_and_per_term_agree_on_adversarial_terms(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"corpus.txt": self.adversarial_corpus()}])
+            head = git(repo, "rev-parse", "HEAD")
+            # The haystack is live for the fragments and for the
+            # plain terms, so an empty result everywhere cannot
+            # pass this test.
+            self.assertTrue(
+                extract_mod.git_grep_lines(repo, head, "nl")
+            )
+            self.assertTrue(
+                extract_mod.git_grep_lines(repo, head, "plain")
+            )
+            bulk = extract_mod.git_grep_bulk(
+                repo, head,
+                self.ADVERSARIAL_TERMS + ["zzdummyzz"],
+            )
+            single = extract_mod.git_grep_bulk(
+                repo, head, ["nl\nname"]
+            )
+            for term in self.ADVERSARIAL_TERMS:
+                per_term = set(
+                    extract_mod.git_grep_lines(repo, head, term)
+                )
+                self.assertEqual(
+                    set(bulk.get(term, [])), per_term, term
+                )
+                if "\n" in term:
+                    self.assertEqual(per_term, set(), term)
+                else:
+                    self.assertTrue(per_term, term)
+            self.assertEqual(single.get("nl\nname"), [])
+
+    def test_newline_named_changed_file_fabricates_no_companions(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "a\nb.py": "VALUE = 1\n",
+                    "tests/test_other.py": (
+                        "a = 1\nb = 2\nassert a + b == 3\n"
+                    ),
+                },
+                {
+                    "a\nb.py": "VALUE = 2\n",
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(
+                manifest["verified"], manifest["discrepancies"]
+            )
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "No test files mention the changed modules "
+                "or functions.",
+                packet,
+            )
+            self.assertNotIn("test_other.py", packet.split(
+                "### Test files that mention the changed code", 1
+            )[1].split("## T3", 1)[0])
+            check = subprocess.run(
+                [sys.executable,
+                 str(ROOT / "scripts" / "check_packet.py"),
+                 str(out), "--repo", str(repo)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(check.returncode, 0, check.stderr)
+
+    def test_bulk_search_batches_under_the_cap_and_keeps_hits(self):
+        with RetryingTemporaryDirectory() as tmp:
+            names = ["term%02d" % i for i in range(60)]
+            corpus = "".join(
+                "call %s now\n" % name for name in names
+            )
+            repo = make_repo(tmp, [{"corpus.txt": corpus}])
+            head = git(repo, "rev-parse", "HEAD")
+            calls = []
+            original = extract_mod.run_git
+
+            def counting(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "grep":
+                    calls.append(list(args))
+                return original(
+                    repo_arg, args, check=check,
+                    global_flags=global_flags,
+                )
+
+            extract_mod.run_git = counting
+            try:
+                bulk = extract_mod.git_grep_bulk(repo, head, names)
+            finally:
+                extract_mod.run_git = original
+            # The cap value itself is pinned at its measured 25,
+            # so the expected shape below stands in literals and
+            # cannot drift with the constant it guards.
+            self.assertEqual(extract_mod.MAX_BULK_SEARCH_TERMS, 25)
+            self.assertEqual(len(calls), 3, calls)
+            for call in calls:
+                self.assertLessEqual(call.count("-e"), 25, call)
+            for name in names:
+                self.assertEqual(
+                    set(bulk.get(name, [])),
+                    set(extract_mod.git_grep_lines(repo, head, name)),
+                    name,
+                )
+                self.assertTrue(bulk[name], name)
+
+    def test_build_t2_batches_a_large_term_count_and_completes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            base = {}
+            head_files = {}
+            for i in range(30):
+                base["mod%02d.py" % i] = (
+                    "def func%02d():\n    return %d\n" % (i, i)
+                )
+                head_files["mod%02d.py" % i] = (
+                    "def func%02d():\n    return %d\n" % (i, i + 100)
+                )
+            caller = "".join(
+                "from mod%02d import func%02d\n" % (i, i)
+                for i in range(30)
+            )
+            base["caller.py"] = caller
+            head_files["caller.py"] = caller
+            repo = make_repo(tmp, [base, head_files])
+            head = git(repo, "rev-parse", "HEAD")
+            files = [
+                {
+                    "path": "mod%02d.py" % i, "status": "modified",
+                    "old_path": None,
+                }
+                for i in range(30)
+            ]
+            functions = {
+                "mod%02d.py" % i: ["func%02d" % i] for i in range(30)
+            }
+            calls = []
+            original = extract_mod.run_git
+
+            def counting(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "grep":
+                    calls.append(list(args))
+                return original(
+                    repo_arg, args, check=check,
+                    global_flags=global_flags,
+                )
+
+            extract_mod.run_git = counting
+            try:
+                text, _notes, _count = extract_mod.build_t2(
+                    repo, head, files, functions
+                )
+            finally:
+                extract_mod.run_git = original
+            cap = extract_mod.MAX_BULK_SEARCH_TERMS
+            # Sixty gathered terms stand in three batches at the
+            # cap, and no single search carries more than the cap.
+            self.assertEqual(len(calls), 3, calls)
+            for call in calls:
+                self.assertLessEqual(call.count("-e"), cap, call)
+            self.assertIn("Call sites for func00 in mod00.py", text)
+            self.assertIn("Call sites for func29 in mod29.py", text)
+
+    def test_large_term_range_completes_end_to_end(self):
+        with RetryingTemporaryDirectory() as tmp:
+            base = {}
+            head_files = {}
+            for i in range(40):
+                funcs = "".join(
+                    "def f%02d_%d():\n    return %d\n" % (i, j, j)
+                    for j in range(4)
+                )
+                base["mod%02d.py" % i] = funcs
+                head_files["mod%02d.py" % i] = funcs.replace(
+                    "return 0", "return 100", 1
+                )
+            caller = "".join(
+                "from mod%02d import f%02d_0\n" % (i, i)
+                for i in range(40)
+            )
+            base["caller.py"] = caller
+            head_files["caller.py"] = caller
+            repo = make_repo(tmp, [base, head_files])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(
+                manifest["verified"], manifest["discrepancies"]
+            )
+            self.assertEqual(len(manifest["files"]), 40)
+
+    def test_companion_timeout_names_the_tier_and_the_remedy(self):
+        original = extract_mod.run_git
+
+        def stalled(repo_arg, args, check=True, global_flags=()):
+            if args and args[0] == "grep":
+                raise extract_mod.GitError(
+                    "command timed out after 120 seconds: git grep"
+                )
+            return original(
+                repo_arg, args, check=check, global_flags=global_flags
+            )
+
+        extract_mod.run_git = stalled
+        try:
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.git_grep_bulk(
+                    "repo", "head", ["one", "two", "three"]
+                )
+            with self.assertRaises(extract_mod.GitError) as caught_one:
+                extract_mod.git_grep_lines("repo", "head", "one")
+        finally:
+            extract_mod.run_git = original
+        for message in (str(caught.exception), str(caught_one.exception)):
+            self.assertIn("tier T2", message)
+            self.assertIn("--tiers 0-1", message)
+            self.assertIn("per area", message)
+
+    def test_companion_timeout_at_a_single_term_batch_reports_all_terms(self):
+        original = extract_mod.run_git
+
+        def stalled_on_single(repo_arg, args, check=True, global_flags=()):
+            if args and args[0] == "grep" and args.count("-e") == 1:
+                raise extract_mod.GitError(
+                    "command timed out after 120 seconds: git grep"
+                )
+            return original(
+                repo_arg, args, check=check, global_flags=global_flags
+            )
+
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"corpus.txt": "plain line\n"}])
+            head = git(repo, "rev-parse", "HEAD")
+            terms = ["term%02d" % i for i in range(26)]
+            extract_mod.run_git = stalled_on_single
+            try:
+                with self.assertRaises(extract_mod.GitError) as caught:
+                    extract_mod.git_grep_bulk(repo, head, terms)
+            finally:
+                extract_mod.run_git = original
+        self.assertIn("26 gathered terms", str(caught.exception))
+        self.assertIn("tier T2", str(caught.exception))
+
+    def test_faulted_staging_write_leaves_no_leftover(self):
+        with RetryingTemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            out.mkdir()
+            target = extract_mod.OutputTarget(out.resolve())
+            target.open_dir()
+            original_write = os.write
+
+            def failing_write(fd, data):
+                raise OSError(28, "No space left on device")
+
+            os.write = failing_write
+            try:
+                with self.assertRaises(extract_mod.OutputRefusal):
+                    target._stage("packet.md", b"finished packet\n")
+            finally:
+                os.write = original_write
+                target.close()
+            self.assertEqual(os.listdir(out), [])
+
+    def test_faulted_staging_close_leaves_no_leftover(self):
+        with RetryingTemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            out.mkdir()
+            target = extract_mod.OutputTarget(out.resolve())
+            target.open_dir()
+            original_close = os.close
+
+            def failing_close(fd):
+                raise OSError(5, "Input/output error")
+
+            os.close = failing_close
+            try:
+                with self.assertRaises(extract_mod.OutputRefusal):
+                    target._stage("packet.md", b"finished packet\n")
+            finally:
+                os.close = original_close
+                target.close()
+            self.assertEqual(os.listdir(out), [])
+
+    def test_faulted_discard_is_named_in_the_staging_refusal(self):
+        with RetryingTemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            out.mkdir()
+            target = extract_mod.OutputTarget(out.resolve())
+            target.open_dir()
+            original_write = os.write
+            original_unlink = os.unlink
+
+            def failing_write(fd, data):
+                raise OSError(28, "No space left on device")
+
+            def failing_unlink(name, dir_fd=None):
+                raise OSError(1, "Operation not permitted")
+
+            os.write = failing_write
+            os.unlink = failing_unlink
+            try:
+                with self.assertRaises(extract_mod.OutputRefusal) as caught:
+                    target._stage("packet.md", b"finished packet\n")
+            finally:
+                os.write = original_write
+                os.unlink = original_unlink
+                target.close()
+            self.assertIn("could not be discarded", str(caught.exception))
+            self.assertIn(".recognitio-tmp-", str(caught.exception))
+            leftovers = os.listdir(out)
+            self.assertEqual(len(leftovers), 1)
+            self.assertTrue(leftovers[0].startswith(".recognitio-tmp-"))
+
+    def test_faulted_publish_leaves_the_verified_pair_stampable(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "VALUE = 1\n"},
+                {"mod.py": "VALUE = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            before = {
+                name: (out / name).read_bytes()
+                for name in ("packet.md", "manifest.json")
+            }
+            target = extract_mod.OutputTarget(out.resolve())
+            original_write = os.write
+
+            def failing_write(fd, data):
+                raise OSError(28, "No space left on device")
+
+            os.write = failing_write
+            try:
+                with self.assertRaises(extract_mod.OutputRefusal):
+                    target.publish_pair(
+                        before["packet.md"], read_manifest(out)
+                    )
+            finally:
+                os.write = original_write
+                target.close()
+            self.assertEqual(
+                sorted(os.listdir(out)),
+                ["manifest.json", "packet.md"],
+            )
+            for name, data in before.items():
+                self.assertEqual((out / name).read_bytes(), data)
+            check = subprocess.run(
+                [sys.executable,
+                 str(ROOT / "scripts" / "check_packet.py"),
+                 str(out), "--repo", str(repo)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(check.returncode, 0, check.stderr)
 
 
 OLD_CALC = (

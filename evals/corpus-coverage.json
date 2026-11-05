@@ -115,7 +115,7 @@
       "test_a_decoy_carries_phrase_in_a_release_note_loses",
       "test_a_leading_zero_version_is_not_a_version",
       "test_an_empty_or_missing_plugins_list_is_a_problem",
-      "test_build_t2_runs_one_grep_however_many_files",
+      "test_build_t2_runs_one_grep_for_terms_within_one_batch",
       "test_dedupe_findings_keeps_first_of_each",
       "test_discovery_extends_to_a_new_markdown_file_by_rule",
       "test_duplicates_cannot_crowd_out_a_unique_finding",

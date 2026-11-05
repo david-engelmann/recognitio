@@ -3575,3 +3575,34 @@ This unreleased work carries version 1.3.0.
   the paths it needs from the root argument it is
   handed, so each gate now holds one spelling of
   each path and no dead one beside it.
+- A changed source file whose stem carries a newline
+  no longer fabricates companion evidence. The per
+  term search now reassigns every returned line
+  against the full term under the same rule the bulk
+  search uses, and a term carrying a newline is
+  answered without a search, because git reads a
+  newline inside a pattern argument as a pattern
+  separator and the fragments were credited to the
+  whole term inside verified packets whenever the
+  stem stood as the only gathered term.
+- The companion search now runs in batches under a
+  named cap of 25 terms per search, with the measured
+  basis for the cap standing in the comment that
+  names it. One unbounded search previously outgrew
+  the fixed per command time limit on large ranges
+  and the default run built no packet at all, while
+  its cost grew with the term count and with the
+  candidate lines the reassignment loop walked.
+  Batching changes only the command shape and the
+  hits per term are unchanged. A companion search
+  that times out now names tier T2 and the remedy the
+  skill text prescribes, and the skill text states
+  the batched cost shape and names the packet as the
+  deterministic surface of a run.
+- A staging fault inside the stage step, at its write
+  or its sync or its close, now discards the file it
+  created before the refusal propagates, and a discard
+  that faults itself is named in the refusal, so a
+  faulted publish leaves the output directory exactly
+  as it stood and no hidden staging leftover stands
+  beside a verified pair.

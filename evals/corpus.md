@@ -69,7 +69,7 @@ without reading three audit reports first.
 | The version gate passed a marketplace listing that listed nothing and accepted a leading zero version (R2-04) | `test_an_empty_or_missing_plugins_list_is_a_problem` and `test_a_leading_zero_version_is_not_a_version` in the gate script suite |
 | The changelog version search was not scoped to the unreleased section (R2-05) | `test_a_decoy_carries_phrase_in_a_release_note_loses` in the gate script suite |
 | Duplicate findings entries counted as separate findings and could crowd a real finding past the cap (R2-06) | `test_duplicates_cannot_crowd_out_a_unique_finding` and `test_dedupe_findings_keeps_first_of_each` in the extractor suite |
-| Companion gathering grew faster than the change and a large packet took minutes (R2-07) | `test_build_t2_runs_one_grep_however_many_files` in the extractor suite |
+| Companion gathering grew faster than the change and a large packet took minutes (R2-07) | `test_build_t2_runs_one_grep_for_terms_within_one_batch` in the extractor suite |
 | The copy fence again sat narrower than its claim and the authored evals files and the manifest descriptions stood outside it (ST2-01) | `test_discovery_extends_to_a_new_markdown_file_by_rule` and `test_em_dash_in_a_manifest_description_is_caught` and `test_fence_covers_every_authored_prose_file_in_the_tree` in the gate script suite |
 | The marketplace entry lacked the researched skills list and the plugin manifest lacked an owner email (EX2-04) | `test_marketplace_lists_the_plugin_with_its_skill_path` in the gate script suite and `test_plugin_manifest_carries_the_owner_email` in the gate script suite |
 

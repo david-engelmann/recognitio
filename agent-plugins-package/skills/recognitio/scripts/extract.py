@@ -76,6 +76,20 @@ MAX_PRIOR_PRS = 5
 MAX_PRIOR_PR_LIST = 30
 MAX_SPEC_REFERENCES = 5
 MAX_FINDINGS_ACCOUNTED = 100
+# The companion search carries its gathered terms in batches under
+# this cap, one search per batch. The cost of one search grows
+# faster than its term count against the fixed per command limit
+# below, and the reassignment of its returned lines grows with the
+# product of its candidate lines and its term count. Measured on
+# this repo tree at its 357ba2d4 head under load, with the most
+# common words in the tree as the terms, one search for 100 terms
+# took 56.1 seconds in the search process and 8.6 seconds in the
+# reassignment, while one search for 25 terms took 7.9 seconds and
+# 2.7 seconds. A batch at this cap therefore sits an order of
+# magnitude under the per command limit on the worst terms this
+# tree offers, and a range of any size completes as more batches
+# rather than as one search that outgrows the limit.
+MAX_BULK_SEARCH_TERMS = 25
 
 STATUS_NAMES = {
     "A": "added",
@@ -495,7 +509,14 @@ def scrubbed_child_env():
 
 
 # Every child process gets a timeout, the network calls to the GitHub
-# CLI included. A stalled call must fail the run, never hang it.
+# CLI included. A stalled call must fail the run, never hang it. The
+# value is a stall guard and not a work budget. It stands far above
+# the slowest legitimate command the run makes, which is one batched
+# companion search at the MAX_BULK_SEARCH_TERMS cap, measured at
+# about 11 seconds for the worst terms this repo tree offers under
+# load, so a call still working at this limit is read as stalled
+# rather than slow, and the batching cap is what keeps that reading
+# true as ranges grow.
 PROCESS_TIMEOUT_SECONDS = 120
 
 
@@ -2599,7 +2620,59 @@ def parse_grep_z(stdout, rev):
     return out
 
 
-def git_grep_lines(repo, head, term, fixed=True):
+def _companion_timeout_error(exc, term_count):
+    """The tier named form of a companion search timeout, or None.
+
+    The process wrapper composes its timeout message from the
+    argument list alone, so it cannot name the tier that was being
+    gathered or the remedy the skill text prescribes for a large
+    change. A timeout raised by a companion search is reworded
+    here, at the layer that knows both, in the same voice as the
+    other refusals in this file. Any other failure keeps its own
+    message and returns None.
+    """
+    marker = "command timed out after %d seconds" % (
+        PROCESS_TIMEOUT_SECONDS
+    )
+    if marker not in str(exc):
+        return None
+    return GitError(
+        "the companion search for tier T2 timed out after %d "
+        "seconds while searching for %d gathered term%s in "
+        "batches of at most %d, so no packet was built. Run "
+        "with --tiers 0-1 to build the packet without the "
+        "companion tier, then run again per area with the "
+        "companion tier where depth is needed"
+        % (
+            PROCESS_TIMEOUT_SECONDS,
+            term_count,
+            "" if term_count == 1 else "s",
+            MAX_BULK_SEARCH_TERMS,
+        )
+    )
+
+
+def _run_companion_search(repo, head, args, term_count):
+    """Run one companion search command through the pinned wrapper.
+
+    A timeout on the search is reworded by the tier named helper
+    above, so every companion search path surfaces the same
+    failure in the same words with the gathered term count of
+    the whole gathering, however the search was batched.
+    """
+    try:
+        return run_git(
+            repo, args, check=False,
+            global_flags=["--attr-source=" + head],
+        )
+    except GitError as exc:
+        timeout_error = _companion_timeout_error(exc, term_count)
+        if timeout_error is not None:
+            raise timeout_error from exc
+        raise
+
+
+def git_grep_lines(repo, head, term, fixed=True, term_count=None):
     """Return (path, line number, content) hits for a term at a head.
 
     Output is NUL delimited, so paths containing colons or spaces parse
@@ -2609,14 +2682,28 @@ def git_grep_lines(repo, head, term, fixed=True):
     and leave the section reporting that no call sites exist. The
     textconv refusal stands on the call as well, so the search reads
     the bytes the tree holds and never a driver rewriting of them.
+
+    A fixed term is credited only with the lines it word matches
+    under term_matches_line, the same reassignment the bulk search
+    applies. Git reads a newline inside a pattern argument as a
+    pattern separator, so an unfiltered per term search for a term
+    carrying a newline, which a changed file stem can carry, would
+    credit the whole term with lines that match only one fragment
+    of it. A term carrying a newline can word match no single line
+    at all, so it is answered without a search, and every other
+    returned line is reassigned against the full term before it
+    stands as a hit, so this path and the bulk path reach the same
+    hits for every term shape.
     """
+    if fixed and ("\n" in term or not term):
+        return []
     args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w",
             "-e", term, head]
     if fixed:
         args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w",
                 "-F", "-e", term, head]
-    result = run_git(
-        repo, args, check=False, global_flags=["--attr-source=" + head]
+    result = _run_companion_search(
+        repo, head, args, 1 if term_count is None else term_count
     )
     if result.returncode not in (0, 1):
         # A search that failed is not a search that found nothing.
@@ -2626,7 +2713,12 @@ def git_grep_lines(repo, head, term, fixed=True):
             "git grep failed with exit %d: %s"
             % (result.returncode, result.stderr.strip())
         )
-    return parse_grep_z(result.stdout, head)
+    hits = parse_grep_z(result.stdout, head)
+    if fixed:
+        hits = [
+            hit for hit in hits if term_matches_line(term, hit[2])
+        ]
+    return hits
 
 
 _WORD_CHARS = frozenset(
@@ -2662,37 +2754,64 @@ def term_matches_line(term, content):
 
 
 def git_grep_bulk(repo, head, terms):
-    """Return hits per term from one search over the whole tree.
+    """Return hits per term from batched searches over the whole tree.
 
     The companion tier once ran one whole tree search per changed
     function and per changed file stem, so its work grew with the
-    product of the change size and the tree size. One search that
-    carries every term at once, with each returned line handed to
-    the terms it word matches, keeps the same hits in an order
-    that matches the per term searches while the search count
-    stays at one however large the change grows.
+    product of the change size and the tree size. A bulk search
+    that carries many terms at once, with each returned line
+    handed to the terms it word matches, keeps the same hits in
+    an order that matches the per term searches. The terms run in
+    batches under MAX_BULK_SEARCH_TERMS rather than in one search
+    however large the change grows, because the cost of a single
+    search grows faster than its term count against the fixed per
+    command limit, and its reassignment grows with the product of
+    its candidate lines and its term count. Batching changes only
+    the command shape. Each term stands in exactly one batch, a
+    batch returns its lines in the same tree order the unbounded
+    search returns them, and the reassignment tests each returned
+    line against the full term, so the hits per term are the hits
+    the unbounded search would have produced.
     """
     unique = sorted(set(terms))
     if not unique:
         return {}
     if len(unique) == 1:
         return {unique[0]: git_grep_lines(repo, head, unique[0])}
-    args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w", "-F"]
-    for term in unique:
-        args.extend(["-e", term])
-    args.append(head)
-    result = run_git(
-        repo, args, check=False, global_flags=["--attr-source=" + head]
-    )
-    if result.returncode not in (0, 1):
-        raise GitError(
-            "git grep failed with exit %d: %s"
-            % (result.returncode, result.stderr.strip())
-        )
     hits = {term: [] for term in unique}
-    for path, lineno, content in parse_grep_z(result.stdout, head):
-        for term in unique:
-            if term_matches_line(term, content):
+    for start in range(0, len(unique), MAX_BULK_SEARCH_TERMS):
+        batch = unique[start:start + MAX_BULK_SEARCH_TERMS]
+        if len(batch) == 1:
+            hits[batch[0]] = git_grep_lines(
+                repo, head, batch[0], term_count=len(unique)
+            )
+            continue
+        args = ["grep", "--no-textconv", "--text", "-n", "-z", "-w", "-F"]
+        for term in batch:
+            args.extend(["-e", term])
+        args.append(head)
+        result = _run_companion_search(repo, head, args, len(unique))
+        if result.returncode not in (0, 1):
+            raise GitError(
+                "git grep failed with exit %d: %s"
+                % (result.returncode, result.stderr.strip())
+            )
+        # Candidate lines repeat across files, so the reassignment
+        # of one distinct line is computed once per batch and
+        # reused, which bounds this loop by the distinct candidate
+        # lines of the batch rather than by its raw hit count. The
+        # cache is per batch because the terms it is computed
+        # against are the batch terms.
+        matched_by_content = {}
+        for path, lineno, content in parse_grep_z(result.stdout, head):
+            matched = matched_by_content.get(content)
+            if matched is None:
+                matched = [
+                    term for term in batch
+                    if term_matches_line(term, content)
+                ]
+                matched_by_content[content] = matched
+            for term in matched:
                 hits[term].append((path, lineno, content))
     return hits
 
@@ -4803,6 +4922,13 @@ class OutputTarget:
                 "cannot stage the %s in the output directory %s "
                 "because %s" % (hint, self.path, exc.strerror or exc)
             ) from exc
+        # The write and the sync and the close all stand inside
+        # the guarded region, because a fault at any of the three
+        # is a staging fault of this call. A close left in a
+        # finally block would escape as a bare OSError past the
+        # refusal the caller handles, and the file this call
+        # created would stand as a leftover no caller can name.
+        error = None
         try:
             view = memoryview(data)
             while view:
@@ -4810,19 +4936,40 @@ class OutputTarget:
                 view = view[written:]
             os.fsync(fd)
         except OSError as exc:
+            error = exc
+        try:
+            os.close(fd)
+        except OSError as exc:
+            if error is None:
+                error = exc
+        if error is not None:
+            # The file this call created is discarded here, by the
+            # one layer that knows its name. No caller receives a
+            # staging name for a fault inside this call, so a caller
+            # side discard could never name it, and the file would
+            # stand as a leftover beside whatever pair the directory
+            # holds until a later publish swept it. A discard that
+            # faults itself is named in the refusal, so the
+            # leftover it leaves stands discoverable in the message.
+            note = ""
+            if not self._discard(temp_name):
+                note = (
+                    ", and its staging file %s could not be "
+                    "discarded" % temp_name
+                )
             raise OutputRefusal(
                 "cannot stage the %s in the output directory %s "
-                "because %s" % (hint, self.path, exc.strerror or exc)
-            ) from exc
-        finally:
-            os.close(fd)
+                "because %s%s"
+                % (hint, self.path, error.strerror or error, note)
+            ) from error
         return temp_name
 
     def _discard(self, temp_name):
         try:
             os.unlink(temp_name, dir_fd=self.dir_fd)
+            return True
         except OSError:
-            pass
+            return False
 
     def _discard_stale_temps(self):
         """Drop staging files a killed run left in the directory.
