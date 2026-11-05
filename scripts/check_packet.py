@@ -213,10 +213,31 @@ def strict_json_loads(text):
 # The gate takes no third party dependencies, so the validator is a
 # short walk over the schema rather than a library call. It covers
 # the keywords the shipped schema uses and refuses anything else by
-# ignoring nothing that could hide a bad manifest. Unknown keywords
-# in the schema itself are a schema authoring error and are reported
-# by the schema load check in the tests rather than at stamp time.
+# ignoring nothing that could hide a bad manifest. A keyword in the
+# schema itself that the walk does not know fails closed at stamp
+# time and in the schema keyword census the tests run over the
+# shipped schema, in the same way the fan out validator fails
+# closed on a schema keyword outside its own known set.
 # ---------------------------------------------------------------------
+
+# The keywords one schema node may carry. The validation keywords
+# are the ones the walk below enforces. The metadata keywords state
+# facts about the schema itself and carry no rule for a manifest
+# value, so the walk may pass them by. Any other keyword on a node
+# is an authoring error the stamp must not silently step over,
+# because the rule it names would then never be enforced while
+# the stamp still claimed the schema had been applied.
+_SCHEMA_VALIDATION_KEYWORDS = (
+    "$ref", "additionalProperties", "anyOf", "const", "enum",
+    "items", "minItems", "minLength", "minimum", "pattern",
+    "properties", "required", "type", "uniqueItems",
+)
+_SCHEMA_METADATA_KEYWORDS = (
+    "$defs", "$id", "$schema", "description", "title",
+)
+_SCHEMA_KNOWN_KEYWORDS = frozenset(
+    _SCHEMA_VALIDATION_KEYWORDS + _SCHEMA_METADATA_KEYWORDS
+)
 
 _SCHEMA_TYPES = {
     "object": dict,
@@ -266,10 +287,75 @@ def _resolve_ref(schema, root_schema):
     return merged
 
 
+def schema_keyword_problems(schema, where="the packet manifest schema"):
+    """The unknown keyword problems of one whole schema, or none.
+
+    Every node of the schema is walked, through its definitions
+    and its property shapes and its item shapes in the single
+    schema form and in the list form and its anyOf
+    branches, whether or not a manifest value ever reaches that
+    node, so a keyword no branch of the validator enforces is
+    named even where it stands dormant. The walk follows the
+    schema structure the shipped schema uses and treats the keys
+    of a properties mapping as field names rather than as
+    keywords, because field names are data the schema describes
+    and not rules it states.
+    """
+    problems = []
+
+    def walk(node, at):
+        if not isinstance(node, dict):
+            return
+        for key in node:
+            if key not in _SCHEMA_KNOWN_KEYWORDS:
+                problems.append(
+                    "%s carries a keyword this check does not "
+                    "know, %s, at %s, so the rule that keyword "
+                    "names would never be enforced and no "
+                    "manifest can be validated against it"
+                    % (where, key, at)
+                )
+        for key in ("$defs",):
+            defs = node.get(key)
+            if isinstance(defs, dict):
+                for name, sub in defs.items():
+                    walk(sub, "%s %s" % (at, name))
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            for name, sub in properties.items():
+                walk(sub, "%s.%s" % (at, name))
+        items = node.get("items")
+        if isinstance(items, dict):
+            walk(items, at + " items")
+        elif isinstance(items, list):
+            for index, sub in enumerate(items):
+                walk(sub, "%s items %d" % (at, index))
+        branches = node.get("anyOf")
+        if isinstance(branches, list):
+            for branch in branches:
+                walk(branch, at)
+        additional = node.get("additionalProperties")
+        if isinstance(additional, dict):
+            walk(additional, at)
+
+    walk(schema, where)
+    return problems
+
+
 def schema_problems_at(value, schema, root_schema, where):
     """Validate one value against one schema node."""
     problems = []
     schema = _resolve_ref(schema, root_schema)
+    for key in schema:
+        if key not in _SCHEMA_KNOWN_KEYWORDS:
+            problems.append(
+                "the packet manifest schema carries a keyword "
+                "this check does not know, %s, at %s, so the rule "
+                "that keyword names would never be enforced and "
+                "the manifest cannot be validated against it"
+                % (key, where)
+            )
+            return problems
     if "anyOf" in schema:
         branches = schema["anyOf"]
         if not any(
@@ -341,6 +427,14 @@ def schema_problems_at(value, schema, root_schema, where):
                     item, item_schema, root_schema,
                     "%s[%d]" % (where, index),
                 ))
+        elif isinstance(item_schema, list):
+            for index, item in enumerate(value):
+                if index < len(item_schema) and \
+                        isinstance(item_schema[index], dict):
+                    problems.extend(schema_problems_at(
+                        item, item_schema[index], root_schema,
+                        "%s[%d]" % (where, index),
+                    ))
     if isinstance(value, dict):
         for key in schema.get("required", []):
             if key not in value:
@@ -385,7 +479,64 @@ def manifest_schema_problems(manifest):
             "the packet manifest schema cannot be read, so no "
             "manifest can be validated against it (%s)" % exc
         ]
+    keyword_problems = schema_keyword_problems(schema)
+    if keyword_problems:
+        return keyword_problems
     return schema_problems_at(manifest, schema, schema, "the manifest")
+
+
+def single_line_recorded_text(text):
+    """One recorded text with every line break escaped in place.
+
+    Text a packet or a manifest carries is data, not output, so
+    a line break inside it is spelled out as the escape for that
+    break rather than printed as a break. The recorded words
+    then stand on the one labelled line that reports them and
+    can never occupy an unlabelled line of the checker output
+    or wear the shape of a line the checker itself prints.
+    """
+    pieces = []
+    for char in text:
+        if char == "\n":
+            pieces.append("\\n")
+        elif char == "\r":
+            pieces.append("\\r")
+        elif char in "\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029":
+            pieces.append("\\u%04x" % ord(char))
+        else:
+            pieces.append(char)
+    return "".join(pieces)
+
+
+def failure_receipt_problem(manifest):
+    """The one problem a failure receipt draws, or None.
+
+    A failed run leaves a receipt of its own shape rather than a
+    packet manifest. It claims verified false, it carries none of
+    the packet the schema describes, and it records the cause of
+    the failure in its error field. Reading that receipt through
+    the packet schema would name a pile of shape complaints and
+    never the cause, so a manifest of that shape is recognised
+    here and its recorded cause is reported in its place. The
+    recorded cause is printed in its escaped single line form
+    under its recorded label, so a cause carrying line breaks
+    cannot mint a line of its own in the checker output. The
+    stamp still refuses, because a failure receipt is not a
+    packet, and the refusal now names the one fact a reader of
+    the receipt needs.
+    """
+    if not isinstance(manifest, dict):
+        return None
+    if manifest.get("verified") is not False:
+        return None
+    error = manifest.get("error")
+    if not isinstance(error, str) or not error.strip():
+        return None
+    return (
+        "the manifest is the failure receipt of a run that built "
+        "no packet, and the run recorded its cause in these "
+        "words. %s" % single_line_recorded_text(error)
+    )
 
 
 CREATED_ALLOWANCE_SECONDS = 3600
@@ -1760,10 +1911,16 @@ def tier_span_problems(packet_text, manifest, extractor):
             continue
         text = span[:-1] if span.endswith("\n") else span
         if info["state"] == "included":
-            estimate = (
-                extractor.estimate_tokens(text)
-                if extractor is not None else len(text) // 4
-            )
+            if extractor is None:
+                problems.append(
+                    "the %s tier measure reading was skipped "
+                    "because the extractor cannot be loaded from "
+                    "the canonical skill, so its receipt was not "
+                    "checked against the packet in this check"
+                    % tier
+                )
+                continue
+            estimate = extractor.estimate_tokens(text)
             if estimate != info["estimated_tokens"] or \
                     estimate != info["emitted_tokens"]:
                 problems.append(
@@ -1775,6 +1932,13 @@ def tier_span_problems(packet_text, manifest, extractor):
                 )
         else:
             if extractor is None:
+                problems.append(
+                    "the %s placeholder reading was skipped "
+                    "because the extractor cannot be loaded from "
+                    "the canonical skill, so its placeholder was "
+                    "not checked against the packet in this check"
+                    % tier
+                )
                 continue
             expected = extractor.tier_placeholder(tier, info["state"])
             if text != expected:
@@ -1941,16 +2105,22 @@ def receipt_problems(packet_text, manifest, totals, extractor=None):
         )
     if extractor is None:
         extractor = load_extractor()
-    packet_measure = (
-        extractor.estimate_tokens(packet_text)
-        if extractor is not None else len(packet_text) // 4
-    )
-    if budget["estimated_tokens"] != packet_measure:
+    if extractor is None:
         problems.append(
-            "the manifest packet estimate of %d tokens does not "
-            "measure the packet, which measures %d tokens"
-            % (budget["estimated_tokens"], packet_measure)
+            "the closing receipt packet measure was skipped "
+            "because the extractor cannot be loaded from the "
+            "canonical skill, so the packet estimate the manifest "
+            "records was not checked against the packet in this "
+            "check"
         )
+    else:
+        packet_measure = extractor.estimate_tokens(packet_text)
+        if budget["estimated_tokens"] != packet_measure:
+            problems.append(
+                "the manifest packet estimate of %d tokens does "
+                "not measure the packet, which measures %d tokens"
+                % (budget["estimated_tokens"], packet_measure)
+            )
     for tier in TIER_ORDER:
         info = tiers[tier]
         if info["state"] == "included":
@@ -2267,7 +2437,15 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
             % recorded_budget
         )
     if "--tiers" in flags:
-        if extractor is not None:
+        if extractor is None:
+            problems.append(
+                "the tier selection reading of the recorded "
+                "command was skipped because the extractor cannot "
+                "be loaded from the canonical skill, so the tiers "
+                "the command selects were not checked against the "
+                "manifest in this check"
+            )
+        else:
             try:
                 selected = extractor.parse_tier_selection(
                     last_flag(flags, "--tiers")
@@ -2395,8 +2573,14 @@ def identity_problems(manifest, extractor, repo=None, packet_text=None):
     problems.extend(
         command_problems(manifest, repo, packet_text, extractor)
     )
-    if extractor is not None and \
-            manifest["version"] != extractor.EXTRACTOR_VERSION:
+    if extractor is None:
+        problems.append(
+            "the extractor version reading was skipped because "
+            "the extractor cannot be loaded from the canonical "
+            "skill, so the version the manifest records was not "
+            "checked in this check"
+        )
+    elif manifest["version"] != extractor.EXTRACTOR_VERSION:
         problems.append(
             "the manifest records extractor version %s, but the "
             "extractor in this tree is version %s"
@@ -2458,6 +2642,48 @@ def mask_prior_prs(text):
     if end == -1:
         return text[:start] + "<prior pull requests passage>\n"
     return text[:start] + "<prior pull requests passage>" + text[end:]
+
+
+def passage_problems(packet_text, manifest, extractor):
+    """Check the manifest passage record against the packet itself.
+
+    The stamp disclosure for the prior pull requests passage is
+    earned by the packet, not by the manifest field alone. The
+    passage the packet history tier itself carries is read from
+    the packet text, and the passage the manifest records must
+    match it exactly, so a packet carrying the passage stamps
+    with the disclosure only where the field records that same
+    passage, and a field planted on a packet carrying no passage
+    earns no disclosure. Exactly one side carrying a passage, or
+    the two sides carrying different passages, is a mismatch the
+    stamp refuses. A dropped history tier carries no passage in
+    the packet by its shape, and its recorded passage is the
+    record the dropped tier size is settled against, so that
+    shape stands on the settling reading and not on this one.
+    """
+    if extractor is None:
+        return []
+    tiers = manifest.get("tiers")
+    if not isinstance(tiers, dict):
+        return []
+    tier = tiers.get("T3")
+    if not isinstance(tier, dict):
+        return []
+    if tier.get("state") == "dropped":
+        return []
+    span = span_text(packet_text, "## T3 History")
+    if span is None:
+        packet_passage = None
+    else:
+        packet_passage = extractor.prior_prs_passage(span)
+    recorded_passage = manifest.get("prior_pull_requests_passage")
+    if packet_passage == recorded_passage:
+        return []
+    return [
+        "the prior pull requests passage in the packet history "
+        "tier does not match the passage the manifest records "
+        "for it, so the packet cannot be stamped"
+    ]
 
 
 FINDING_VERDICTS = (
@@ -2882,7 +3108,7 @@ def pr_state_line(pr_record):
 
 
 def pr_triage_problems(packet_text, manifest, repo, fresh_change,
-                       extractor):
+                       extractor, stamp_notes=None):
     """Rebuild the pull request triage tier and compare it whole.
 
     A pull request packet skips the deterministic rebuild the
@@ -2914,8 +3140,13 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
     mutation of the packet alone must not convert the whole
     rebuild into a presence only reading in silence. A title
     forged in the manifest and the packet together, in an
-    environment with no CLI, is the shape that still stands,
-    and it is recorded in the fix report.
+    environment with no CLI, is the shape that still stands.
+    The fallback itself is a reasonable shape for an offline
+    check, so it stands, and the stamp that issues on it names
+    the fallback in its own sentence, recorded through the
+    stamp notes list the caller hands in, so a reader of the stamp
+    can tell the title and the state were taken from the
+    manifest record and not from the record a CLI reports.
     """
     problems = []
     recorded = manifest["pr"]
@@ -2964,6 +3195,8 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
             "state_as_of": recorded.get("state_as_of"),
         }
     else:
+        if stamp_notes is not None:
+            stamp_notes.append("pr_fallback")
         body_text = parse_pr_body(packet_text)
         if body_text is None:
             body = section_body(packet_text, "## T0 Triage") or []
@@ -3037,7 +3270,7 @@ def pr_triage_problems(packet_text, manifest, repo, fresh_change,
 
 
 def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
-                     packet_dir=None):
+                     packet_dir=None, stamp_notes=None):
     """Rebuild the deterministic tiers and compare them whole.
 
     Token accounting catches a tier that shrinks or grows, but
@@ -3060,7 +3293,14 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
     repository and from the records those sections stand on.
     """
     problems = []
-    if fresh_change is None or extractor is None:
+    if extractor is None:
+        return [
+            "the tier rebuild was skipped because the extractor "
+            "cannot be loaded from the canonical skill, so the "
+            "tiers were not compared against the repository in "
+            "this check"
+        ]
+    if fresh_change is None:
         return problems
     files = fresh_change["files"]
     chunks = fresh_change["chunks"]
@@ -3076,7 +3316,8 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
     try:
         if manifest["mode"] == "pr":
             problems.extend(pr_triage_problems(
-                packet_text, manifest, repo, fresh_change, extractor
+                packet_text, manifest, repo, fresh_change, extractor,
+                stamp_notes=stamp_notes,
             ))
         else:
             expected = extractor.build_t0(
@@ -3144,17 +3385,6 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
                     problems.append(
                         "the history tier disagrees with the tier "
                         "the recount rebuilds from the repository"
-                    )
-                recorded_passage = manifest.get(
-                    "prior_pull_requests_passage"
-                )
-                if actual is not None and recorded_passage is not None and \
-                        extractor.prior_prs_passage(actual) != \
-                        recorded_passage:
-                    problems.append(
-                        "the manifest records a prior pull requests "
-                        "passage that the packet history tier does "
-                        "not carry"
                     )
             else:
                 recorded_passage = manifest.get(
@@ -3238,7 +3468,13 @@ def whole_section_problems(packet_text, manifest, extractor):
     """
     problems = []
     if extractor is None:
-        return problems
+        return [
+            "the framing section rebuild was skipped because "
+            "the extractor cannot be loaded from the canonical "
+            "skill, so the header and the contents and the "
+            "closing recount were not compared against their "
+            "rebuilds in this check"
+        ]
     totals = manifest_totals(manifest)
     counts = {
         "files": totals["files"], "hunks": totals["hunks"],
@@ -3317,12 +3553,14 @@ def whole_section_problems(packet_text, manifest, extractor):
 
 
 def body_problems(packet_text, manifest, fresh_change, extractor,
-                  repo=".", packet_dir=None):
+                  repo=".", packet_dir=None, stamp_notes=None):
     problems = []
+    problems.extend(passage_problems(packet_text, manifest, extractor))
     totals = manifest_totals(manifest)
     problems.extend(
         rebuild_problems(packet_text, manifest, repo, fresh_change,
-                         extractor, packet_dir=packet_dir)
+                         extractor, packet_dir=packet_dir,
+                         stamp_notes=stamp_notes)
     )
     problems.extend(section_sequence_problems(packet_text, manifest))
     problems.extend(header_problems(packet_text, manifest))
@@ -3468,7 +3706,11 @@ def main(argv=None):
     packet_path = packet_dir / "packet.md"
     packet_text = None
     if not packet_path.is_file():
-        problems.append("no packet.md in %s" % packet_dir)
+        problems.append(
+            "there is no packet.md in %s, so the directory holds "
+            "no packet for this check to read and nothing in it "
+            "can be stamped" % packet_dir
+        )
     elif packet_path.stat().st_size == 0:
         problems.append(
             "packet.md in %s is empty. A packet with no content "
@@ -3493,18 +3735,30 @@ def main(argv=None):
                 "text document its consumers are handed"
             )
         except OSError as exc:
-            problems.append("packet.md cannot be read: %s" % exc)
+            problems.append(
+                "packet.md in %s cannot be read, so its bytes "
+                "cannot be checked and the packet cannot be "
+                "stamped (%s)" % (packet_dir, exc)
+            )
 
     manifest_path = packet_dir / "manifest.json"
     manifest = None
     manifest_parsed = False
     if not manifest_path.is_file():
-        problems.append("no manifest.json in %s" % packet_dir)
+        problems.append(
+            "there is no manifest.json in %s, so the directory "
+            "holds no manifest receipt for this check to read "
+            "and nothing in it can be stamped" % packet_dir
+        )
     else:
         try:
             manifest_text = manifest_path.read_bytes().decode("utf-8")
         except (OSError, UnicodeDecodeError) as exc:
-            problems.append("manifest.json cannot be read: %s" % exc)
+            problems.append(
+                "manifest.json in %s cannot be read, so its "
+                "record cannot be checked and the packet cannot "
+                "be stamped (%s)" % (packet_dir, exc)
+            )
         else:
             try:
                 manifest = strict_json_loads(manifest_text)
@@ -3512,10 +3766,15 @@ def main(argv=None):
             except DuplicateKeyError as exc:
                 problems.append(
                     "manifest.json carries a repeated key and so "
-                    "does not parse as one manifest: %s" % exc
+                    "does not parse as one manifest (%s)" % exc
                 )
             except json.JSONDecodeError as exc:
-                problems.append("manifest.json does not parse: %s" % exc)
+                problems.append(
+                    "manifest.json in %s does not parse as JSON, "
+                    "so its record cannot be checked and the "
+                    "packet cannot be stamped (%s)"
+                    % (packet_dir, exc)
+                )
 
     if manifest_parsed and not isinstance(manifest, dict):
         problems.append(
@@ -3524,7 +3783,17 @@ def main(argv=None):
         )
         manifest = None
 
-    if manifest is not None:
+    stamp_notes = []
+    if manifest is not None and \
+            failure_receipt_problem(manifest) is not None:
+        # A failure receipt is recognised before any packet
+        # reading runs against it. Its shape is not the packet
+        # manifest shape, so the schema reading and the deep
+        # checks would only bury its recorded cause under shape
+        # complaints, and the receipt is refused on its cause
+        # alone beside any problem the directory itself drew.
+        problems.append(failure_receipt_problem(manifest))
+    elif manifest is not None:
         schema_problem_list = manifest_schema_problems(manifest)
         problems.extend(schema_problem_list)
         problems.extend(created_problems(manifest, args.repo))
@@ -3622,6 +3891,7 @@ def main(argv=None):
                         body_problems(
                             packet_text, manifest, fresh_change, extractor,
                             repo=args.repo, packet_dir=packet_dir,
+                            stamp_notes=stamp_notes,
                         )
                     )
         else:
@@ -3648,14 +3918,33 @@ def main(argv=None):
             "the stamp covers the range the review named with "
             "its expect flags"
         )
-    print(
-        "check_packet: packet in %s is verified for the current "
-        "head %s, covering base %s and merge base %s, and %s"
-        % (
-            packet_dir, manifest["head"], manifest["base"],
-            manifest["merge_base"], expectation,
+    if manifest["base"] is None:
+        covering = "the root commit, which has no base and no merge base"
+    else:
+        covering = "base %s and merge base %s" % (
+            manifest["base"], manifest["merge_base"],
         )
+    stamp = (
+        "check_packet: packet in %s is verified for the current "
+        "head %s, covering %s, and %s"
+        % (packet_dir, manifest["head"], covering, expectation)
     )
+    if manifest.get("prior_pull_requests_passage") is not None:
+        stamp += (
+            " The prior pull requests passage of the history "
+            "tier stands as the run recorded it with the packet "
+            "and was not recounted from the repository or from "
+            "GitHub in this check."
+        )
+    if "pr_fallback" in stamp_notes:
+        stamp += (
+            " The pull request title and state in this stamp "
+            "were taken from the manifest record because no "
+            "GitHub CLI answered in this check, so they were "
+            "compared against the packet itself and not against "
+            "the record the CLI reports."
+        )
+    print(stamp)
     return 0
 
 

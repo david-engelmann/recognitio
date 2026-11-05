@@ -16,11 +16,11 @@ The builder writes a plain Contents line between the packet header and its conte
 
 ## Pull request references
 
-In pull request mode the check reads the record the GitHub CLI reports for the pull request under review. The title and the body are ground truth for the triage rebuild, the spec references are recomputed from that body, and the base and head identifiers in the same record are compared against the base and head the manifest records. A pull request retargeted to another base, or a head branch moved on the host, therefore refuses the stamp while the CLI answers. No identifier the record carries is fetched and left unread, and the branch names the record also offers are not requested, because no surface in the pair records a branch name for them to be compared against.
+In pull request mode the check reads the record the GitHub CLI reports for the pull request under review. The title and the body are ground truth for the triage rebuild, the spec references are recomputed from that body, and the base and head identifiers in the same record are compared against the base and head the manifest records. A pull request retargeted to another base, or a head branch moved on the host, therefore refuses the stamp while the CLI answers. No identifier the record carries is fetched and left unread, and the branch names the record also offers are not requested, because no surface in the pair records a branch name for them to be compared against. That ground truth reading stands only where a CLI answers in the checking environment, and where none answers the title and the state fall back to the manifest record on the terms the body fence reading states, so the two are not ground truth on that path at all.
 
 ## The body fence
 
-When no CLI answers, the body is read back out of the packet and the triage tier is rebuilt from it. A body that cannot be read back takes the presence only reading, where the title line and the spec reference line and the state line are asked to stand, only where the packet carries the cap line the builder writes for a capped body. A body whose fence is damaged or missing, with no cap line standing, is refused. A mutation of the packet alone never converts the whole rebuild into the weaker reading in silence.
+When no CLI answers, the body is read back out of the packet and the triage tier is rebuilt from it. A body that cannot be read back takes the presence only reading, where the title line and the spec reference line and the state line are asked to stand, only where the packet carries the cap line the builder writes for a capped body. A body whose fence is damaged or missing, with no cap line standing, is refused. A mutation of the packet alone never converts the whole rebuild into the weaker reading in silence. On that fallback path the body and the spec references are recomputed from the packet itself, while the title and the state are taken from the manifest record and compared against the packet alone, because no record outside the pair reports them. A stamp that issues on the fallback path names the fallback in its own sentence, so a reader can tell the title and the state were not read from the CLI record.
 
 ## The findings path
 
@@ -43,3 +43,15 @@ The manifest creation time is read against the repository the check runs against
 ## Pull request state
 
 The extractor records the state of the pull request under review as the CLI reported it at fetch time, with the fetch moment standing beside it, in the triage tier and in the manifest pull request record. The packet words that state as a snapshot from that fetch and never as a live claim. The check rebuilds the state line from the manifest record and never refuses a packet because the live state has since moved, because a moved state does not falsify a snapshot that names its own moment. The fetch moment is held inside the same bounds as the creation time, so a state cannot have been fetched before the change it names existed or after the run that recorded it. The history tier words the states of prior pull requests as a snapshot from the fetch that built the packet on the same terms, and those states are not refreshed after that fetch.
+
+## The prior pull requests passage
+
+The stamp does not recount the passage of the history tier that names the prior pull requests touching the most changed files. The passage is self reported by the run that built the packet, because two environments can honestly report different live state for the same pull requests and a recount could refuse a genuine packet over that difference. The check holds the passage in the packet against the passage the manifest records beside it, and the size of a history tier dropped at the token budget is settled against that same record. When a stamped packet carries the passage, the stamp output names it as recorded with the packet rather than recounted from the repository, so a reader does not take the stamp as covering words it never re-derived.
+
+## The recount source
+
+The check recounts the change through the extractor copy that stands beside it in the checker tree, loaded from the canonical skill path the checker names rather than from an extractor installed elsewhere. A stamp therefore speaks for the repository as that copy measures it, and trust in a stamp includes trust in the checker tree the check ran from.
+
+## The tier files counts
+
+Each tier receipt in the manifest carries a files count, and the count means a different set in each tier. In the triage tier and the change tier it counts every changed file in the change. In the companion tier it counts the changed files under the source extensions the extractor searches, so a change holding no source file records none there. In the history tier it counts the most changed files the tier works over, capped at three, so a wide change still records at most three there. The closing receipt prints each count beside its tier under the same meanings.

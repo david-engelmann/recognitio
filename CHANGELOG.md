@@ -3500,6 +3500,54 @@ This unreleased work carries version 1.3.0.
   figures that measure the guidance file stand
   restated to its new size in the README and the
   Codex plugin brief.
+- The packet check stamp now names what it does not
+  recount. A stamped packet carrying the prior pull
+  requests passage of the history tier names that
+  passage in the stamp output as recorded with the
+  packet rather than recounted from the repository,
+  and a stamp whose pull request title and state came
+  from the manifest record because no GitHub CLI
+  answered names that fallback in its own sentence.
+  The README claim and the completeness readings
+  state the same boundaries, and the completeness
+  readings now also state that the check recounts
+  through the extractor copy beside it and what the
+  files count of each tier receipt means.
+- The extractor heading reader now splits packet
+  lines on the newline character alone, the rule the
+  packet check reads under, so a heading standing
+  after a carriage return or a Unicode separator
+  inside one packet line is no longer recorded as a
+  section the check never sees. An agreement test
+  holds the two readers to one reading across those
+  inputs.
+- The packet check now recognises a failure receipt
+  as its own shape and reports the cause the failed
+  run recorded, instead of reading the receipt
+  through the packet schema and naming shape
+  complaints that never name the cause.
+- The packet manifest schema validator now fails
+  closed on a schema keyword it does not know, in the
+  walk and in a census over the whole shipped schema,
+  where it previously stepped over an unknown keyword
+  in silence.
+- The packet check readings that need the extractor
+  now name their skip when the extractor cannot be
+  loaded, instead of falling silent or falling back
+  to the characters divided by four measure the file
+  disowns, and the earliest refusal doors of the
+  check now speak in full sentences with the reason
+  named. The stamp sentence for a root commit now
+  names the root commit and its missing base in
+  words instead of the Python spelling of a null.
+- The extractor recount behind the verified flag now
+  states its own boundary where the flag rests, the
+  fields it compares and the fields it does not, with
+  the packet check recount named as the field
+  complete one, and the skill determinism sentence
+  now scopes itself to range and commit runs, with a
+  pull request packet named as carrying its fetch
+  moment.
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

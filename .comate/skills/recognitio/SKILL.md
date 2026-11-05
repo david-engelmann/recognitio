@@ -28,7 +28,7 @@ Extraction always runs against the local clone. The hosted API diff is never tru
 1. Resolve the refs and confirm the base, the head and the merge base all resolve in the local clone. Stop and report when a ref does not resolve.
 2. Choose the tiers and a budget for the size of the change.
 3. Run the bundled extractor script with the chosen mode, an output directory, and the tier and budget choices from step 2.
-4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step. That check stamps only where the recorded head is the current head of the repository it runs against. The packet is the deterministic surface and the manifest stamp moves.
+4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step. That check stamps only where the recorded head is the current head of the repository it runs against. In range and commit runs the packet is the deterministic surface and the manifest stamp moves, while a pull request packet carries its fetch moment and can move.
 5. Hand the packet to the review skill when verification passed. Stop and say exactly what is missing when verification failed.
 6. Record the three refs from the manifest wherever the review is recorded, so it can be reproduced later.
 

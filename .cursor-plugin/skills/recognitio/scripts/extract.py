@@ -1912,8 +1912,19 @@ def packet_headings(packet):
     let quoted text stand in the manifest as packet structure,
     and checking against it would let quoted text satisfy a
     section the packet itself does not hold.
+
+    Lines are split on the newline character alone, the same
+    rule the packet check reads the packet under, because the
+    packet is joined with single newlines and its line structure
+    is that character alone. The wider splitting rule would also
+    break a line at a carriage return and at the Unicode line
+    and paragraph separators and control characters a filename
+    or a diff body can carry, so a heading standing after one of
+    those characters inside one packet line would be recorded
+    as a section the packet check never sees, and a genuine
+    packet would fail its own stamp on the disagreement.
     """
-    lines = packet.splitlines()
+    lines = packet.split("\n")
     return [
         line for line, outside in zip(lines, outside_fence(lines))
         if outside and line.startswith("## ")
@@ -4320,6 +4331,20 @@ def verify_counts(repo, diff_base, head, manifest_files):
     zero context diff. Returns a list of discrepancy strings. An empty
     list means the manifest matches the recount in files, statuses,
     old paths, hunks and lines.
+
+    The boundary of this pass stands here because the verified
+    flag rests on it. The pass compares the file set and, per
+    file, the status and the old path and the hunks and the
+    additions and the deletions, then the added and deleted
+    totals, and the line counts counted from the recount diff
+    body for files the recount does not mark binary. It does not
+    compare the status code or the binary flag or the attribute
+    text flag or the binary transition flag or the placeholder
+    or the instruction file flag or the credential file flag.
+    Those fields are held at the stamp, where the packet check
+    recount compares every field of every record against a fresh
+    record, so the checker recount is the field complete recount
+    and this pass is the narrower one the run itself can make.
     """
     discrepancies = []
     change = fetch_change(repo, diff_base, head)
