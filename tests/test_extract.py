@@ -4034,6 +4034,60 @@ class TestPerfectionRound2Companion(unittest.TestCase):
                 )
                 self.assertTrue(bulk[name], name)
 
+    def test_bulk_search_never_hands_an_unmatchable_term_to_grep(
+        self,
+    ):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(
+                tmp,
+                [{"corpus.txt": "call plain now\nnl name apart\n"}],
+            )
+            head = git(repo, "rev-parse", "HEAD")
+            calls = []
+            original = extract_mod.run_git
+
+            def counting(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "grep":
+                    calls.append(list(args))
+                return original(
+                    repo_arg, args, check=check,
+                    global_flags=global_flags,
+                )
+
+            extract_mod.run_git = counting
+            try:
+                bulk = extract_mod.git_grep_bulk(
+                    repo, head, ["plain", "nl\nname", ""],
+                )
+                calls_before = len(calls)
+                only_unmatchable = extract_mod.git_grep_bulk(
+                    repo, head, ["nl\nname"],
+                )
+            finally:
+                extract_mod.run_git = original
+            # The newline term and the empty term are answered
+            # under the same rule the per term search states, so
+            # no search the bulk path ran carries either of them
+            # as a pattern, and a gathering of unmatchable terms
+            # alone runs no search at all.
+            self.assertEqual(len(calls), calls_before, calls)
+            for call in calls:
+                patterns = [
+                    call[i + 1]
+                    for i, arg in enumerate(call[:-1])
+                    if arg == "-e"
+                ]
+                self.assertNotIn("nl\nname", patterns, call)
+                self.assertNotIn("", patterns, call)
+            self.assertEqual(bulk["nl\nname"], [])
+            self.assertEqual(bulk[""], [])
+            self.assertEqual(
+                set(bulk["plain"]),
+                set(extract_mod.git_grep_lines(repo, head, "plain")),
+            )
+            self.assertTrue(bulk["plain"])
+            self.assertEqual(only_unmatchable, {"nl\nname": []})
+
     def test_build_t2_batches_a_large_term_count_and_completes(self):
         with RetryingTemporaryDirectory() as tmp:
             base = {}

@@ -2776,11 +2776,23 @@ def git_grep_bulk(repo, head, terms):
     unique = sorted(set(terms))
     if not unique:
         return {}
-    if len(unique) == 1:
-        return {unique[0]: git_grep_lines(repo, head, unique[0])}
     hits = {term: [] for term in unique}
-    for start in range(0, len(unique), MAX_BULK_SEARCH_TERMS):
-        batch = unique[start:start + MAX_BULK_SEARCH_TERMS]
+    # Terms no line can word match are answered here, under the
+    # same stated rule the per term search applies, rather than
+    # being handed to the search program and discarded only
+    # because the matcher cannot match across a line boundary.
+    searchable = [
+        term for term in unique if term and "\n" not in term
+    ]
+    if not searchable:
+        return hits
+    if len(searchable) == 1:
+        hits[searchable[0]] = git_grep_lines(
+            repo, head, searchable[0], term_count=len(unique)
+        )
+        return hits
+    for start in range(0, len(searchable), MAX_BULK_SEARCH_TERMS):
+        batch = searchable[start:start + MAX_BULK_SEARCH_TERMS]
         if len(batch) == 1:
             hits[batch[0]] = git_grep_lines(
                 repo, head, batch[0], term_count=len(unique)
