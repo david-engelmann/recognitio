@@ -3599,10 +3599,13 @@ This unreleased work carries version 1.3.0.
   skill text prescribes, and the skill text states
   the batched cost shape and names the packet as the
   deterministic surface of a run.
-- A staging fault inside the stage step, at its write
-  or its sync or its close, now discards the file it
-  created before the refusal propagates, and a discard
-  that faults itself is named in the refusal, so a
-  faulted publish leaves the output directory exactly
-  as it stood and no hidden staging leftover stands
-  beside a verified pair.
+- A staging fault inside the stage step now discards
+  the file it created before the refusal propagates.
+  The write and the sync and the descriptor close all
+  stand inside the guarded region, and a discard that
+  itself faults cannot mask the refusal, because the
+  refusal then names the staged file it could not
+  remove, so a faulted publish leaves the output
+  directory exactly as it stood or names the one
+  leftover it could not clear, and no hidden staging
+  leftover stands beside a verified pair in silence.
