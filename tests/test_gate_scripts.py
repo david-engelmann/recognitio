@@ -121,17 +121,29 @@ class TestCheckCopy(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def run_main_on(self, files, comment_files=()):
+    def run_main_on(self, files, comment_files=(), manifest_files=None):
+        # The error stream is kept on self.last_stderr rather
+        # than discarded, so a test that plants a defect can
+        # assert the failure names the planted surface instead
+        # of holding only the exit code. The manifest list is
+        # patchable for the same reason.
         original = self.mod.PROSE_FILES
         original_comments = self.mod.COMMENT_FILES
+        original_manifests = self.mod.MANIFEST_FILES
         self.mod.PROSE_FILES = files
         self.mod.COMMENT_FILES = list(comment_files)
+        if manifest_files is not None:
+            self.mod.MANIFEST_FILES = list(manifest_files)
+        err = io.StringIO()
         try:
-            with redirect_stderr(io.StringIO()):
-                return self.mod.main()
+            with redirect_stderr(err):
+                code = self.mod.main()
         finally:
             self.mod.PROSE_FILES = original
             self.mod.COMMENT_FILES = original_comments
+            self.mod.MANIFEST_FILES = original_manifests
+        self.last_stderr = err.getvalue()
+        return code
 
     def test_every_public_prose_surface_is_scanned(self):
         names = {str(path.relative_to(ROOT)) for path in self.mod.PROSE_FILES}
@@ -173,6 +185,8 @@ class TestCheckCopy(unittest.TestCase):
                 % EM_DASH,
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("config.yml", self.last_stderr)
 
     def test_em_dash_in_a_workflow_comment_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -188,6 +202,8 @@ class TestCheckCopy(unittest.TestCase):
                 "          echo one; echo two\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("ci.yml", self.last_stderr)
 
     def test_shell_code_in_a_run_block_is_not_prose(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -216,6 +232,8 @@ class TestCheckCopy(unittest.TestCase):
                 "\tpython3 -m unittest discover -s tests\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("Makefile", self.last_stderr)
 
     def test_em_dash_in_a_gitignore_comment_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -225,6 +243,8 @@ class TestCheckCopy(unittest.TestCase):
                 "packet/\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn(".gitignore", self.last_stderr)
 
     def test_em_dash_in_a_dependabot_comment_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -236,6 +256,8 @@ class TestCheckCopy(unittest.TestCase):
                 "  - package-ecosystem: \"github-actions\"\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([], [path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("dependabot.yml", self.last_stderr)
 
     def test_em_dash_beside_a_url_is_still_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -245,6 +267,7 @@ class TestCheckCopy(unittest.TestCase):
                 % EM_DASH,
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
 
     def test_semicolon_right_after_a_markdown_link_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -253,6 +276,7 @@ class TestCheckCopy(unittest.TestCase):
                 "See [guide](https://example.com/spec); then continue.\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a semicolon", self.last_stderr)
 
     def test_colon_right_after_a_markdown_link_is_caught(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -261,6 +285,7 @@ class TestCheckCopy(unittest.TestCase):
                 "See [guide](https://example.com/spec): then continue.\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_picture_tag_line_is_markup_not_prose(self):
         # Visual round 8. The README wordmark stood in a
@@ -298,6 +323,7 @@ class TestCheckCopy(unittest.TestCase):
                 "<p>Words in prose: with a colon beside a tag.</p>\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_markdown_link_with_clean_prose_passes(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -322,6 +348,8 @@ class TestCheckCopy(unittest.TestCase):
                 "All guidance lives elsewhere %s read it first.\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("CLAUDE.md", self.last_stderr)
 
     def test_yaml_block_scalar_prose_is_scanned(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -331,6 +359,7 @@ class TestCheckCopy(unittest.TestCase):
                 "    Be direct %s always.\n" % EM_DASH,
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has an em dash", self.last_stderr)
 
     def test_fence_covers_every_authored_prose_file_in_the_tree(self):
         covered = {str(p.relative_to(ROOT)) for p in self.mod.PROSE_FILES}
@@ -537,6 +566,8 @@ class TestCheckCopy(unittest.TestCase):
             found = self.mod.discover_prose_files(root)
             self.assertIn(form, found)
             self.assertEqual(self.run_main_on(found), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("feature_form.yml", self.last_stderr)
 
     def test_the_walk_and_discovery_share_one_exclusion_rule(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -614,22 +645,13 @@ class TestCheckCopy(unittest.TestCase):
                 '{"name": "x", "description": "Does a thing %s '
                 'in plain words."}\n' % EM_DASH,
             )
-            original = (
-                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                self.mod.MANIFEST_FILES,
+            code = self.run_main_on(
+                [], manifest_files=[path]
             )
-            self.mod.PROSE_FILES = []
-            self.mod.COMMENT_FILES = []
-            self.mod.MANIFEST_FILES = [path]
-            try:
-                with redirect_stderr(io.StringIO()):
-                    code = self.mod.main()
-            finally:
-                (
-                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                    self.mod.MANIFEST_FILES,
-                ) = original
             self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has an em dash", self.last_stderr
+            )
 
     def test_em_dash_in_cursor_plugin_readme_is_caught(self):
         # R23-ST-01. The Cursor plugin README is public prose, so
@@ -647,6 +669,8 @@ class TestCheckCopy(unittest.TestCase):
             files = self.mod.discover_prose_files(root)
             self.assertIn(readme, files)
             self.assertEqual(self.run_main_on(files), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("README.md", self.last_stderr)
 
     def test_em_dash_in_cursor_plugin_rule_file_is_caught(self):
         # R23-ST-01. The Cursor rule file is public prose, so an
@@ -667,6 +691,8 @@ class TestCheckCopy(unittest.TestCase):
             files = self.mod.discover_prose_files(root)
             self.assertIn(rule, files)
             self.assertEqual(self.run_main_on(files), 1)
+            self.assertIn("has an em dash", self.last_stderr)
+            self.assertIn("recognitio.mdc", self.last_stderr)
 
     def test_em_dash_in_cursor_plugin_manifest_is_caught(self):
         # R23-ST-01. The Cursor plugin manifest descriptions are
@@ -682,22 +708,13 @@ class TestCheckCopy(unittest.TestCase):
             )
             found = self.mod.discover_manifest_files(root)
             self.assertIn(manifest, found)
-            original = (
-                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                self.mod.MANIFEST_FILES,
+            code = self.run_main_on(
+                [], manifest_files=[manifest]
             )
-            self.mod.PROSE_FILES = []
-            self.mod.COMMENT_FILES = []
-            self.mod.MANIFEST_FILES = [manifest]
-            try:
-                with redirect_stderr(io.StringIO()):
-                    code = self.mod.main()
-            finally:
-                (
-                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                    self.mod.MANIFEST_FILES,
-                ) = original
             self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has an em dash", self.last_stderr
+            )
 
     def test_em_dash_in_antigravity_plugin_manifest_is_caught(self):
         # R38-ST-01. The Antigravity plugin manifest
@@ -715,22 +732,13 @@ class TestCheckCopy(unittest.TestCase):
             )
             found = self.mod.discover_manifest_files(root)
             self.assertIn(manifest, found)
-            original = (
-                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                self.mod.MANIFEST_FILES,
+            code = self.run_main_on(
+                [], manifest_files=[manifest]
             )
-            self.mod.PROSE_FILES = []
-            self.mod.COMMENT_FILES = []
-            self.mod.MANIFEST_FILES = [manifest]
-            try:
-                with redirect_stderr(io.StringIO()):
-                    code = self.mod.main()
-            finally:
-                (
-                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                    self.mod.MANIFEST_FILES,
-                ) = original
             self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has an em dash", self.last_stderr
+            )
 
     def test_em_dash_in_zcode_plugin_manifest_is_caught(self):
         # R38-ST-01. The ZCode plugin manifest description
@@ -746,22 +754,13 @@ class TestCheckCopy(unittest.TestCase):
             )
             found = self.mod.discover_manifest_files(root)
             self.assertIn(manifest, found)
-            original = (
-                self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                self.mod.MANIFEST_FILES,
+            code = self.run_main_on(
+                [], manifest_files=[manifest]
             )
-            self.mod.PROSE_FILES = []
-            self.mod.COMMENT_FILES = []
-            self.mod.MANIFEST_FILES = [manifest]
-            try:
-                with redirect_stderr(io.StringIO()):
-                    code = self.mod.main()
-            finally:
-                (
-                    self.mod.PROSE_FILES, self.mod.COMMENT_FILES,
-                    self.mod.MANIFEST_FILES,
-                ) = original
             self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has an em dash", self.last_stderr
+            )
 
     def test_discovery_keeps_the_plugin_skill_copy_out(self):
         # R23-ST-01. The plugin skill copy is pinned byte identical
@@ -804,6 +803,7 @@ class TestCheckCopy(unittest.TestCase):
                 "point: {label: \"Read: now\"}\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_colon_inside_a_list_item_flow_mapping_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -813,6 +813,7 @@ class TestCheckCopy(unittest.TestCase):
                 "  - {label: \"Read: now\"}\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_prose_mapping_value_with_a_colon_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -821,6 +822,7 @@ class TestCheckCopy(unittest.TestCase):
                 "note: see the guide for details: the long version\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_prose_value_in_a_nested_sequence_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -830,6 +832,7 @@ class TestCheckCopy(unittest.TestCase):
                 "  - - name: alpha: the first one\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_wide_key_shapes_are_structure_not_prose(self):
         shapes = (
@@ -856,6 +859,9 @@ class TestCheckCopy(unittest.TestCase):
             with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
+                self.assertIn(
+                    "has a colon in prose", self.last_stderr, text
+                )
 
     def test_flow_collections_after_anchors_and_tags_are_structure(self):
         shapes = (
@@ -894,6 +900,9 @@ class TestCheckCopy(unittest.TestCase):
             with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
+                self.assertIn(
+                    "has a colon in prose", self.last_stderr, text
+                )
 
     def test_an_apostrophe_in_a_plain_flow_scalar_is_not_a_quote(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -909,6 +918,7 @@ class TestCheckCopy(unittest.TestCase):
                 "tags: [don't, \"Read: now\"]\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_text_after_a_flow_collection_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -917,6 +927,7 @@ class TestCheckCopy(unittest.TestCase):
                 "ports: [80, 443] # Open: web\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
         with RetryingTemporaryDirectory() as tmp:
             path = self.write_tmp(
                 tmp, "config.yaml",
@@ -935,6 +946,9 @@ class TestCheckCopy(unittest.TestCase):
             with RetryingTemporaryDirectory() as tmp:
                 path = self.write_tmp(tmp, "config.yaml", text)
                 self.assertEqual(self.run_main_on([path]), 1, text)
+                self.assertIn(
+                    "has a colon in prose", self.last_stderr, text
+                )
 
     def test_a_key_shaped_continuation_of_a_plain_scalar_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -944,6 +958,7 @@ class TestCheckCopy(unittest.TestCase):
                 "  Summary: only colon is here\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_a_key_shaped_line_inside_a_flow_quoted_scalar_still_flags(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -953,6 +968,7 @@ class TestCheckCopy(unittest.TestCase):
                 "  now: the sequel\"}\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_ordinary_keys_after_a_plain_value_still_parse(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -975,6 +991,7 @@ class TestCheckCopy(unittest.TestCase):
                 "}\n",
             )
             self.assertEqual(self.run_main_on([path]), 1)
+            self.assertIn("has a colon in prose", self.last_stderr)
 
     def test_yaml_keys_and_directives_are_syntax(self):
         with RetryingTemporaryDirectory() as tmp:
@@ -985,6 +1002,226 @@ class TestCheckCopy(unittest.TestCase):
                 "tone: \"Be direct and plain.\"\n",
             )
             self.assertEqual(self.run_main_on([path]), 0)
+
+    def test_a_banned_mark_in_a_long_description_is_caught(self):
+        # Round 4 spec Major 1, in the seat probe shape. The
+        # portable manifest carries its prose under keys the
+        # scan once never read, so a banned mark there passed
+        # the whole gate unseen.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "longDescription": "Does a thing '
+                '%s in plain words."}\n' % EM_DASH,
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "longDescription field has an em dash",
+                self.last_stderr,
+            )
+
+    def test_a_banned_mark_in_a_short_description_is_caught(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "shortDescription": "Does a thing; '
+                'in plain words."}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "shortDescription field has a semicolon",
+                self.last_stderr,
+            )
+
+    def test_a_banned_mark_in_a_note_field_is_caught(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "note": "Does a thing: in plain '
+                'words."}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "note field has a colon in prose", self.last_stderr
+            )
+
+    def test_a_missing_readme_fails_the_gate_itself(self):
+        # Round 4 audit Minor 4 and red team Minor 3. Deleting
+        # README.md once left the gate green over the prose
+        # that remained. The gate now refuses by name when a
+        # required surface is absent, run here as the gate
+        # itself inside a scratch tree rather than through
+        # the suite helpers.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp) / "tree"
+            script_dir = root / "scripts"
+            script_dir.mkdir(parents=True)
+            shutil.copyfile(
+                ROOT / "scripts" / "check_copy.py",
+                script_dir / "check_copy.py",
+            )
+            (root / "docs").mkdir()
+            (root / "docs" / "page.md").write_text(
+                "Clean prose stands here.\n", encoding="utf-8"
+            )
+            mod = load_script_at(
+                script_dir / "check_copy.py", "copy_gate_no_readme"
+            )
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = mod.main()
+            self.assertEqual(code, 1)
+            self.assertIn("README.md is missing", err.getvalue())
+
+    def test_an_empty_census_fails_the_gate_itself(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp) / "tree"
+            script_dir = root / "scripts"
+            script_dir.mkdir(parents=True)
+            shutil.copyfile(
+                ROOT / "scripts" / "check_copy.py",
+                script_dir / "check_copy.py",
+            )
+            mod = load_script_at(
+                script_dir / "check_copy.py", "copy_gate_empty"
+            )
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = mod.main()
+            self.assertEqual(code, 1)
+            self.assertIn("census stands at zero", err.getvalue())
+
+    def test_a_broken_relative_link_is_caught(self):
+        # Round 4 red team Minor 2, in the seat plant shape.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "Clean words stand here.\n"
+                "\n"
+                "See [the missing guide](missing-guide-zzz.md) "
+                "for the rest.\n",
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 1)
+            self.assertIn("missing-guide-zzz.md", self.last_stderr)
+            self.assertIn("does not stand in the tree", self.last_stderr)
+
+    def test_a_relative_link_to_a_standing_file_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            target = self.write_tmp(
+                tmp, "other.md", "The other page.\n"
+            )
+            path = self.write_tmp(
+                tmp, "page.md",
+                "See [the other page](other.md) for the rest.\n",
+            )
+            code = self.run_main_on([path, target])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_a_split_link_to_a_missing_file_is_caught(self):
+        # Round 4 red team Minor 2, second shape. The
+        # destination stands on the line after the opening
+        # bracket, and the grammar reads it as one link, so
+        # the gate reads it as one link and reports the
+        # line where the link opens.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "Clean words stand here.\n"
+                "\n"
+                "See [the missing guide](\n"
+                "missing-split-zzz.md) for the rest.\n",
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 1)
+            self.assertIn("missing-split-zzz.md", self.last_stderr)
+            self.assertIn(
+                "does not stand in the tree", self.last_stderr
+            )
+            self.assertIn("line 3", self.last_stderr)
+
+    def test_a_split_link_to_a_standing_file_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            target = self.write_tmp(
+                tmp, "other.md", "The other page.\n"
+            )
+            path = self.write_tmp(
+                tmp, "page.md",
+                "See [the other page](\n"
+                "other.md) for the rest.\n",
+            )
+            code = self.run_main_on([path, target])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_an_html_href_to_a_missing_file_is_caught(self):
+        # Round 4 red team Minor 2, third shape. An anchor
+        # element href is the HTML form of the same reader
+        # facing reference inside a prose page.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                "Clean words stand here.\n"
+                "\n"
+                '<a href="missing-html-zzz.md">A guide</a>\n',
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 1)
+            self.assertIn("missing-html-zzz.md", self.last_stderr)
+            self.assertIn(
+                "does not stand in the tree", self.last_stderr
+            )
+            self.assertIn("line 3", self.last_stderr)
+
+    def test_an_external_html_href_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "page.md",
+                '<a href="https://example.com/guide">A guide</a>\n',
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_a_banned_mark_in_a_default_prompt_is_caught(self):
+        # Round 4 red team Note 4. The default prompt list
+        # of the OpenAI interface object is prose a listing
+        # reader meets, in a list of strings rather than
+        # one string.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "interface": {"defaultPrompt": '
+                '["Does a thing %s in plain words.", '
+                '"A clean prompt."]}}\n' % EM_DASH,
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "defaultPrompt field has an em dash",
+                self.last_stderr,
+            )
+
+    def test_a_clean_default_prompt_list_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "interface": {"defaultPrompt": '
+                '["Does a thing in plain words."]}}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_an_undecodable_prose_file_is_named(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = Path(tmp) / "page.md"
+            path.write_bytes(b"\xff\xfe\x00bad")
+            code = self.run_main_on([path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "cannot be read as UTF-8 text", self.last_stderr
+            )
 
     def test_no_function_in_check_copy_passes_the_length_ceiling(self):
         source = (ROOT / "scripts" / "check_copy.py").read_text(
@@ -997,9 +1234,250 @@ class TestCheckCopy(unittest.TestCase):
                 self.assertLessEqual(
                     length, 86,
                     "function %s runs %d lines, over the 86 line "
-                    "ceiling the gate scripts record"
+                    "ceiling this test records for the functions "
+                    "of scripts/check_copy.py alone"
                     % (node.name, length),
                 )
+
+
+class TestUndecodableGateInputs(unittest.TestCase):
+    """Undecodable files draw a named problem, never a traceback.
+
+    Round 4 standards Minor 3. The read_text copies across
+    the gates caught the OS error and let the decode error
+    escape, so one byte damaged input file crashed the gate
+    that read it instead of failing in the family voice.
+    Every copy now behaves the same way over the same bytes.
+    """
+
+    SINGLE_PATH_GATES = (
+        "check_antigravity",
+        "check_brand",
+        "check_coderabbit",
+        "check_copilot",
+        "check_cursor",
+        "check_devin",
+        "check_kimi",
+        "check_qwen",
+        "check_zcode",
+    )
+
+    def test_every_read_text_copy_returns_none_on_bad_bytes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = Path(tmp) / "damaged.md"
+            path.write_bytes(b"\xff\xfe\x00bad")
+            for name in self.SINGLE_PATH_GATES:
+                mod = load_script(name)
+                self.assertIsNone(mod.read_text(path), name)
+                self.assertTrue(
+                    any(
+                        "damaged.md" in p
+                        and "cannot be read as UTF-8 text" in p
+                        for p in mod.utf8_problems()
+                    ),
+                    (name, mod.utf8_problems()),
+                )
+            version = load_script("check_version")
+            self.assertIsNone(version.read(path))
+            self.assertTrue(
+                any(
+                    "damaged.md" in p
+                    and "cannot be read as UTF-8 text" in p
+                    for p in version.utf8_problems()
+                ),
+                version.utf8_problems(),
+            )
+
+    def test_every_read_text_copy_records_nothing_on_absent(self):
+        # An absent file keeps the missing wording at the
+        # caller, so the helper records no UTF-8 problem
+        # for it and still returns no text.
+        with RetryingTemporaryDirectory() as tmp:
+            absent = Path(tmp) / "absent.md"
+            for name in self.SINGLE_PATH_GATES:
+                mod = load_script(name)
+                self.assertIsNone(mod.read_text(absent), name)
+                self.assertEqual(mod.utf8_problems(), [], name)
+            version = load_script("check_version")
+            self.assertIsNone(version.read(absent))
+            self.assertEqual(version.utf8_problems(), [])
+
+    def test_the_comate_copy_records_the_problem(self):
+        mod = load_script("check_comate")
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "damaged.md").write_bytes(b"\xff\xfe\x00bad")
+            problems = []
+            result = mod.read_text(
+                root, "damaged.md", problems, "the damaged file"
+            )
+            self.assertIsNone(result)
+            self.assertTrue(
+                any("cannot be read as UTF-8 text" in p
+                    for p in problems),
+                problems,
+            )
+
+
+class TestUndecodableProblemLevelPlants(unittest.TestCase):
+    """Problem level plants for the seven remaining gates.
+
+    Round 4 fix review, standards Minor 3. The kimi and
+    qwen and zcode plants pin the decode repair wiring at
+    problem level, and the helper level battery above pins
+    the read copies, but the other seven gates carried the
+    same repair wiring with no plant at the level a
+    contributor meets. Each plant below stands a damaged
+    file at the path its gate reads first and calls the
+    gate problems entry, so reverting the repair call or
+    the entry clearing in any one of the seven leaves that
+    gate calling a standing damaged file missing and turns
+    its plant red.
+    """
+
+    def gate_problems(self, script, entry, rel):
+        mod = load_script(script)
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"\xff\xfe\x00bad")
+            return getattr(mod, entry)(root)
+
+    def assert_utf8_named_not_missing(self, problems, name,
+                                      missing_wording):
+        self.assertTrue(
+            any(
+                name in p and "cannot be read as UTF-8 text" in p
+                for p in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any(missing_wording in p for p in problems),
+            problems,
+        )
+
+    def test_antigravity_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_antigravity", "antigravity_problems",
+            "docs/antigravity-plugin-brief.md",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "antigravity-plugin-brief.md",
+            "docs/antigravity-plugin-brief.md is missing",
+        )
+
+    def test_brand_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_brand", "brand_problems",
+            ".claude-plugin/plugin.json",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "plugin.json",
+            "missing manifest at .claude-plugin/plugin.json",
+        )
+
+    def test_coderabbit_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_coderabbit", "coderabbit_problems",
+            "docs/coderabbit-review-brief.md",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "coderabbit-review-brief.md",
+            "docs/coderabbit-review-brief.md is missing",
+        )
+
+    def test_copilot_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_copilot", "copilot_problems",
+            "docs/copilot-sdk-brief.md",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "copilot-sdk-brief.md",
+            "docs/copilot-sdk-brief.md is missing",
+        )
+
+    def test_cursor_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_cursor", "cursor_problems",
+            ".cursor-plugin/plugin.json",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "plugin.json",
+            ".cursor-plugin/plugin.json is missing",
+        )
+
+    def test_devin_problems_name_utf8_not_missing(self):
+        problems = self.gate_problems(
+            "check_devin", "devin_problems",
+            "docs/devin-playbook-brief.md",
+        )
+        self.assert_utf8_named_not_missing(
+            problems, "devin-playbook-brief.md",
+            "docs/devin-playbook-brief.md is missing",
+        )
+
+    def test_version_main_names_utf8_not_missing(self):
+        mod = load_script("check_version")
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plugin = root / ".claude-plugin" / "plugin.json"
+            plugin.parent.mkdir(parents=True)
+            plugin.write_bytes(b"\xff\xfe\x00bad")
+            mod_plugin = root / "mod-plugin.json"
+            mod_plugin.write_text(
+                '{"version": "1.3.0"}', encoding="utf-8"
+            )
+            antigravity_plugin = root / "antigravity-plugin.json"
+            antigravity_plugin.write_text(
+                '{"name": "recognitio", '
+                '"description": "A plugin."}',
+                encoding="utf-8",
+            )
+            market = root / "marketplace.json"
+            market.write_text(
+                '{"metadata": {"version": "1.3.0"}, "plugins": '
+                '[{"name": "recognitio", "version": "1.3.0"}]}',
+                encoding="utf-8",
+            )
+            extract = root / "extract.py"
+            extract.write_text(
+                'EXTRACTOR_VERSION = "1.3.0"\n', encoding="utf-8"
+            )
+            log = root / "CHANGELOG.md"
+            log.write_text(
+                "## [Unreleased]\n\n"
+                "This work carries version 1.3.0.\n",
+                encoding="utf-8",
+            )
+            original = (
+                mod.PLUGIN_JSON, mod.MOD_PLUGIN_JSON,
+                mod.MARKETPLACE_JSON, mod.EXTRACT_PY,
+                mod.CHANGELOG_MD, mod.ANTIGRAVITY_PLUGIN_JSON,
+            )
+            mod.PLUGIN_JSON = plugin
+            mod.MOD_PLUGIN_JSON = mod_plugin
+            mod.MARKETPLACE_JSON = market
+            mod.EXTRACT_PY = extract
+            mod.CHANGELOG_MD = log
+            mod.ANTIGRAVITY_PLUGIN_JSON = antigravity_plugin
+            try:
+                with redirect_stderr(io.StringIO()) as captured:
+                    code = mod.main()
+            finally:
+                (
+                    mod.PLUGIN_JSON, mod.MOD_PLUGIN_JSON,
+                    mod.MARKETPLACE_JSON, mod.EXTRACT_PY,
+                    mod.CHANGELOG_MD, mod.ANTIGRAVITY_PLUGIN_JSON,
+                ) = original
+            err = captured.getvalue()
+        self.assertEqual(code, 1, err)
+        self.assertIn(
+            "plugin.json cannot be read as UTF-8 text", err
+        )
+        self.assertNotIn("missing plugin manifest", err)
+        self.assertNotIn("Traceback", err)
 
 
 class TestEvalDocs(unittest.TestCase):
@@ -4697,10 +5175,17 @@ class TestCheckPacket(unittest.TestCase):
         (out / "packet.md").write_text(text, encoding="utf-8")
 
     def run_check(self, out, *extra):
-        with redirect_stderr(io.StringIO()):
-            return self.mod.main(
+        # The error stream is kept on self.last_stderr rather
+        # than discarded, so a tamper test can assert the
+        # failure names the tampered surface instead of
+        # holding only the exit code.
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = self.mod.main(
                 [str(out), "--repo", str(self.repo)] + list(extra)
             )
+        self.last_stderr = err.getvalue()
+        return code
 
     def test_verified_packet_for_the_current_head_passes(self):
         out = self.clone_packet("good")
@@ -4712,6 +5197,10 @@ class TestCheckPacket(unittest.TestCase):
         del manifest["sections"]
         self.write_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "missing a key its schema requires, sections",
+            self.last_stderr,
+        )
 
     def test_unverified_packet_fails(self):
         out = self.clone_packet("bad")
@@ -4719,6 +5208,7 @@ class TestCheckPacket(unittest.TestCase):
         manifest["verified"] = False
         self.write_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn("does not report verified", self.last_stderr)
 
     def test_packet_for_a_stale_head_fails(self):
         out = self.clone_packet("stale")
@@ -4726,22 +5216,30 @@ class TestCheckPacket(unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "-m", "three")
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn("The packet is stale", self.last_stderr)
 
     def test_missing_manifest_fails(self):
         out = Path(self.tmp.name) / "empty"
         out.mkdir()
         (out / "packet.md").write_text("# packet\n", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn("there is no manifest.json in", self.last_stderr)
 
     def test_empty_packet_file_fails(self):
         out = self.clone_packet("hollow")
         (out / "packet.md").write_text("", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn("is empty", self.last_stderr)
+        self.assertIn("packet.md", self.last_stderr)
 
     def test_null_manifest_fails(self):
         out = self.clone_packet("nullman")
         (out / "manifest.json").write_text("null", encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "manifest.json does not hold a JSON object",
+            self.last_stderr,
+        )
 
     def test_non_object_manifest_fails(self):
         out = self.clone_packet("listman")
@@ -4749,6 +5247,10 @@ class TestCheckPacket(unittest.TestCase):
             '["verified"]', encoding="utf-8"
         )
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "manifest.json does not hold a JSON object",
+            self.last_stderr,
+        )
 
     def test_recorded_sections_present_and_filled_pass(self):
         out = self.clone_packet("whole")
@@ -4777,6 +5279,10 @@ class TestCheckPacket(unittest.TestCase):
         )
         self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "carries only the placeholder for a tier",
+            self.last_stderr,
+        )
 
     def test_a_dropped_section_wearing_a_full_manifest_fails(self):
         out = self.clone_packet("dropppedsection")
@@ -4786,6 +5292,11 @@ class TestCheckPacket(unittest.TestCase):
         text = text[:start] + text[end:]
         self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "records a section the packet does not hold",
+            self.last_stderr,
+        )
+        self.assertIn("## T3 History", self.last_stderr)
 
     def test_an_included_tier_with_real_content_passes(self):
         out = self.clone_packet("fullreceipt")
@@ -4802,6 +5313,12 @@ class TestCheckPacket(unittest.TestCase):
         text = text[:start] + text[end:]
         self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "receipts a changed file the packet change tier "
+            "does not hold",
+            self.last_stderr,
+        )
+        self.assertIn("calc.py", self.last_stderr)
 
     def test_manifest_files_present_in_the_change_tier_pass(self):
         out = self.clone_packet("wholefiles")
@@ -4817,6 +5334,11 @@ class TestCheckPacket(unittest.TestCase):
         text = text[:start] + "## T3 History\n\n" + text[end:]
         self.write_packet_text(out, text)
         self.assertEqual(self.run_check(out), 1)
+        self.assertIn(
+            "stands in the packet with no content under it",
+            self.last_stderr,
+        )
+        self.assertIn("## T3 History", self.last_stderr)
 
     def test_a_heading_inside_a_fence_satisfies_nothing(self):
         packet = (
@@ -4826,7 +5348,14 @@ class TestCheckPacket(unittest.TestCase):
         problems = self.mod.section_problems(
             packet, ["## T0 Triage", "## T3 History"]
         )
-        self.assertTrue(problems)
+        self.assertTrue(
+            any(
+                "records a section the packet does not hold" in p
+                and "## T3 History" in p
+                for p in problems
+            ),
+            problems,
+        )
 
     def test_exported_git_dir_does_not_redirect_the_packet_check(self):
         decoy = Path(self.tmp.name) / "decoy"

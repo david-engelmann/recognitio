@@ -94,6 +94,39 @@ test*.py pattern the unittest loader uses and with the
 methods whose names start with test are inspected, inside
 classes and at module level.
 
+Discovery carries a floor, in the style of the sibling
+discovery gates. A tests directory that does not stand, a
+tests directory holding no test file, and a discovery that
+finds no test method at all are each a problem by name, so
+the guard never prints its success sentence over an absent
+or empty suite. A scoped run of this guard alone therefore
+fails on the absence the full gate would catch at the
+discover step.
+
+An assertion about a mock call state argues about nothing
+the suite exercises. A name bound in the body to a mock, or
+to an attribute or a call of one, or handed in as a patch
+stand in, is a mock on this reading, and an assertion whose
+operands argue only about such a name and its call state,
+the called flag and the call count and the recorded call
+arguments among them, counts no more than a constant
+assertion does. A direct assert call on the mock itself
+already counted for nothing under the operand table. An
+assertion standing beside it that touches a real return or
+a real output keeps its credit in full, so a test that
+checks a call and also checks what the call produced is
+judged by the second assertion and not by the first.
+The patch route honours every spelling that hands back a
+mock, the bare patch and its object and multiple forms and
+the same forms under the mock and unittest.mock module
+spellings, while the dict patching spelling hands back the
+patched mapping itself and stands outside the mock set, so
+an assertion about that mapping entries keeps its credit.
+Mock provenance also reaches past the method body, to a
+mock assigned to self in a setUp method of the same class,
+to a mock built at module level, and to a mock handed back
+by a helper function in the same file.
+
 A fail call inside a conditional branch or a
 conditional expression does not count as a real
 assertion on its own. Such a call guards an earlier
@@ -115,7 +148,13 @@ subtle tautology that argues about fixture derived values,
 such as reading one file twice and comparing the two reads,
 because whether such a comparison can fail depends on what
 the called code does at run time and no static reading of
-one body can settle that in general. It does not enumerate
+one body can settle that in general. It does not follow a
+mock constructor reached under another name, whether the
+constructor stands imported under an alias, or bound first
+to a plain name and called through that name, or reached
+through a getattr call, because the provenance reading
+matches the constructor spellings it holds and no others.
+It does not enumerate
 tests built at run time by decorators, by load_tests or by
 attribute assignment, and it does not follow helpers held
 in another class or another module. Assertions guarded by a
@@ -315,6 +354,351 @@ BUILTIN_VALUES = {
 # a constructor call and then filled by update calls holds
 # what the update calls put in it and not the empty set the
 # constructor returned, so the binding is dropped there.
+# Names that build a mock when called, in their plain and
+# module qualified spellings alike. A test that asserts only
+# about the call state of an object built by one of these
+# asserts about a stand in and not about the code under test.
+MOCK_CTOR_NAMES = {
+    "Mock",
+    "MagicMock",
+    "NonCallableMock",
+    "NonCallableMagicMock",
+    "PropertyMock",
+    "AsyncMock",
+    "create_autospec",
+}
+
+# Call names that hand a mock in as a stand in when they are
+# used as a context manager with a bound name. The names are
+# the suffix forms that remain after a module prefix is
+# stripped, because the same patch family stands under the
+# bare spelling and under the mock and unittest.mock module
+# spellings. The dict spelling stands outside the set by
+# design, because its bound name holds the patched mapping
+# itself and not a mock, so an assertion about the entries
+# of that mapping is a real assertion.
+MOCK_PATCH_NAMES = {"patch", "patch.object", "patch.multiple"}
+
+
+def is_mock_patch_name(dotted):
+    """Whether a dotted call name is a mock handing patch form."""
+    if not dotted:
+        return False
+    parts = dotted.split(".")
+    if parts[:2] == ["unittest", "mock"]:
+        parts = parts[2:]
+    elif parts[:1] == ["mock"]:
+        parts = parts[1:]
+    return ".".join(parts) in MOCK_PATCH_NAMES
+
+
+def dotted_node_name(node):
+    """The dotted name an attribute chain spells, or None."""
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+    return None
+
+
+def mock_prefixed(dotted, mock_names):
+    """Whether a dotted name or one of its prefixes is a mock."""
+    if not dotted:
+        return False
+    parts = dotted.split(".")
+    return any(
+        ".".join(parts[:index]) in mock_names
+        for index in range(1, len(parts) + 1)
+    )
+
+
+def call_dotted_name(func):
+    """The dotted name a call target spells, or its leaf name."""
+    parts = []
+    node = func
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+    return parts[0] if parts else None
+
+
+def root_name(node):
+    """The plain name at the root of an attribute chain."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def is_mock_producing(node, mock_names, return_names=()):
+    """Whether an expression builds or reaches a mock object."""
+    if isinstance(node, ast.Call):
+        dotted = call_dotted_name(node.func)
+        leaf = dotted.rsplit(".", 1)[-1] if dotted else None
+        if leaf in MOCK_CTOR_NAMES:
+            return True
+        if dotted in return_names or leaf in return_names:
+            return True
+        return root_name(node.func) in mock_names
+    if isinstance(node, ast.Attribute):
+        return root_name(node) in mock_names or mock_prefixed(
+            dotted_node_name(node), mock_names
+        )
+    if isinstance(node, ast.Name):
+        return node.id in mock_names
+    if isinstance(node, ast.Subscript):
+        return is_mock_producing(node.value, mock_names, return_names)
+    return False
+
+
+def mock_names_in_body(func, return_names=()):
+    """Names bound to a mock anywhere in one function body.
+
+    The reading is static and whole body, in the same spirit
+    as the constant tracking. A name bound to a mock and
+    later rebound to a real value would still read as a
+    mock here, and an assertion about the call state of
+    such a name argues about a stand in on either binding,
+    so the over reading fails in the safe direction.
+    """
+    names = set()
+    assignments = []
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            targets = []
+            for target in node.targets:
+                targets.extend(bound_names(target))
+            assignments.append((targets, node.value))
+        elif isinstance(node, ast.AnnAssign) and (
+            node.value is not None
+        ):
+            assignments.append(
+                (bound_names(node.target), node.value)
+            )
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                if item.optional_vars is None:
+                    continue
+                if not isinstance(item.context_expr, ast.Call):
+                    continue
+                dotted = call_dotted_name(item.context_expr.func)
+                leaf = dotted.rsplit(".", 1)[-1] if dotted else None
+                if is_mock_patch_name(dotted) or (
+                    leaf in MOCK_CTOR_NAMES
+                ):
+                    names.update(bound_names(item.optional_vars))
+    changed = True
+    while changed:
+        changed = False
+        for targets, value in assignments:
+            if is_mock_producing(value, names, return_names):
+                for name in targets:
+                    if name not in names:
+                        names.add(name)
+                        changed = True
+    return names
+
+
+def own_returns(func):
+    """Return nodes that belong to one function body itself."""
+    found = []
+    stack = list(func.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            continue
+        if isinstance(node, ast.Return) and node.value is not None:
+            found.append(node)
+        stack.extend(ast.iter_child_nodes(node))
+    return found
+
+
+def function_returns_mock(func, return_names, extra_mocks=()):
+    """Whether one function hands a mock back to its caller."""
+    local = mock_names_in_body(func, return_names) | set(extra_mocks)
+    return any(
+        is_mock_producing(node.value, local, return_names)
+        for node in own_returns(func)
+    )
+
+
+def file_mock_provenance(tree):
+    """Module mock names and names of helpers returning a mock.
+
+    Mock provenance does not stop at a test method body. A
+    mock built once at module level, and a mock handed back
+    by a helper function in the same file, are stand ins in
+    the test methods that reach them in the same way a mock
+    built in the body is, so both routes are read here in
+    one fixpoint over the file.
+    """
+    functions = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    return_names = set()
+    module_mocks = set()
+    changed = True
+    while changed:
+        changed = False
+        for stmt in tree.body:
+            value = None
+            targets = []
+            if isinstance(stmt, ast.Assign):
+                value = stmt.value
+                for target in stmt.targets:
+                    targets.extend(bound_names(target))
+            elif isinstance(stmt, ast.AnnAssign) and (
+                stmt.value is not None
+            ):
+                value = stmt.value
+                targets = bound_names(stmt.target)
+            if value is not None and is_mock_producing(
+                value, module_mocks, return_names
+            ):
+                for name in targets:
+                    if name not in module_mocks:
+                        module_mocks.add(name)
+                        changed = True
+        for func in functions:
+            if func.name in return_names:
+                continue
+            if function_returns_mock(
+                func, return_names, module_mocks
+            ):
+                return_names.add(func.name)
+                changed = True
+    return module_mocks, return_names
+
+
+def class_setup_mock_names(cls, return_names, module_mocks):
+    """Dotted self names a setUp method in one class binds to a mock."""
+    names = set()
+    for method in cls.body:
+        if not isinstance(
+            method, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ) or method.name != "setUp":
+            continue
+        local = (
+            mock_names_in_body(method, return_names)
+            | set(module_mocks)
+            | set(names)
+        )
+        assignments = []
+        for node in ast.walk(method):
+            if isinstance(node, ast.Assign):
+                assignments.append((node.targets, node.value))
+            elif isinstance(node, ast.AnnAssign) and (
+                node.value is not None
+            ):
+                assignments.append(([node.target], node.value))
+        changed = True
+        while changed:
+            changed = False
+            known = local | set(names)
+            for targets, value in assignments:
+                if not is_mock_producing(value, known, return_names):
+                    continue
+                for target in targets:
+                    dotted = dotted_node_name(target)
+                    if dotted and dotted.startswith("self."):
+                        if dotted not in names:
+                            names.add(dotted)
+                            changed = True
+    return names
+
+
+def contains_mock_reference(node, mock_names):
+    """Whether an expression mentions a mock bound name."""
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and child.id in mock_names:
+            return True
+        if isinstance(child, ast.Attribute) and mock_prefixed(
+            dotted_node_name(child), mock_names
+        ):
+            return True
+    return False
+
+
+def mock_only_expression(node, mock_names):
+    """Whether an expression argues only about mocks and constants.
+
+    A pure call over a mock call state, a comparison of a
+    call count against a literal, and a boolean joining of
+    called flags all stay inside the mock on this reading.
+    Any name that is not a mock, and any call that is not a
+    pure call or a call on a mock, takes the expression
+    outside it.
+    """
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, ast.Name):
+        return node.id in mock_names
+    if isinstance(node, ast.Attribute):
+        if mock_prefixed(dotted_node_name(node), mock_names):
+            return True
+        return mock_only_expression(node.value, mock_names)
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Attribute):
+            if not mock_only_expression(func.value, mock_names):
+                return False
+        elif isinstance(func, ast.Name):
+            if func.id not in mock_names and (
+                func.id not in PURE_CALL_NAMES
+            ):
+                return False
+        else:
+            return False
+        return all(
+            mock_only_expression(arg, mock_names) for arg in node.args
+        ) and all(
+            mock_only_expression(keyword.value, mock_names)
+            for keyword in node.keywords
+        )
+    if isinstance(node, ast.UnaryOp):
+        return mock_only_expression(node.operand, mock_names)
+    if isinstance(node, ast.BoolOp):
+        return all(
+            mock_only_expression(value, mock_names)
+            for value in node.values
+        )
+    if isinstance(node, ast.BinOp):
+        return mock_only_expression(
+            node.left, mock_names
+        ) and mock_only_expression(node.right, mock_names)
+    if isinstance(node, ast.Compare):
+        return mock_only_expression(
+            node.left, mock_names
+        ) and all(
+            mock_only_expression(part, mock_names)
+            for part in node.comparators
+        )
+    if isinstance(node, ast.IfExp):
+        return all(
+            mock_only_expression(part, mock_names)
+            for part in (node.test, node.body, node.orelse)
+        )
+    if isinstance(node, ast.Subscript):
+        return mock_only_expression(
+            node.value, mock_names
+        ) and mock_only_expression(node.slice, mock_names)
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        return all(
+            mock_only_expression(part, mock_names)
+            for part in node.elts
+        )
+    return False
+
+
 MUTATING_METHOD_NAMES = {
     "add",
     "append",
@@ -1082,9 +1466,13 @@ class ScopeResult:
 class Collector:
     """Walk one body keeping only its live assertions."""
 
-    def __init__(self, global_values):
+    def __init__(self, global_values, return_names=(),
+                 extra_mocks=()):
         self.global_values = global_values
         self.conditional_depth = 0
+        self.mock_names = set()
+        self.return_names = set(return_names)
+        self.extra_mocks = set(extra_mocks)
 
     def walk_conditional_block(self, stmts, values, result, swallowed):
         self.conditional_depth += 1
@@ -1093,16 +1481,30 @@ class Collector:
         finally:
             self.conditional_depth -= 1
 
-    def collect(self, func, seed=None, param_values=None):
+    def collect(self, func, seed=None, param_values=None,
+                param_mocks=None, extra_mocks=None):
         # A fresh body starts outside every conditional branch
         # of the body that defined or called it, because its
         # own branches are the ones that judge its calls.
         outer_depth = self.conditional_depth
         self.conditional_depth = 0
+        # The mock names of a body are its own static bindings,
+        # the mock parameters a caller handed in, and the mock
+        # names of an enclosing body a nested function closes
+        # over, which still stand in the set at this point.
+        outer_mocks = self.mock_names
+        self.mock_names = (
+            mock_names_in_body(func, self.return_names)
+            | set(param_mocks or ())
+            | set(outer_mocks)
+            | set(self.extra_mocks)
+            | set(extra_mocks or ())
+        )
         try:
             return self.collect_body(func, seed, param_values)
         finally:
             self.conditional_depth = outer_depth
+            self.mock_names = outer_mocks
 
     def collect_body(self, func, seed=None, param_values=None):
         result = ScopeResult()
@@ -1280,6 +1682,7 @@ class Collector:
                     False,
                     swallowed,
                     self.conditional_depth > 0,
+                    frozenset(self.mock_names),
                 )
             )
             self.walk_expr(stmt.test, values, result, swallowed)
@@ -1552,6 +1955,7 @@ class Collector:
                             id(node) in result.context_call_ids,
                             swallowed,
                             self.conditional_depth > 0,
+                            frozenset(self.mock_names),
                         )
                     )
             if isinstance(func, ast.Lambda):
@@ -1625,13 +2029,16 @@ class Collector:
 
 
 def assertion_record_is_real(record):
-    kind, node, name, values, in_context, swallowed, conditional = (
-        record
-    )
+    (kind, node, name, values, in_context, swallowed, conditional,
+     mock_names) = record
     if swallowed:
         return False
     if kind == "assert":
         test = node.test
+        if mock_names and contains_mock_reference(
+            test, mock_names
+        ) and mock_only_expression(test, mock_names):
+            return False
         if is_constant_expression(test, values):
             return False
         if self_comparison(test):
@@ -1680,6 +2087,14 @@ def assertion_record_is_real(record):
             operand.op, ast.Not
         ) and self_comparison(operand.operand):
             return False
+    if mock_names and any(
+        contains_mock_reference(operand, mock_names)
+        for operand in operands
+    ) and all(
+        mock_only_expression(operand, mock_names)
+        for operand in operands
+    ):
+        return False
     return True
 
 
@@ -1754,9 +2169,21 @@ def vacuity_problems(root=None):
     tests_dir = root / "tests"
     problems = []
     paths = set()
-    if tests_dir.is_dir():
-        paths.update(tests_dir.glob("test*.py"))
-        paths.update(tests_dir.glob("*_test.py"))
+    if not tests_dir.is_dir():
+        problems.append(
+            "the tests directory is missing, so the guard "
+            "discovered no test methods to judge"
+        )
+        return problems
+    paths.update(tests_dir.glob("test*.py"))
+    paths.update(tests_dir.glob("*_test.py"))
+    if not paths:
+        problems.append(
+            "the tests directory holds no test files, so the "
+            "guard discovered no test methods to judge"
+        )
+        return problems
+    method_count = [0]
     for path in sorted(paths):
         if not path.is_file():
             problems.append(
@@ -1768,13 +2195,24 @@ def vacuity_problems(root=None):
             tree = ast.parse(
                 path.read_text(encoding="utf-8"), filename=str(path)
             )
+        except UnicodeDecodeError as exc:
+            problems.append(
+                "%s cannot be read as UTF-8 text, %s"
+                % (path.name, exc)
+            )
+            continue
         except (OSError, SyntaxError) as exc:
             problems.append(
                 "%s does not parse, %s" % (path.name, exc)
             )
             continue
         global_values = module_global_values(tree)
-        collector = Collector(global_values)
+        module_mocks, return_names = file_mock_provenance(tree)
+        collector = Collector(
+            global_values,
+            return_names=return_names,
+            extra_mocks=module_mocks,
+        )
 
         def no_resolve(name, node, snapshot):
             return (False, False)
@@ -1796,6 +2234,7 @@ def vacuity_problems(root=None):
             if isinstance(
                 item, (ast.FunctionDef, ast.AsyncFunctionDef)
             ) and item.name.startswith("test"):
+                method_count[0] += 1
                 result = collector.collect(item)
                 check(
                     "%s %s" % (path.name, item.name),
@@ -1902,12 +2341,60 @@ def vacuity_problems(root=None):
                         )
                 return bindings
 
+            caller_mocks = [set()]
+
+            def param_mock_names(func, node):
+                names = set()
+                arguments = func.args
+                positional = [
+                    arg.arg
+                    for arg in (
+                        list(arguments.posonlyargs)
+                        + list(arguments.args)
+                    )
+                ]
+                decorator_names = set()
+                for decorator in func.decorator_list:
+                    if isinstance(decorator, ast.Name):
+                        decorator_names.add(decorator.id)
+                    elif isinstance(decorator, ast.Attribute):
+                        decorator_names.add(decorator.attr)
+                if (
+                    positional
+                    and isinstance(node.func, ast.Attribute)
+                    and "staticmethod" not in decorator_names
+                ):
+                    positional = positional[1:]
+                keywords = {
+                    keyword.arg: keyword.value
+                    for keyword in node.keywords
+                    if keyword.arg is not None
+                }
+                exprs = {}
+                for index, param in enumerate(positional):
+                    if index < len(node.args):
+                        exprs[param] = node.args[index]
+                    elif param in keywords:
+                        exprs[param] = keywords[param]
+                for arg in arguments.kwonlyargs:
+                    if arg.arg in keywords:
+                        exprs[arg.arg] = keywords[arg.arg]
+                for param, expr in exprs.items():
+                    if is_mock_producing(
+                        expr, caller_mocks[0], return_names
+                    ) or contains_mock_reference(
+                        expr, caller_mocks[0]
+                    ):
+                        names.add(param)
+                return names
+
             def resolve_call(name, node, snapshot):
                 if name not in helpers:
                     return (False, False)
                 bindings = param_bindings(
                     helpers[name], node, snapshot
                 )
+                param_mocks = param_mock_names(helpers[name], node)
                 key = (
                     name,
                     repr(
@@ -1916,6 +2403,7 @@ def vacuity_problems(root=None):
                             for param, value in bindings.items()
                         )
                     ),
+                    repr(sorted(param_mocks)),
                 )
                 if key in resolved:
                     return resolved[key]
@@ -1923,7 +2411,8 @@ def vacuity_problems(root=None):
                     return (False, False)
                 visiting.add(key)
                 sub = collector.collect(
-                    helpers[name], param_values=bindings
+                    helpers[name], param_values=bindings,
+                    param_mocks=param_mocks,
                 )
                 value = (
                     scope_is_real(sub, resolve_call),
@@ -1933,14 +2422,36 @@ def vacuity_problems(root=None):
                 resolved[key] = value
                 return value
 
+            setup_mocks = class_setup_mock_names(
+                cls, return_names, module_mocks
+            )
+            collector.extra_mocks = (
+                set(module_mocks) | set(setup_mocks)
+            )
             for item in methods:
                 if item.name.startswith("test"):
-                    result = collector.collect(item)
+                    method_count[0] += 1
+                    caller_mocks[0] = (
+                        mock_names_in_body(item, return_names)
+                        | set(module_mocks)
+                        | set(setup_mocks)
+                    )
+                    result = collector.collect(
+                        item,
+                        extra_mocks=(
+                            set(module_mocks) | set(setup_mocks)
+                        ),
+                    )
                     check(
                         "%s %s" % (path.name, item.name),
                         result,
                         resolve_call,
                     )
+    if method_count[0] == 0:
+        problems.append(
+            "the discovered test files hold no test methods, "
+            "so the guard judged an empty suite"
+        )
     return problems
 
 

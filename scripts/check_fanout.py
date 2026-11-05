@@ -90,6 +90,24 @@ GIT_DRIVER_ENV_VARS = (
     "GIT_EXEC_PATH",
 )
 GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+# The same attribute source and pathspec mode scrub the
+# extractor and the packet check run under, ported in full so
+# every gate that spawns git children stands under the same
+# hardened environment. An exported attribute source names a
+# tree whose attributes every child would read in place of
+# the reviewed tree, and an exported pathspec mode makes git
+# refuse the literal pathspec flag the line readings use.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
 
 
 def scrubbed_child_env():
@@ -99,9 +117,12 @@ def scrubbed_child_env():
         for key, value in os.environ.items()
         if key not in GIT_SCRUB_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     return env
 
 
@@ -498,7 +519,10 @@ def repo_line_problems(record, manifest, repo):
     against the file as it stands at the manifest head. A
     location naming a line the file does not have is a
     location no packet held, however consistent the record
-    is internally.
+    is internally. A file git cannot show at the head at
+    all draws a problem of its own, because a missing file
+    and a failed reading must never read as a location that
+    passed, so this reading fails closed on that shape.
     """
     head = manifest.get("head") if isinstance(manifest, dict) else None
     if not isinstance(head, str):
@@ -537,6 +561,13 @@ def repo_line_problems(record, manifest, repo):
                 len(result.stdout.splitlines())
                 if result.returncode == 0 else None
             )
+            if result.returncode != 0:
+                problems.append(
+                    "%s cites %s line %d, but that file cannot "
+                    "be read at the packet head, so the cited "
+                    "line stands unverified and the location "
+                    "is refused" % (where, path, line)
+                )
         total = counts[path]
         if total is not None and line > total:
             problems.append(

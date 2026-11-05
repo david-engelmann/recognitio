@@ -384,6 +384,11 @@ def read_text(root, rel, problems, label):
         return None
     try:
         return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "%s cannot be read as UTF-8 text" % label
+        )
+        return None
     except OSError:
         problems.append("%s is missing" % label)
         return None

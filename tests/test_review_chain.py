@@ -798,7 +798,7 @@ class TestHeadlessChain(ChainFixture):
             swapped,
         )
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("no packet file stands beside", result.stdout)
+        self.assertIn("no packet file stands beside", result.stderr)
 
     def test_a_verified_false_manifest_fails(self):
         import shutil
@@ -818,7 +818,7 @@ class TestHeadlessChain(ChainFixture):
             [self.result({"verdict": "pass", "findings": []})], target
         )
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("not verified", result.stdout)
+        self.assertIn("not verified", result.stderr)
 
     def test_the_other_packet_manifest_disagrees_with_the_stream_head(self):
         # Finding F8. The bridge stream names the chain packet
@@ -831,7 +831,7 @@ class TestHeadlessChain(ChainFixture):
             events, self.dir / "packet-other" / "manifest.json"
         )
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn("packet head", result.stdout)
+        self.assertIn("packet head", result.stderr)
 
     def test_a_recorded_exit_of_127_fails_against_a_claim_of_zero(self):
         # Finding F8. The exit code is data in a file, and a
@@ -854,7 +854,7 @@ class TestHeadlessChain(ChainFixture):
         result = run(command, check=False)
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn("disagrees with the recorded exit code",
-                      result.stdout)
+                      result.stderr)
 
 
 class TestFindingsFileChain(ChainFixture):

@@ -17,10 +17,12 @@ gate.
 """
 
 import importlib.util
+import io
 import re
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,6 +90,75 @@ class TestCheckZcode(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
+
+    def test_the_success_line_names_what_was_checked(self):
+        # Round 4 audit Major 3. The gate once passed in
+        # silence, so a green run left no evidence of what
+        # had been read. The success line now names the
+        # surfaces on the output stream.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            out = io.StringIO()
+            err = io.StringIO()
+            with redirect_stdout(out):
+                with redirect_stderr(err):
+                    code = self.mod.main(root)
+            self.assertEqual(code, 0)
+            self.assertIn("check_zcode", out.getvalue())
+            self.assertIn(
+                "the ZCode plugin build holds", out.getvalue()
+            )
+            self.assertIn("decision record", out.getvalue())
+            self.assertEqual(err.getvalue(), "")
+
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        # Round 4 standards Minor 3, repaired at the fix
+        # review. The brief reading once let the decode
+        # error escape as a traceback. A standing file with
+        # damaged bytes is not a missing file, so the
+        # problem names the UTF-8 defect and never the
+        # missing wording.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "zcode-plugin-brief.md").write_bytes(
+                b"\xff\xfe\x00bad"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "zcode-plugin-brief.md" in p
+                    and "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "zcode-plugin-brief.md is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_missing_brief_keeps_the_missing_wording(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "zcode-plugin-brief.md").unlink()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "zcode-plugin-brief.md is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
 
     def test_a_dropped_version_bump_sentence_fails(self):
         # The version bump rule is the distribution claim:

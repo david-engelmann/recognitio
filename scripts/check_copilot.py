@@ -126,13 +126,77 @@ MODEL_TOKENS = re.compile(
 RETIREMENT_RULE = "R12"
 
 
+UTF8_UNREADABLE = []
+
+
 def read_text(path):
     if path.exists() and not path.is_file():
         return None
     try:
         return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        if str(path) not in UTF8_UNREADABLE:
+            UTF8_UNREADABLE.append(str(path))
+        return None
     except OSError:
         return None
+
+
+def utf8_problems():
+    """Problems naming the files the readings could not decode."""
+    return [
+        "%s cannot be read as UTF-8 text" % Path(path).name
+        for path in UTF8_UNREADABLE
+    ]
+
+
+def repair_utf8_problems(problems):
+    """Name the UTF-8 defect in place of the missing wording.
+
+    A file that stands on disk holding damaged bytes is not
+    a missing file, so a problem that calls a recorded
+    undecodable file missing is replaced by the UTF-8
+    problem for that file, in the shape the comate and copy
+    readings use. A genuinely missing file records nothing
+    here and keeps its missing wording.
+    """
+    if not UTF8_UNREADABLE:
+        return problems
+    kept = []
+    labels = []
+    for problem in problems:
+        label = None
+        if "missing" in problem:
+            for path in UTF8_UNREADABLE:
+                parts = Path(path).parts
+                for size in range(len(parts), 0, -1):
+                    candidate = "/".join(parts[-size:])
+                    if candidate not in problem:
+                        continue
+                    if size == 1:
+                        token = re.search(
+                            r"[^\s]*" + re.escape(candidate),
+                            problem,
+                        )
+                        if token and "/" in token.group(0):
+                            continue
+                    label = candidate
+                    break
+                if label is not None:
+                    break
+        if label is None:
+            kept.append(problem)
+        elif label not in labels:
+            labels.append(label)
+    for path in UTF8_UNREADABLE:
+        name = Path(path).name
+        if not any(label.endswith(name) for label in labels):
+            labels.append(name)
+    kept.extend(
+        "%s cannot be read as UTF-8 text" % label
+        for label in labels
+    )
+    return kept
 
 
 def deliberate_source(note):
@@ -820,6 +884,7 @@ def decision_problems(root=None):
 
 def copilot_problems(root=None):
     """Every Build 13 Copilot SDK agent build problem."""
+    UTF8_UNREADABLE.clear()
     problems = []
     problems.extend(brief_problems(root))
     problems.extend(rules_problems(root))
@@ -827,7 +892,7 @@ def copilot_problems(root=None):
     problems.extend(model_problems(root))
     problems.extend(approval_problems(root))
     problems.extend(decision_problems(root))
-    return problems
+    return repair_utf8_problems(problems)
 
 
 def main(root=None):

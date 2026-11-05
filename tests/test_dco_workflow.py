@@ -166,6 +166,92 @@ class TestDcoWorkflow(unittest.TestCase):
         )
         self.assertNotEqual(self.check(sha), 0)
 
+    def dco_script(self, base, head):
+        """The DCO step run block from the workflow, with the
+        range ends substituted, ready to run in the fixture."""
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        lines = workflow.splitlines()
+        start = None
+        for index, line in enumerate(lines):
+            if "require the Signed-off-by identity" in line:
+                start = index
+                break
+        self.assertIsNotNone(start)
+        run_at = None
+        for index in range(start, len(lines)):
+            if lines[index].strip() == "run: |":
+                run_at = index
+                break
+        self.assertIsNotNone(run_at)
+        body = []
+        for line in lines[run_at + 1:]:
+            if line.startswith("          "):
+                body.append(line[10:])
+            elif not line.strip():
+                body.append("")
+            else:
+                break
+        script = "\n".join(body)
+        script = script.replace(
+            "${{ github.event.pull_request.base.sha }}", base
+        )
+        script = script.replace(
+            "${{ github.event.pull_request.head.sha }}", head
+        )
+        return script
+
+    def run_dco(self, base, head):
+        env = dict(os.environ)
+        for var in GIT_LOCATION_VARS:
+            env.pop(var, None)
+        return subprocess.run(
+            ["bash", "-c", self.dco_script(base, head)],
+            cwd=str(self.repo), env=env,
+            capture_output=True, text=True,
+        )
+
+    def test_an_empty_range_fails_the_dco_step(self):
+        # Round 4 audit Minor 2. A range holding zero
+        # non-merge commits once printed the success sentence
+        # over no commits at all. The step now fails with a
+        # named message instead, because no pull request shape
+        # this job runs on legitimately holds an empty range.
+        sha = self.commit_message(
+            "only.txt", "A change\n\n%s\n" % SIGN_OFF
+        )
+        result = self.run_dco(sha, sha)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no non-merge commits", result.stdout)
+        self.assertNotIn("present on all", result.stdout)
+
+    def test_a_signed_range_passes_the_dco_step(self):
+        base = self.commit_message(
+            "base.txt", "The base\n\n%s\n" % SIGN_OFF
+        )
+        head = self.commit_message(
+            "head.txt", "A change\n\n%s\n" % SIGN_OFF
+        )
+        result = self.run_dco(base, head)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "DCO sign-off identity present on all 1", result.stdout
+        )
+
+    def test_an_unsigned_range_fails_the_dco_step(self):
+        base = self.commit_message(
+            "base2.txt", "The base\n\n%s\n" % SIGN_OFF
+        )
+        head = self.commit_message(
+            "head2.txt", "A change with no trailer\n"
+        )
+        result = self.run_dco(base, head)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "missing the Signed-off-by identity", result.stdout
+        )
+
     def test_the_workflow_exempts_dependabot_by_actor(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"

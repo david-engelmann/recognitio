@@ -2665,10 +2665,9 @@ class TestCheckSubmissions(unittest.TestCase):
             or "demo" in largest[1], largest)
         self.assertEqual(
             stated(
-                r"scripts/check_mod\.py at ([\d,]+) bytes"),
+                re.escape(largest_plain[1])
+                + r" at ([\d,]+) bytes"),
             format(largest_plain[0], ","))
-        self.assertEqual(largest_plain[1],
-                         "scripts/check_mod.py")
         self.assertEqual(
             int(stated(r"scan over all (\d+) files in the tree")),
             len(listed))

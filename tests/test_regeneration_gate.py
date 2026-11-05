@@ -129,6 +129,150 @@ def clone_tree(tmp):
     return dest
 
 
+TOOL_STEPS = ("check_packet.py", "check_headless.py")
+SMOKE_STEP = "smoke_extract.py"
+DISCOVER_STEP = "$(PYTHON) -m unittest discover -s tests"
+STEP_SEQUENCE = (
+    "check_skill.py",
+    "check_version.py",
+    "check_copy.py",
+    "check_evals.py",
+    "check_regeneration.py",
+    "check_persona.py",
+    "check_fanout.py",
+    "check_mod.py",
+    "check_package.py",
+    "check_codex.py",
+    "check_codex_plugin.py",
+    "check_cursor.py",
+    "check_coderabbit.py",
+    "check_antigravity.py",
+    "check_copilot.py",
+    "check_kimi.py",
+    "check_zcode.py",
+    "check_devin.py",
+    "check_qwen.py",
+    "check_comate.py",
+    "check_brand.py",
+    "check_discovery.py",
+    "check_submissions.py",
+    "check_test_vacuity.py",
+    SMOKE_STEP,
+)
+
+
+def invocation_step_name(step):
+    """The script a plain invocation step runs, or None.
+
+    A step counts only when its line is the invocation form
+    the recipe ships, a tabbed line whose content is exactly
+    the interpreter variable and the script path, with no
+    arguments, because the shipped recipe carries none for
+    the check steps. A softened line, an ignore error
+    prefix or a trailing shell fallback or a comment line
+    naming a script, is not that form and counts as no step
+    for its script.
+    """
+    prefix = "$(PYTHON) scripts/"
+    if not step.startswith(prefix):
+        return None
+    name = step[len(prefix):]
+    if not name or any(char in name for char in " \t#|&;"):
+        return None
+    return name
+
+
+def makefile_step_problems(makefile_text, script_names):
+    """Problems with the Makefile check recipe as a gate census.
+
+    The recipe is the gate, so its step list is read against
+    the scripts the tree ships. The discover stands first and
+    the smoke stands last, every check script on disk stands
+    as a step apart from the two reviewer tools that take a
+    named input no recipe can invent, and no step names a
+    script the tree does not ship. Divergence in either
+    direction is a problem by name. A step counts only in
+    the plain invocation form the recipe ships, and the
+    counted steps must stand in the shipped sequence, so a
+    softened step and two swapped steps are each a problem.
+    """
+    problems = []
+    steps = []
+    in_check = False
+    for line in makefile_text.splitlines():
+        if line.startswith("check:"):
+            in_check = True
+            continue
+        if in_check:
+            if line.startswith("\t"):
+                steps.append(line.strip())
+            elif line.strip():
+                break
+    script_steps = []
+    for step in steps:
+        name = invocation_step_name(step)
+        if name is not None:
+            script_steps.append(name)
+        elif step != DISCOVER_STEP and "scripts/" in step:
+            problems.append(
+                "the Makefile check recipe line %r names a "
+                "script but is not the plain invocation form "
+                "the recipe ships" % step
+            )
+    if not steps or "discover" not in steps[0]:
+        problems.append(
+            "the Makefile check recipe does not open with "
+            "the test discover step"
+        )
+    wired = set(script_names)
+    for name in sorted(wired):
+        if not name.startswith("check_"):
+            continue
+        if name in TOOL_STEPS:
+            continue
+        if script_steps.count(name) == 0:
+            problems.append(
+                "the Makefile check recipe names no step "
+                "for scripts/%s" % name
+            )
+        elif script_steps.count(name) > 1:
+            problems.append(
+                "the Makefile check recipe runs scripts/%s "
+                "more than once" % name
+            )
+    for name in script_steps:
+        if name not in wired and name != SMOKE_STEP:
+            problems.append(
+                "the Makefile check recipe names scripts/%s, "
+                "which does not stand in the scripts directory"
+                % name
+            )
+    if script_steps.count(SMOKE_STEP) != 1:
+        problems.append(
+            "the Makefile check recipe does not run the "
+            "extractor smoke exactly once"
+        )
+    elif not steps or SMOKE_STEP not in steps[-1]:
+        problems.append(
+            "the Makefile check recipe does not stand the "
+            "extractor smoke last"
+        )
+    expected = [
+        name
+        for name in STEP_SEQUENCE
+        if name in wired or name == SMOKE_STEP
+    ]
+    if sorted(script_steps) == sorted(expected) and (
+        script_steps != expected
+    ):
+        problems.append(
+            "the Makefile check recipe steps do not stand "
+            "in the shipped sequence, so two or more steps "
+            "stand swapped"
+        )
+    return problems
+
+
 class MakefileStepTest(unittest.TestCase):
     def test_the_step_stands_between_evals_and_persona(self):
         lines = (ROOT / "Makefile").read_text(
@@ -145,6 +289,140 @@ class MakefileStepTest(unittest.TestCase):
         )
         self.assertEqual(
             steps[position + 1], "$(PYTHON) scripts/check_persona.py"
+        )
+
+    def recipe_and_scripts(self):
+        text = (ROOT / "Makefile").read_text(encoding="utf-8")
+        names = {
+            path.name
+            for path in (ROOT / "scripts").glob("*.py")
+        }
+        return text, names
+
+    def test_the_recipe_matches_the_scripts_on_disk(self):
+        # Round 4 audit Major 1. The step list itself is
+        # pinned against the scripts directory in both
+        # directions, so a deleted step or an unwired new
+        # gate turns this test red instead of leaving a
+        # green gate one check short of its claim.
+        text, names = self.recipe_and_scripts()
+        problems = makefile_step_problems(text, names)
+        self.assertEqual(problems, [], problems)
+
+    def test_a_deleted_step_is_named(self):
+        text, names = self.recipe_and_scripts()
+        broken = "\n".join(
+            line for line in text.splitlines()
+            if "check_kimi.py" not in line
+        )
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_kimi.py" in p for p in problems), problems
+        )
+
+    def test_a_deleted_vacuity_step_is_named(self):
+        text, names = self.recipe_and_scripts()
+        broken = "\n".join(
+            line for line in text.splitlines()
+            if "check_test_vacuity.py" not in line
+        )
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_test_vacuity.py" in p for p in problems),
+            problems,
+        )
+
+    def test_an_unwired_script_on_disk_is_named(self):
+        text, names = self.recipe_and_scripts()
+        names = set(names) | {"check_newgate.py"}
+        problems = makefile_step_problems(text, names)
+        self.assertTrue(
+            any("check_newgate.py" in p for p in problems),
+            problems,
+        )
+
+    def test_a_step_naming_no_script_on_disk_is_named(self):
+        text, names = self.recipe_and_scripts()
+        broken = text.replace(
+            "\t$(PYTHON) scripts/smoke_extract.py\n",
+            "\t$(PYTHON) scripts/check_ghost.py\n"
+            "\t$(PYTHON) scripts/smoke_extract.py\n",
+        )
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_ghost.py" in p for p in problems), problems
+        )
+
+    def test_the_smoke_must_stand_last(self):
+        text, names = self.recipe_and_scripts()
+        smoke = "\t$(PYTHON) scripts/smoke_extract.py\n"
+        broken = text.replace(smoke, "")
+        broken = broken.replace(
+            "\t$(PYTHON) scripts/check_skill.py\n",
+            smoke + "\t$(PYTHON) scripts/check_skill.py\n",
+        )
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("smoke" in p and "last" in p for p in problems),
+            problems,
+        )
+
+    def test_an_ignore_error_prefix_step_is_refused(self):
+        # A step softened in place with the make ignore
+        # error prefix names the same script and no longer
+        # enforces it, so the census must not count it.
+        text, names = self.recipe_and_scripts()
+        broken = text.replace(
+            "\t$(PYTHON) scripts/check_kimi.py\n",
+            "\t-$(PYTHON) scripts/check_kimi.py\n",
+        )
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_kimi.py" in p for p in problems),
+            problems,
+        )
+
+    def test_a_trailing_fallback_step_is_refused(self):
+        text, names = self.recipe_and_scripts()
+        broken = text.replace(
+            "\t$(PYTHON) scripts/check_kimi.py\n",
+            "\t$(PYTHON) scripts/check_kimi.py || true\n",
+        )
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_kimi.py" in p for p in problems),
+            problems,
+        )
+
+    def test_a_comment_line_naming_a_script_is_refused(self):
+        text, names = self.recipe_and_scripts()
+        broken = text.replace(
+            "\t$(PYTHON) scripts/check_kimi.py\n",
+            "\t# $(PYTHON) scripts/check_kimi.py\n",
+        )
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("check_kimi.py" in p for p in problems),
+            problems,
+        )
+
+    def test_two_swapped_check_steps_are_refused(self):
+        text, names = self.recipe_and_scripts()
+        kimi = "\t$(PYTHON) scripts/check_kimi.py\n"
+        zcode = "\t$(PYTHON) scripts/check_zcode.py\n"
+        broken = text.replace(kimi, "@@STEP@@\n")
+        broken = broken.replace(zcode, kimi)
+        broken = broken.replace("@@STEP@@\n", zcode)
+        self.assertNotEqual(broken, text)
+        problems = makefile_step_problems(broken, names)
+        self.assertTrue(
+            any("sequence" in p for p in problems),
+            problems,
         )
 
 

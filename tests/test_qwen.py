@@ -21,10 +21,12 @@ sentence that fails each fail the Qwen gate.
 """
 
 import importlib.util
+import io
 import re
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,6 +162,95 @@ class TestCheckQwen(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
+
+    def run_main_on(self, root):
+        original = self.mod.ROOT
+        self.mod.ROOT = root
+        out = io.StringIO()
+        err = io.StringIO()
+        try:
+            with redirect_stdout(out):
+                with redirect_stderr(err):
+                    code = self.mod.main()
+        finally:
+            self.mod.ROOT = original
+        return code, out.getvalue(), err.getvalue()
+
+    def test_problems_print_to_the_error_stream_naming_the_brief(self):
+        # Round 4 audit Major 3. The gate once printed its
+        # problems to the output stream as fragments, so a
+        # failing run read as ordinary output and named no
+        # surface. Problems now land on the error stream as
+        # sentences naming the brief.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "qwen-code-brief.md").unlink()
+            code, out, err = self.run_main_on(root)
+            self.assertEqual(code, 1)
+            self.assertIn("check_qwen", err)
+            self.assertIn("docs/qwen-code-brief.md", err)
+            self.assertIn("is missing", err)
+            self.assertNotIn("is missing", out)
+
+    def test_the_success_line_stays_on_the_output_stream(self):
+        code, out, err = self.run_main_on(ROOT)
+        self.assertEqual(code, 0)
+        self.assertIn("check_qwen: Qwen contract holds", out)
+        self.assertEqual(err, "")
+
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        # Round 4 standards Minor 3, repaired at the fix
+        # review. The brief reading once let the decode
+        # error escape as a traceback. A standing file with
+        # damaged bytes is not a missing file, so the
+        # problem names the UTF-8 defect and never the
+        # missing wording.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "qwen-code-brief.md").write_bytes(
+                b"\xff\xfe\x00bad"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "qwen-code-brief.md" in p
+                    and "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "qwen-code-brief.md is missing" in p
+                    or (
+                        "qwen-code-brief.md" in p
+                        and "is missing" in p
+                    )
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_missing_brief_keeps_the_missing_wording(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "qwen-code-brief.md").unlink()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "qwen-code-brief.md" in p
+                    and "is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
 
     def test_the_readme_scoped_npm_form_fails(self):
         # Visual round 1. The copyable scoped npm test
@@ -422,6 +513,68 @@ class TestCheckQwen(unittest.TestCase):
                 any("no listing file" in p for p in problems),
                 problems,
             )
+
+    def test_a_negative_family_plant_speaks_in_the_sentence_form(self):
+        # Round 4 fix review, standards Minor 5. The
+        # negative family problems are rewritten into full
+        # sentences naming the brief, and this pin holds
+        # that form, so reverting the rewriting to a pass
+        # through that returns the old labels fails here.
+        problems = self.mod.negative_problems(
+            "Qwen runs 16 agents working side by side on a "
+            "large review"
+        )
+        self.assertTrue(problems, problems)
+        self.assertTrue(
+            any(
+                p.startswith(
+                    "the Qwen brief at "
+                    "docs/qwen-code-brief.md carries a "
+                    "figure plant in the sentence "
+                )
+                and "16 agents" in p
+                for p in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any(p.startswith("figure plant:") for p in problems),
+            problems,
+        )
+
+    def test_a_derivation_plant_speaks_in_the_sentence_form(self):
+        # The derivation reading was rewritten the same
+        # way, and its sentence form is pinned the same
+        # way, naming the brief and the rule head and the
+        # defect in one sentence.
+        raw = (
+            "## The Qwen rules\n"
+            "\n"
+            "### R1. A planted rule head\n"
+            "\n"
+            "A rule body with no derivation note at all.\n"
+        )
+        problems = self.mod.derivation_problems(raw)
+        self.assertTrue(
+            any(
+                p.startswith(
+                    "the Qwen brief at "
+                    "docs/qwen-code-brief.md carries a rule "
+                    "without derivation note, the rule "
+                    "headed A planted rule head, so the "
+                    "rule names no source a reader can check"
+                )
+                for p in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any(
+                p.startswith("rule without derivation note:")
+                for p in problems
+            ),
+            problems,
+        )
 
     def test_a_dropped_derivation_note_fails(self):
         with tempfile.TemporaryDirectory() as tmp:

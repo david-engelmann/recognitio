@@ -773,6 +773,151 @@ class TestAbbrevPin(unittest.TestCase):
         self.assertEqual(read_packet(out), self.clean_packet)
 
 
+class TestGateScrubParity(unittest.TestCase):
+    """Every gate that runs git carries the full scrub.
+
+    Round 4 standards Major 2. The extractor and the packet
+    checker scrubbed the attribute sources, the replace refs
+    and the pathspec modes, while four sibling gates that also
+    run git scrubbed only the location family, so the same
+    poisoned environment that the hardened pair refused could
+    still reshape their readings. One poisoned environment is
+    held over every shipped scrub helper and every helper
+    must produce the hardened result.
+    """
+
+    FORCED_OFF = ("GIT_NO_REPLACE_OBJECTS", "GIT_ATTR_NOSYSTEM")
+
+    def dropped_names(self):
+        # The planted key set is derived from the scrub
+        # tuples the helpers themselves carry, so the plant
+        # and the scrub cannot drift apart by hand. Every
+        # name any shipped helper lists in its location or
+        # scrub tuple or its driver or attribute or pathspec
+        # tuple is planted, apart from the two names the
+        # scrub forces on rather than drops. The config
+        # family stands behind a prefix rather than a tuple,
+        # so its planted names are built from that prefix.
+        names = set()
+        for _label, _helper, module in self.scrub_helpers():
+            for attr in (
+                "GIT_SCRUB_VARS",
+                "GIT_LOCATION_VARS",
+                "GIT_DRIVER_ENV_VARS",
+                "GIT_ATTR_ENV_VARS",
+                "GIT_PATHSPEC_ENV_VARS",
+            ):
+                names.update(getattr(module, attr, ()))
+        names.difference_update(self.FORCED_OFF)
+        return names
+
+    def poisoned_env(self):
+        poisoned = {
+            name: "/tmp/forge" for name in self.dropped_names()
+        }
+        prefix = extract_mod.GIT_CONFIG_ENV_PREFIX
+        poisoned[prefix + "_COUNT"] = "1"
+        poisoned[prefix + "_KEY_0"] = "diff.drv.textconv"
+        poisoned[prefix + "_VALUE_0"] = "/tmp/forge.sh"
+        poisoned[prefix + "_PARAMETERS"] = (
+            "'diff.drv.textconv=/tmp/forge.sh'"
+        )
+        return poisoned
+
+    def scrub_helpers(self):
+        # The helper set is discovered from the tree rather
+        # than named by hand. Every shipped file that
+        # carries a scrub helper of this family stands in
+        # the set, being the canonical extractor and every
+        # file under scripts that defines one of the two
+        # helper spellings, the packet checker and the gate
+        # scripts and the smoke script among them. A future
+        # gate carrying the helper joins the parity test
+        # when it lands, with no list to remember to extend.
+        candidates = [EXTRACT_PATH]
+        candidates.extend(
+            sorted((ROOT / "scripts").glob("*.py"))
+        )
+        helpers = []
+        seen = set()
+        for path in candidates:
+            if path in seen:
+                continue
+            seen.add(path)
+            text = path.read_text(encoding="utf-8")
+            helper_name = None
+            for spelling in (
+                "scrubbed_child_env",
+                "scrubbed_git_env",
+            ):
+                if ("def " + spelling) in text:
+                    helper_name = spelling
+                    break
+            if helper_name is None:
+                continue
+            label = (
+                "extract"
+                if path == EXTRACT_PATH
+                else path.stem
+            )
+            module = load_at(
+                path, "scrub_parity_discovered_" + label
+            )
+            helpers.append(
+                (label, getattr(module, helper_name), module)
+            )
+        return helpers
+
+    def test_the_discovery_finds_every_hand_named_helper(self):
+        # The discovery must find exactly the helpers the
+        # hand written list named on this tree, no fewer.
+        labels = {
+            label for label, _helper, _module in self.scrub_helpers()
+        }
+        self.assertEqual(
+            labels,
+            {
+                "extract",
+                "check_packet",
+                "check_evals",
+                "check_fanout",
+                "check_regeneration",
+                "smoke_extract",
+            },
+        )
+
+    def test_the_derived_poison_covers_the_named_five(self):
+        # The derivation stands on the shipped tuples, and
+        # these five names stand in those tuples today, so
+        # a tuple that lost one of them in every helper at
+        # once would shrink the plant in silence without
+        # this pin.
+        dropped = self.dropped_names()
+        for name in (
+            "GIT_COMMON_DIR",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_DIFF_OPTS",
+            "GIT_PAGER",
+            "GIT_EXEC_PATH",
+        ):
+            self.assertIn(name, dropped)
+
+    def test_every_gate_scrub_drops_the_poisoned_families(self):
+        poisoned = self.poisoned_env()
+        planted = set(poisoned)
+        poisoned["GIT_NO_REPLACE_OBJECTS"] = "0"
+        for label, helper, _module in self.scrub_helpers():
+            with mock.patch.dict(os.environ, poisoned):
+                env = helper()
+            for name in planted:
+                self.assertNotIn(name, env, "%s kept %s" % (label, name))
+            for name in self.FORCED_OFF:
+                self.assertEqual(
+                    env[name], "1", "%s left %s unset" % (label, name)
+                )
+            self.assertIn("PATH", env)
+
+
 class TestPathspecEnvScrub(unittest.TestCase):
     """Pathspec mode variables in the caller env cannot break a run."""
 

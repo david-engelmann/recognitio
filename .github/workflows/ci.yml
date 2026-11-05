@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [dev, main]
+    branches: [main]
   pull_request:
 
 # Least privilege. Both jobs only read the code they check out.
@@ -21,9 +21,10 @@ jobs:
     # before pushing, word for word. CI is a backstop, not a gate.
     # The timeout holds the whole gate with room to spare. The test
     # discover alone took 380 seconds on the runner at 2,344 tests
-    # in run 302, the suite now stands at 2,508 tests by the loader
-    # count on this tree, and two dozen gate scripts run behind the
-    # discover, so the old ten minutes cancelled the job inside the
+    # in run 302, the suite now stands at 2,586 tests by the loader
+    # count on this tree, and 24 gate scripts plus the smoke script
+    # run behind the discover, so the old ten minutes cancelled
+    # the job inside the
     # gate step before any verdict could stand. Thirty minutes is
     # several times the extrapolated discover run of about 400
     # seconds and still bounds a hung job.
@@ -54,7 +55,11 @@ jobs:
     # Dependabot is exempt by actor. Its commits are machine made and
     # cannot carry a sign-off, and the exemption is recorded in
     # AGENTS.md. Push runs are the already gated squash result, so the
-    # pull request is the enforcement point. Adapted from peira.
+    # pull request is the enforcement point. A range holding no
+    # non-merge commit fails the job rather than passing over an
+    # empty set, because a green claim about zero commits certifies
+    # nothing and no pull request shape in this repo needs one.
+    # Adapted from peira.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
@@ -76,6 +81,10 @@ jobs:
               missing=1
             fi
           done
+          if [ "$count" -eq 0 ]; then
+            echo "The DCO check found no non-merge commits in the pull request range, so no commit stands for the sign-off identity to be checked against and the job fails rather than passing over an empty range."
+            exit 1
+          fi
           if [ "$missing" -ne 0 ]; then
             echo "Every commit needs the 'Signed-off-by: David Engelmann <81196676+david-engelmann@users.noreply.github.com>' trailer (git commit -s)."
             exit 1

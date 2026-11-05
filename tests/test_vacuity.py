@@ -89,6 +89,439 @@ class TestCheckTestVacuity(unittest.TestCase):
     def test_the_shipped_suite_holds(self):
         self.assertEqual(self.mod.vacuity_problems(ROOT), [])
 
+    def test_a_missing_tests_directory_fails_the_guard(self):
+        # Round 4 audit Major 2. The guard judged whatever
+        # discovery reached, so a tree holding no tests at
+        # all read as a suite with no vacuous test in it.
+        # The discovery floor refuses by name instead.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            root.mkdir()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "tests directory is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_empty_tests_directory_fails_the_guard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {})
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "holds no test files" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_suite_with_no_test_methods_fails_the_guard(self):
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "def helper():\n"
+            "    return 1\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "hold no test methods" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_floor_refusal_exits_nonzero_without_the_success_line(self):
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            root.mkdir()
+            err = io.StringIO()
+            out = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                with contextlib.redirect_stdout(out):
+                    code = self.mod.main(root)
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "tests directory is missing", err.getvalue()
+            )
+            self.assertNotIn("stands clear", out.getvalue())
+
+    def test_a_mock_only_assertion_fails(self):
+        # Round 4 red team Minor 1. A method whose only
+        # assertions read back a mock's own call bookkeeping
+        # argues about the stand-in and never about a value
+        # the code under test returned.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = mock.Mock()\n"
+            "        m.run()\n"
+            "        self.assertTrue(m.run.called)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_mock_call_count_assertion_fails(self):
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = mock.Mock()\n"
+            "        m.run()\n"
+            "        self.assertEqual(m.run.call_count, 1)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_plain_assert_on_a_mock_called_flag_fails(self):
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = mock.Mock()\n"
+            "        m.run()\n"
+            "        assert m.run.called\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_mock_assertion_beside_a_real_assertion_passes(self):
+        # The control. Mock bookkeeping beside an assertion
+        # on a value a real function computed is a real test,
+        # and the extension must leave it standing, which is
+        # what lets the genuine suite pass with no new
+        # problems.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def measure(text):\n"
+            "    return len(text)\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mixed_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = mock.Mock()\n"
+            "        m.run()\n"
+            "        self.assertTrue(m.run.called)\n"
+            "        self.assertEqual(measure(touched), 0)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_helper_asserting_on_a_passed_mock_fails(self):
+        # The helper form. A mock handed to a same-file
+        # helper that asserts on its call state stays
+        # mock-only across the call.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def _check(self, m):\n"
+            "        self.assertTrue(m.run.called)\n"
+            "\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = mock.Mock()\n"
+            "        m.run()\n"
+            "        self._check(m)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def patch_body(self, header, with_expr):
+        return (
+            header
+            + "import unittest\n"
+            + "from pathlib import Path\n"
+            + "ROOT = Path('.')\n"
+            + "\n"
+            + "\n"
+            + "class TestSomething(unittest.TestCase):\n"
+            + "    def test_a_mocked_case(self):\n"
+            + "        touched = ROOT.name\n"
+            + "        with " + with_expr + " as m:\n"
+            + "            m()\n"
+            + "            self.assertTrue(m.called)\n"
+        )
+
+    def assert_patch_spelling_fails(self, header, with_expr):
+        body = self.patch_body(header, with_expr)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_mock_only_patch_spelling_fails(self):
+        # Round 4 fix repair. Every patch spelling that
+        # hands back a mock marks its bound name as a mock,
+        # in the refused shape of a fixture touch, the stand
+        # in called, and assertions only on its call
+        # bookkeeping.
+        self.assert_patch_spelling_fails(
+            "from unittest.mock import patch\n",
+            "patch('os.getcwd')",
+        )
+
+    def test_a_mock_only_patch_object_spelling_fails(self):
+        self.assert_patch_spelling_fails(
+            "from unittest.mock import patch\n",
+            "patch.object(Path, 'name')",
+        )
+
+    def test_a_mock_only_patch_multiple_spelling_fails(self):
+        self.assert_patch_spelling_fails(
+            "from unittest.mock import patch\n",
+            "patch.multiple('os', getcwd=True)",
+        )
+
+    def test_a_mock_only_mock_patch_spelling_fails(self):
+        # The red team plant B6 shape, the spelling the
+        # shipped suite itself uses for this work.
+        self.assert_patch_spelling_fails(
+            "from unittest import mock\n",
+            "mock.patch('os.getcwd')",
+        )
+
+    def test_a_mock_only_mock_patch_object_spelling_fails(self):
+        self.assert_patch_spelling_fails(
+            "from unittest import mock\n",
+            "mock.patch.object(Path, 'name')",
+        )
+
+    def test_a_mock_only_mock_patch_multiple_spelling_fails(self):
+        self.assert_patch_spelling_fails(
+            "from unittest import mock\n",
+            "mock.patch.multiple('os', getcwd=True)",
+        )
+
+    def test_a_mock_only_unittest_mock_patch_spelling_fails(self):
+        self.assert_patch_spelling_fails(
+            "import unittest.mock\n",
+            "unittest.mock.patch('os.getcwd')",
+        )
+
+    def test_a_mock_only_unittest_mock_patch_object_fails(self):
+        self.assert_patch_spelling_fails(
+            "import unittest.mock\n",
+            "unittest.mock.patch.object(Path, 'name')",
+        )
+
+    def test_a_mock_only_unittest_mock_patch_multiple_fails(self):
+        self.assert_patch_spelling_fails(
+            "import unittest.mock\n",
+            "unittest.mock.patch.multiple('os', getcwd=True)",
+        )
+
+    def test_a_patch_dict_bound_dictionary_assertion_passes(self):
+        # The control in the other direction. The dict
+        # patching spelling binds the patched mapping
+        # itself, so an assertion about its entries is a
+        # real assertion and keeps its credit.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_dict_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        config = {'mode': 'old'}\n"
+            "        with mock.patch.dict(\n"
+            "            config, {'mode': 'new'}\n"
+            "        ) as bound:\n"
+            "            self.assertEqual(bound['mode'], 'new')\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_mock_patch_beside_a_real_assertion_passes(self):
+        # The control. A stand in bound through mock.patch
+        # stands beside an assertion on a real return, and
+        # the second assertion keeps the test standing.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def measure(text):\n"
+            "    return len(text)\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mixed_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        with mock.patch('os.getcwd') as m:\n"
+            "            m()\n"
+            "            self.assertTrue(m.called)\n"
+            "        self.assertEqual(measure(touched), 0)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_setup_mock_assertion_fails(self):
+        # The red team plant B8 shape. A mock assigned to
+        # self in setUp is a stand in in the test method
+        # that asserts on it.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def setUp(self):\n"
+            "        self.m = mock.Mock()\n"
+            "\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        self.m.run()\n"
+            "        self.assertTrue(self.m.run.called)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_module_level_mock_assertion_fails(self):
+        # The red team plant B9 shape.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "m = mock.Mock()\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m.run()\n"
+            "        self.assertTrue(m.run.called)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_a_helper_returned_mock_assertion_fails(self):
+        # The red team plant B10 shape.
+        body = (
+            "import unittest\n"
+            "from unittest import mock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def make_mock():\n"
+            "    return mock.Mock()\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = make_mock()\n"
+            "        m.run()\n"
+            "        self.assertTrue(m.run.called)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(tmp, {"test_x.py": body})
+            problems = self.problems(root)
+            self.assertTrue(
+                any("no real assertion" in p for p in problems),
+                problems,
+            )
+
+    def test_an_undecodable_test_file_is_named_not_raised(self):
+        # Round 4 red team Minor 3. A test file holding
+        # damaged bytes draws the named UTF-8 problem in
+        # the family wording and never a traceback.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            tests = root / "tests"
+            tests.mkdir(parents=True)
+            (tests / "test_x.py").write_bytes(b"\xff\xfe\x00bad")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "test_x.py" in p
+                    and "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_a_real_test_method_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_tree(tmp, {"test_x.py": REAL_TEST})

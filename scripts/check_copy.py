@@ -27,20 +27,38 @@ gitignore are scanned by comment span only, so their shell and
 pattern lines are never judged as prose while every sentence a
 contributor writes in them is.
 
-The fence is discovered by rule rather than listed by hand, so a
-new authored prose surface joins it by construction instead of
-waiting for someone to remember the list. Every Markdown file
-and every Cursor rule file in the tree is prose, apart from the
-generated packets saved as eval fixtures, which are extractor
-output and not authored text, regenerated on every check by
-`scripts/check_regeneration.py`, and the plugin skill copy, which
-is pinned byte identical to the canonical skill by its own gate
-script. The description fields of the plugin manifests are prose
-a reader meets in a listing, so they are scanned as values. Every
-YAML file in the tree is discovered by the same rule as the
-Markdown files and scanned as YAML, apart from the files in the
-comment span class, whose values are code and whose prose lives
-in hash comments, and those are scanned by comment span.
+The fence is discovered by rule inside a bounded frame rather
+than listed by hand, so a new authored prose surface in a
+format and a location the frame already covers joins it by
+construction instead of waiting for someone to remember the
+list. The frame is the four file patterns the discovery rule
+walks and the allow list of hidden directories below, and a
+surface in a new format or under a new hidden directory stands
+outside the fence until the frame itself is extended to cover
+it. Every Markdown file and every Cursor rule file the frame
+covers is prose, apart from the generated packets saved as eval
+fixtures, which are extractor output and not authored text,
+regenerated on every check by `scripts/check_regeneration.py`,
+and the plugin skill copy, which is pinned byte identical to
+the canonical skill by its own gate script. The description
+fields of the plugin manifests are prose a reader meets in a
+listing, so they are scanned as values, and the scan collects
+the longer listing description keys and the extension note
+keys beside the plain description key, because a listing
+reader meets that prose first. Every YAML file the frame
+covers is discovered by the same rule as the Markdown files
+and scanned as YAML, apart from the files in the comment span
+class, whose values are code and whose prose lives in hash
+comments, and those are scanned by comment span.
+
+The fence also carries a floor. The root README is a required
+prose surface, and a discovery that finds no prose file at all
+is a violation by name, so the gate never prints its success
+line over a tree whose prose has gone missing. Relative
+Markdown link targets in the scanned Markdown files are
+checked against the tree as well, so a link naming a file that
+does not stand in the tree is a violation, while external
+addresses are never fetched and stand outside this check.
 
 Exits nonzero and lists every violation when the bar is broken.
 """
@@ -49,6 +67,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -798,13 +817,44 @@ def scan(violations, path, spans):
             violations.append("%s has a colon in prose" % where)
 
 
+PROSE_VALUE_KEYS = (
+    "description",
+    "longDescription",
+    "shortDescription",
+    "note",
+    "defaultPrompt",
+)
+
+
 def description_values(data):
-    """Every description string in a parsed manifest, at any depth."""
+    """Every prose value in a parsed manifest, at any depth.
+
+    The collected keys are the plain description key, the two
+    longer listing description keys the portable manifest
+    carries under its OpenAI extension, and the note key its
+    extension objects carry, because all four are prose a
+    listing reader meets and none may stand outside the bar
+    the plain description already stands under. The default
+    prompt key of the same OpenAI interface object joins
+    them, holding a list of suggested prompt sentences a
+    listing reader also meets, so the strings inside that
+    list are collected under its name as well. Each value
+    travels with the key it stood under, so a violation can
+    name the field that carries it.
+    """
     values = []
     if isinstance(data, dict):
         for key, value in data.items():
-            if key == "description" and isinstance(value, str):
-                values.append(value)
+            if key == "defaultPrompt" and isinstance(value, list):
+                values.extend(
+                    (key, item)
+                    for item in value
+                    if isinstance(item, str)
+                )
+            elif key in PROSE_VALUE_KEYS and isinstance(
+                value, str
+            ):
+                values.append((key, value))
             else:
                 values.extend(description_values(value))
     elif isinstance(data, list):
@@ -816,15 +866,15 @@ def description_values(data):
 def scan_manifest(violations, path):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         violations.append(
             "%s does not parse for the copy scan: %s"
             % (display_name(path), exc)
         )
         return
-    for value in description_values(data):
+    for key, value in description_values(data):
         text = clean(value)
-        where = "%s description field" % display_name(path)
+        where = "%s %s field" % (display_name(path), key)
         if EM_DASH in text:
             violations.append("%s has an em dash" % where)
         if EN_DASH in text:
@@ -835,18 +885,167 @@ def scan_manifest(violations, path):
             violations.append("%s has a colon in prose" % where)
 
 
+MARKDOWN_LINK = re.compile(
+    r"!?\[[^\]]*\]\((<[^>]+>|[^\s)]+)"
+    r"(?:\s+[\"'][^\"']*[\"'])?\s*\)"
+)
+LINK_REFERENCE_TARGET = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)")
+LINK_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+HTML_HREF = re.compile(
+    r"<a\s[^>]*?href\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
+SPLIT_DESTINATION = re.compile(r"^\s*(<[^>]+>|[^\s)]+)")
+SPLIT_PAREN_DESTINATION = re.compile(
+    r"^\s*\(\s*(<[^>]+>|[^\s)]+)"
+)
+
+
+def split_link_target(lines, index, text):
+    """The target of a link split over two lines, or None.
+
+    The Markdown grammar these pages render under reads an
+    inline link as one link even when the destination
+    stands on the line after the opening bracket, so the
+    per line pattern never sees it. The destination line is
+    the line after the opening line in either split shape,
+    the bracket closing with an open parenthesis at the end
+    of the opening line, or the parenthesis opening the
+    following line.
+    """
+    if index + 1 >= len(lines):
+        return None
+    following = INLINE_CODE.sub("", lines[index + 1])
+    if re.search(r"\]\(\s*$", text):
+        match = SPLIT_DESTINATION.match(following)
+        return match.group(1) if match else None
+    if re.search(r"\]\s*$", text):
+        match = SPLIT_PAREN_DESTINATION.match(following)
+        return match.group(1) if match else None
+    return None
+
+
+def link_target_problems(path):
+    """Problems with relative Markdown link targets in one file.
+
+    A relative target names a file in the tree, so a target
+    that resolves to nothing is a dead link a reader meets
+    under a green gate. External addresses and anchors and
+    absolute paths stand outside this check and no address
+    is ever fetched. Links inside fenced blocks and inline
+    code spans are examples and not references, so they are
+    skipped in the same way the prose scan skips them. A
+    link whose destination stands on the line after its
+    opening bracket is read as one link and reported at the
+    line where it opens, and an anchor element href naming
+    a relative target is checked the same way, with
+    external schemes and pure anchors still skipped.
+    """
+    problems = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        return [
+            "%s cannot be read as UTF-8 text, %s"
+            % (display_name(path), exc)
+        ]
+    in_fence = False
+    for index, raw in enumerate(lines):
+        number = index + 1
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        text = INLINE_CODE.sub("", raw)
+        targets = [
+            match.group(1) for match in MARKDOWN_LINK.finditer(text)
+        ]
+        ref = LINK_REFERENCE_TARGET.match(text)
+        if ref:
+            targets.append(ref.group(1))
+        targets.extend(HTML_HREF.findall(text))
+        split = split_link_target(lines, index, text)
+        if split:
+            targets.append(split)
+        for target in targets:
+            target = target.strip("<>")
+            if not target or target.startswith(("#", "/")):
+                continue
+            if LINK_SCHEME.match(target):
+                continue
+            rel_target = target.split("#", 1)[0].split("?", 1)[0]
+            if not rel_target:
+                continue
+            if not (path.parent / unquote(rel_target)).exists():
+                problems.append(
+                    "%s line %d links to %s, which does not "
+                    "stand in the tree"
+                    % (display_name(path), number, target)
+                )
+    return problems
+
+
+def census_problems(root=None):
+    """Problems with the prose census the fence stands on.
+
+    The floor is read from a fresh discovery over the root
+    rather than from the module level sets, so the reading
+    names the tree as it stands when the gate runs. The
+    root README is a required prose surface, and a census
+    of zero prose files certifies nothing at all.
+    """
+    root = ROOT if root is None else root
+    problems = []
+    prose = discover_prose_files(root)
+    if not prose:
+        problems.append(
+            "the copy fence discovered no prose files, so "
+            "its census stands at zero and the bar certifies "
+            "nothing"
+        )
+    readme = root / "README.md"
+    if not readme.is_file():
+        problems.append(
+            "README.md is missing, and the copy fence "
+            "requires it as a prose surface"
+        )
+    elif readme not in prose:
+        problems.append(
+            "README.md stands outside the copy fence "
+            "discovery, so the bar never reads it"
+        )
+    return problems
+
+
 def main():
     violations = []
+    violations.extend(census_problems())
     for path in PROSE_FILES:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
-        scan(violations, path, prose_lines(path))
+        try:
+            scan(violations, path, prose_lines(path))
+        except (OSError, UnicodeDecodeError) as exc:
+            violations.append(
+                "%s cannot be read as UTF-8 text, %s"
+                % (display_name(path), exc)
+            )
+            continue
+        if path.suffix in (".md", ".mdc"):
+            violations.extend(link_target_problems(path))
     for path in COMMENT_FILES:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
-        scan(violations, path, comment_spans(path))
+        try:
+            scan(violations, path, comment_spans(path))
+        except (OSError, UnicodeDecodeError) as exc:
+            violations.append(
+                "%s cannot be read as UTF-8 text, %s"
+                % (display_name(path), exc)
+            )
     for path in MANIFEST_FILES:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))

@@ -45,6 +45,24 @@ GIT_DRIVER_ENV_VARS = (
     "GIT_EXEC_PATH",
 )
 GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+# The same attribute source and pathspec mode scrub the
+# extractor and the packet check run under, ported in full so
+# every gate that spawns git children stands under the same
+# hardened environment. An exported attribute source names a
+# tree whose attributes every child would read in place of
+# the reviewed tree, and an exported pathspec mode makes git
+# refuse the literal pathspec flag the fixture readings use.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
 
 
 def scrubbed_git_env():
@@ -53,9 +71,12 @@ def scrubbed_git_env():
         for key, value in os.environ.items()
         if key not in GIT_LOCATION_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     return env
 
 

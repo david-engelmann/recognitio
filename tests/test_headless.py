@@ -404,7 +404,8 @@ class TestHeadlessCheck(unittest.TestCase):
                 text=True,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("permission denials", result.stdout)
+            self.assertIn("permission denials", result.stderr)
+            self.assertNotIn("permission denials", result.stdout)
 
     def test_the_cli_reads_a_clean_run_green(self):
         with tempfile.TemporaryDirectory() as tmp:

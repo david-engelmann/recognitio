@@ -647,6 +647,24 @@ def _figure_guarded(sentence):
     return guarded(sentence[clause_start:clause_end])
 
 
+def plant_sentence(raw):
+    """One plant reading stated as a sentence naming its file.
+
+    The readings inside the negative family collect a label
+    and the sentence that drew it. The gate speaks in full
+    sentences naming the surface, in the voice its sibling
+    gates use, so the collected label is stated that way on
+    the way out.
+    """
+    kind, _, rest = raw.partition(": ")
+    if not rest:
+        return raw
+    return (
+        "the Qwen brief at docs/qwen-code-brief.md carries "
+        "a %s in the sentence %s" % (kind, rest)
+    )
+
+
 def negative_problems(text):
     """Meaning based negatives over sentences, not lines.
 
@@ -870,7 +888,10 @@ def negative_problems(text):
                 problems.append(
                     "figure plant: " + " ".join(window)[:120]
                 )
-    return problems
+    return [plant_sentence(problem) for problem in problems]
+
+
+UTF8_UNREADABLE = []
 
 
 def read_text(path):
@@ -878,8 +899,69 @@ def read_text(path):
         return None
     try:
         return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        if str(path) not in UTF8_UNREADABLE:
+            UTF8_UNREADABLE.append(str(path))
+        return None
     except OSError:
         return None
+
+
+def utf8_problems():
+    """Problems naming the files the readings could not decode."""
+    return [
+        "%s cannot be read as UTF-8 text" % Path(path).name
+        for path in UTF8_UNREADABLE
+    ]
+
+
+def repair_utf8_problems(problems):
+    """Name the UTF-8 defect in place of the missing wording.
+
+    A file that stands on disk holding damaged bytes is not
+    a missing file, so a problem that calls a recorded
+    undecodable file missing is replaced by the UTF-8
+    problem for that file, in the shape the comate and copy
+    readings use. A genuinely missing file records nothing
+    here and keeps its missing wording.
+    """
+    if not UTF8_UNREADABLE:
+        return problems
+    kept = []
+    labels = []
+    for problem in problems:
+        label = None
+        if "missing" in problem:
+            for path in UTF8_UNREADABLE:
+                parts = Path(path).parts
+                for size in range(len(parts), 0, -1):
+                    candidate = "/".join(parts[-size:])
+                    if candidate not in problem:
+                        continue
+                    if size == 1:
+                        token = re.search(
+                            r"[^\s]*" + re.escape(candidate),
+                            problem,
+                        )
+                        if token and "/" in token.group(0):
+                            continue
+                    label = candidate
+                    break
+                if label is not None:
+                    break
+        if label is None:
+            kept.append(problem)
+        elif label not in labels:
+            labels.append(label)
+    for path in UTF8_UNREADABLE:
+        name = Path(path).name
+        if not any(label.endswith(name) for label in labels):
+            labels.append(name)
+    kept.extend(
+        "%s cannot be read as UTF-8 text" % label
+        for label in labels
+    )
+    return kept
 
 
 def deliberate_source(note):
@@ -909,13 +991,27 @@ def derivation_problems(raw):
     for part in parts[1:]:
         head = part.split("\n", 1)[0]
         if "Derives from" not in part:
-            problems.append("rule without derivation note: " + head)
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "carries a rule without derivation note, the "
+                "rule headed " + head + ", so the rule names "
+                "no source a reader can check"
+            )
             continue
         note = part[part.find("Derives from"):]
         if not deliberate_source(note):
-            problems.append("derivation note names no source: " + head)
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "carries a rule whose derivation note names "
+                "no source, the rule headed " + head + ", so "
+                "the note names nothing a reader can check"
+            )
     if len(parts) - 1 < 10:
-        problems.append("fewer than ten Qwen rules found")
+        problems.append(
+            "the Qwen brief at docs/qwen-code-brief.md "
+            "carries fewer than ten Qwen rules, so the rules "
+            "section the gate pins does not stand in full"
+        )
     return problems
 
 
@@ -940,17 +1036,26 @@ def readme_qwen_section(raw):
 
 
 def qwen_problems(root):
+    UTF8_UNREADABLE.clear()
     problems = []
     brief = read_text(root / "docs" / "qwen-code-brief.md")
     if brief is None:
-        return ["the Qwen brief is missing"]
+        return repair_utf8_problems([
+            "the Qwen brief at docs/qwen-code-brief.md is "
+            "missing, so no Qwen claim in it can be checked"
+        ])
     flat = re.sub(r"\s+", " ", brief)
     for name, fragment in PINNED:
         if re.sub(r"\s+", " ", fragment) not in flat:
-            problems.append("dropped pin: " + name)
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "carries a dropped pin, namely " + name + ", "
+                "which the brief must state in its pinned form"
+            )
     if "Runtime invocation stays UNVERIFIED" in flat:
         problems.append(
-            "the brief carries the stale runtime UNVERIFIED "
+            "the Qwen brief at docs/qwen-code-brief.md "
+            "carries the stale runtime UNVERIFIED "
             "wording the live run of 2026-10-29 falsified for "
             "the one scoped shape the brief now records"
         )
@@ -958,29 +1063,55 @@ def qwen_problems(root):
     problems.extend(negative_problems(brief))
     decisions = read_text(root / "docs" / "decisions.md")
     if decisions is None:
-        problems.append("the decision record is missing")
+        problems.append(
+            "the decision record at docs/decisions.md is "
+            "missing, so the round 33 decision note cannot "
+            "be checked"
+        )
     else:
         note = decision_note(decisions)
         if note is None:
-            problems.append("the round 33 decision note is missing")
+            problems.append(
+                "the decision record at docs/decisions.md "
+                "carries no round 33 decision note, so the "
+                "note the gate pins does not stand"
+            )
         else:
             flat_note = re.sub(r"\s+", " ", note)
             for fragment in DECISION_NOTE_PINS:
                 if fragment not in flat_note:
-                    problems.append("decision note drops: " + fragment)
+                    problems.append(
+                        "the decision record at "
+                        "docs/decisions.md carries a decision "
+                        "note that drops the pinned fragment "
+                        + fragment
+                    )
             if "round 31 note" in flat_note and "Round 31 note" not in decisions:
-                problems.append("the round 31 note is missing")
+                problems.append(
+                    "the decision record at docs/decisions.md "
+                    "carries no round 31 note, so the note the "
+                    "gate pins does not stand"
+                )
     changelog = read_text(root / "CHANGELOG.md")
     if changelog is None:
-        problems.append("the changelog is missing")
+        problems.append(
+            "the changelog at CHANGELOG.md is missing, so "
+            "its pinned Qwen fragments cannot be checked"
+        )
     else:
         flat_log = re.sub(r"\s+", " ", changelog)
         for fragment in CHANGELOG_PINS:
             if fragment not in flat_log:
-                problems.append("changelog drops: " + fragment)
+                problems.append(
+                    "the changelog at CHANGELOG.md drops the "
+                    "pinned fragment " + fragment
+                )
     readme = read_text(root / "README.md")
     if readme is None:
-        problems.append("the README is missing")
+        problems.append(
+            "the README at README.md is missing, so its "
+            "Qwen section cannot be checked"
+        )
     else:
         section = readme_qwen_section(readme)
         if section is None:
@@ -998,15 +1129,19 @@ def qwen_problems(root):
             )
     for path in root.rglob("qwen-extension.json"):
         if "scratch" not in str(path):
-            problems.append("a Qwen listing file ships: " + str(path))
-    return problems
+            problems.append(
+                "a Qwen listing file ships at " + str(path)
+                + ", and no Qwen listing file may ship in "
+                "this tree"
+            )
+    return repair_utf8_problems(problems)
 
 
 def main():
     problems = qwen_problems(ROOT)
     if problems:
         for problem in problems:
-            print("check_qwen: " + problem)
+            print("check_qwen: " + problem, file=sys.stderr)
         return 1
     print("check_qwen: Qwen contract holds")
     return 0

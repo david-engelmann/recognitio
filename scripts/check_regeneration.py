@@ -285,6 +285,24 @@ GIT_DRIVER_ENV_VARS = (
     "GIT_PAGER",
     "GIT_EXEC_PATH",
 )
+# The same attribute source and pathspec mode scrub the
+# extractor and the packet check run under, ported in full so
+# every gate that spawns git children stands under the same
+# hardened environment. An exported attribute source names a
+# tree whose attributes every child would read in place of
+# the reviewed tree, and an exported pathspec mode makes git
+# refuse the literal pathspec flag the diff readings use.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
 
 
 class DuplicateKeyError(ValueError):
@@ -335,15 +353,31 @@ def scrubbed_child_env(extra=None):
         for key, value in os.environ.items()
         if key not in GIT_SCRUB_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and not key.startswith("GIT_CONFIG")
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     if extra:
         env.update(extra)
     return env
 
 
+# Timeout basis for the shared runner default, extrapolated
+# from the one recorded measurement the workflow comment
+# carries, being the discover run of 380 seconds at 2,344
+# tests inside a thirty minute job bound. The heaviest
+# children this runner carries are single builder or
+# extractor runs over one tree, and an unmeasured estimate
+# puts each at a fraction of that recorded span. The
+# default of six hundred seconds is extrapolated from that
+# record and stands as a ceiling for a slow or loaded
+# machine rather than an expectation, so a hung child is
+# still cut well inside the job bound. Call sites that run
+# lighter children name smaller values with their own basis
+# at each site.
 def run(argv, cwd=None, env=None, timeout=600):
     child_env = dict(os.environ if env is None else env)
     child_env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -358,6 +392,14 @@ def run(argv, cwd=None, env=None, timeout=600):
 
 
 def run_extractor(args, out):
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. One extractor run over the
+    # example history is, on an unmeasured estimate, a
+    # fraction of that recorded span, and three hundred
+    # seconds is extrapolated from that record as a ceiling
+    # rather than an expectation, under the shared ceiling.
     result = run(
         [sys.executable, str(EXTRACT)] + args + ["--out", str(out)],
         env=scrubbed_child_env(),
@@ -592,6 +634,14 @@ def printed_template_problems(block, root):
             "value %s and that value is not a hex commit "
             "name, so the block is not run" % commit
         ]
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. One git read over the
+    # checked tree is, on an unmeasured estimate, a small
+    # fraction of that recorded span, and one hundred and
+    # twenty seconds is extrapolated from that record as a
+    # ceiling rather than an expectation.
     resolved = run(
         [
             "git", "-C", str(root), "rev-parse", "--verify",
@@ -966,6 +1016,14 @@ def scratch_checkout(root, tmp):
     in the clone and never in the checked tree.
     """
     scratch = Path(tmp) / "scratch"
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. One git read over the
+    # checked tree, on the same basis as the rev-parse
+    # reading above, carries the same one hundred and
+    # twenty second bound, extrapolated from that record
+    # as a ceiling rather than an expectation.
     head = run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         env=scrubbed_child_env(),
@@ -976,6 +1034,15 @@ def scratch_checkout(root, tmp):
             "the checked tree head cannot be read for a scratch "
             "checkout with %s" % head.stderr.strip()
         ]
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. A local clone copies the
+    # whole checked tree and its history, and an
+    # unmeasured estimate puts it among the heaviest git
+    # shapes in this gate. Three hundred seconds is
+    # extrapolated from that record as a ceiling rather
+    # than an expectation, under the shared ceiling.
     clone = run(
         ["git", "clone", "-q", str(root), str(scratch)],
         env=scrubbed_child_env(),
@@ -986,6 +1053,16 @@ def scratch_checkout(root, tmp):
             "a scratch checkout of the checked tree cannot be "
             "cloned with %s" % clone.stderr.strip()
         ]
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. One checkout in a fresh
+    # local clone is one git write over the checked tree
+    # shape, and an unmeasured estimate puts it at a small
+    # fraction of that recorded span, so it carries the
+    # same one hundred and twenty second bound as the git
+    # reads above, extrapolated from that record as a
+    # ceiling rather than an expectation.
     checkout = run(
         ["git", "-C", str(scratch), "checkout", "-q", head.stdout.strip()],
         env=scrubbed_child_env(),
@@ -1048,6 +1125,16 @@ def example_regeneration_problems(block, root, folder, shipped_packet):
                 ],
                 cwd=scratch,
                 env=scrubbed_child_env(),
+                # Timeout basis, extrapolated from the one
+                # recorded measurement the workflow comment
+                # carries, being the discover run of 380
+                # seconds at 2,344 tests inside a thirty
+                # minute job bound. The printed command is
+                # one extractor run over the example history,
+                # the same shape as the run_extractor calls,
+                # so it carries their three hundred second
+                # bound, extrapolated from that record as a
+                # ceiling rather than an expectation.
                 timeout=300,
             )
         except (OSError, subprocess.SubprocessError) as exc:
@@ -1257,6 +1344,15 @@ def git(repo, *args, env_extra=None):
         "--literal-pathspecs", "-C", str(repo),
         "-c", "core.quotepath=false",
     ] + list(args)
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. This helper runs one git
+    # command over a scratch repo of the checked tree
+    # shape, and an unmeasured estimate puts it at a small
+    # fraction of that recorded span. One hundred and
+    # twenty seconds is extrapolated from that record as a
+    # ceiling rather than an expectation.
     result = run(argv, env=env, timeout=120)
     if result.returncode != 0:
         raise AssertionError(
@@ -1625,6 +1721,17 @@ def one_builder_problems(root, builder, other_folders=()):
             shutil.copytree(folder, copy)
             before = folder_snapshot(copy)
             trace = Path(tmp) / "trace.log"
+            # Timeout basis, extrapolated from the one
+            # recorded measurement the workflow comment
+            # carries, being the discover run of 380 seconds
+            # at 2,344 tests inside a thirty minute job
+            # bound. A builder run in a scratch copy is, on
+            # an unmeasured estimate, one of the heaviest
+            # children this gate carries, so this site
+            # spends the shared runner ceiling of six hundred
+            # seconds stated at the runner definition,
+            # extrapolated from that record as a ceiling
+            # rather than an expectation.
             result = run(
                 [
                     sys.executable, "-c", BUILDER_RUNNER,
@@ -1787,6 +1894,15 @@ def marker_restored_names(folder, builder, candidates, digests, tmp):
         for name in marked:
             (copy / name).write_bytes(MARKER_BYTES)
         trace = Path(tmp) / "marker-trace.log"
+        # Timeout basis, extrapolated from the one recorded
+        # measurement the workflow comment carries, being
+        # the discover run of 380 seconds at 2,344 tests
+        # inside a thirty minute job bound. The marker run
+        # is the same builder shape as the traced run above,
+        # so it spends the same shared ceiling of six
+        # hundred seconds stated at the runner definition,
+        # extrapolated from that record as a ceiling rather
+        # than an expectation.
         run(
             [
                 sys.executable, "-c", BUILDER_RUNNER,

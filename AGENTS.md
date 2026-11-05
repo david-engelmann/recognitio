@@ -30,7 +30,12 @@ python3 -m unittest discover -s tests
 ```
 
 The first command is the full gate and the second is the narrow form
-to use while working. The gate runs the extractor test suite, the
+to use while working. The gate is a wiring of steps in order, and the
+wiring stops at the first step that fails. Steps after the failing
+one do not run in that invocation, so a red gate names only the
+first failing step, and a step that is reached lists its own
+problems in full before the wiring stops. The gate runs the
+extractor test suite, the
 skill validator at `scripts/check_skill.py`, the version coherence
 check at `scripts/check_version.py`, the copy bar scan at
 `scripts/check_copy.py`, the eval integrity check at
@@ -72,7 +77,10 @@ whose caps exceed the primary numbers. The bridge at
 into the headless stream shape with its finding ids unchanged,
 and the headless gate at `scripts/check_headless.py` reads the
 whole captured envelope against the packet the manifest belongs
-to and the exit file the invocation names. The mod contract check pins
+to and the exit file the invocation names. The headless gate
+takes a captured run rather than the tree as its input, so it
+stands outside the gate enumeration above and is exercised
+through the discover suite instead. The mod contract check pins
 the `hooks/` module list, the `agent.spawn` hook with its `.catch`
 deny handler, the literal environment name, the plain dot
 receiver spelling and the path only
@@ -105,7 +113,15 @@ script, each as its own committed step, and then refreshes the
 checksum record by running
 `python3 scripts/check_evals.py --write-checksums` and committing
 the record beside the artefacts it covers. The checksum refresh
-refuses to run while an anchor or the coverage is stale. CI runs the gate word for word and
+refuses to run while an anchor or the coverage is stale. The gate
+also stands on an environment the wiring assumes. The regeneration
+step rebuilds the brand assets, and the brand builder it drives
+imports CairoSVG and fontTools and reads the Liberation fonts for
+its lettering, so a machine running the gate needs all three at
+hand, and CI installs them before its gate run starts. The stdlib
+only rule below binds the extractor and the check scripts in their
+own code and says nothing about the tools a step drives, which is
+why the brand builder may import what it imports. CI runs the gate word for word and
 adds one job with no local step. The DCO job checks the Signed-off-by
 trailer on pull request commits, and a green local run says nothing
 about it. Green local gates first, then push. CI is a backstop,
@@ -360,8 +376,10 @@ not a gate.
    drop oversized patches without a flag.
 2. The manifest fails closed. A packet whose verified flag is false
    is not a packet, and nobody reviews it as if it were whole.
-3. Stdlib only. The extractor and the gate scripts take no third
-   party dependencies.
+3. Stdlib only in their own code. The extractor and the gate
+   scripts take no third party dependencies in the code they run
+   themselves. A tool a gate step drives, like the brand builder
+   under the regeneration step, stands outside this rule.
 4. Every fix ships with a test that fails when the fix is reverted.
    A test that cannot fail for a real reason is not a test.
 5. The skill is never named `code-review`. That name would shadow

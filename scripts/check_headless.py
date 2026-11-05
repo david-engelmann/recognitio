@@ -489,7 +489,7 @@ def main(argv=None):
     )
     if problems:
         for problem in problems:
-            print(problem)
+            print("check_headless: %s" % problem, file=sys.stderr)
         return 1
     print("the headless run reads green")
     return 0

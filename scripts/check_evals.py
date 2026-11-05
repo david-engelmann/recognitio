@@ -141,6 +141,24 @@ GIT_DRIVER_ENV_VARS = (
     "GIT_EXEC_PATH",
 )
 GIT_CONFIG_ENV_PREFIX = "GIT_CONFIG"
+# The same attribute source and pathspec mode scrub the
+# extractor and the packet check run under, ported in full so
+# every gate that spawns git children stands under the same
+# hardened environment. An exported attribute source names a
+# tree whose attributes every child would read in place of
+# the reviewed tree, and an exported pathspec mode makes git
+# refuse the literal pathspec flag the rebuild readings use.
+GIT_ATTR_ENV_VARS = (
+    "GIT_ATTR_SOURCE",
+    "GIT_ATTR_GLOBAL",
+    "GIT_ATTR_SYSTEM",
+)
+GIT_PATHSPEC_ENV_VARS = (
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+)
 
 
 def scrubbed_child_env(extra_drop=()):
@@ -150,10 +168,13 @@ def scrubbed_child_env(extra_drop=()):
         for key, value in os.environ.items()
         if key not in GIT_SCRUB_VARS
         and key not in GIT_DRIVER_ENV_VARS
+        and key not in GIT_ATTR_ENV_VARS
+        and key not in GIT_PATHSPEC_ENV_VARS
         and key not in extra_drop
         and not key.startswith(GIT_CONFIG_ENV_PREFIX)
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    env["GIT_ATTR_NOSYSTEM"] = "1"
     return env
 
 
@@ -592,6 +613,15 @@ def _anchor_import_breaks(repo, d1_file):
     """
     module = d1_file[:-3] if d1_file.endswith(".py") else d1_file
     try:
+        # Timeout basis, extrapolated from the one recorded
+        # measurement the workflow comment carries, being
+        # the discover run of 380 seconds at 2,344 tests
+        # inside a thirty minute job bound. This probe is
+        # one small import, and an unmeasured estimate puts
+        # it at a tiny fraction of that run. Sixty seconds
+        # is extrapolated from that record as a ceiling
+        # rather than an expectation, and it still bounds a
+        # hung probe.
         run = subprocess.run(
             [sys.executable, "-c", "import %s" % module],
             cwd=str(repo),
@@ -883,6 +913,14 @@ def _run_anchor_probe(repo, code, expect):
     stands, else a message naming the failure.
     """
     try:
+        # Timeout basis, extrapolated from the one recorded
+        # measurement the workflow comment carries, being
+        # the discover run of 380 seconds at 2,344 tests
+        # inside a thirty minute job bound. This run is one
+        # small snippet against a fixture repo, and an
+        # unmeasured estimate puts it at a tiny fraction of
+        # that run. Sixty seconds is extrapolated from that
+        # record as a ceiling rather than an expectation.
         run = subprocess.run(
             [sys.executable, "-c", code],
             cwd=str(repo),
@@ -1326,6 +1364,15 @@ def git(repo, *args, raw=False):
          "--literal-pathspecs"]
         + ["-C", str(repo)] + GIT_PIN + list(args)
     )
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. This helper runs one git
+    # read over a small fixture repo, and an unmeasured
+    # estimate puts one read far below that span. One
+    # hundred and twenty seconds is extrapolated from that
+    # record as a ceiling rather than an expectation, and
+    # it bounds a hung git child inside the job bound.
     result = subprocess.run(
         argv,
         capture_output=True,
@@ -1527,6 +1574,15 @@ def rebuild_problems(root, task_dir, tmp):
         )
     out = Path(tmp) / "out"
     extract = root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. This run is one extraction
+    # over one small rebuilt eval task history, and an
+    # unmeasured estimate puts it at a small fraction of
+    # that span. One hundred and twenty seconds is
+    # extrapolated from that record as a ceiling rather
+    # than an expectation.
     run = subprocess.run(
         [sys.executable, str(extract), "--repo", str(repo),
          "--range", "%s..%s" % (base, head),
@@ -1553,6 +1609,15 @@ def rebuild_problems(root, task_dir, tmp):
             % task_dir.name
         )
     problems.extend(entry_problems(task_dir.name, saved, rebuilt))
+    # Timeout basis, extrapolated from the one recorded
+    # measurement the workflow comment carries, being the
+    # discover run of 380 seconds at 2,344 tests inside a
+    # thirty minute job bound. This run is one packet check
+    # over one rebuilt packet, and an unmeasured estimate
+    # puts it at the same small fraction of that span as
+    # the extraction above it, so it carries the same one
+    # hundred and twenty second bound, extrapolated from
+    # that record as a ceiling rather than an expectation.
     check = subprocess.run(
         [sys.executable, str(root / "scripts" / "check_packet.py"),
          str(out), "--repo", str(repo)],

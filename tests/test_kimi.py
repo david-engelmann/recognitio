@@ -114,6 +114,56 @@ class TestCheckKimi(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        # Round 4 standards Minor 3, repaired at the fix
+        # review. The brief reading was the seat probe that
+        # tracebacked on undecodable bytes, so the plant
+        # lands on this gate by name. A standing file with
+        # damaged bytes is not a missing file, so the
+        # problem names the UTF-8 defect and never the
+        # missing wording.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "kimi-plugin-brief.md").write_bytes(
+                b"\xff\xfe\x00bad"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "kimi-plugin-brief.md" in p
+                    and "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "kimi-plugin-brief.md is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_missing_brief_keeps_the_missing_wording(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "docs" / "kimi-plugin-brief.md").unlink()
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "kimi-plugin-brief.md is missing" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any(
+                    "cannot be read as UTF-8 text" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_each_hook_event_runs_an_observation_check(self):
         # R27-RT-01, restated in the 300 round program. The
         # managed plugin wires every hook event through an

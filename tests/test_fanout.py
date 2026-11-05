@@ -1264,5 +1264,88 @@ class FanoutFifoTestCase(unittest.TestCase):
                 sock.close()
 
 
+class TestRepoLineProblems(unittest.TestCase):
+    """Line readings against a real repository fail closed.
+
+    Round 4 standards Minor 1. A finding citing a file git
+    cannot show at the packet head drew silence from the line
+    reading, which read as a location that passed, while a
+    finding citing a real file past its end drew a problem.
+    The two shapes now draw problems of the same standing.
+    """
+
+    def setUp(self):
+        self.fanout = load_script("check_fanout")
+
+    def make_repo(self, tmp):
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        git(repo, "init", "-b", "main")
+        git(repo, "config", "user.email", "test@example.com")
+        git(repo, "config", "user.name", "Test User")
+        git(repo, "config", "commit.gpgsign", "false")
+        (repo / "real.py").write_text(
+            "one = 1\ntwo = 2\nthree = 3\n", encoding="utf-8"
+        )
+        git(repo, "add", "-A")
+        git(repo, "commit", "-m", "one")
+        return repo
+
+    def record_citing(self, path, line):
+        return {
+            "reviews": [
+                {
+                    "findings": [
+                        {"location": {"file": path, "line": line}}
+                    ]
+                }
+            ],
+            "merged_findings": [],
+            "second_pass": [],
+        }
+
+    def test_a_line_past_the_end_of_a_real_file_is_a_problem(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = self.make_repo(tmp)
+            head = git(repo, "rev-parse", "HEAD")
+            problems = self.fanout.repo_line_problems(
+                self.record_citing("real.py", 999),
+                {"head": head},
+                repo,
+            )
+            self.assertTrue(
+                any("past the" in p for p in problems), problems
+            )
+
+    def test_a_file_git_cannot_show_is_a_problem(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = self.make_repo(tmp)
+            head = git(repo, "rev-parse", "HEAD")
+            problems = self.fanout.repo_line_problems(
+                self.record_citing("missing.py", 999),
+                {"head": head},
+                repo,
+            )
+            self.assertTrue(
+                any(
+                    "missing.py" in p
+                    and "cannot be read at the packet head" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_line_inside_a_real_file_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = self.make_repo(tmp)
+            head = git(repo, "rev-parse", "HEAD")
+            problems = self.fanout.repo_line_problems(
+                self.record_citing("real.py", 2),
+                {"head": head},
+                repo,
+            )
+            self.assertEqual(problems, [])
+
+
 if __name__ == "__main__":
     unittest.main()
