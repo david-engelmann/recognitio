@@ -929,6 +929,15 @@ This unreleased work carries version 1.3.0.
   the review reports required the added sentences.
   The weighed page total stands at 820,122 bytes
   under the 850,000 ceiling, which does not move.
+- A design record for the storefront at `DESIGN.md` in
+  the repository root, adopted from the house storefront
+  standard. Its token values were extracted from the
+  rendered repository page and reconciled against the
+  palette record under `docs/brand/`, with the light
+  theme carried as the canonical set and the dark theme
+  values recorded beside the adoption in the programme
+  record. The file stands under the DESIGN.md format
+  lint and the diff gate from this change onward.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
@@ -3592,6 +3601,46 @@ This unreleased work carries version 1.3.0.
   grew it, and the hosted gate at the landing head
   refused the stale figure. The submissions gate pin
   moved to the restated figure in the same change.
+- The listing descriptions on the marketplace
+  faces now carry the one canonical sentence and
+  nothing more, under the listing standard the
+  storefront finalization adopted. The Claude plugin
+  manifest and its marketplace entry drop their second
+  sentence of install guidance, the portable manifest
+  drops its packaging sentence, the Antigravity
+  manifest drops its platform sentence, and the
+  portable long description is restated in the five
+  parts the
+  standard sets in order, what the software is, what
+  it does, how it is used, what it does not do, and
+  license and provenance, so the install guidance the
+  short descriptions let go stands in the long
+  description in full. The pins in the package gate
+  and the Codex plugin gate and their test mirrors
+  moved with the text.
+- The copy gate reads two shapes it once missed. A
+  prose field in a manifest that holds a list of
+  strings is now collected string by string under its
+  field name, at any depth inside the list, where the
+  bare strings inside such a
+  list once fell out of the collection unseen and a
+  banned mark carried that way passed the whole gate.
+  A Markdown front matter key is now read as syntax
+  at any indentation, where a key nested inside the
+  adopted DESIGN.md front matter was once judged as
+  prose and its key colon flagged, fifty two
+  violations on that one file and every one a key
+  colon. A banned mark planted in a nested value
+  still fails, and both repairs are pinned by tests
+  that fail when the repair is reverted.
+- The Claude submission pack largest plain file figure
+  stands restated to the measured tree at the
+  storefront finalization landing. The pack named
+  tests/test_gate_scripts.py at 301,537 bytes and the
+  reconciled tree measures that file at 306,233 bytes
+  after the finalization additions grew it again, and
+  the submissions gate pin moved to the restated
+  figure in the same change.
 
 ### Removed
 

@@ -10,7 +10,7 @@
   },
   "plugins": [
     {
-      "description": "Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet. The marketplace also offers recognitio-mod, the spawn gate on its own, and this plugin already includes that gate, so install one entry or the other and never both.",
+      "description": "Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.",
       "name": "recognitio",
       "source": "./",
       "strict": true,

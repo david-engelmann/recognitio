@@ -37,7 +37,13 @@ Code install family and the MCP file family. Each family
 reads the brief sentence by sentence over the claim verb
 and object forms, and a negated claim clause states no
 claim. Those families are narrow and named, and prose
-outside them stays a human review surface.
+outside them stays a human review surface. The storefront
+finalization then restated the pins on the portable
+manifest description, the native manifest description and
+the recognitio marketplace entry to the one canonical
+sentence the listing standard sets for every face, and
+the never both instruction moved to the portable long
+description, where the standard puts usage guidance.
 """
 
 import json
@@ -531,15 +537,12 @@ def tree_problems(root):
 PORTABLE_DESCRIPTION = (
     "Pulls the relevant changes from a pull request or a commit "
     "range, with the context a reviewer needs, into one verified "
-    "review packet. This is the portable Agent Plugins 1.0.0 "
-    "packaging of the skill."
+    "review packet."
 )
 NATIVE_DESCRIPTION = (
     "Pulls the relevant changes from a pull request or a commit "
     "range, with the context a reviewer needs, into one verified "
-    "review packet. The marketplace also offers recognitio-mod, "
-    "the spawn gate on its own, and this plugin already includes "
-    "that gate, so install one entry or the other and never both."
+    "review packet."
 )
 MARKETPLACE_METADATA_DESCRIPTION = (
     "Pulls the relevant changes from a pull request or a commit "
@@ -735,9 +738,9 @@ def _description_source(path, root, problems):
 def description_problems(data, root):
     """Problems with the manifest description fields, word for word.
 
-    The portable identity and the never both instruction live
-    in these description fields, so each one is pinned word
-    for word and a reversal or relabel is refused by name.
+    Every listing face carries the one canonical sentence in
+    these description fields, so each one is pinned word for
+    word and a reversal or relabel is refused by name.
     """
     problems = []
     if data.get("description") != PORTABLE_DESCRIPTION:
@@ -753,9 +756,8 @@ def description_problems(data, root):
         if native.get("description") != NATIVE_DESCRIPTION:
             problems.append(
                 "the native manifest description is %r, not the "
-                "pinned description carrying the never both "
-                "instruction to install one entry or the other "
-                "and never both" % (native.get("description"),)
+                "pinned canonical description"
+                % (native.get("description"),)
             )
     market_path = root / ".claude-plugin" / "marketplace.json"
     market = _description_source(market_path, root, problems)
@@ -779,9 +781,7 @@ def description_problems(data, root):
             if name in expected and entry.get("description") != expected[name]:
                 problems.append(
                     "the marketplace entry %r description is %r, "
-                    "not the pinned description carrying the "
-                    "never both instruction to install one entry "
-                    "or the other and never both"
+                    "not the pinned description for that entry"
                     % (name, entry.get("description"))
                 )
     return problems

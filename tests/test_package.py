@@ -1068,13 +1068,14 @@ class TestRound5Package(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             data = self.inner.read_native(root)
             data["description"] = data["description"].replace(
-                "so install one entry or the other and never both.",
-                "so install both entries together.")
+                "into one verified review packet.",
+                "into one unverified review packet.")
             self.inner.write_native(root, data)
             problems = self.inner.problems(root)
             self.assertTrue(any(
                 "native manifest description" in p
-                and "never both" in p for p in problems), problems)
+                and "pinned canonical description" in p
+                for p in problems), problems)
 
     def test_marketplace_entry_description_reversal_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1085,12 +1086,13 @@ class TestRound5Package(unittest.TestCase):
             data = json.loads(target.read_text(encoding="utf-8"))
             entry = data["plugins"][0]
             entry["description"] = entry["description"].replace(
-                "so install one entry or the other and never both.",
-                "so install both entries together.")
+                "into one verified review packet.",
+                "into one unverified review packet.")
             target.write_text(json.dumps(data, indent=2), encoding="utf-8")
             problems = self.inner.problems(root)
             self.assertTrue(any(
-                "marketplace entry" in p and "never both" in p
+                "marketplace entry" in p
+                and "pinned description for that entry" in p
                 for p in problems), problems)
 
     def test_portable_description_relabel_fails(self):
@@ -1098,8 +1100,8 @@ class TestRound5Package(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             data = self.inner.read_manifest(root)
             data["description"] = data["description"].replace(
-                "This is the portable Agent Plugins 1.0.0 packaging of the skill.",
-                "This is the portable Cursor plugin packaging of the skill.")
+                "into one verified review packet.",
+                "into one verified Cursor review packet.")
             self.inner.write_manifest(root, data)
             problems = self.inner.problems(root)
             self.assertTrue(any(

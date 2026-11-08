@@ -1048,6 +1048,118 @@ class TestCheckCopy(unittest.TestCase):
                 "note field has a colon in prose", self.last_stderr
             )
 
+    def test_a_banned_mark_in_a_list_valued_description_is_caught(self):
+        # The storefront finalization repair. A prose key
+        # holding a list of strings once escaped collection
+        # whole, because collection required a string value
+        # and the recursion dropped the bare strings inside
+        # the list, so a description carried as a list passed
+        # the gate unseen.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "description": ["Does a thing in '
+                'plain words.", "And a second part; in plain '
+                'words."]}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has a semicolon",
+                self.last_stderr,
+            )
+
+    def test_a_banned_mark_in_a_list_valued_note_is_caught(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "note": ["Does a thing %s in '
+                'plain words."]}\n' % EM_DASH,
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "note field has an em dash", self.last_stderr
+            )
+
+    def test_a_clean_list_valued_description_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "description": ["Does a thing in '
+                'plain words.", "And a second part in plain '
+                'words."]}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_a_banned_mark_in_a_nested_list_is_caught(self):
+        # The repair review's plant. A list inside the list
+        # a prose key holds once escaped the list repair one
+        # level down, because the items of the outer list
+        # were passed back through a reading that returns
+        # nothing for a bare string, so the strings inside
+        # the inner list fell out of the collection unseen.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "plugin.json",
+                '{"name": "x", "description": [["Does a thing; '
+                'in plain words."]]}\n',
+            )
+            code = self.run_main_on([], manifest_files=[path])
+            self.assertEqual(code, 1)
+            self.assertIn(
+                "description field has a semicolon",
+                self.last_stderr,
+            )
+
+    def test_nested_frontmatter_keys_are_syntax(self):
+        # The storefront finalization repair. The DESIGN.md
+        # format nests its front matter keys one and two
+        # levels down, and the key pattern once anchored at
+        # column zero, so every nested key line was judged
+        # as prose and its key colon flagged, 52 violations
+        # on the adopted file and every one a key colon.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "DESIGN.md",
+                "---\n"
+                "version: alpha\n"
+                "name: Product storefront\n"
+                "colors:\n"
+                "  ground: \"#ffffff\"\n"
+                "  panel: \"#f6f8fa\"\n"
+                "typography:\n"
+                "  display:\n"
+                "    fontSize: \"2rem\"\n"
+                "---\n"
+                "\n"
+                "# Product storefront\n"
+                "\n"
+                "Clean prose stands here.\n",
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 0, self.last_stderr)
+
+    def test_a_banned_mark_in_a_nested_frontmatter_value_is_caught(self):
+        # The other direction of the same repair. A nested
+        # key is syntax at any depth, and its value stays
+        # prose under the bar.
+        with RetryingTemporaryDirectory() as tmp:
+            path = self.write_tmp(
+                tmp, "DESIGN.md",
+                "---\n"
+                "version: alpha\n"
+                "colors:\n"
+                "  ground: \"a bad; ground\"\n"
+                "---\n"
+                "\n"
+                "Clean prose stands here.\n",
+            )
+            code = self.run_main_on([path])
+            self.assertEqual(code, 1)
+            self.assertIn("has a semicolon", self.last_stderr)
+
     def test_a_missing_readme_fails_the_gate_itself(self):
         # Round 4 audit Minor 4 and red team Minor 3. Deleting
         # README.md once left the gate green over the prose
@@ -2503,29 +2615,22 @@ class TestDescriptionPins(unittest.TestCase):
         "Pulls the relevant changes from a pull request or a commit range, "
         "with the context a reviewer needs, into one verified review packet."
     )
-    # The storefront repair round. The two Claude listing
-    # surfaces carry one further sentence the other surfaces
-    # do not, because the never install both rule belongs to
-    # the listing a reader chooses between, and the two
-    # Claude entries are the only pair a single listing
-    # offers side by side. The canonical sentence above
-    # still opens the spelling and still stands alone on
-    # every other surface.
-    CLAUDE_DESCRIPTION = (
-        MANIFEST_DESCRIPTION
-        + " The marketplace also offers recognitio-mod, the "
-        "spawn gate on its own, and this plugin already "
-        "includes that gate, so install one entry or the "
-        "other and never both."
-    )
-    ANTIGRAVITY_DESCRIPTION = (
-        MANIFEST_DESCRIPTION
-        + " Antigravity native hook wiring serves the review run gate."
-    )
-    PACKAGE_DESCRIPTION = (
-        MANIFEST_DESCRIPTION
-        + " This is the portable Agent Plugins 1.0.0 packaging of the skill."
-    )
+    # The storefront repair round once let the two Claude
+    # listing surfaces and the portable manifest carry one
+    # further sentence each, on the ground that the never
+    # install both rule belonged to the listing a reader
+    # chooses between. The storefront finalization retired
+    # both exceptions under the listing standard, which sets
+    # one short description identical on every face, and
+    # the never both guidance stands in the portable long
+    # description at the place the standard reserves for
+    # how the software is used. Every short description
+    # below therefore pins to the canonical sentence alone.
+    # The Antigravity face carried one platform sentence of
+    # its own beside the canonical sentence until this
+    # stack, and it standardizes with the rest, so its pin
+    # below is the canonical sentence as well.
+    ANTIGRAVITY_DESCRIPTION = MANIFEST_DESCRIPTION
 
     def setUp(self):
         self.skill_mod = load_script("check_skill")
@@ -2579,13 +2684,13 @@ class TestDescriptionPins(unittest.TestCase):
     def test_plugin_manifest_description_is_pinned(self):
         self.assertEqual(
             self.manifest_description("plugin.json"),
-            self.CLAUDE_DESCRIPTION,
+            self.MANIFEST_DESCRIPTION,
         )
 
     def test_marketplace_entry_description_is_pinned(self):
         self.assertEqual(
             self.marketplace_entry_description(),
-            self.CLAUDE_DESCRIPTION,
+            self.MANIFEST_DESCRIPTION,
         )
 
     def test_marketplace_metadata_description_is_pinned(self):
@@ -2633,7 +2738,7 @@ class TestDescriptionPins(unittest.TestCase):
     def test_package_manifest_description_is_pinned(self):
         self.assertEqual(
             self.json_description("agent-plugins-package", "plugin.json"),
-            self.PACKAGE_DESCRIPTION,
+            self.MANIFEST_DESCRIPTION,
         )
 
 
@@ -3577,13 +3682,16 @@ class TestRound6PublicClaims(unittest.TestCase):
             "subsection describes",
             self.flat,
         )
-        plugin = json.loads(
-            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+        package = json.loads(
+            (ROOT / "agent-plugins-package" / "plugin.json").read_text(
                 encoding="utf-8"
             )
         )
+        long_description = package["extensions"]["com.openai"][
+            "interface"
+        ]["longDescription"]
         self.assertIn(
-            "the spawn gate on its own", plugin["description"]
+            "the spawn gate on its own", long_description
         )
         release = (ROOT / "docs" / "release-1.3.0.md").read_text(
             encoding="utf-8"

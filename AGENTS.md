@@ -166,6 +166,14 @@ not a gate.
   renders the PNG exports through CairoSVG, pinned by the
   gate at `scripts/check_brand.py` and by the asset pins in
   the gate script suite.
+- `DESIGN.md` at the repository root holds the adopted
+  storefront design record for the repository page itself,
+  its tokens extracted from the rendered page and
+  reconciled against the palette record under
+  `docs/brand/`, with the light theme carried as the
+  canonical set. The file stands under the copy
+  fence, its front matter values read as prose and
+  its front matter keys read as syntax.
 - `evals/` holds the paired eval tasks, the trigger set, the
   corpus index and their recorded results.
 - `.claude-plugin/` holds the plugin manifest at

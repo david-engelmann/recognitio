@@ -253,7 +253,7 @@ MANIFEST_FILES = discover_manifest_files()
 
 EM_DASH = "\u2014"
 EN_DASH = "\u2013"
-FRONTMATTER_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*:(\s|$)")
+FRONTMATTER_KEY = re.compile(r"^\s*[A-Za-z][A-Za-z0-9_-]*:(\s|$)")
 LINK_REFERENCE = re.compile(r"^\s*\[[^\]]+\]:")
 BARE_PATH = re.compile(r"^[\w.@~+-]+(/[\w.@~+-]+)+/?$")
 HTML_TAG_LINE = re.compile(r"^<[^>]*>$")
@@ -826,6 +826,24 @@ PROSE_VALUE_KEYS = (
 )
 
 
+def collect_list_strings(key, items, values):
+    """Collect the strings inside a list a prose key holds.
+
+    A string item is collected under the key's name. A
+    dictionary item is searched as a manifest in its own
+    right. A list item is walked by this same reading, so
+    the strings inside a list inside the list are collected
+    under the key's name as well.
+    """
+    for item in items:
+        if isinstance(item, str):
+            values.append((key, item))
+        elif isinstance(item, list):
+            collect_list_strings(key, item, values)
+        else:
+            values.extend(description_values(item))
+
+
 def description_values(data):
     """Every prose value in a parsed manifest, at any depth.
 
@@ -838,23 +856,26 @@ def description_values(data):
     prompt key of the same OpenAI interface object joins
     them, holding a list of suggested prompt sentences a
     listing reader also meets, so the strings inside that
-    list are collected under its name as well. Each value
-    travels with the key it stood under, so a violation can
-    name the field that carries it.
+    list are collected under its name as well. Any of the
+    collected keys may hold a list of strings rather than
+    one string, and the strings inside such a list are
+    collected under the key's name the same way, because a
+    reader meets them as the same prose in list dress.
+    A list inside such a list is walked the same way, so a
+    string at any depth inside the list a collected key
+    holds is collected under that key's name.
+    Each value travels with the key it stood under, so a
+    violation can name the field that carries it.
     """
     values = []
     if isinstance(data, dict):
         for key, value in data.items():
-            if key == "defaultPrompt" and isinstance(value, list):
-                values.extend(
-                    (key, item)
-                    for item in value
-                    if isinstance(item, str)
-                )
-            elif key in PROSE_VALUE_KEYS and isinstance(
-                value, str
-            ):
+            if key in PROSE_VALUE_KEYS and isinstance(value, str):
                 values.append((key, value))
+            elif key in PROSE_VALUE_KEYS and isinstance(
+                value, list
+            ):
+                collect_list_strings(key, value, values)
             else:
                 values.extend(description_values(value))
     elif isinstance(data, list):
