@@ -3584,6 +3584,14 @@ This unreleased work carries version 1.3.0.
   where the guard follows it, the shape the round 5
   discharge refusal named eleven tests for before the
   move.
+- The Claude submission pack largest plain file figure
+  stands restated to the measured tree. The pack named
+  tests/test_gate_scripts.py at 295,649 bytes and the
+  tree at the round 6 landing measured that file at
+  301,537 bytes after the additions of the round itself
+  grew it, and the hosted gate at the landing head
+  refused the stale figure. The submissions gate pin
+  moved to the restated figure in the same change.
 
 ### Removed
 

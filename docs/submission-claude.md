@@ -161,7 +161,7 @@ demo recording at 607,309 bytes, well under the 5 MiB file
 limit. The file count also holds under the cap the
 checklist holds for a reviewer, at 254 files against a cap
 of 512 files. Its largest file that is not an image or a
-font is tests/test_gate_scripts.py at 295,649 bytes, over
+font is tests/test_gate_scripts.py at 301,537 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files, so this one limit stands unmet while the
 other limits in this item hold. Its tracked extensions run
