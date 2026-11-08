@@ -14,7 +14,7 @@ The module validates clean on Claude Code 2.1.314 with its agent.spawn hook name
 
 **What is unverified**
 
-Agent team teammate spawns, the Desktop and VS Code surfaces, and an induced catch handler timeout stand unverified. The catch handler limit itself stands as the recorded limit section states it, on the primary events guide's word and the reference's one second limit for catch handlers. The gate certifies the shipped module and its structural family only, and the seven named residuals in the structural family section stand outside what it can judge.
+Agent team teammate spawns, the Desktop and VS Code surfaces, and an induced catch handler timeout stand unverified. The catch handler limit itself stands as the recorded limit section states it, on the word of the Claude Code mods reference, whose limits table states the one second limit for catch handlers. The gate certifies the shipped module and its structural family only, and the seven named residuals in the structural family section stand outside what it can judge.
 
 ## Summary
 

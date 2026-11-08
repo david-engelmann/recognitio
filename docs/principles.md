@@ -97,7 +97,13 @@ The paired eval recorded in this repo measured what judging from the
 diff alone costs. The packet pass found 8 of 8 planted defects across
 four fixture tasks and the raw diff pass found 4 of 8, and every defect
 the raw pass missed lived in a file the diff never showed. A reviewer
-cannot find a defect in a file the evidence never carried.
+cannot find a defect in a file the evidence never carried. The limits
+of that measurement stand stated with it. A defect in an unchanged
+file is unreachable by a raw diff pass by construction, because the
+pass holds no content from any unchanged file. One reviewer ran both
+passes and graded both, so the grading is not blind, and the tasks
+were designed around the packet strengths, as the limits in the
+results record state.
 
 ## Cut everything before you cut the change
 

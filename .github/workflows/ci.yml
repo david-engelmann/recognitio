@@ -21,7 +21,7 @@ jobs:
     # before pushing, word for word. CI is a backstop, not a gate.
     # The timeout holds the whole gate with room to spare. The test
     # discover alone took 380 seconds on the runner at 2,344 tests
-    # in run 302, the suite now stands at 2,779 tests by the loader
+    # in run 302, the suite now stands at 2,785 tests by the loader
     # count on this tree, and 24 gate scripts plus the smoke script
     # run behind the discover, so the old ten minutes cancelled
     # the job inside the

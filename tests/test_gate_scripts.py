@@ -3519,6 +3519,159 @@ def _png_pixels(path):
     return width, height, rows
 
 
+class TestRound6PublicClaims(unittest.TestCase):
+    """Round 6 pins on public claims the gates used to leave free.
+
+    The round 6 audit plants renamed a capability in the
+    README plugin table, softened the shallow clone limit in
+    README prose, renamed a tier in the README naming
+    sentence and set a contradictory figure into the eval
+    chart title, and every gate read green on each plant.
+    These tests pin the README tier names against the
+    example packet, the spawn gate name against the plugin
+    manifest that carries it, the shallow clone limit
+    against the skill text, the chart title and description
+    as exact text, and the release file against naming a
+    standing tag candidate in the present tense.
+    """
+
+    def setUp(self):
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.flat = " ".join(self.readme.split())
+
+    def test_readme_tier_names_match_the_example_packet(self):
+        sentence = (
+            "The four tiers are T0 Triage, T1 The change, "
+            "T2 Companions and T3 History."
+        )
+        self.assertIn(sentence, self.flat)
+        packet = (
+            ROOT / "examples" / "example-packet-991ac6a" / "packet.md"
+        ).read_text(encoding="utf-8")
+        listed = re.findall(
+            r"^- (T[0-3] (?:Triage|The change|Companions|History))$",
+            packet,
+            flags=re.M,
+        )
+        self.assertEqual(
+            listed,
+            [
+                "T0 Triage",
+                "T1 The change",
+                "T2 Companions",
+                "T3 History",
+            ],
+        )
+        for name in listed:
+            self.assertIn("## " + name, packet)
+
+    def test_readme_spawn_gate_name_matches_the_manifest(self):
+        self.assertIn(
+            "recognitio-mod | The spawn gate on its own", self.flat
+        )
+        self.assertIn(
+            "with the spawn gate mod included", self.flat
+        )
+        self.assertIn(
+            "brings the spawn gate the Claude Code plugin "
+            "subsection describes",
+            self.flat,
+        )
+        plugin = json.loads(
+            (ROOT / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn(
+            "the spawn gate on its own", plugin["description"]
+        )
+        release = (ROOT / "docs" / "release-1.3.0.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "the Build 7 spawn gate mod",
+            " ".join(release.split()),
+        )
+
+    def test_readme_shallow_clone_limit_matches_the_skill(self):
+        fragment = "A shallow clone is refused outright"
+        self.assertIn(fragment, self.flat)
+        skill = (
+            ROOT / ".agents" / "skills" / "recognitio" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(fragment, skill)
+        persona = (ROOT / "agents" / "reviewer.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(fragment, persona)
+
+    def test_eval_chart_title_and_description_are_exact(self):
+        chart = (ROOT / "docs" / "images" / "eval-chart.svg").read_text(
+            encoding="utf-8"
+        )
+        title = re.search(
+            r'<title id="chartTitle">([^<]+)</title>', chart
+        )
+        desc = re.search(r'<desc id="chartDesc">([^<]+)</desc>', chart)
+        self.assertIsNotNone(title)
+        self.assertIsNotNone(desc)
+        self.assertEqual(
+            title.group(1),
+            "Paired eval results. The packet pass found 8 of 8 "
+            "planted defects and the raw diff pass found 4 of 8.",
+        )
+        self.assertEqual(
+            desc.group(1),
+            "Two bars on a scale of eight. On the defects inside "
+            "the diff the two passes tied at 4 of 4 each. In "
+            "unchanged files the packet pass found 4 of 4 and "
+            "the raw diff pass found 0 of 4.",
+        )
+        # The visible labels carry the same figures, and the
+        # README alt text restates them, so each figure stands
+        # in the chart exactly twice and the alt sentence is
+        # pinned word for word.
+        self.assertEqual(chart.count("8 of 8"), 2)
+        self.assertEqual(chart.count("4 of 8"), 2)
+        self.assertEqual(chart.count("4 of 4"), 4)
+        self.assertEqual(chart.count("0 of 4"), 2)
+        self.assertIn(
+            "Paired eval chart. The packet pass found 8 of 8 "
+            "planted defects and the raw diff pass found 4 of 8.",
+            self.readme,
+        )
+
+    def test_release_file_names_no_standing_tag_candidate(self):
+        release = (ROOT / "docs" / "release-1.3.0.md").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(release.split())
+        self.assertIn(
+            "No tag candidate stands named on the face of this "
+            "file while the tag stays held.",
+            flat,
+        )
+        self.assertNotIn(
+            "The tag candidate head for this release is", flat
+        )
+        # The claim must not survive in another word order or
+        # in another section of the same file. The release
+        # notes name no candidate at all, and the checklist
+        # holds exactly the three standing mentions of the
+        # candidate head its items carry, so a claim added to
+        # either section in any wording raises one of these
+        # readings.
+        self.assertNotIn("tag candidate head", flat)
+        self.assertNotIn("as the tag candidate", flat)
+        self.assertNotIn("current head of main", flat)
+        notes = release.split("## Release notes", 1)[1].split(
+            "## The tag checklist", 1
+        )[0]
+        self.assertNotIn("candidate", notes.lower())
+        checklist = release.split("## The tag checklist", 1)[1]
+        self.assertEqual(checklist.lower().count("candidate"), 3)
+
+
 class TestDocsIndex(unittest.TestCase):
     """The visual round 7 docs index and navigation pins.
 

@@ -51,7 +51,7 @@ capture record, so no document in this set stands unlisted.
 - [The Build 15 Qwen Code marketplace presence](qwen-code-brief.md) (conditional)
   is a conditional draft in which no listing file ships and
   nothing is presented as published.
-- [The ZCode plugin build](zcode-plugin-brief.md) (landed) records the
+- [The Build 16 ZCode plugin build](zcode-plugin-brief.md) (landed) records the
   Build 16 native plugin, its marketplace distribution and
   version bump rule, and the portable fields that lose effect
   there.
@@ -70,9 +70,10 @@ capture record, so no document in this set stands unlisted.
 ## The release
 
 - [The 1.3.0 release notes and tag checklist](release-1.3.0.md) (held) states
-  what the 1.3.0 release carries, names its tag candidate
-  head on its face, and records the checklist the owner
-  follows to cut a tag that stays held until the owner acts.
+  what the 1.3.0 release carries, names no tag candidate
+  while the tag stays held, and records the checklist the
+  owner follows to cut the tag at the close of the
+  programme.
 
 ## The submission packs
 

@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -330,3 +331,29 @@ class TestDcoWorkflow(unittest.TestCase):
         )
         self.assertIn("CONTRIBUTING.md states", template)
         self.assertIn("outside pull requests are not taken", template)
+
+
+class TestCiSuiteFigure(unittest.TestCase):
+    """The suite figure the CI comment states is the counted figure.
+
+    Round 6 plant P1 restated the figure in the timeout
+    comment and every gate read green, because no test read
+    the comment against the suite it describes. This test
+    counts the suite with the same loader the gate runs and
+    holds the stated figure to the count, so a restatement
+    in either direction fails here until the comment is
+    restated with it.
+    """
+
+    def test_ci_comment_suite_figure_matches_the_loader_count(self):
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(
+            r"suite now stands at ([\d,]+) tests by the loader",
+            workflow,
+        )
+        self.assertIsNotNone(match)
+        stated = int(match.group(1).replace(",", ""))
+        suite = unittest.TestLoader().discover(str(ROOT / "tests"))
+        self.assertEqual(stated, suite.countTestCases())

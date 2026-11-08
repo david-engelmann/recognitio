@@ -3479,15 +3479,15 @@ This unreleased work carries version 1.3.0.
 - The CI check job timeout of ten minutes could no longer
   hold the gate it runs. The test discover alone took 380
   seconds on the runner at 2,344 tests in run 302 and the
-  suite now stands at 2,450 tests by the loader count on
-  this tree with two dozen gate scripts behind
+  suite then stood at 2,450 tests by the loader count on
+  the tree that landing carried, with two dozen gate scripts behind
   the discover, so the job was cancelled inside the gate
   step and the head it ran on carried no verdict at all.
   The check job timeout now stands at thirty minutes. The
   gate command the job runs stands unchanged.
 - The 1.3.0 release file named a local landing stack
   head as its tag candidate, a head no reader of the
-  landed main could reach, and it now names the head
+  landed main could reach, and it then named the head
   of main itself, `3a2f7adf`, with the tree identity
   chain of the heads it replaces stated on its face.
   The commit convention
@@ -3694,3 +3694,25 @@ This unreleased work carries version 1.3.0.
   directory exactly as it stood or names the one
   leftover it could not clear, and no hidden staging
   leftover stands beside a verified pair in silence.
+- The public claims the gates used to leave free now
+  stand pinned. The release file named a landing head
+  from five landings back as the current head of main
+  and the tag candidate, and it now names no standing
+  candidate while the tag stays held, with the
+  restatement held open in its own checklist for the
+  close of the programme. The suite figure in the CI
+  timeout comment is held to the loader count by a
+  test that counts the suite, the README tier names
+  and the spawn gate name and the shallow clone limit
+  are pinned against the example packet and the
+  manifests and the skill text, and the eval chart
+  title and description are pinned as exact text
+  against the results record. The principles page now
+  carries the paired eval limits beside its result,
+  the Antigravity brief carries a dated recheck of its
+  version pin, three brief titles carry their build
+  numbers, the headless runbook names the version
+  floor of its permission flag, the mod brief names
+  the mods reference its catch handler limit rests
+  on, and a past changelog figure that read in the
+  present tense now reads scoped to its own landing.

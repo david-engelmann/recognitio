@@ -143,6 +143,20 @@ carries no colon, so the hardening does not interact with the
 shipped skill, and the change stays an adjacent watch item with
 no brief impact.
 
+## The version pin recheck of 2026-11-08
+
+A recheck of the releases page on 2026-11-08 found the line
+moved on from the October read above. The 0.66.0 release
+shipped as a stable release on 2026-10-27 and the 0.67.0
+release followed on 2026-11-04. The preview build named
+above stays a preview build, and the sentence resting the
+pin on its standing reads as a sentence about that build
+alone. The pin itself stays at v0.65.0 in this brief,
+because the shipped bundle and its gate were built and
+verified against that version and no newer bundle has been
+adopted or verified here. Adopting a newer bundle is
+separate work, and nothing in this brief claims it.
+
 ## The extension boundary
 
 The Antigravity native shapes live as a second extensions
