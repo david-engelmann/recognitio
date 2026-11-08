@@ -855,5 +855,238 @@ class TestCheckDevin(unittest.TestCase):
             )
 
 
+class TestRound5Devin(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckDevin()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_live_review_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live Devin review run "
+                "verified the playbook in this build.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live Devin run confirmed "
+                "the playbook during this build.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_claim_validated_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live Devin session "
+                "validated the playbook in this build.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_claim_certified_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live Devin session "
+                "certified the playbook in this build.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_guard_in_whilst_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run whilst a live Devin run verified the "
+                "playbook.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run while a live Devin run verified the "
+                "playbook.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live Devin review run verified the playbook" in p
+                for p in problems), problems)
+
+    def test_invented_rule_before_the_rules_section_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The second packet guard"
+            self.assertIn(anchor, text)
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    "### R99. Nightly schedule\n\nDevin reviews "
+                    "run nightly on a schedule the playbook "
+                    "sets.\n\n" + anchor, 1))
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "R99" in p and "outside the certified rules "
+                "section" in p for p in problems), problems)
+
+
+class TestRound5SecondSeatDevin(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckDevin()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def assert_oncall_refused(self, root):
+        problems = self.inner.problems(root)
+        self.assertTrue(any(
+            "Oncall as a code review result" in p
+            for p in problems), problems)
+
+    def test_oncall_summary_pair_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nOncall investigations close "
+                "incidents. Oncall material stands as a review "
+                "finding for the packet.\n")
+            self.assert_oncall_refused(root)
+
+    def test_oncall_additive_inside_r12_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.inner.break_brief(
+                root,
+                "it as incident handling, never as a review finding.",
+                "it as incident handling, never as a review "
+                "finding. An Oncall investigation stands as a "
+                "review finding when a packet cites it.")
+            self.assert_oncall_refused(root)
+
+    def test_oncall_verdict_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nDevin Oncall is a code "
+                "review verdict.\n")
+            self.assert_oncall_refused(root)
+
+    def test_oncall_canonical_inside_r12_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.inner.break_brief(
+                root,
+                "it as incident handling, never as a review finding.",
+                "it as incident handling, never as a review "
+                "finding. Devin Oncall is a code review result.")
+            self.assert_oncall_refused(root)
+
+    def test_r16_harness_figures_exchanged_additive_inside_r16_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.inner.break_brief(
+                root,
+                "11.5 points on Gemini CLI with Gemini 3.1 Pro,",
+                "11.5 points on Gemini CLI with Gemini 3.1 "
+                "Pro. The harness record gives 11.3 points "
+                "on Claude Code and 8.1 points on Codex.")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "harness figures exchanged" in p
+                for p in problems), problems)
+
+    def test_r16_harness_figures_true_binding_additive_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe harness record gives "
+                "8.1 points on Claude Code and 11.3 points "
+                "on Codex and 11.5 points on Gemini CLI.\n")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "harness figures exchanged" in p
+                for p in problems), problems)
+
+    def test_r16_harness_figures_exchanged_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.inner.break_brief(
+                root,
+                "8.1\npoints on Claude Code with Opus 4.7 and 11.3 points on\nCodex with GPT-5.5 and 11.5 points on Gemini CLI with",
+                "11.5\npoints on Claude Code with Opus 4.7 and 11.3 points on\nCodex with GPT-5.5 and 8.1 points on Gemini CLI with")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "rule R16 does not bind" in p for p in problems),
+                problems)
+
+
+class TestRepairPassFiveDevin(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckDevin()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def plant_brief(self, root, suffix):
+        text = self.inner.read_brief(root)
+        self.inner.write_brief(root, text + suffix)
+        return self.inner.problems(root)
+
+    def assert_sarif_refused(self, problems):
+        self.assertTrue(any(
+            "other than 2.1.0" in p for p in problems),
+            problems)
+
+    def test_spelled_sarif_copula_dotted_form_fails(self):
+        # Repair pass five. The spelled reading admitted
+        # the number words standing straight after the
+        # version word only, so the dotted spelled figure
+        # standing after the is copula passed. That
+        # placement counts the same as the digit form now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe SARIF version is two point two "
+                "point zero.\n")
+            self.assert_sarif_refused(problems)
+
+    def test_spelled_sarif_copula_bare_form_fails(self):
+        # Repair pass five. The bare spelled figure
+        # standing after the is copula passed the same
+        # way. That placement counts the same as the
+        # digit form now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe SARIF version is two.\n")
+            self.assert_sarif_refused(problems)
+
+
 if __name__ == "__main__":
     unittest.main()

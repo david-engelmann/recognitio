@@ -5895,5 +5895,162 @@ class TestCheckKimi(unittest.TestCase):
             )
 
 
+class TestRound5Kimi(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckKimi()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_a_restated_cli_version_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.inner.break_brief(
+                root,
+                "under Kimi Code CLI 2.4.0",
+                "under Kimi Code CLI 2.5.0")
+            self.assertTrue(any(
+                "CLI version of 2.5.0" in p and "2.4.0" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatKimi(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckKimi()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_summary_bare_name_pair_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## Summary"
+            self.assertIn(anchor, text)
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nA plugin skill can still be "
+                    "called by its short name. The qualified "
+                    "form stands as an alternative label.", 1))
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "bare name" in p for p in problems), problems)
+
+
+class TestRepairPassFourKimi(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckKimi()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_a_restated_cli_version_with_version_word_fails(self):
+        # Repair pass four. The value check read only the
+        # bare form, so a restatement carrying the word
+        # version passed beside the pinned statement. The
+        # word form is value checked against 2.4.0 now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA session under Kimi Code "
+                "CLI version 2.5.0 ran the review.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "CLI version of 2.5.0" in p and "2.4.0" in p
+                for p in problems), problems)
+
+    def test_a_restated_cli_version_with_v_prefix_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA session under Kimi Code "
+                "CLI v2.5.0 ran the review.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "CLI version of 2.5.0" in p and "2.4.0" in p
+                for p in problems), problems)
+
+    def test_a_restated_cli_version_named_alone_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe CLI version is "
+                "2.5.0.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "CLI version of 2.5.0" in p and "2.4.0" in p
+                for p in problems), problems)
+
+    def test_a_restated_cli_version_true_forms_hold(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA session under Kimi Code "
+                "CLI version 2.4.0 ran the review. The CLI "
+                "version is 2.4.0.\n")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "CLI version of" in p for p in problems),
+                problems)
+
+
+class TestRepairPassFiveKimi(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckKimi()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def plant_brief(self, root, suffix):
+        text = self.inner.read_brief(root)
+        self.inner.write_brief(root, text + suffix)
+        return self.inner.problems(root)
+
+    def assert_cli_version_refused(self, problems):
+        self.assertTrue(any(
+            "CLI version of 2.5.0" in p and "2.4.0" in p
+            for p in problems), problems)
+
+    def test_a_restated_cli_version_with_copula_fails(self):
+        # Repair pass five. The named side of the value
+        # check admitted the version word standing
+        # straight after the CLI name only, so the copula
+        # form with the word is standing before its
+        # version word passed. That form is value checked
+        # against 2.4.0 now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nKimi Code CLI is version 2.5.0.\n")
+            self.assert_cli_version_refused(problems)
+
+    def test_a_restated_cli_version_stands_at_fails(self):
+        # Repair pass five. The named alone side admitted
+        # its is form only, so the stands at form passed
+        # beside it. That form is value checked against
+        # 2.4.0 now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe CLI version stands at 2.5.0.\n")
+            self.assert_cli_version_refused(problems)
+
+    def test_a_restated_cli_version_with_build_word_fails(self):
+        # Repair pass five. A version statement carrying
+        # the word build in place of the version word
+        # passed the named side of the check. That
+        # carrier word stands in the form now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nA session under Kimi Code CLI build "
+                "2.5.0 ran the review.\n")
+            self.assert_cli_version_refused(problems)
+
+
 if __name__ == "__main__":
     unittest.main()

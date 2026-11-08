@@ -103,15 +103,18 @@ and settings.
 
 ### Z5. The format limits
 
-A ZCode plugin description runs at most 1024 characters, and
-a plugin body over 100KB is truncated at 100KB. The shipped
-recognitio description runs far under the cap, and the
-shipped skill body runs far under the truncation limit.
+The SKILL.md frontmatter description is capped at 1024
+characters, and going over drops the whole skill rather than
+truncating it. A SKILL.md body over 100KB is truncated when
+loaded. The shipped skill frontmatter description runs far
+under the cap, and the shipped skill body runs far under the
+truncation limit.
 
 Derives from the primary ZCode plugin documentation, read in
 the round 15 research sweep at https://zcode.z.ai/en/docs/skill
 and https://zcode.z.ai/en/docs/plugin, which documents the 1024
-character description cap and the 100KB body truncation.
+character skill description cap with the whole skill dropped
+on excess and the 100KB skill body truncation at load.
 
 ### Z6. The trust posture stands unchanged
 

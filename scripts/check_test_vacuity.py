@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Reject test methods that cannot fail for a real reason.
+"""Reject test methods that carry no real assertion this
+guard can follow.
 
 R23-RT-01. The round 23 red team proved that softening a check
 together with its paired test defeats the gate in silence. A
@@ -73,10 +74,14 @@ not a pure call, so both shapes keep the credit a call
 over a value keeps.
 
 A helper is judged at each call site, so a
-parameter bound to a literal at the call, or left at a
-literal default, counts as a constant inside the helper for
-that call, while a parameter passed a fixture value counts
-as a value there.
+parameter bound to a scalar literal at the call, or left
+at a scalar literal default, counts as a constant inside
+the helper for that call, while a parameter passed a
+fixture value counts as a value there. A parameter bound
+to a list literal at the call stands under the mutable
+container reading instead, for the reason that reading
+records, so the call site binding does not settle what
+the helper reads out of the list.
 
 Only live assertions count. An assertion after a return or a
 raise or a break or a continue in the same block never runs.
@@ -99,9 +104,12 @@ discovery gates. A tests directory that does not stand, a
 tests directory holding no test file, and a discovery that
 finds no test method at all are each a problem by name, so
 the guard never prints its success sentence over an absent
-or empty suite. A scoped run of this guard alone therefore
-fails on the absence the full gate would catch at the
-discover step.
+or empty suite. A discovered test file that stands empty
+is a problem by name on the same reading, because a suite
+file truncated to nothing would otherwise pass in silence
+while the global floor still saw the files around it.
+A scoped run of this guard alone therefore fails on the
+absence the full gate would catch at the discover step.
 
 An assertion about a mock call state argues about nothing
 the suite exercises. A name bound in the body to a mock, or
@@ -157,11 +165,22 @@ matches the constructor spellings it holds and no others.
 It does not enumerate
 tests built at run time by decorators, by load_tests or by
 attribute assignment, and it does not follow helpers held
-in another class or another module. Assertions guarded by a
+in another class or another module. It does not settle
+what a list holds where a helper parameter binds that
+list at a call site, so a test that hands its helper a
+list literal holding the very problems it expects, and
+asserts over that parameter inside the helper, passes
+this guard while pinning nothing.
+Assertions guarded by a
 data dependent condition that happens never to hold, and
 assertions after a call that happens never to return, are
 likewise beyond a static reading. The spec lane diff review
-stays the guard for those shapes.
+stays the guard for those shapes. The printed failure lines
+are narrowed to the same limits. A refusal names the shapes
+this guard follows and the reach of its sight, rather than
+claiming a test cannot fail at run time, because a test
+that delegates its assertion to a helper in another class
+can fail for a real reason this guard does not follow.
 """
 
 import ast
@@ -2192,16 +2211,27 @@ def vacuity_problems(root=None):
             )
             continue
         try:
-            tree = ast.parse(
-                path.read_text(encoding="utf-8"), filename=str(path)
-            )
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:
             problems.append(
                 "%s cannot be read as UTF-8 text, %s"
                 % (path.name, exc)
             )
             continue
-        except (OSError, SyntaxError) as exc:
+        except OSError as exc:
+            problems.append(
+                "%s does not parse, %s" % (path.name, exc)
+            )
+            continue
+        if not text.strip():
+            problems.append(
+                "%s stands empty, so it holds no test "
+                "methods for the guard to judge" % path.name
+            )
+            continue
+        try:
+            tree = ast.parse(text, filename=str(path))
+        except SyntaxError as exc:
             problems.append(
                 "%s does not parse, %s" % (path.name, exc)
             )
@@ -2220,14 +2250,17 @@ def vacuity_problems(root=None):
         def check(where, result, resolve_call):
             if not scope_is_real(result, resolve_call):
                 problems.append(
-                    "%s carries no real assertion, so it "
-                    "cannot fail for a real reason" % where
+                    "%s carries no real assertion in a "
+                    "shape this guard follows, so it cannot "
+                    "fail for a real reason within this "
+                    "guard's sight" % where
                 )
             if not scope_fixture(result, resolve_call):
                 problems.append(
-                    "%s never touches a fixture, so it "
-                    "argues about nothing the suite "
-                    "exercises" % where
+                    "%s never touches a fixture in a "
+                    "shape this guard follows, so it "
+                    "argues about nothing within this "
+                    "guard's sight" % where
                 )
 
         for item in tree.body:

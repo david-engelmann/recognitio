@@ -7,21 +7,30 @@ the in client plugin marketplace distribution with the
 version bump rule, the portable v1 shape losing output
 styles and settings on ZCode, the register but not execute
 behavior for channels, lspServers, outputStyles, and
-settings, the 1024 character description cap and the 100KB
-body truncation, and the trust posture standing unchanged,
-per the primary ZCode plugin documentation read in the
-round 15 research sweep. Decision 4 binds this build like
-every other build. The brief documents the contract and
-never enforces it on a live ZCode client, so this script
-pins the contract without a ZCode host. It requires the
-brief to keep the stated pins with a derivation note on
-every rule, the manifest at the native path with its name,
-description, and version, the description under the cap,
-the manifest version matching the repo version, and the
-decision record with its decision 4 statement, so the
-scoped guidance cannot become a rival instruction source
-and a later edit cannot soften or drop a stated claim in
-silence.
+settings, the skill format limits, the SKILL.md frontmatter
+description capped at 1024 characters with the whole skill
+dropped on excess and a SKILL.md body over 100KB truncated
+at load, and the trust posture standing unchanged, per the
+primary ZCode documentation read in the round 15 research
+sweep. Decision 4 binds this build like every other build.
+The brief documents the contract and never enforces it on a
+live ZCode client, so this script pins the contract without
+a ZCode host. It requires the brief to keep the stated pins
+with a derivation note on every rule, the manifest at the
+native path with its name, description, and version, the
+manifest description pinned word for word, the skill
+frontmatter description under the cap, the manifest version
+matching the repo version, and the decision record with its
+decision 4 statement, so the scoped guidance cannot become
+a rival instruction source and a later edit cannot soften
+or drop a stated claim in silence. The round 5 repairs also
+refuse a scoped live client claim family in the brief,
+stated as a live ZCode client verifying or confirming or
+proving the plugin behaviour, which the brief states
+stands unproven because no client is available on this
+box, read sentence by sentence with a negated claim
+clause stating no claim. That family is narrow and named,
+and prose outside it stays a human review surface.
 """
 
 import json
@@ -74,9 +83,11 @@ PINNED = (
     ("the four registered fields",
      "Channels, lspServers, outputStyles, and settings"),
     ("the description cap",
-     "runs at most 1024 characters"),
+     "The SKILL.md frontmatter description is capped at 1024 characters"),
+    ("the whole skill drop on excess",
+     "going over drops the whole skill rather than truncating it"),
     ("the body truncation",
-     "truncated at 100KB"),
+     "A SKILL.md body over 100KB is truncated when loaded"),
     ("the trust posture",
      "stand unchanged on ZCode"),
     ("the ZCode skill page URL",
@@ -201,6 +212,40 @@ def rule_blocks(section):
     return blocks
 
 
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
 def brief_problems(root=None):
     """Problems with the Build 16 brief's stated contract."""
     root = ROOT if root is None else root
@@ -215,6 +260,29 @@ def brief_problems(root=None):
                 "docs/zcode-plugin-brief.md does not state %s"
                 % label
             )
+    # Repair pass. The glance check is a scoped negative
+    # family, not a literal membership test. A sentence
+    # states the claim when it joins the live wording and
+    # the ZCode client subject to a verify or confirm or
+    # prove verb form, and a negation in the claim clause
+    # states no claim.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(r"\b(verif\w*|confirm\w*|prov\w*)\b", low)
+        if (
+            "zcode" in low
+            and "client" in low
+            and re.search(r"\blive\b", low)
+            and verb
+            and not _claim_clause_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/zcode-plugin-brief.md claims a live ZCode "
+                "client verified the plugin behaviour in this build, "
+                "beside its pinned sentence that no ZCode client is "
+                "available on this box"
+            )
+            break
     return problems
 
 
@@ -225,6 +293,31 @@ def rules_problems(root=None):
     if raw is None:
         return ["docs/zcode-plugin-brief.md is missing"]
     problems = []
+    # Round 5 second seat. The portable shape token stands
+    # pinned inside rule Z3 itself, and no sentence may
+    # attach the body cap figure to the description or the
+    # description cap figure to the body.
+    z3_start = raw.find("### Z3.")
+    z3_end = raw.find("### Z4.", z3_start)
+    z3_block = raw[z3_start:z3_end] if z3_start >= 0 else ""
+    if "The portable v1 shape" not in z3_block:
+        problems.append(
+            "docs/zcode-plugin-brief.md rule Z3 does not state "
+            "the portable v1 shape"
+        )
+    low = re.sub(r"\s+", " ", raw.lower())
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if re.search(
+            r"\bdescription\b[^.]{0,40}\b100\s?kb\b", sentence
+        ) or re.search(
+            r"\bbody\b[^.]{0,40}\b1024\b", sentence
+        ):
+            problems.append(
+                "docs/zcode-plugin-brief.md attaches a skill "
+                "format figure to the wrong surface, the body "
+                "cap and the description cap exchanged"
+            )
+            break
     section = rules_section(raw)
     if section is None:
         problems.append(
@@ -308,11 +401,17 @@ def manifest_problems(root=None):
             % (data.get("keywords"), expected_keywords)
         )
     if "description" in data:
-        if len(data["description"]) > DESCRIPTION_LIMIT:
+        pinned_description = (
+            "Pulls the relevant changes from a pull request or "
+            "a commit range, with the context a reviewer needs, "
+            "into one verified review packet."
+        )
+        if data["description"] != pinned_description:
             problems.append(
-                ".zcode-plugin/plugin.json description runs %d "
-                "characters, over the %d limit"
-                % (len(data["description"]), DESCRIPTION_LIMIT)
+                ".zcode-plugin/plugin.json description is %r, "
+                "not the pinned description, so its wording or "
+                "a claim inside it has drifted in silence"
+                % (data["description"],)
             )
     if "version" in data:
         home_raw = read_text(root / ".claude-plugin" / "plugin.json")
@@ -330,20 +429,52 @@ def manifest_problems(root=None):
     return problems
 
 
+def skill_frontmatter_description(raw):
+    """The description value of a skill frontmatter block."""
+    if not raw.startswith("---"):
+        return None
+    end = raw.find("\n---", 3)
+    if end < 0:
+        return None
+    match = re.search(
+        r"(?m)^description:[ \t]*(.*)$", raw[3:end])
+    return match.group(1).strip() if match else None
+
+
 def body_problems(root=None):
-    """Problems with the shipped skill body against the cap."""
+    """Problems with the shipped skill against the format limits.
+
+    Rule Z5 places both limits on the skill, so the
+    description measurement reads the canonical skill
+    frontmatter description and the body measurement reads
+    the canonical skill file as a whole.
+    """
     root = ROOT if root is None else root
     raw = read_text(
         root / ".agents" / "skills" / "recognitio" / "SKILL.md"
     )
     if raw is None:
         return ["canonical skill is missing"]
+    problems = []
+    description = skill_frontmatter_description(raw)
+    if description is None:
+        problems.append(
+            "canonical skill carries no frontmatter description "
+            "for the ZCode description cap to measure"
+        )
+    elif len(description) > DESCRIPTION_LIMIT:
+        problems.append(
+            "canonical skill frontmatter description runs %d "
+            "characters, over the 1024 limit, so the whole "
+            "skill would drop on ZCode"
+            % len(description)
+        )
     if len(raw.encode("utf-8")) > BODY_LIMIT:
-        return [
+        problems.append(
             "canonical skill body runs over the 100KB ZCode "
             "truncation limit"
-        ]
-    return []
+        )
+    return problems
 
 
 def negative_problems(root=None):
@@ -601,6 +732,23 @@ def _execution_problem(judged):
             r"[^.]*\b(are|is|were|was|gets?)\s+"
             r"(?:\w+ly\s+)?(execut\w*|run|ran)\b"
             r"[^.]*\bzcode\b",
+            judged,
+        )
+        or re.search(
+            r"\bswitch\w*\s+(?:a\s+|the\s+)?"
+            r"(channel|channels|setting|settings)\s+on\b",
+            judged,
+        )
+        or re.search(
+            r"\bregistration\b[^.]*\bswitch\w*\b",
+            judged,
+        )
+        or re.search(
+            r"\bruns?\s+as\s+live\s+configuration\b",
+            judged,
+        )
+        or re.search(
+            r"\boperat\w*\s+as\s+live\s+configuration\b",
             judged,
         )
     ):

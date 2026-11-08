@@ -1509,7 +1509,12 @@ class TestCheckCoderabbit(unittest.TestCase):
             text = self.read_brief(root)
             self.write_brief(root, text + "\n\n" + plant + "\n")
             problems = self.problems(root)
-            self.assertTrue(problems, problems)
+            self.assertTrue(
+                any(
+                    "linked repository cap of 50" in p
+                    for p in problems
+                ), problems
+            )
 
     def test_gate_round38_platform_across_paragraphs_fails(self):
         # R38G-RT-02. The platform claim split across a
@@ -1580,6 +1585,224 @@ class TestCheckCoderabbit(unittest.TestCase):
                     for p in problems
                 ), problems
             )
+
+
+class TestRound5Coderabbit(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCoderabbit()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_t0_kimi_member_removed_from_g3_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.inner.break_brief(
+                root,
+                "A Kimi plugin manifest named kimi.plugin.json at any depth",
+                "A Kimi plugin manifest at any depth")
+            self.assertTrue(any(
+                "canonical T0 member" in p
+                and "kimi.plugin.json" in p for p in problems), problems)
+
+    def test_t0_copilot_member_removed_from_g3_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.inner.break_brief(
+                root,
+                "the Copilot instructions file name",
+                "the Copilot file name")
+            self.assertTrue(any(
+                "canonical T0 member" in p
+                and "Copilot instructions file name" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live CodeRabbit review of a "
+                "pull request verified the guidelines on a real "
+                "pull request.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live CodeRabbit review verified the guidelines" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA live CodeRabbit review "
+                "confirmed the guidelines against a real pull "
+                "request.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live CodeRabbit review verified the guidelines" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatCoderabbit(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCoderabbit()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def assert_deeper_refused(self, root):
+        problems = self.inner.problems(root)
+        self.assertTrue(any(
+            "deeper analysis at high focus" in p
+            for p in problems), problems)
+
+    def test_deeper_analysis_split_triple_in_two_axes_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus widens the review. "
+                    "It deepens the analysis. The change is read "
+                    "more closely at high focus.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_blunt_in_two_axes_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nAt high focus the review runs "
+                    "a deeper analysis of the change.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_canonical_in_focus_table_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The focus table as a constraint"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus reads as deeper "
+                    "review, a deeper analysis of the change "
+                    "that high focus runs.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_guard_in_separate_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never trims the "
+                    "packet, and it deepens the analysis at "
+                    "high focus.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_guard_covering_the_claim_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never deepens the "
+                    "analysis at high focus.", 1))
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "deeper analysis at high focus" in p
+                for p in problems), problems)
+
+    def test_deeper_analysis_guard_in_in_that_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never trims the "
+                    "packet in that it deepens the analysis at "
+                    "high focus.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_guard_covering_in_that_claim_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never deepens "
+                    "the analysis in that it trims the packet.", 1))
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "deeper analysis at high focus" in p
+                for p in problems), problems)
+
+    def test_deeper_analysis_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never trims the "
+                    "packet while it deepens the analysis at "
+                    "high focus.", 1))
+            self.assert_deeper_refused(root)
+
+    def test_deeper_analysis_guard_covering_while_claim_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "## The two axes"
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n\nHigh focus never deepens "
+                    "the analysis while it trims the packet.", 1))
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "deeper analysis at high focus" in p
+                for p in problems), problems)
+
+    def test_live_review_glance_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "check while a live CodeRabbit review "
+                "verified the guidelines.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "live CodeRabbit review verified the guidelines" in p
+                for p in problems), problems)
+
+    def test_deeper_analysis_inside_g5_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = "### G5."
+            idx = text.find(anchor)
+            self.assertGreaterEqual(idx, 0)
+            end = text.find("\n", idx)
+            self.inner.write_brief(
+                root, text[:end] + "\n\nA guideline review at "
+                "high focus also runs a deeper analysis of "
+                "the change." + text[end:])
+            self.assert_deeper_refused(root)
 
 
 if __name__ == "__main__":

@@ -19,12 +19,39 @@ without a Qwen client. It requires the brief to keep the
 stated pins with a derivation note on every rule, and it
 runs a meaning based negative check with number
 normalisation and a separation guard, so a reworded
-contradiction fails instead of passing on changed wording
-alone.
+contradiction inside its families fails instead of passing
+on changed wording alone. The negative check covers the
+figure family, the wrapper exit family, the activation
+family, the alias discovery and precedence families, the
+npm scope family, the conversion family and the
+publication family, which refuses a prose claim that a
+listing file ships or has shipped or that the marketplace
+presence is published or listed, in present or past tense
+and in a heading as well as in a sentence and as a bare
+status word standing in a table cell beside a marketplace
+cell, with markdown emphasis inside a cell stripped before
+the cell is judged, and as a status stated under a table
+whose row names the marketplace or the listing or Qwen,
+in a caption line
+standing directly under the table whose row points at the
+caption, where the caption line opens with the words
+Table caption or with the word Caption and states the
+status in the stands published or stands listed form or
+as the bare status word, or in a standalone status line
+standing directly under the table in the stands form or
+as the bare status word, while a caption line standing
+after an intervening prose paragraph stands outside the
+reading, judged on claim
+carrying sentences regardless of
+guard words elsewhere in the sentence. A live presence family beside it refuses a
+claim that the build is live in the Qwen marketplace. A
+paraphrase outside those families stays a human review
+surface.
 """
 
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -541,12 +568,25 @@ def figure_problem(sentence):
 
 
 def wrapper_problem(sentence):
-    """Whether a sentence states a wrapper exit of 4.
+    """Whether a sentence states a wrapper exit outside its set.
 
     A wrapper noun plus a bare 4 is not enough. The
     sentence must also carry an exit, code, or return
     token, so a sentence about a wrapper supporting 4
-    tools passes while an exit claim fires.
+    tools passes while an exit claim fires. Repair pass
+    four widens the figure side from the 4 alone to any
+    figure outside the wrapper set of 0 and 1 and 3,
+    because the binding is the set membership and an
+    added sentence assigning the wrapper an exit of 2 or
+    5 states the same false membership as the 4 form.
+    The widened side reads only figures standing in an
+    exit figure position, after the word exit or exits
+    with the word of standing between the exit word and
+    its figure admitted beside the plain form, or in a
+    list the word exits heads, or standing before a
+    wrapper exit phrase, so a figure counting something
+    else in the same sentence, the 2 tables the exits
+    live in, states no membership.
     """
     if not re.search(
         r"\b(exit\w*|code|return\w*)\b", sentence
@@ -557,10 +597,117 @@ def wrapper_problem(sentence):
         sentence,
     ):
         return True
-    return bool(re.search(
+    if re.search(
         r"\b4\b" + WINDOW + r"\b(" + WRAPPER_WORDS + r")\b",
         sentence,
-    ))
+    ):
+        return True
+    if not re.search(r"\b(" + WRAPPER_WORDS + r")\b", sentence):
+        return False
+    figures = []
+    for match in re.finditer(
+        r"\bexits?\s+(?:is\s+|are\s+|of\s+)?"
+        r"(\d+(?:\s*,\s*(?:and\s+)?\d+|\s+and\s+\d+)*)",
+        sentence,
+    ):
+        figures.extend(re.findall(r"\d+", match.group(1)))
+    for match in re.finditer(
+        r"\b(\d+)\s+is\s+(?:a\s+|the\s+)?"
+        r"(?:" + WRAPPER_WORDS + r")\s+exit",
+        sentence,
+    ):
+        figures.append(match.group(1))
+    return any(
+        number not in ("0", "1", "3") for number in figures
+    )
+
+
+# The exit meaning fragments in normalised form, keyed by
+# the exit each belongs to. Repair pass four. A sentence
+# that pairs one exit with the meaning fragment of another
+# states the swapped binding the presence pins cannot see,
+# because the pinned sentences all still stand.
+EXIT_MEANINGS = {
+    0: "review completed whatever it decided",
+    1: "never reached a verdict",
+    3: "completed with request_changes",
+    4: "internal verify refusal",
+}
+
+
+def _exit_meaning_problem(sentence):
+    """The plant kind of a swapped exit meaning, or None.
+
+    A sentence claims an exit in one of two shapes, the
+    internal verify shape, which claims exit 4, and the
+    wrapper shape, a wrapper word with an exit figure in
+    the same sentence. When the sentence also carries the
+    meaning fragment of a different exit, with no clause
+    negation guarding that fragment, it states the other
+    exit its meaning, and the kind names the claimed side.
+    A sentence carrying the claimed exit its own fragment
+    states the shipped pairing and passes.
+    """
+    claimed = None
+    if "internal verify" in sentence:
+        claimed = 4
+    else:
+        match = re.search(
+            r"\b(?:" + WRAPPER_WORDS + r")\b[^.]{0,60}?"
+            r"\bexit\w* (\d+)\b",
+            sentence,
+        ) or re.search(
+            r"\bexit\w* (\d+)\b[^.]{0,60}?"
+            r"\b(?:" + WRAPPER_WORDS + r")\b",
+            sentence,
+        )
+        if match:
+            claimed = int(match.group(1))
+    if claimed is None:
+        return None
+    for number, fragment in EXIT_MEANINGS.items():
+        if number == claimed:
+            continue
+        index = sentence.find(fragment)
+        if index != -1 and not _claim_negated(sentence, index):
+            if claimed == 4:
+                return "internal verify exit"
+            return "wrapper exit"
+    return None
+
+
+def _internal_verify_problem(sentence):
+    """Whether a sentence gives the internal verify another exit.
+
+    The internal verify exit is 4 alone, so a sentence
+    that names the internal verify and places a figure
+    other than 4 in an exit figure position, after the
+    word exit with the word of standing between the exit
+    word and its figure admitted beside the plain form,
+    or standing before an internal verify exit
+    phrase, states a false membership, judged with the
+    same clause negation as the prose publication family.
+    A sentence naming no figure in that position, or the
+    figure 4, states no false membership here, so a
+    figure counting something else in the same sentence,
+    the 2 tables the exits live in, passes.
+    """
+    if "internal verify" not in sentence:
+        return False
+    figures = []
+    for match in re.finditer(
+        r"\bexits?\s+(?:is\s+|of\s+)?(\d+)\b", sentence
+    ):
+        figures.append(match)
+    for match in re.finditer(
+        r"\b(\d+)\s+is\s+(?:a\s+|the\s+)?internal verify exit",
+        sentence,
+    ):
+        figures.append(match)
+    for match in figures:
+        if match.group(1) != "4":
+            return not _claim_negated(sentence, match.start(1))
+    return False
 
 
 def activation_problem(sentence):
@@ -592,6 +739,13 @@ def activation_problem(sentence):
 
 
 def guarded(line):
+    """Whether a sentence carries a guard word.
+
+    The claim is that a sentence holding one of the guard
+    words states its claim under a basis, a negation or a
+    record framing the negative families exempt. The bound
+    is the guard word list alone, read on the one sentence.
+    """
     return any(word in line for word in GUARD_WORDS)
 
 
@@ -665,6 +819,214 @@ def plant_sentence(raw):
     )
 
 
+PUBLICATION_PATTERNS = (
+    r"\ba listing file ships\b",
+    r"\ba listing file (?:has|had) shipped\b",
+    r"\ba listing file shipped\b",
+    r"\bmarketplace presence (?:is|was|has been) "
+    r"(?:published|listed)\b",
+    r"\b(?:is|was|were|has been|have been) published\b",
+    r"\bpublished in the qwen marketplace\b",
+)
+
+
+def _claim_negated(line, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = line[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never|nothing)\b|n't", prefix[cut:])
+    )
+
+
+def _table_cell_publication_claim(line):
+    """Whether a table row states the publication claim in a cell.
+
+    A status table is a claim surface in this brief, so a
+    row that names the marketplace in one cell and carries
+    the bare status word published or listed in another
+    cell states the publication claim with no verb form at
+    all. Markdown emphasis inside a cell is stripped before
+    the cell is judged, so a status word wearing emphasis
+    reads as the bare status word it carries. A cell
+    carrying an honest status, a negated status among
+    them, states no claim, because its cell text is not
+    the bare status word.
+    """
+    if not line.lstrip().startswith("|"):
+        return False
+    cells = [
+        re.sub(r"[*_`]", "", cell).strip()
+        for cell in line.strip().strip("|").split("|")
+    ]
+    status = [
+        index for index, cell in enumerate(cells)
+        if cell in ("published", "listed")
+    ]
+    if not status:
+        return False
+    return any(
+        index not in status
+        and re.search(
+            r"\b(marketplace|listing|qwen)\b", cell)
+        for index, cell in enumerate(cells)
+    )
+
+
+def _publication_claim(line):
+    """Whether a sentence states the publication claim.
+
+    The family covers the present and past tense forms of
+    the listing and published claims and the heading form
+    that names the marketplace as published in, each judged
+    with its own clause negation, so a negated claim states
+    no claim while a guard word elsewhere in the sentence
+    shelters nothing. The family also covers the table cell
+    form, a bare status word standing in a cell beside a
+    marketplace cell, and the forms the helper
+    _caption_publication_claims reads, a status stated in
+    a caption line standing directly under a table whose
+    row names the marketplace or the listing or Qwen
+    and points at the caption, where the caption line
+    opens with the words Table caption or with the word
+    Caption and states the status in the stands published
+    or stands listed form or as the bare status word, and
+    a status stated in a standalone status line standing
+    directly under a table whose row names the
+    marketplace or the listing or Qwen, in the stands
+    form or as the bare status word. A caption line
+    standing after an intervening prose paragraph stands
+    outside the reading.
+    """
+    if _table_cell_publication_claim(line):
+        return True
+    for pattern in PUBLICATION_PATTERNS:
+        match = re.search(pattern, line)
+        if match and not _claim_negated(line, match.start()):
+            return True
+    return False
+
+
+def _status_sentence(sentence):
+    """Whether one sentence states the bare or stands status.
+
+    The stands form states the status in the stands
+    published or stands listed form, judged with the same
+    clause negation as the prose family. The bare form is
+    the status word standing as the whole sentence, so no
+    negation can stand inside it.
+    """
+    match = re.search(
+        r"\bstands? (?:published|listed)\b", sentence)
+    if match and not _claim_negated(sentence, match.start()):
+        return True
+    return sentence.strip().rstrip(".!?") in (
+        "published", "listed")
+
+
+def _caption_publication_claims(text):
+    """Caption and status line sentences that state the claim.
+
+    Repair pass three. A claim split between a table cell
+    and the caption standing under the table reads whole.
+    Repair pass four widens the reading to the forms the
+    scoping texts now name. The caption form covers a
+    caption line standing directly under a table whose
+    row names the marketplace or the listing or Qwen and
+    points at the caption, where the caption line opens
+    with the words Table caption or with the word Caption
+    and a sentence of it states the status in the stands
+    published or stands listed form or as the bare status
+    word. The standalone form covers a status line
+    standing directly under a table whose row names the
+    marketplace or the listing or Qwen, stating the
+    status in the stands form or as the bare status word,
+    with no caption lead and no pointing row needed,
+    because the line itself carries the status. A caption
+    line standing after an intervening prose paragraph
+    stands outside the reading, because the rows no
+    longer stand directly before it. A caption under a
+    row that names no marketplace states no claim in this
+    reading.
+    """
+    claims = set()
+    groups = sentence_unit_groups(text)
+    for index, group in enumerate(groups):
+        if not group:
+            continue
+        rows = []
+        back = index - 1
+        while (
+            back >= 0 and groups[back]
+            and groups[back][0].lstrip().startswith("|")
+        ):
+            rows.extend(groups[back])
+            back -= 1
+        if not rows:
+            continue
+        named = any(
+            re.search(r"\b(marketplace|listing|qwen)\b", row)
+            for row in rows
+        )
+        if not named:
+            continue
+        if re.match(r"^(table )?caption\b", group[0]):
+            pointed = any(
+                re.search(r"\b(marketplace|listing|qwen)\b", row)
+                and "caption" in row
+                for row in rows
+            )
+            if not pointed:
+                continue
+        for sentence in group:
+            if _status_sentence(sentence):
+                claims.add(sentence)
+    return claims
+
+
+def _live_presence_claim(line):
+    """Whether a sentence claims the build is live in the marketplace.
+
+    The live wording is a distinct member from the
+    publication family, stated as the build standing live
+    in the Qwen marketplace, with the same clause negation
+    discipline.
+    """
+    for pattern in (
+        r"\blive in the qwen marketplace\b",
+        r"\bis live\b[^.]{0,40}\bqwen marketplace\b",
+    ):
+        match = re.search(pattern, line)
+        if match and not _claim_negated(line, match.start()):
+            return True
+    return False
+
+
 def negative_problems(text):
     """Meaning based negatives over sentences, not lines.
 
@@ -677,6 +1039,7 @@ def negative_problems(text):
     a rewrap of that sentence keeps the exemption too.
     """
     problems = []
+    caption_claims = _caption_publication_claims(normalise(text))
     for line in sentence_units(normalise(text)):
         if not re.search(r"\b(never|no sentence|not a wrapper)\b", line):
             if wrapper_problem(line):
@@ -688,6 +1051,29 @@ def negative_problems(text):
         # sentence carries a guard phrase.
         if figure_problem(line) and not _figure_guarded(line):
             problems.append("figure plant: " + line[:120])
+        # Repair pass. The publication family and the live
+        # presence family are judged on claim carrying
+        # sentences regardless of guard words elsewhere in
+        # the sentence, so they stand ahead of the guarded
+        # sentence skip. The guarded readings of the other
+        # families below keep their skip untouched.
+        if _publication_claim(line) or line in caption_claims:
+            problems.append("publication plant: " + line[:120])
+        if _live_presence_claim(line):
+            problems.append("live presence plant: " + line[:120])
+        # Repair pass four. The exit membership and meaning
+        # readings stand ahead of the guarded sentence skip
+        # beside the publication family, because an internal
+        # verify sentence carries its own guard word and a
+        # guard word elsewhere in a sentence shelters no
+        # swapped meaning.
+        if _internal_verify_problem(line):
+            problems.append(
+                "internal verify exit plant: " + line[:120])
+        meaning_kind = _exit_meaning_problem(line)
+        if meaning_kind is not None:
+            problems.append(
+                meaning_kind + " plant: " + line[:120])
         if guarded(line):
             continue
         if re.search(r"\breturns? 4\b", line) and re.search(
@@ -965,6 +1351,13 @@ def repair_utf8_problems(problems):
 
 
 def deliberate_source(note):
+    """Whether a derivation note names a source on purpose.
+
+    The claim is that a note counts only when it names a
+    canonical skill section as its source, a primary Qwen
+    citation, or a binding decision. A passing mention of a
+    title states no derivation and does not count.
+    """
     for title in CANONICAL_SECTIONS:
         if re.search(
             r"canonical skill[^.;]{0,200}" + re.escape(title), note
@@ -976,13 +1369,31 @@ def deliberate_source(note):
 
 
 def rules_section(raw):
+    """The text of the rules section alone, or None.
+
+    The claim is the rules section from its heading to the
+    next section heading, so a marker standing in the
+    navigation section after it is not judged as part of
+    the last rule. The bound is the next level two heading.
+    """
     start = raw.find(RULES_HEADING)
     if start < 0:
         return None
-    return raw[start:]
+    rest = raw[start + len(RULES_HEADING):]
+    match = re.search(r"(?m)^## ", rest)
+    if match:
+        rest = rest[:match.start()]
+    return raw[start:start + len(RULES_HEADING) + len(rest)]
 
 
 def derivation_problems(raw):
+    """Problems with the derivation discipline of the rules.
+
+    The claim is that every rule in the rules section
+    carries a derivation note naming a checkable source and
+    that at least ten rules stand. The bound is the rules
+    section alone, cut at the next section heading.
+    """
     section = rules_section(raw)
     if section is None:
         return ["the Qwen rules section is missing"]
@@ -1016,6 +1427,13 @@ def derivation_problems(raw):
 
 
 def decision_note(raw):
+    """The round 33 decision note text, or None.
+
+    The claim is the note from its marker heading to the
+    next section heading of the decision record. The bound
+    is that next heading, so a later record is not judged
+    as part of this note.
+    """
     start = raw.find(DECISION_NOTE_MARKER)
     if start < 0:
         return None
@@ -1024,6 +1442,13 @@ def decision_note(raw):
 
 
 def readme_qwen_section(raw):
+    """The README Qwen Code section text, or None.
+
+    The claim is the section from its heading to the next
+    heading at either level. The bound is that next
+    heading, so a neighbouring install section is not
+    judged as part of the Qwen section.
+    """
     start = raw.find("### Qwen Code")
     if start < 0:
         return None
@@ -1035,7 +1460,177 @@ def readme_qwen_section(raw):
     return rest
 
 
-def qwen_problems(root):
+QWEN_WRAPPER_ROWS = (
+    "| 0 | The review completed whatever it decided |",
+    "| 1 | It never reached a verdict because a child failed or timed out or left no composed artifact |",
+    "| 3 | It completed with REQUEST_CHANGES and fail-on request-changes set |",
+)
+
+QWEN_INTERNAL_ROWS = (
+    "| 4 | Internal verify refusal at the compose floor |",
+)
+
+
+def _row_cells(row):
+    """The cells of one normalised table row line."""
+    return [cell.strip() for cell in row.strip("|").split("|")]
+
+
+def _is_separator(row):
+    """Whether a normalised table line is the separator row."""
+    return bool(re.fullmatch(r"\|[\s:\-|]+\|", row))
+
+
+def _block_rows(lines, start):
+    """The data rows of the table whose header stands at start.
+
+    The rows are the table lines standing after the header
+    and its separator, up to the first line that is not a
+    table line, returned with their line indexes so a row
+    standing in a block is never counted twice.
+    """
+    found = {}
+    index = start + 1
+    while index < len(lines) and lines[index].startswith("|"):
+        if not _is_separator(lines[index]):
+            found[index] = lines[index]
+        index += 1
+    return found
+
+
+def _labelled_exit_rows(lines, label):
+    """The data rows of the exit table standing under a label."""
+    for index, line in enumerate(lines):
+        if line != label:
+            continue
+        for head in range(index + 1, len(lines)):
+            if lines[head] == "| Exit | Meaning |":
+                return _block_rows(lines, head)
+            if lines[head].startswith("### "):
+                break
+        return {}
+    return {}
+
+
+def _census_problems(table, found_rows, pinned_rows):
+    """Problems with rows standing outside a pinned census.
+
+    Repair pass four. A presence pin proves the pinned
+    rows stand, and the census is its other half, proving
+    no row stands beside them. The rows standing in the
+    table must be exactly the pinned set, each row whole,
+    so a row added to the table, or a restated row standing
+    anywhere in the brief in the form of a table row, is
+    refused here, while a dropped row and a restated
+    figure in a standing row refuse on the presence pins
+    above.
+    """
+    extra = Counter(found_rows) - Counter(pinned_rows)
+    problems = []
+    for row in dict.fromkeys(found_rows):
+        if extra[row] > 0:
+            problems.append(
+                "docs/qwen-code-brief.md " + table
+                + " carries a row outside the pinned census, "
+                "namely " + repr(row) + ", so the rows "
+                "standing in the table are not the pinned set"
+            )
+    return problems
+
+
+def _table_census_problems(raw):
+    """Census problems over the three pinned brief tables.
+
+    The R1 scope table is found by its header, and a stray
+    row in the R1 form standing anywhere in the brief, a
+    row whose page cell names one of the two R1 pages or
+    whose scope cell names a pinned scope, joins the
+    census wherever it stands. The two exit tables are
+    found by their labels, and a stray exit row whose
+    meaning cell states a pinned exit meaning joins the
+    census of the table that meaning belongs to.
+    """
+    lines = [
+        re.sub(r"\s+", " ", line).strip()
+        for line in raw.splitlines()
+    ]
+    problems = []
+    r1_found = {}
+    for index, line in enumerate(lines):
+        if line == "| Page | Scope | Figure | Basis |":
+            r1_found.update(_block_rows(lines, index))
+            break
+    scopes = {_row_cells(row)[1] for row in QWEN_R1_ROWS}
+    for index, line in enumerate(lines):
+        if index in r1_found or not line.startswith("|"):
+            continue
+        cells = _row_cells(line)
+        if len(cells) == 4 and (
+            cells[0] in ("Code review page", "Commands page")
+            or cells[1] in scopes
+        ):
+            r1_found[index] = line
+    problems.extend(_census_problems(
+        "R1 scope table",
+        [r1_found[index] for index in sorted(r1_found)],
+        QWEN_R1_ROWS,
+    ))
+    wrapper_found = _labelled_exit_rows(lines, "Wrapper exits")
+    internal_found = _labelled_exit_rows(
+        lines, "Internal verify exit")
+    in_blocks = set(wrapper_found) | set(internal_found)
+    wrapper_meanings = {
+        _row_cells(row)[1] for row in QWEN_WRAPPER_ROWS}
+    internal_meanings = {
+        _row_cells(row)[1] for row in QWEN_INTERNAL_ROWS}
+    for index, line in enumerate(lines):
+        if index in in_blocks or not line.startswith("|"):
+            continue
+        cells = _row_cells(line)
+        if len(cells) != 2 or not re.fullmatch(r"\d+", cells[0]):
+            continue
+        if cells[1] in wrapper_meanings:
+            wrapper_found[index] = line
+        elif cells[1] in internal_meanings:
+            internal_found[index] = line
+    problems.extend(_census_problems(
+        "wrapper exit table",
+        [wrapper_found[index] for index in sorted(wrapper_found)],
+        QWEN_WRAPPER_ROWS,
+    ))
+    problems.extend(_census_problems(
+        "internal verify exit table",
+        [internal_found[index] for index in sorted(internal_found)],
+        QWEN_INTERNAL_ROWS,
+    ))
+    return problems
+
+
+QWEN_R1_ROWS = (
+    "| Code review page | Step 3A small diff roster | Up to 16 parallel agents | Effort table |",
+    "| Code review page | Same repo PR reviews | Up to 17 parallel tasks | Roster narrative |",
+    "| Code review page | Same repo PR reviews in practice with finders | 16 to 19 in practice | Roster narrative |",
+    "| Code review page | Local diff and file path reviews | 14 to 17 | Roster narrative |",
+    "| Code review page | Cross repo lightweight mode with PR identity | 14 to 17 | Roster narrative |",
+    "| Code review page | Cross repo lightweight mode without PR identity | 12 to 15 | Roster narrative |",
+    "| Code review page | Review agents in Step 3 | 17 with 0 to 2 added | Token efficiency table |",
+    "| Code review page | Review agents in Step 3 without Agent 1e | 16 | Token efficiency table |",
+    "| Code review page | Local and file reviews | 15 | Token efficiency table |",
+    "| Code review page | Cross repo reviews with PR identity | 15 | Token efficiency table |",
+    "| Code review page | Cross repo reviews without PR identity | 13 | Token efficiency table |",
+    "| Commands page | Built in skills table | 12 parallel agents at high effort | Conflicting summary not used |",
+)
+
+
+def qwen_problems(root=None):
+    """Every Build 15 Qwen Code marketplace presence problem.
+
+    The claim is that the brief, the decision note, the
+    changelog and the README Qwen section state the pinned
+    contract and that no listing file ships in the tree. The
+    bound is those surfaces alone, read at the root given.
+    """
+    root = ROOT if root is None else root
     UTF8_UNREADABLE.clear()
     problems = []
     brief = read_text(root / "docs" / "qwen-code-brief.md")
@@ -1045,6 +1640,21 @@ def qwen_problems(root):
             "missing, so no Qwen claim in it can be checked"
         ])
     flat = re.sub(r"\s+", " ", brief)
+    # Round 5 second seat. Each row of the R1 scope table
+    # is pinned whole, so exchanging two figures between
+    # scopes refuses by row.
+    # Repair pass four. The pin is now one half of a closed
+    # census. The census over the R1 scope table and the
+    # two R2 exit tables refuses any row standing outside
+    # the pinned set, so an added row refuses beside the
+    # dropped and restated rows the presence pins refuse.
+    for row in QWEN_R1_ROWS:
+        if row not in flat:
+            problems.append(
+                "docs/qwen-code-brief.md R1 scope table does "
+                "not carry the pinned row %r" % row
+            )
+    problems.extend(_table_census_problems(brief))
     for name, fragment in PINNED:
         if re.sub(r"\s+", " ", fragment) not in flat:
             problems.append(
@@ -1059,6 +1669,24 @@ def qwen_problems(root):
             "wording the live run of 2026-10-29 falsified for "
             "the one scoped shape the brief now records"
         )
+    for stated in re.findall(
+            r"live Qwen Code session on (\d{4}-\d{2}-\d{2})", flat):
+        if stated != "2026-10-29":
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states the first live session date as " + stated
+                + ", which differs from the recorded live "
+                "session date 2026-10-29"
+            )
+    for stated in re.findall(
+            r"second live session on (\d{4}-\d{2}-\d{2})", flat):
+        if stated != "2026-11-03":
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states the second live session date as " + stated
+                + ", which differs from the recorded live "
+                "session date 2026-11-03"
+            )
     problems.extend(derivation_problems(brief))
     problems.extend(negative_problems(brief))
     decisions = read_text(root / "docs" / "decisions.md")
@@ -1128,22 +1756,25 @@ def qwen_problems(root):
                 "test form that belongs in the brief only"
             )
     for path in root.rglob("qwen-extension.json"):
-        if "scratch" not in str(path):
-            problems.append(
-                "a Qwen listing file ships at " + str(path)
-                + ", and no Qwen listing file may ship in "
-                "this tree"
-            )
+        problems.append(
+            "a Qwen listing file ships at " + str(path)
+            + ", and no Qwen listing file may ship in "
+            "this tree"
+        )
     return repair_utf8_problems(problems)
 
 
-def main():
-    problems = qwen_problems(ROOT)
+def main(root=None):
+    root = ROOT if root is None else root
+    problems = qwen_problems(root)
     if problems:
         for problem in problems:
             print("check_qwen: " + problem, file=sys.stderr)
         return 1
-    print("check_qwen: Qwen contract holds")
+    print(
+        "check_qwen: the Build 15 Qwen Code marketplace "
+        "presence contract holds"
+    )
     return 0
 
 

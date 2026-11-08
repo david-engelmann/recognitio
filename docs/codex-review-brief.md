@@ -105,9 +105,12 @@ file name, a path specific Copilot instructions file under the
 instructions folder of .github carrying the .instructions.md
 suffix, the .cursorrules file name, a Cursor rules file under a
 .cursor folder, and a Claude rules file under a .claude/rules
-folder, with a rename flagged when either its old name or its new
-name stands in the set. A review packet output style under the
-output-styles folder of the plugin is flagged too.
+folder. A Kimi plugin manifest named kimi.plugin.json at any
+depth and a Kimi plugin agent, hook script or manifest under a
+.kimi-plugin folder are flagged too. A renamed file is flagged
+when either its old name or its new name stands in the set. A
+review packet output style under the output-styles folder of the
+plugin is flagged too.
 
 Derives from canonical skill, The tier model, the T0
 instruction file flag.

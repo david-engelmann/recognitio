@@ -17,6 +17,14 @@ the OpenAI owned figures, and the SECURITY.md policy context note
 are all pinned as brief sentences, and the decision record must
 name Build 9 with a decision 4 statement. A later edit that
 drops any of them fails the gate instead of drifting in silence.
+The round 5 repairs pin the canonical T0 name set in rule R4
+member by member and as a whole, and refuse a scoped packet
+gating claim family, stated as the packet gating rule
+exercised in a run in any verb order, which the brief states
+was not exercised, read sentence by sentence with a negated
+claim clause stating no claim. Those families are narrow
+and named, and prose outside them stays a human review
+surface.
 """
 
 import re
@@ -112,6 +120,71 @@ def rule_blocks(section):
     return [part for part in parts[1:]]
 
 
+T0_MEMBERS = (
+    ("the base names AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth",
+     "AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth"),
+    ("the Copilot instructions file name",
+     "the Copilot instructions file name"),
+    ("a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix",
+     "a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix"),
+    ("the .cursorrules file name", "the .cursorrules file name"),
+    ("a Cursor rules file under a .cursor folder",
+     "a Cursor rules file under a .cursor folder"),
+    ("a Claude rules file under a .claude/rules folder",
+     "a Claude rules file under a .claude/rules folder"),
+    ("a Kimi plugin manifest named kimi.plugin.json at any depth",
+     "A Kimi plugin manifest named kimi.plugin.json at any depth"),
+    ("a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder",
+     "a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder are flagged too"),
+    ("the rename flag for either name",
+     "A renamed file is flagged when either its old name or its new name stands in the set"),
+    ("a review packet output style under the output-styles folder of the plugin",
+     "A review packet output style under the output-styles folder of the plugin is flagged too"),
+)
+
+T0_SET_TEXT = (
+    "The name set is AGENTS.md and CLAUDE.md and SKILL.md and "
+    "GEMINI.md at any depth, the Copilot instructions file name, "
+    "a path specific Copilot instructions file under the "
+    "instructions folder of .github carrying the "
+    ".instructions.md suffix, the .cursorrules file name, a "
+    "Cursor rules file under a .cursor folder, and a Claude "
+    "rules file under a .claude/rules folder. A Kimi plugin "
+    "manifest named kimi.plugin.json at any depth and a Kimi "
+    "plugin agent, hook script or manifest under a .kimi-plugin "
+    "folder are flagged too. A renamed file is flagged when "
+    "either its old name or its new name stands in the set. A "
+    "review packet output style under the output-styles folder "
+    "of the plugin is flagged too."
+)
+
+
+def t0_problems_for_section(section):
+    """Problems with rule R4 stating the canonical T0 set."""
+    problems = []
+    for block in rule_blocks(section):
+        flat = re.sub(r"\s+", " ", block)
+        if "The name set is" not in flat:
+            continue
+        for label, fragment in T0_MEMBERS:
+            if fragment not in flat:
+                problems.append(
+                    "docs/codex-review-brief.md rule R4 does not "
+                    "state the canonical T0 member %s" % label
+                )
+        start = flat.find("The name set is")
+        end_marker = "of the plugin is flagged too."
+        end = flat.find(end_marker, start)
+        stated = flat[start:end + len(end_marker)] if end >= 0 else ""
+        if stated != T0_SET_TEXT:
+            problems.append(
+                "docs/codex-review-brief.md rule R4 states a "
+                "name set that differs from the canonical T0 "
+                "set, with a member missing or added"
+            )
+    return problems
+
+
 def deliberate_source(note):
     """Whether the derivation note names a source on purpose.
 
@@ -156,6 +229,72 @@ def derivation_problems(section):
     return problems
 
 
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
+def _recovery_binding_problems(text):
+    """Problems with a sentence binding the figures exchanged.
+
+    Repair pass. The presence pins bind the figures in
+    place, and this reading refuses the additive form of
+    the same exchange, in the form the ZCode gate uses for
+    its additive figure exchange. Any sentence that binds
+    the 98 percent figure to the baseline subject or the
+    58.3 percent figure to the rule guided subject states
+    the exchange, wherever the sentence stands. The bound
+    on the subject stretch keeps the shipped worked
+    example sentence, which binds both figures correctly
+    across a longer stretch, outside the reading.
+    """
+    low = re.sub(r"\s+", " ", text.lower())
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if (
+            re.search(r"\bbaseline\b[^.]{0,80}\b98 percent\b", sentence)
+            or re.search(
+                r"\brule guided\b[^.]{0,80}\b58\.3 percent\b", sentence
+            )
+            or "98 percent for the baseline" in sentence
+            or "58.3 percent for the rule guided" in sentence
+        ):
+            return [
+                "docs/codex-review-brief.md binds the recovery "
+                "figures to the wrong subjects, the baseline and "
+                "rule guided figures exchanged"
+            ]
+    return []
+
+
 def brief_problems(root=None):
     """Problems with the Build 9 brief's stated contract."""
     root = ROOT if root is None else root
@@ -167,10 +306,35 @@ def brief_problems(root=None):
         ]
     try:
         raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return [
+            "cannot read docs/codex-review-brief.md, it cannot "
+            "be read as UTF-8 text"
+        ]
     except OSError as exc:
         return ["cannot read docs/codex-review-brief.md, %s" % exc]
     text = re.sub(r"\s+", " ", raw)
     problems = []
+    # Repair pass. The glance check is a scoped negative
+    # family, not a literal membership test. A sentence
+    # states the claim when it joins the packet gating
+    # subject to an exercise verb form in either order, and
+    # a negation in the claim clause states no claim.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(r"\bexercis\w*\b", low)
+        if (
+            "packet gating" in low
+            and verb
+            and not _claim_clause_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/codex-review-brief.md claims the packet "
+                "gating rule was exercised in the paired run, beside "
+                "its pinned sentence that it was not exercised"
+            )
+            break
+    problems.extend(_recovery_binding_problems(text))
     section = rules_section(raw)
     if section is None:
         problems.append(
@@ -179,6 +343,7 @@ def brief_problems(root=None):
         )
     else:
         problems.extend(derivation_problems(section))
+        problems.extend(t0_problems_for_section(section))
     for label, fragment in PINNED:
         if fragment not in text:
             problems.append(
@@ -189,6 +354,61 @@ def brief_problems(root=None):
             "docs/codex-review-brief.md does not report the 98 "
             "percent against 58.3 percent figures"
         )
+    # Round 5 second seat. The two evidence figures are
+    # bound to their subjects, so exchanging them in place
+    # refuses.
+    if not re.search(r"recovered 98 percent", text):
+        problems.append(
+            "docs/codex-review-brief.md does not bind the 98 "
+            "percent figure to the rule guided recovery"
+        )
+    if not re.search(r"58\.3 percent for the baseline", text):
+        problems.append(
+            "docs/codex-review-brief.md does not bind the "
+            "58.3 percent figure to the baseline control"
+        )
+    problems.extend(round5_codex_claim_problems(text))
+    return problems
+
+
+def round5_codex_claim_problems(text):
+    """Problems with two additive claims the brief denies.
+
+    Round 5 second seat. No sentence may claim a product
+    native calendar schedule, which the scheduled scans
+    section denies, and no sentence may state that a
+    SECURITY.md file is executable instruction, which rule
+    R6 denies. A sentence carrying the pinned denial states
+    no claim and is skipped.
+    """
+    problems = []
+    low = text.lower()
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if "calendar" in sentence and re.search(
+            r"\bschedul\w*\b", sentence
+        ) and not any(
+            guard in sentence
+            for guard in ("no product", "must not", "never", "no ")
+        ):
+            problems.append(
+                "docs/codex-review-brief.md claims a product "
+                "native calendar schedule, which its scheduled "
+                "scans section denies"
+            )
+            break
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if (
+            "security.md" in sentence
+            and "executable instruction" in sentence
+            and "not executable" not in sentence
+            and "policy context" not in sentence
+        ):
+            problems.append(
+                "docs/codex-review-brief.md states a "
+                "SECURITY.md file is executable instruction, "
+                "which rule R6 denies"
+            )
+            break
     return problems
 
 
@@ -203,6 +423,11 @@ def decision_problems(root=None):
         ]
     try:
         raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return [
+            "cannot read docs/decisions.md, it cannot be read "
+            "as UTF-8 text"
+        ]
     except OSError as exc:
         return ["cannot read docs/decisions.md, %s" % exc]
     start = raw.find(DECISION_HEADING)

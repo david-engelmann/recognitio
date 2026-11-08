@@ -26,7 +26,13 @@ harness contract with a derivation note on every contract
 statement, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
 instruction source and a later edit cannot soften or drop a
-dated claim in silence.
+dated claim in silence. The repair pass also refuses a
+scoped live hook claim family in the brief, stated as an
+Antigravity product running in this build and verifying
+or confirming or proving the hook contract live, read
+sentence by sentence with a negated claim clause stating
+no claim. That family is narrow and named, and prose
+outside it stays a human review surface.
 """
 
 import json
@@ -341,6 +347,40 @@ def statement_blocks(section):
     return [part for part in parts[1:]]
 
 
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
 def brief_problems(root=None):
     """Problems with the Build 12 brief's stated contract."""
     root = ROOT if root is None else root
@@ -354,6 +394,36 @@ def brief_problems(root=None):
             problems.append(
                 "docs/antigravity-plugin-brief.md does not state %s"
                 % label
+            )
+    # Repair pass. The glance check is a scoped negative
+    # family, not a literal membership test. A sentence
+    # states the claim when it joins the Antigravity subject
+    # to a run verb form and a verify or confirm or prove
+    # verb form and the hook or live object, and a negation
+    # in the claim clause states no claim.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(r"\b(verif\w*|confirm\w*|prov\w*)\b", low)
+        if (
+            "antigravity" in low
+            and re.search(r"\b(ran|runs|run)\b", low)
+            and verb
+            and re.search(r"\b(hook|live)\b", low)
+            and not _claim_clause_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/antigravity-plugin-brief.md claims an "
+                "Antigravity product ran in this build and verified "
+                "the hook contract live, beside its pinned sentence "
+                "that no Antigravity product ran in this build"
+            )
+            break
+    for token in re.findall(r"(v\d+\.\d+\.\d+) stable pin", text):
+        if token != "v0.65.0":
+            problems.append(
+                "docs/antigravity-plugin-brief.md states the "
+                "stable pin as %s, which differs from the pinned "
+                "v0.65.0" % token
             )
     return problems
 

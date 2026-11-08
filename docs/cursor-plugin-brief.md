@@ -10,7 +10,7 @@ The Cursor plugin tree under `.cursor-plugin` with the skill as a real directory
 
 **What was proven**
 
-The official desktop client ran on this box and loaded the plugin with zero failures before any sign in, and live agent CLI sessions settled invocation precedence on that surface, both as recorded in this brief.
+The official desktop client ran on this box and loaded the plugin with zero failures before any sign in, and live agent CLI sessions settled invocation precedence on that surface, both as recorded in this brief. The desktop load stands proven for the layout that stood before the later correction, and a fresh desktop run of the corrected layout stands unverified, as the manifest section of this brief records.
 
 **What is unverified**
 
@@ -32,8 +32,7 @@ with its packaging rules, the six component set of Rules, Skills,
 Agents, Commands, MCP Servers, and Hooks, the Bugbot rules in
 `.cursor/BUGBOT.md` with the effort levels, and the second rule
 surface at `.cursor/config/bugbot.yaml` with its precedence
-order, distributed through the manually reviewed Cursor
-Marketplace. The component set uses the primary term Agents, not
+order. The component set uses the primary term Agents, not
 subagents. Decision 4 binds this build like every other build.
 The plugin and the Bugbot rules advise and never enforce.
 Enforcement stays on the shipped scripts.
@@ -393,10 +392,17 @@ whose verified flag is false."
 A change that touches an instruction bearing file is flagged in
 the review, because a change to such a file steers the next agent
 that loads the tree. The name set is AGENTS.md and CLAUDE.md and
-SKILL.md and GEMINI.md at any depth, the .cursorrules file name,
-a Cursor rules file under a .cursor folder, and a Claude rules
-file under a .claude/rules folder, with a rename flagged when
-either its old name or its new name stands in the set.
+SKILL.md and GEMINI.md at any depth, the Copilot instructions
+file name, a path specific Copilot instructions file under the
+instructions folder of .github carrying the .instructions.md
+suffix, the .cursorrules file name, a Cursor rules file under a
+.cursor folder, and a Claude rules file under a .claude/rules
+folder. A Kimi plugin manifest named kimi.plugin.json at any
+depth and a Kimi plugin agent, hook script or manifest under a
+.kimi-plugin folder are flagged too. A renamed file is flagged
+when either its old name or its new name stands in the set. A
+review packet output style under the output-styles folder of the
+plugin is flagged too.
 
 Derives from canonical skill, The tier model, the T0 instruction
 file flag.

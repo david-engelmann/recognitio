@@ -17,7 +17,17 @@ review model, the October 19 2026 deprecation negative, the
 vendor reported figures, and the decision record naming
 Build 13 with a decision 4 statement are all pinned as
 brief sentences. A later edit that drops any of them fails
-the gate instead of drifting in silence.
+the gate instead of drifting in silence. The repair pass
+also refuses two scoped glance families in the brief, a
+live run family stated as a live Copilot run verifying or
+confirming or proving the rules, and an enforcement family
+stated as the agent enforcing or imposing or mandating
+the packet discipline or the packet rules, each read
+sentence by sentence with a negated claim clause stating
+no claim.
+Those families are
+narrow and named, and prose outside them stays a human
+review surface.
 """
 
 import re
@@ -240,6 +250,76 @@ def rule_blocks(section):
     return blocks
 
 
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
+def _live_run_claim(low):
+    """Whether one sentence states the live Copilot run claim.
+
+    The claim verb has to bind to the live Copilot subject,
+    in the clause that carries the subject or in a clause
+    that carries the subject forward with a pronoun or with
+    the verb itself. A verify verb standing in a clause
+    with its own explicit subject states that subject its
+    own fact, as the glance sentence states the vendor
+    figures stay as reported rather than proven. A negation
+    in the verb clause before the verb states no claim.
+    """
+    clauses = re.split(r",\s+and\s+|,\s+|;\s*", low)
+    subject_at = None
+    for index, clause in enumerate(clauses):
+        if "copilot" in clause and re.search(r"\blive\b", clause):
+            subject_at = index
+            break
+    if subject_at is None:
+        return False
+    for index, clause in enumerate(clauses):
+        if index < subject_at:
+            continue
+        verb = re.search(r"\b(verif\w*|confirm\w*|prov\w*)\b", clause)
+        if not verb:
+            continue
+        if index > subject_at and not re.match(
+            r"\s*(it|they|this|that|which)\b", clause
+        ) and not re.match(r"\s*(verif\w*|confirm\w*|prov\w*)\b", clause):
+            continue
+        if re.search(r"\b(not|no|never)\b|n't", clause[:verb.start()]):
+            continue
+        return True
+    return False
+
+
 def brief_problems(root=None):
     """Problems with the Build 13 brief's stated contract."""
     root = ROOT if root is None else root
@@ -253,6 +333,86 @@ def brief_problems(root=None):
             problems.append(
                 "docs/copilot-sdk-brief.md does not state %s"
                 % label
+            )
+    # Repair pass. The two glance checks are scoped negative
+    # families, not literal membership tests. The live run
+    # family refuses a sentence that joins the live wording
+    # and the Copilot subject to a verify or confirm or
+    # prove verb form, and the enforcement family refuses a
+    # sentence that joins an enforce or impose or mandate
+    # verb form to the packet discipline or the packet
+    # rules. A negation in the claim clause states no
+    # claim.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if _live_run_claim(sentence.lower()):
+            problems.append(
+                "docs/copilot-sdk-brief.md claims a live Copilot "
+                "review run verified the rules in this build, beside "
+                "its pinned sentence that no live Copilot review run "
+                "stands in this brief"
+            )
+            break
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(r"\b(enforc\w*|impos\w*|mandat\w*)\b", low)
+        if (
+            verb
+            and re.search(r"\b(packet discipline|packet rules)\b", low)
+            and not _claim_clause_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/copilot-sdk-brief.md claims the agent enforces "
+                "the packet discipline on every run, beside its pinned "
+                "position that the rules advise and never enforce"
+            )
+            break
+    # Round 5 second seat. The R6 glob limit figure and the
+    # R12 retiring model pair stand pinned by name.
+    if "up to 15 file path globs per rule" not in text:
+        problems.append(
+            "docs/copilot-sdk-brief.md rule R6 does not state "
+            "the glob limit figure of 15 file path globs per rule"
+        )
+    if (
+        "Claude Opus 4.8, Claude Opus 5, and GPT-5.6 Terra retire"
+        not in text
+    ):
+        problems.append(
+            "docs/copilot-sdk-brief.md rule R12 does not name "
+            "the retiring model pair Claude Opus 5 and "
+            "GPT-5.6 Terra beside Claude Opus 4.8"
+        )
+    problems.extend(outside_rules_problems(raw))
+    return problems
+
+
+def outside_rules_problems(raw):
+    """Problems with rule shaped headings outside the rules section.
+
+    A heading of the form the rules section uses, standing
+    anywhere else in the brief body, must also carry a
+    derivation note or it is refused as a rival instruction
+    source standing outside the certified section.
+    """
+    problems = []
+    start = raw.find(RULES_HEADING)
+    if start < 0:
+        return problems
+    rest = raw[start + len(RULES_HEADING):]
+    match = re.search(r"(?m)^## ", rest)
+    inside_end = start + len(RULES_HEADING) + (
+        match.start() if match else len(rest))
+    outside = raw[:start] + raw[inside_end:]
+    parts = re.split(r"(?m)^### (R\d+)\.", outside)
+    for i in range(1, len(parts), 2):
+        name, block = parts[i], parts[i + 1]
+        block = re.split(r"(?m)^#{2,3} ", block)[0]
+        flat = re.sub(r"\s+", " ", block)
+        if "Derives from" not in flat:
+            problems.append(
+                "copilot rule %s carries no derivation note, so "
+                "it would be a rival instruction source standing "
+                "outside the certified rules section" % name
             )
     return problems
 

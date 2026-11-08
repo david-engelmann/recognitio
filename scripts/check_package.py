@@ -29,7 +29,15 @@ of agent-plugins-package/ itself is pinned to plugin.json, the
 skills/ tree, and the one asset file the builds name inside
 the portable core, so a native platform shape placed inside
 the portable core fails the gate instead of blending in
-silence.
+silence. The round 5 repairs pin the description fields of
+the portable manifest, the native manifest and the
+marketplace entries word for word, and refuse two scoped
+negative families in the brief itself, the native Claude
+Code install family and the MCP file family. Each family
+reads the brief sentence by sentence over the claim verb
+and object forms, and a negated claim clause states no
+claim. Those families are narrow and named, and prose
+outside them stays a human review surface.
 """
 
 import json
@@ -88,6 +96,16 @@ EXTENSION_NOTES = {
         "ignore this object. The shapes are the Antigravity "
         "plugin manifest and the PreToolUse hook wiring."
     ),
+}
+
+EXTENSION_KEYS = {
+    "com.anthropic.claude-code": {
+        "nativeManifest", "nativeMarketplace", "note", "shapes",
+    },
+    "com.google.antigravity": {
+        "nativeManifest", "note", "shapes",
+    },
+    "com.openai": {"interface"},
 }
 
 HONESTY_SENTENCE = (
@@ -182,6 +200,11 @@ def load_manifest(root):
         )
     try:
         text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None, (
+            "the portable manifest at %s cannot be read, "
+            "it cannot be read as UTF-8 text" % describe(path, root)
+        )
     except OSError:
         return None, "the portable manifest at %s is missing" % describe(
             path, root
@@ -338,6 +361,25 @@ def manifest_problems(data, root):
                 "note text, which reads %r"
                 % (note_namespace, declared.get("note"), note_text)
             )
+    # Round 5 second seat. Each extension object carries
+    # exactly its declared keys, so a renamed or unknown key
+    # is refused by name instead of dropping a declaration
+    # in silence.
+    for ext_namespace, expected_keys in EXTENSION_KEYS.items():
+        declared_obj = extensions.get(ext_namespace)
+        if not isinstance(declared_obj, dict):
+            continue
+        for key in sorted(set(declared_obj) - expected_keys):
+            problems.append(
+                "the %s extension carries the undeclared key "
+                "%r" % (ext_namespace, key)
+            )
+        for key in sorted(expected_keys - set(declared_obj)):
+            problems.append(
+                "the %s extension carries no %r key, which "
+                "its declared key set requires"
+                % (ext_namespace, key)
+            )
     namespace = extensions.get(NAMESPACE)
     if not isinstance(namespace, dict):
         problems.append(
@@ -486,6 +528,76 @@ def tree_problems(root):
     return problems
 
 
+PORTABLE_DESCRIPTION = (
+    "Pulls the relevant changes from a pull request or a commit "
+    "range, with the context a reviewer needs, into one verified "
+    "review packet. This is the portable Agent Plugins 1.0.0 "
+    "packaging of the skill."
+)
+NATIVE_DESCRIPTION = (
+    "Pulls the relevant changes from a pull request or a commit "
+    "range, with the context a reviewer needs, into one verified "
+    "review packet. The marketplace also offers recognitio-mod, "
+    "the spawn gate on its own, and this plugin already includes "
+    "that gate, so install one entry or the other and never both."
+)
+MARKETPLACE_METADATA_DESCRIPTION = (
+    "Pulls the relevant changes from a pull request or a commit "
+    "range, with the context a reviewer needs, into one verified "
+    "review packet."
+)
+MARKETPLACE_MOD_DESCRIPTION = (
+    "Gates reviewer spawns in Claude Code on the verified review "
+    "packet manifest, and denies a spawn whose packet is missing, "
+    "unreadable or unverified. The full recognitio plugin already "
+    "includes this gate, so install one entry or the other and "
+    "never both."
+)
+
+
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
+def _brief_sentences(text):
+    """The sentences of a flattened brief, in order."""
+    return [
+        piece.strip()
+        for piece in re.split(r"(?<=[.!?])\s+", text)
+        if piece.strip()
+    ]
+
+
 def brief_problems(root):
     """Problems with the Build 8 brief's stated contract."""
     problems = []
@@ -497,9 +609,54 @@ def brief_problems(root):
         ]
     try:
         raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return [
+            "cannot read docs/agent-plugins-brief.md, it cannot "
+            "be read as UTF-8 text"
+        ]
     except OSError as exc:
         return ["cannot read docs/agent-plugins-brief.md, %s" % exc]
     text = re.sub(r"\s+", " ", raw)
+    # Repair pass. The two glance checks are scoped negative
+    # families, not literal membership tests. The native
+    # install family refuses a sentence that joins an install
+    # verb form to the native wording and the Claude Code
+    # object, and the MCP family refuses a sentence that
+    # joins the MCP file object to a ship or inclusion verb
+    # form. A negation in the claim clause states no claim,
+    # so the pinned honesty sentences pass.
+    for sentence in _brief_sentences(text):
+        low = sentence.lower()
+        match = re.search(r"\binstall\w*\b", low)
+        if (
+            match
+            and re.search(r"\bnativ\w*\b", low)
+            and "claude code" in low
+            and not _claim_clause_negated(low, match.start())
+        ):
+            problems.append(
+                "docs/agent-plugins-brief.md claims the package also "
+                "installs natively in Claude Code, beside its pinned "
+                "honesty sentence that it does not"
+            )
+            break
+    for sentence in _brief_sentences(text):
+        low = sentence.lower()
+        match = re.search(r"\bmcp file\b", low)
+        if (
+            match
+            and re.search(
+                r"\b(ships?|shipped|includ\w*|contain\w*|carr\w*)\b",
+                low,
+            )
+            and not _claim_clause_negated(low, match.start())
+        ):
+            problems.append(
+                "docs/agent-plugins-brief.md claims an MCP file "
+                "ships in the package, beside its pinned position "
+                "that no MCP file ships in the package"
+            )
+            break
     if HONESTY_SENTENCE not in text:
         problems.append(
             "docs/agent-plugins-brief.md does not state the honesty "
@@ -533,6 +690,103 @@ def brief_problems(root):
     return problems
 
 
+def _description_source(path, root, problems):
+    """The parsed JSON object a description reading judges.
+
+    A file that stands in the tree but cannot be read or
+    cannot be parsed or is not a JSON object records its
+    own problem here, beside the refusal the sibling
+    readings give the same state, so this reading never
+    passes over its own surface in silence. A file that
+    does not stand in the tree records nothing, because
+    the extension path reading already names that absence
+    in its own terms. The regular file test stands before
+    any read, with the same link following reading the
+    sibling loaders use, so a FIFO at the path refuses by
+    name instead of blocking on the read.
+    """
+    if not path.exists():
+        return None
+    if not path.is_file():
+        problems.append(
+            "the file at %s cannot be read, it is not a regular "
+            "file, so its description cannot be checked"
+            % describe(path, root)
+        )
+        return None
+    try:
+        data = strict_json_loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        problems.append(
+            "the file at %s cannot be parsed, %s, so its "
+            "description cannot be checked"
+            % (describe(path, root), exc)
+        )
+        return None
+    if not isinstance(data, dict):
+        problems.append(
+            "the file at %s is not a JSON object, so its "
+            "description cannot be checked" % describe(path, root)
+        )
+        return None
+    return data
+
+
+def description_problems(data, root):
+    """Problems with the manifest description fields, word for word.
+
+    The portable identity and the never both instruction live
+    in these description fields, so each one is pinned word
+    for word and a reversal or relabel is refused by name.
+    """
+    problems = []
+    if data.get("description") != PORTABLE_DESCRIPTION:
+        problems.append(
+            "the portable manifest description is %r, not the "
+            "pinned portable description, so the portable "
+            "identity or its wording has drifted"
+            % (data.get("description"),)
+        )
+    native_path = root / ".claude-plugin" / "plugin.json"
+    native = _description_source(native_path, root, problems)
+    if isinstance(native, dict):
+        if native.get("description") != NATIVE_DESCRIPTION:
+            problems.append(
+                "the native manifest description is %r, not the "
+                "pinned description carrying the never both "
+                "instruction to install one entry or the other "
+                "and never both" % (native.get("description"),)
+            )
+    market_path = root / ".claude-plugin" / "marketplace.json"
+    market = _description_source(market_path, root, problems)
+    if isinstance(market, dict):
+        metadata = market.get("metadata") or {}
+        if metadata.get("description") != MARKETPLACE_METADATA_DESCRIPTION:
+            problems.append(
+                "the marketplace metadata description is %r, not "
+                "the pinned description"
+                % (metadata.get("description"),)
+            )
+        expected = {
+            "recognitio": NATIVE_DESCRIPTION,
+            "recognitio-mod": MARKETPLACE_MOD_DESCRIPTION,
+        }
+        entries = market.get("plugins") or []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name")
+            if name in expected and entry.get("description") != expected[name]:
+                problems.append(
+                    "the marketplace entry %r description is %r, "
+                    "not the pinned description carrying the "
+                    "never both instruction to install one entry "
+                    "or the other and never both"
+                    % (name, entry.get("description"))
+                )
+    return problems
+
+
 def package_problems(root=None):
     """Every Build 8 portable package problem."""
     root = ROOT if root is None else root
@@ -541,6 +795,7 @@ def package_problems(root=None):
     if problem:
         return [problem]
     problems.extend(manifest_problems(data, root))
+    problems.extend(description_problems(data, root))
     problems.extend(skills_problems(root))
     problems.extend(mcp_problems(root))
     problems.extend(tree_problems(root))

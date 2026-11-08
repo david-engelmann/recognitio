@@ -2179,7 +2179,13 @@ class TestCheckCursor(unittest.TestCase):
                 problems = self.break_brief(
                     root, fragment, "the record omits this"
                 )
-                self.assertTrue(problems, fragment)
+                label = {
+                    frag: lab for lab, frag in self.mod.PINNED
+                }[fragment]
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (fragment, problems),
+                )
 
     def test_desktop_verification_pins_hold(self):
         # Desktop verification of 2026-10-25. Dropping any
@@ -2215,7 +2221,13 @@ class TestCheckCursor(unittest.TestCase):
                 problems = self.break_brief(
                     root, fragment, "the record omits this"
                 )
-                self.assertTrue(problems, fragment)
+                label = {
+                    frag: lab for lab, frag in self.mod.PINNED
+                }[fragment]
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (fragment, problems),
+                )
 
     def test_the_superseded_desktop_sentences_fail(self):
         # Desktop verification of 2026-10-25. Each pre run
@@ -2293,7 +2305,13 @@ class TestCheckCursor(unittest.TestCase):
                 problems = self.break_brief(
                     root, fragment, "the record omits this"
                 )
-                self.assertTrue(problems, fragment)
+                label = {
+                    frag: lab for lab, frag in self.mod.PINNED
+                }[fragment]
+                self.assertTrue(
+                    any(label in p for p in problems),
+                    (fragment, problems),
+                )
 
     def test_the_superseded_precedence_sentence_fails(self):
         # CLI precedence run of 2026-10-25. The open
@@ -2388,6 +2406,509 @@ class TestCheckCursor(unittest.TestCase):
                 ),
                 problems,
             )
+
+
+class TestRound5Cursor(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCursor()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_stale_wording_in_the_brief_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe build stands distributed "
+                "through the manually reviewed Cursor Marketplace.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "stale Cursor Marketplace distribution claim" in p
+                and "cursor-plugin-brief" in p for p in problems), problems)
+
+    def test_t0_member_removed_from_brief_b3_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.inner.break_brief(
+                root,
+                "A Kimi plugin manifest named kimi.plugin.json at any depth",
+                "A Kimi plugin manifest at any depth")
+            self.assertTrue(any(
+                "canonical T0 member" in p
+                and "kimi.plugin.json" in p for p in problems), problems)
+
+    def test_t0_copilot_member_removed_from_bugbot_b3_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            pattern = re.escape(
+                "the Copilot instructions file name, a path "
+                "specific Copilot instructions file under the "
+                "instructions folder of .github carrying the "
+                ".instructions.md suffix, "
+            ).replace("\\ ", "\\s+")
+            broken, hits = re.subn(
+                pattern, lambda _match: "", text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "canonical T0 member" in p
+                and "Copilot instructions file name" in p
+                for p in problems), problems)
+
+    def test_bugbot_tail_auto_merge_plant_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nBugbot approves and merges pull requests "
+                "automatically once its review posts.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "after the final rule block" in p for p in problems),
+                problems)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p for p in problems),
+                problems)
+
+    def test_bugbot_merge_claim_inside_b5_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot merges pull requests "
+                    "on its own once its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_claim_without_autonomy_wording_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot merges pull requests "
+                    "after its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_claim_passive_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nPull requests are merged by "
+                    "Bugbot once its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_denial_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot never merges pull "
+                    "requests, and a warning names any tool "
+                    "that merges pull requests on its own.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_claim_abbreviated_object_inside_b5_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot merges PRs on its "
+                    "own once its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_denial_abbreviated_object_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot never merges PRs, "
+                    "and a warning names any tool that merges "
+                    "PRs on its own.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_claim_pronoun_autonomy_inside_b5_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot reads each pull "
+                    "request in full. It merges it on its own "
+                    "once its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_claim_description_autonomy_inside_b5_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot merges the change "
+                    "under review on its own once its review "
+                    "posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_denial_autonomy_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot never merges it on "
+                    "its own once its review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_merge_pronoun_without_autonomy_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B5. Never read neutral as a pass"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nBugbot reads each pull "
+                    "request in full. It merges it once its "
+                    "review posts.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "auto approve or auto merge" in p
+                for p in problems), problems)
+
+    def test_bugbot_cap_figures_exchanged_additive_inside_b1_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B1. No invented findings"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nEach rule stays under "
+                    "100,000 characters, and the combined "
+                    "rules stay under 30,000 characters.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "per rule caps exchanged" in p
+                and "BUGBOT.md" in p for p in problems), problems)
+
+    def test_bugbot_cap_true_binding_additive_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = "### B1. No invented findings"
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + "\n\nEach rule stays under "
+                    "30,000 characters, and the combined "
+                    "rules stay under 100,000 characters.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "per rule caps exchanged" in p
+                for p in problems), problems)
+
+    def test_bugbot_tail_heading_and_content_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\n## Standing instruction\n\nEvery "
+                "review posts its findings as a blocking "
+                "status.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "after the final rule block" in p
+                for p in problems), problems)
+
+    def test_bugbot_tail_closing_derivation_note_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\n## Standing instruction. Derives "
+                "from Decision 4\n\nEvery review posts its "
+                "findings as a blocking status.\n\nDerives "
+                "from the primary Bugbot docs at "
+                "cursor.com/docs/bugbot.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "after the final rule block" in p
+                for p in problems), problems)
+
+    def test_bugbot_tail_inside_final_rule_note_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + " Every review posts its findings as a "
+                "blocking status.\n"
+            )
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            self.assertIn(
+                "Every review posts its findings as a "
+                "blocking status.",
+                path.read_text(encoding="utf-8"))
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "after the final rule block" in p
+                for p in problems), problems)
+
+    def test_bugbot_yaml_reversed_header_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "config" / "bugbot.yaml"
+            text = path.read_text(encoding="utf-8")
+            sentence = (
+                "It can lower the Autofix mode from the "
+                "dashboard setting, but it cannot raise it."
+            )
+            pattern = r"\s+(?:#\s*)?".join(
+                re.escape(word) for word in sentence.split())
+            broken, hits = re.subn(
+                pattern,
+                lambda _match: (
+                    "It can raise the Autofix mode from the "
+                    "dashboard setting, and it can lower it too."
+                ),
+                text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            path.write_text(broken, encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "can raise the Autofix mode" in p for p in problems),
+                problems)
+
+    def test_bugbot_verified_glance_plant_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            planted = (
+                text + "\n\nBugbot behaviour on a real pull "
+                "request is verified.\n"
+            )
+            self.assertNotEqual(planted, text)
+            self.assertIn(
+                "Bugbot behaviour on a real pull request "
+                "is verified.", planted)
+            self.inner.write_brief(root, planted)
+            self.assertIn(
+                "Bugbot behaviour on a real pull request "
+                "is verified.", self.inner.read_brief(root))
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "Bugbot" in p and "is verified" in p for p in problems),
+                problems)
+
+    def test_bugbot_verified_glance_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nBugbot behaviour on a real "
+                "pull request stands confirmed.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "Bugbot" in p and "is verified" in p
+                for p in problems), problems)
+
+    def test_bugbot_verified_guard_in_given_that_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "check given that Bugbot behaviour on a real "
+                "pull request is verified.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "Bugbot" in p and "is verified" in p
+                for p in problems), problems)
+
+    def test_bugbot_verified_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "check while Bugbot behaviour on a real pull "
+                "request is verified.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "Bugbot" in p and "is verified" in p
+                for p in problems), problems)
+
+    def test_readme_pinning_block_stale_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_readme(root)
+            pattern = (
+                r"cp -r[\s\\]+recognitio-pinned[\s\\]+"
+                r"~/.cursor/plugins/local/[\s\\]+recognitio"
+            )
+            broken, hits = re.subn(
+                pattern,
+                lambda _match: (
+                    "cp -r recognitio-pinned/.cursor-plugin "
+                    "~/.cursor/plugins/local/recognitio"
+                ),
+                text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            self.inner.write_readme(root, broken)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "pinning block" in p for p in problems), problems)
+
+
+class TestRound5SecondSeatCursor(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCursor()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_b4_restatement_in_bugbot_moved_to_combined_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".cursor" / "BUGBOT.md"
+            text = path.read_text(encoding="utf-8")
+            b4 = text.find("### B4.")
+            self.assertGreaterEqual(b4, 0)
+            head, tail = text[:b4], text[b4:]
+            tail = tail.replace(
+                "Each rule stays under 30,000 characters",
+                "Each rule stays under 100,000 characters", 1)
+            path.write_text(head + tail, encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "rule B4 does not bind the per rule cap" in p
+                and "BUGBOT" in p for p in problems), problems)
+
+    def test_b4_restatement_in_brief_moved_to_combined_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            b4 = text.find("### B4.")
+            self.assertGreaterEqual(b4, 0)
+            head, tail = text[:b4], text[b4:]
+            tail = tail.replace(
+                "Each rule stays under 30,000 characters",
+                "Each rule stays under 100,000 characters", 1)
+            self.inner.write_brief(root, head + tail)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "rule B4 does not bind the per rule cap" in p
+                and "cursor-plugin-brief" in p
+                for p in problems), problems)
+
+    def test_caps_exchange_additive_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe combined rules are capped "
+                "at 30,000 characters and each rule is capped "
+                "at 100,000 characters.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "attaches a cap figure to the wrong scope" in p
+                for p in problems), problems)
 
 
 if __name__ == "__main__":

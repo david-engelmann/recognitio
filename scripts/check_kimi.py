@@ -321,6 +321,11 @@ def _clauses(sentence):
     return [part.strip() for part in parts if part.strip()]
 
 
+# The fifty character default window here is a conservative
+# bound and not a measured derivation. A negation standing
+# outside the window is not credited, so the gate refuses
+# where a wider window would have passed, and that refusal
+# direction is the safe one.
 def _neg_before(clause, index, window=50):
     """Whether a negation word stands shortly before index in
     the clause."""
@@ -496,6 +501,34 @@ def brief_problems(root=None):
             problems.append(
                 "docs/kimi-plugin-brief.md does not state %s"
                 % label
+            )
+    # Repair pass four. The value check read only the
+    # bare form, Kimi Code CLI followed straight by the
+    # version, so a restatement carrying the word version
+    # or a v prefix, or naming the CLI version on its own,
+    # passed beside the pinned statement. Every restated
+    # form below is value checked against 2.4.0 wherever
+    # it stands in the brief.
+    # Repair pass five. The named side of the check also
+    # admits the copula form with the word is standing
+    # before its version word and the build carrier word
+    # standing in place of the version word, and the
+    # named alone side admits the stands at form beside
+    # its is form. A carrier word past those forms states
+    # no CLI version in this reading.
+    stated_all = []
+    for pattern in (
+        r"Kimi Code CLI (?:is )?(?:version |build )?"
+        r"v?(\d+\.\d+\.\d+)",
+        r"CLI version (?:is |stands at )?v?(\d+\.\d+\.\d+)",
+    ):
+        stated_all.extend(re.findall(pattern, text))
+    for stated in dict.fromkeys(stated_all):
+        if stated != "2.4.0":
+            problems.append(
+                "docs/kimi-plugin-brief.md states a Kimi Code "
+                "CLI version of %s, which differs from the "
+                "recorded CLI version 2.4.0" % stated
             )
     return problems
 
@@ -711,7 +744,6 @@ _MODIFIER_WORD = (
     r"(?!" + _VERB_STEMS + r"\w*)"
     r"[\w-]+\s+)"
 )
-_PARTICIPIAL_WORD = _VERB_STEMS + r"\w*\s+"
 _PARTICIPIAL_TOKEN = _VERB_STEMS + r"[\w-]*?(?:ed|en)\s+"
 _PRESENT_TOKEN = _VERB_STEMS + r"\w*ing\s+"
 _PARTICIPIAL_GROUP = (
@@ -1799,6 +1831,17 @@ def qualified_problems(root=None):
                     hit = True
             if "by its bare skill name" in segment:
                 hit = True
+            # Round 5 second seat. Bare name acceptance
+            # stated as a skill called by its short name
+            # states the same acceptance, and the reading
+            # runs over the whole brief, the Summary
+            # included, not only inside the rule.
+            if re.search(
+                r"\bby its short name\b"
+                r"|\bcall\w*\b[^.]*\bshort name\b",
+                segment,
+            ):
+                hit = True
             # R36-RT-02. Bare name acceptance stated with the
             # bare name as the subject of an invocation verb
             # states the same acceptance. The shipped record
@@ -2177,6 +2220,12 @@ def _swap_problem(sentence):
                 scope = name
         if scope is None:
             continue
+        # The fifteen character window at this figure reading
+        # is a conservative bound and not a measured
+        # derivation. A negation standing outside the window
+        # is not credited, so the gate refuses where a wider
+        # window would have passed, and that refusal
+        # direction is the safe one.
         if _neg_before(sentence, fstart, 15):
             continue
         if scope == "field" and value != 32:

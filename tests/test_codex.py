@@ -16,6 +16,7 @@ statement each fail the Codex gate.
 """
 
 import importlib.util
+import re
 import shutil
 import tempfile
 import unittest
@@ -375,6 +376,236 @@ class TestCheckCodex(unittest.TestCase):
         # check on its own.
         bare = "The rule keeps the Workflow readable for reviewers"
         self.assertFalse(self.mod.deliberate_source(bare))
+
+
+class TestRound5Codex(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCodex()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def problems(self, root):
+        return self.mod.codex_problems(root)
+
+    def test_t0_kimi_member_removed_from_r4_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            pattern = re.escape(
+                "A Kimi plugin manifest named kimi.plugin.json "
+                "at any depth and a Kimi plugin agent, hook "
+                "script or manifest under a .kimi-plugin folder "
+                "are flagged too. "
+            ).replace("\\ ", "\\s+")
+            broken, hits = re.subn(
+                pattern, lambda _match: "", text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            self.inner.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "canonical T0 member" in p
+                and "kimi.plugin.json" in p for p in problems), problems)
+
+    def test_packet_gating_exercised_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe packet gating rule was "
+                "exercised in the paired run.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "packet gating rule was exercised" in p
+                for p in problems), problems)
+
+    def test_packet_gating_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe paired run exercised the "
+                "packet gating rule.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "packet gating rule was exercised" in p
+                for p in problems), problems)
+
+    def test_evidence_figures_exchanged_additive_in_worked_example_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            plant = (
+                "The baseline control recovered 98 percent."
+            )
+            pattern = re.escape(
+                "58.3 percent for the baseline control."
+            ).replace("\\ ", "\\s+")
+            broken, hits = re.subn(
+                pattern,
+                lambda match: match.group(0) + " " + plant,
+                text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            self.inner.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "binds the recovery figures to the wrong subjects"
+                in p for p in problems), problems)
+
+    def test_evidence_figures_exchanged_additive_inside_r6_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            plant = (
+                "The rule guided variants recovered "
+                "58.3 percent."
+            )
+            pattern = re.escape(
+                "that SECURITY.md is policy context, not "
+                "executable instructions."
+            ).replace("\\ ", "\\s+")
+            broken, hits = re.subn(
+                pattern,
+                lambda match: match.group(0) + " " + plant,
+                text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            self.inner.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "binds the recovery figures to the wrong subjects"
+                in p for p in problems), problems)
+
+    def test_evidence_figures_exchanged_additive_literal_baseline_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe record gives 98 "
+                "percent for the baseline.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "binds the recovery figures to the wrong subjects"
+                in p for p in problems), problems)
+
+    def test_evidence_figures_exchanged_additive_literal_rule_guided_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe record gives 58.3 "
+                "percent for the rule guided.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "binds the recovery figures to the wrong subjects"
+                in p for p in problems), problems)
+
+    def test_packet_gating_guard_in_once_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run once the packet gating rule was "
+                "exercised in the paired run.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "packet gating rule was exercised" in p
+                for p in problems), problems)
+
+    def test_packet_gating_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run while the packet gating rule was "
+                "exercised in the paired run.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "packet gating rule was exercised" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "codex-review-brief.md"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "cannot read docs/codex-review-brief.md" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_decision_record_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "decisions.md"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            problems = self.mod.decision_problems(root)
+            self.assertTrue(any(
+                "cannot read docs/decisions.md" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatCodex(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCodex()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def problems(self, root):
+        return self.mod.codex_problems(root)
+
+    def test_calendar_schedule_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            self.inner.write_brief(
+                root, text + "\n\nScans can be scheduled on a "
+                "product native calendar inside the Codex "
+                "Security console.\n")
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "calendar schedule" in p for p in problems),
+                problems)
+
+    def test_security_md_executable_claim_inside_r6_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            anchor = "that SECURITY.md is policy context, not executable instructions."
+            self.assertIn(anchor, text)
+            self.inner.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + " A SECURITY.md file is executable "
+                    "instruction for the review run.", 1))
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "SECURITY.md file is executable instruction" in p
+                for p in problems), problems)
+
+    def test_evidence_figures_exchanged_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.brief_text(root)
+            broken = text.replace(
+                "rule guided variants recovered 98 percent",
+                "rule guided variants recovered 58.3 percent", 1)
+            broken = broken.replace(
+                "58.3 percent for the baseline control",
+                "98 percent for the baseline control", 1)
+            self.assertNotEqual(broken, text)
+            self.inner.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(any(
+                "does not bind the 98 percent figure" in p
+                for p in problems), problems)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,14 @@ every rule, every Devin Dynamic Workflows mention qualified
 with Devin, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
 instruction source and a later edit cannot soften or drop a
-stated claim in silence.
+stated claim in silence. The repair pass also refuses a
+scoped live run claim family in the brief, stated as a
+live Devin run verifying or confirming or proving or
+validating or certifying the playbook, read sentence by
+sentence with
+a negated claim clause stating no claim. That family is
+narrow and named, and prose outside it stays a human
+review surface.
 """
 
 import re
@@ -277,11 +284,18 @@ SARIF_NUMBER_WORDS = {
 
 
 def spelled_sarif_problem(low):
-    """Whether a spelled SARIF version differs from 2.1.0."""
+    """Whether a spelled SARIF version differs from 2.1.0.
+
+    Repair pass five. The spelled figure may stand
+    straight after the version word or after the is
+    copula standing between the version word and its
+    figure, and both placements count the same as the
+    digit form.
+    """
     word = (
         "zero|one|two|three|four|five|six|seven|eight|nine|ten"
     )
-    prefix = r"\bsarif(?:\s+version)?\s+v?\s*"
+    prefix = r"\bsarif(?:\s+version)?(?:\s+is)?\s+v?\s*"
     dotted = re.search(
         prefix + "(" + word + r")\s+point\s+(" + word
         + r")\s+point\s+(" + word + r")\b", low
@@ -414,6 +428,40 @@ def rule_blocks(section):
     return blocks
 
 
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
 def brief_problems(root=None):
     """Problems with the Build 17 brief's stated contract."""
     root = ROOT if root is None else root
@@ -427,6 +475,153 @@ def brief_problems(root=None):
             problems.append(
                 "docs/devin-playbook-brief.md does not state %s"
                 % label
+            )
+    # Repair pass. The glance check is a scoped negative
+    # family, not a literal membership test. A sentence
+    # states the claim when it joins the live wording and
+    # the Devin subject to a verify or confirm or prove or
+    # validate or certify verb form, and a negation in the
+    # claim clause states no claim.
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(
+            r"\b(verif\w*|confirm\w*|prov\w*|validat\w*|certif\w*)\b",
+            low)
+        if (
+            "devin" in low
+            and re.search(r"\blive\b", low)
+            and verb
+            and not _claim_clause_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/devin-playbook-brief.md claims a live Devin "
+                "review run verified the playbook in this build, "
+                "beside its pinned sentence that no live Devin review "
+                "run stands in this brief"
+            )
+            break
+    problems.extend(outside_rules_problems(raw))
+    problems.extend(oncall_problems(text))
+    problems.extend(harness_figure_problems(text))
+    return problems
+
+
+def oncall_problems(text):
+    """Problems with a Devin Oncall code review claim.
+
+    Round 5 second seat. Rule R12 pins Devin Oncall as an
+    adjacent incident surface only, never as a code review
+    result or a review finding. The repair pass adds the
+    verdict forms of the same claim, a code review verdict
+    and a review verdict. The reading runs over the whole
+    brief, and a sentence carrying the pinned never states
+    no claim and is skipped.
+    """
+    problems = []
+    low = text.lower()
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if "oncall" not in sentence:
+            continue
+        if "never" in sentence:
+            continue
+        if re.search(
+            r"\b(code review result|code review verdict"
+            r"|review finding|review verdict)\b", sentence
+        ):
+            problems.append(
+                "docs/devin-playbook-brief.md claims Devin "
+                "Oncall as a code review result, which rule "
+                "R12 forbids"
+            )
+            break
+    return problems
+
+
+def harness_figure_problems(text):
+    """Problems with the R16 harness loss figure binding.
+
+    Round 5 second seat. Each SkillsBench loss figure in
+    rule R16 is bound to the harness its sentence names, so
+    exchanging two figures between harnesses refuses.
+
+    Repair pass two. The presence pins bind the figures in
+    place, and this reading also refuses the additive form
+    of the same exchange, in the form the Codex gate uses
+    for its additive figure exchange. Any sentence that
+    binds one of the figures to a harness other than the
+    harness the shipped binding names states the exchange,
+    wherever the sentence stands, so an added sentence
+    cannot contradict the binding while the binding itself
+    stands untouched.
+    """
+    problems = []
+    shipped = (
+        ("8.1", "Claude Code"),
+        ("11.3", "Codex"),
+        ("11.5", "Gemini CLI"),
+    )
+    for figure, harness in shipped:
+        if not re.search(
+            re.escape(figure) + r"\s+points on "
+            + re.escape(harness) + r"\b",
+            text,
+        ):
+            problems.append(
+                "docs/devin-playbook-brief.md rule R16 does "
+                "not bind the %s points loss figure to %s"
+                % (figure, harness)
+            )
+    binding = dict(shipped)
+    low = re.sub(r"\s+", " ", text)
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        exchanged = False
+        for match in re.finditer(
+            r"\b(\d+\.\d+)\s+points on "
+            r"(Claude Code|Codex|Gemini CLI)\b",
+            sentence,
+        ):
+            if binding.get(match.group(1)) not in (
+                None, match.group(2)
+            ):
+                exchanged = True
+                break
+        if exchanged:
+            problems.append(
+                "docs/devin-playbook-brief.md binds a harness "
+                "figure to the wrong harness, the harness "
+                "figures exchanged"
+            )
+            break
+    return problems
+
+
+def outside_rules_problems(raw):
+    """Problems with rule shaped headings outside the rules section.
+
+    A heading of the form the rules section uses, standing
+    anywhere else in the brief body, must also carry a
+    derivation note or it is refused as a rival instruction
+    source standing outside the certified section.
+    """
+    problems = []
+    start = raw.find(RULES_HEADING)
+    if start < 0:
+        return problems
+    rest = raw[start + len(RULES_HEADING):]
+    match = re.search(r"(?m)^## ", rest)
+    inside_end = start + len(RULES_HEADING) + (
+        match.start() if match else len(rest))
+    outside = raw[:start] + raw[inside_end:]
+    parts = re.split(r"(?m)^### (R\d+)\.", outside)
+    for i in range(1, len(parts), 2):
+        name, block = parts[i], parts[i + 1]
+        block = re.split(r"(?m)^#{2,3} ", block)[0]
+        flat = re.sub(r"\s+", " ", block)
+        if "Derives from" not in flat:
+            problems.append(
+                "devin rule %s carries no derivation note, so it "
+                "would be a rival instruction source standing "
+                "outside the certified rules section" % name
             )
     return problems
 

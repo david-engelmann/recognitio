@@ -19,6 +19,7 @@ rule C8.
 """
 
 import importlib.util
+import re
 import shutil
 import tempfile
 import unittest
@@ -1676,6 +1677,208 @@ class TestCheckComate(unittest.TestCase):
                     for p in problems),
                 problems,
             )
+
+
+class TestRound5Comate(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckComate()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_a_restated_tool_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read(root, "docs/comate-brief.md")
+            broken = text.replace(
+                "recognition of over 20 tools including",
+                "recognition of over 30 tools including", 1)
+            self.assertNotEqual(broken, text)
+            self.inner.write(root, "docs/comate-brief.md", broken)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "over 30 tools" in p and "over 20 tools" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatComate(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckComate()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_glance_client_version_moved_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/comate-brief.md"
+            text = self.inner.read(root, rel)
+            broken = text.replace(
+                "at version 3.11.5 downloaded", "at version "
+                "3.11.6 downloaded", 1)
+            self.assertNotEqual(broken, text)
+            self.inner.write(root, rel, broken)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "At a glance restates the client version as "
+                "3.11.6" in p for p in problems), problems)
+
+
+class TestRepairPassFourComate(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckComate()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_glance_client_version_in_digit_form_fails(self):
+        # Repair pass four. The glance reading checked
+        # only the at version form, so the same restated
+        # version standing in the glance as a bare digit
+        # form passed beside the pinned statement. Every
+        # version token in the glance is now value checked.
+        # Repair pass five. The plant lands through a
+        # whitespace normalised pattern in the form the
+        # sibling break helpers use, so a pure rewrap of
+        # the shipped paragraph leaves the plant landing
+        # instead of leaving it nothing to land on.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/comate-brief.md"
+            text = self.inner.read(root, rel)
+            pattern = re.escape(
+                "The editor command line in the client "
+                "bundle reports the same version."
+            ).replace("\\ ", "\\s+")
+            broken, hits = re.subn(
+                pattern,
+                lambda _match: (
+                    "The editor command line in the client "
+                    "bundle reports 3.12.0."
+                ),
+                text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            self.inner.write(root, rel, broken)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "At a glance restates the client version "
+                "as 3.12.0" in p for p in problems), problems)
+
+    def test_installer_record_version_restated_fails(self):
+        # Repair pass four. The installer record form of
+        # the client version is value checked over the
+        # whole brief, so an added statement restating it
+        # with a moved version refuses beside the pin.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/comate-brief.md"
+            text = self.inner.read(root, rel)
+            planted = text + (
+                "\n\nThe official Linux installer record "
+                "names Comate AI IDE 3.12.0 for linux x64.\n")
+            self.inner.write(root, rel, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "client version as 3.12.0" in p
+                and "installer record form" in p
+                for p in problems), problems)
+
+    def test_command_line_version_restated_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/comate-brief.md"
+            text = self.inner.read(root, rel)
+            planted = text + (
+                "\n\nThe editor command line reports "
+                "3.12.0.\n")
+            self.inner.write(root, rel, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "client version as 3.12.0" in p
+                and "command line form" in p
+                for p in problems), problems)
+
+    def test_client_version_true_forms_hold(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/comate-brief.md"
+            text = self.inner.read(root, rel)
+            planted = text + (
+                "\n\nThe official Linux installer record "
+                "names Comate AI IDE 3.11.5 for linux x64. "
+                "The editor command line reports 3.11.5.\n")
+            self.inner.write(root, rel, planted)
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "client version" in p for p in problems),
+                problems)
+
+
+class TestRepairPassFiveComate(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckComate()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def plant_brief(self, root, suffix):
+        rel = "docs/comate-brief.md"
+        text = self.inner.read(root, rel)
+        self.inner.write(root, rel, text + suffix)
+        return self.inner.problems(root)
+
+    def test_command_line_bundle_version_restated_fails(self):
+        # Repair pass five. The command line form read
+        # the contiguous form only, so the shipped glance
+        # sentence shape with the client bundle words
+        # standing before its reports word passed outside
+        # the glance with a moved figure in place of its
+        # same version words. That shape is a command line
+        # form in the whole brief check now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe editor command line in the client "
+                "bundle reports 3.12.0.\n")
+            self.assertTrue(any(
+                "client version as 3.12.0" in p
+                and "command line form" in p
+                for p in problems), problems)
+
+    def test_installer_record_version_word_form_fails(self):
+        # Repair pass five. The installer record form
+        # read the figure standing straight after the IDE
+        # name only, so a statement carrying the word
+        # version inside the installer sentence passed.
+        # That carrying word stands in the form now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe official Linux installer record "
+                "names Comate AI IDE version 3.12.0 for "
+                "linux x64.\n")
+            self.assertTrue(any(
+                "client version as 3.12.0" in p
+                and "installer record form" in p
+                for p in problems), problems)
+
+    def test_at_version_form_outside_glance_fails(self):
+        # Repair pass five. The at version form was value
+        # checked inside the glance alone, so the same
+        # client version statement standing at the end of
+        # the brief passed beside the pinned statement.
+        # The form is value checked over the whole brief
+        # now.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            problems = self.plant_brief(
+                root,
+                "\n\nThe official Linux client at version "
+                "3.12.0 downloaded from the installer "
+                "record.\n")
+            self.assertTrue(any(
+                "client version as 3.12.0" in p
+                and "at version form" in p
+                for p in problems), problems)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,15 @@ class TestCheckQwen(unittest.TestCase):
     def problems(self, root):
         return self.mod.qwen_problems(root)
 
+    def assert_plant_kind(self, problems, kind):
+        self.assertTrue(
+            any(
+                ("carries a %s plant in the sentence" % kind) in p
+                for p in problems
+            ),
+            problems,
+        )
+
     def read_brief(self, root):
         return (root / "docs" / "qwen-code-brief.md").read_text(
             encoding="utf-8"
@@ -164,16 +173,11 @@ class TestCheckQwen(unittest.TestCase):
             self.assertEqual(self.problems(root), [])
 
     def run_main_on(self, root):
-        original = self.mod.ROOT
-        self.mod.ROOT = root
         out = io.StringIO()
         err = io.StringIO()
-        try:
-            with redirect_stdout(out):
-                with redirect_stderr(err):
-                    code = self.mod.main()
-        finally:
-            self.mod.ROOT = original
+        with redirect_stdout(out):
+            with redirect_stderr(err):
+                code = self.mod.main(root)
         return code, out.getvalue(), err.getvalue()
 
     def test_problems_print_to_the_error_stream_naming_the_brief(self):
@@ -195,7 +199,9 @@ class TestCheckQwen(unittest.TestCase):
     def test_the_success_line_stays_on_the_output_stream(self):
         code, out, err = self.run_main_on(ROOT)
         self.assertEqual(code, 0)
-        self.assertIn("check_qwen: Qwen contract holds", out)
+        self.assertIn(
+            "check_qwen: the Build 15 Qwen Code marketplace "
+            "presence contract holds", out)
         self.assertEqual(err, "")
 
     def test_an_undecodable_brief_is_named_not_raised(self):
@@ -294,7 +300,15 @@ class TestCheckQwen(unittest.TestCase):
     def test_every_plant_fails(self):
         for plant in PLANTS:
             problems = self.mod.negative_problems(plant)
-            self.assertTrue(problems, plant)
+            norm = re.sub(r"\s+", " ", self.mod.normalise(plant))
+            self.assertTrue(
+                any(
+                    " plant in the sentence " in p
+                    and norm[:60] in p
+                    for p in problems
+                ),
+                (plant, problems),
+            )
 
     def test_the_control_passes(self):
         self.assertEqual(self.mod.negative_problems(CONTROL), [])
@@ -369,7 +383,9 @@ class TestCheckQwen(unittest.TestCase):
             "The .qwen/skills copy was beaten on collision.",
             "The .qwen/skills copy will be beaten on collision.",
         ):
-            self.assertTrue(self.mod.negative_problems(plant), plant)
+            self.assert_plant_kind(
+                self.mod.negative_problems(plant),
+                "alias precedence")
 
     def test_negated_bring_online_passes(self):
         # S3. The negation guard must cover bring just as it
@@ -380,15 +396,17 @@ class TestCheckQwen(unittest.TestCase):
         self.assertEqual(self.mod.negative_problems(
             "Qwen does not turn hooks on for the "
             "recognitio plugin."), [])
-        self.assertTrue(self.mod.negative_problems(
-            "Qwen brings hooks online for the "
-            "recognitio plugin."))
+        self.assert_plant_kind(
+            self.mod.negative_problems(
+                "Qwen brings hooks online for the "
+                "recognitio plugin."),
+            "activation")
 
     def test_the_number_normalisation_fires(self):
         problems = self.mod.negative_problems(
             "twelve parallel agents at high effort"
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_a_dropped_figure_pin_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -524,7 +542,7 @@ class TestCheckQwen(unittest.TestCase):
             "Qwen runs 16 agents working side by side on a "
             "large review"
         )
-        self.assertTrue(problems, problems)
+        self.assert_plant_kind(problems, "figure")
         self.assertTrue(
             any(
                 p.startswith(
@@ -622,13 +640,17 @@ class TestCheckQwen(unittest.TestCase):
         problems = self.mod.negative_problems(
             "wrapper exit table: 0, 1, 3, and also 4 for blocking review"
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "wrapper exit")
 
     def test_the_three_naming_cases(self):
-        self.assertTrue(self.mod.negative_problems(
-            "skills.disabled blocks only the prefixed spelling"))
-        self.assertTrue(self.mod.negative_problems(
-            "skills.enabled turns the skill on under the bare name"))
+        self.assert_plant_kind(
+            self.mod.negative_problems(
+                "skills.disabled blocks only the prefixed spelling"),
+            "disabled naming")
+        self.assert_plant_kind(
+            self.mod.negative_problems(
+                "skills.enabled turns the skill on under the bare name"),
+            "enabled naming")
         self.assertEqual(self.mod.negative_problems(
             "skills.disabled blocks either spelling, "
             "skills.enabled opts in under the prefixed name only."), [])
@@ -637,7 +659,7 @@ class TestCheckQwen(unittest.TestCase):
         problems = self.mod.negative_problems(
             "submit the skill through the central Qwen marketplace approval queue"
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "publication")
 
     def test_round37_figure_split_across_three_sentences_fails(self):
         # R37-RT-10. The count and the simultaneity word
@@ -649,7 +671,7 @@ class TestCheckQwen(unittest.TestCase):
             "packet lists each file in the change beside "
             "its diff. They work together on the review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round37_guard_word_no_longer_shelters_a_figure(self):
         # R37-RT-10. A basis label on the neighbouring
@@ -660,7 +682,7 @@ class TestCheckQwen(unittest.TestCase):
             "together on the review, as the roster "
             "narrative records."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round37_full_conversion_byte_fidelity_claim_fails(self):
         # R37-RT-01. Byte fidelity holds for the round 33
@@ -670,7 +692,7 @@ class TestCheckQwen(unittest.TestCase):
             "The full bundle conversion output is byte "
             "identical to the canonical tree."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "conversion fidelity")
 
     def test_round37_fidelity_record_pins_hold(self):
         # R37-RT-01. Dropping any of the six round 37
@@ -699,7 +721,13 @@ class TestCheckQwen(unittest.TestCase):
                 problems = self.break_brief(
                     root, fragment, "the record omits this"
                 )
-                self.assertTrue(problems, fragment)
+                name = {
+                    frag: lab for lab, frag in self.mod.PINNED
+                }[fragment]
+                self.assertTrue(
+                    any(name in p for p in problems),
+                    (fragment, problems),
+                )
 
     def test_round37_fixreview_figure_split_across_four_fails(self):
         # R37F-RT-15. The windows run to four neighbouring
@@ -712,7 +740,7 @@ class TestCheckQwen(unittest.TestCase):
             "roster records each file in the change. They "
             "work together on the review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round37_fixreview_contrast_clause_guard_no_shelter(self):
         # R37F-RT-16. A guard phrase in a contrast clause
@@ -723,7 +751,7 @@ class TestCheckQwen(unittest.TestCase):
             "Qwen runs 16 agents together on this review, "
             "separate from the roster narrative table."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round37_confirm_figure_split_across_five_fails(self):
         # R37C-RT-01. The windows run to five neighbouring
@@ -737,7 +765,7 @@ class TestCheckQwen(unittest.TestCase):
             "summary notes the packet shape. They work "
             "together on the review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round37_fixreview_window_with_own_count_passes(self):
         # R37F-RT-17. A simultaneity sentence carrying its
@@ -760,7 +788,7 @@ class TestCheckQwen(unittest.TestCase):
             "Qwen runs 16 agents together on this review "
             "as the roster narrative records."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round38_figure_split_across_six_sentences_fails(self):
         # R38-RT-13. The count and the simultaneity word
@@ -775,7 +803,7 @@ class TestCheckQwen(unittest.TestCase):
             "index names each file in the review. They "
             "work together on the review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round38_figure_guard_while_clause_fails(self):
         # R38-RT-14. A basis clause appended with while
@@ -786,7 +814,7 @@ class TestCheckQwen(unittest.TestCase):
             "Qwen runs 16 agents together on this review "
             "while the roster narrative records the count."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round38_window_with_unnumbered_other_subject_passes(self):
         # R38-RT-15. A simultaneity sentence whose subject
@@ -816,7 +844,7 @@ class TestCheckQwen(unittest.TestCase):
             "index names each file in the review.\n\n"
             "They work together on the review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_gate_round38_decoy_member_does_not_shelter_window(self):
         # R38G-RT-05. A simultaneity member headed by an
@@ -840,7 +868,7 @@ class TestCheckQwen(unittest.TestCase):
         )
         for plant in plants:
             problems = self.mod.negative_problems(plant)
-            self.assertTrue(problems, plant)
+            self.assert_plant_kind(problems, "figure")
 
     def test_gate_round38_figure_guard_with_appendage_fails(self):
         # R38G-RT-09. A basis appendage joined by the
@@ -852,7 +880,7 @@ class TestCheckQwen(unittest.TestCase):
             "with the roster narrative recording the "
             "count."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_gate_round38_guard_paragraph_shelters_nothing(self):
         # R38G-RT-03 control. A guard phrase standing in
@@ -864,7 +892,7 @@ class TestCheckQwen(unittest.TestCase):
             "The roster narrative records the count.\n\n"
             "Qwen runs 16 agents together on this review."
         )
-        self.assertTrue(problems)
+        self.assert_plant_kind(problems, "figure")
 
     def test_round38_side_shape_record_pins_hold(self):
         # R38-EX-01 and R38-EX-02. Dropping any of the
@@ -887,7 +915,13 @@ class TestCheckQwen(unittest.TestCase):
                 problems = self.break_brief(
                     root, fragment, "the record omits this"
                 )
-                self.assertTrue(problems, fragment)
+                name = {
+                    frag: lab for lab, frag in self.mod.PINNED
+                }[fragment]
+                self.assertTrue(
+                    any(name in p for p in problems),
+                    (fragment, problems),
+                )
 
     def test_round38_unscoped_side_shape_denial_fails(self):
         # R38-EX-01. The old unscoped denial states the
@@ -899,4 +933,753 @@ class TestCheckQwen(unittest.TestCase):
             "tree.",
         ):
             problems = self.mod.negative_problems(plant)
-            self.assertTrue(problems, plant)
+            self.assert_plant_kind(problems, "conversion")
+
+    def test_a_listing_file_at_the_root_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            (root / "qwen-extension.json").write_text(
+                "{}", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("a Qwen listing file ships at" in p
+                    for p in problems), problems)
+
+    def test_a_listing_file_inside_a_scratch_named_folder_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            folder = root / "scratch-notes"
+            folder.mkdir(parents=True)
+            (folder / "qwen-extension.json").write_text(
+                "{}", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("a Qwen listing file ships at" in p
+                    for p in problems), problems)
+
+    def test_a_listing_under_a_scratch_named_ancestor_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "scratch-ancestor"
+            base.mkdir(parents=True)
+            root = self.make_layout(str(base))
+            (root / "qwen-extension.json").write_text(
+                "{}", encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("a Qwen listing file ships at" in p
+                    for p in problems), problems)
+
+    def test_a_clean_control_under_a_scratch_named_ancestor_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "scratch-ancestor"
+            base.mkdir(parents=True)
+            root = self.make_layout(str(base))
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_publication_claim_in_three_placements_fails(self):
+        plant = (
+            "A listing file ships in this repo and the "
+            "marketplace presence is published."
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(root, text + "\n\n" + plant + "\n")
+            self.assert_plant_kind(
+                self.mod.negative_problems(
+                    self.read_brief(root)), "publication")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("publication plant" in p for p in problems),
+                problems)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "## Summary\n"
+            self.assertIn(anchor, text)
+            self.write_brief(
+                root, text.replace(anchor, anchor + "\n" + plant + "\n", 1))
+            problems = self.problems(root)
+            self.assertTrue(
+                any("publication plant" in p for p in problems),
+                problems)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "## The Qwen rules"
+            self.assertIn(anchor, text)
+            self.write_brief(
+                root, text.replace(
+                    anchor, plant + "\n\n" + anchor, 1))
+            problems = self.problems(root)
+            self.assertTrue(
+                any("publication plant" in p for p in problems),
+                problems)
+
+    def test_a_restated_live_session_date_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "A second live session on 2026-11-03",
+                "A second live session on 2026-12-03")
+            self.assertTrue(
+                any("second live session date" in p
+                    and "2026-12-03" in p for p in problems),
+                problems)
+
+    def test_a_derivation_marker_in_navigation_is_not_a_rule(self):
+        # Standards Note 2. A derivation marker standing in
+        # the navigation section must not be judged as part
+        # of the last rule, so dropping the last rule note
+        # fails even while the marker stands in navigation.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "## Navigation"
+            self.assertIn(anchor, text)
+            nav = text.find(anchor)
+            last = text.rfind("Derives from", 0, nav)
+            self.assertTrue(last > 0)
+            broken = text[:last] + "Source note" + text[last + len("Derives from"):]
+            broken = broken.replace(
+                anchor,
+                anchor + "\n\nDerives from canonical skill, "
+                "The tier model, standing in navigation.\n", 1)
+            self.assertNotEqual(broken, text)
+            self.write_brief(root, broken)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("without derivation note" in p
+                    for p in problems), problems)
+
+    def test_publication_past_tense_listing_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nA listing file has shipped "
+                "in this repo.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_past_tense_build_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nBuild 15 was published.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_claim_with_guard_word_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe marketplace presence is "
+                "listed, as the effort table records.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_listing_present_form_alone_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nA listing file ships in "
+                "this repo.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_listing_past_form_alone_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nA listing file shipped in "
+                "this repo.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_guard_in_given_that_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "listing given that the marketplace presence "
+                "was published.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_guard_covering_given_that_claim_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief states given that "
+                "no claim stands and a listing file ships in "
+                "this repo.\n")
+            problems = self.problems(root)
+            self.assertFalse(any(
+                "publication plant" in p for p in problems),
+                problems)
+
+    def test_publication_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "listing while the marketplace presence was "
+                "published.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_guard_covering_while_claim_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief states while no "
+                "claim stands and a listing file ships in "
+                "this repo.\n")
+            problems = self.problems(root)
+            self.assertFalse(any(
+                "publication plant" in p for p in problems),
+                problems)
+
+    def test_publication_claim_in_a_table_cell_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n| Qwen marketplace | "
+                "Published |\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_claim_in_a_table_cell_emphasis_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n| Qwen marketplace | "
+                "**Published** |\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_claim_split_cell_and_caption_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n| Qwen marketplace | See "
+                "caption |\n\nTable caption. The status "
+                "stands published.\n")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_publication_caption_without_status_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n| Qwen marketplace | See "
+                "caption |\n\nTable caption. The status "
+                "stands open.\n")
+            problems = self.problems(root)
+            self.assertFalse(any(
+                "publication plant" in p for p in problems),
+                problems)
+
+    def test_publication_honest_status_in_a_table_cell_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n| Qwen marketplace | Not "
+                "published |\n")
+            problems = self.problems(root)
+            self.assertFalse(any(
+                "publication plant" in p for p in problems),
+                problems)
+
+    def test_publication_claim_in_a_heading_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            anchor = "## Summary\n"
+            self.assertIn(anchor, text)
+            self.write_brief(
+                root, text.replace(
+                    anchor,
+                    anchor + "\n## Published in the Qwen "
+                    "marketplace\n", 1))
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_live_presence_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nBuild 15 stands live in "
+                "the Qwen marketplace.\n")
+            self.assert_plant_kind(
+                self.problems(root), "live presence")
+
+    def test_live_presence_bounded_form_alone_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nBuild 15 is live on the "
+                "Qwen marketplace.\n")
+            self.assert_plant_kind(
+                self.problems(root), "live presence")
+
+    def test_publication_claim_inside_r9_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.break_brief(
+                root,
+                "### R9. The conditional publication draft",
+                "### R9. The conditional publication draft\n\n"
+                "Build 15 is published in the Qwen marketplace.")
+            self.assert_plant_kind(
+                self.problems(root), "publication")
+
+    def test_r1_scope_table_figures_exchanged_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.break_brief(
+                root,
+                "| Code review page | Step 3A small diff roster | Up to 16 parallel agents | Effort table |",
+                "| Code review page | Step 3A small diff roster | Up to 17 parallel tasks | Effort table |")
+            self.break_brief(
+                root,
+                "| Code review page | Same repo PR reviews | Up to 17 parallel tasks | Roster narrative |",
+                "| Code review page | Same repo PR reviews | Up to 16 parallel agents | Roster narrative |")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("R1 scope table does not carry the pinned "
+                    "row" in p for p in problems), problems)
+
+
+class TestRepairPassFourQwen(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckQwen()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def assert_plant_kind(self, problems, kind):
+        self.assertTrue(
+            any(
+                ("carries a %s plant in the sentence" % kind) in p
+                for p in problems
+            ),
+            problems,
+        )
+
+    def plant_brief(self, root, suffix):
+        text = self.inner.read_brief(root)
+        self.inner.write_brief(root, text + suffix)
+
+    def test_r1_census_added_row_inside_table_fails(self):
+        # Repair pass four. The R1 reading was presence
+        # based, so a thirteenth row binding Step 3A to 19
+        # parallel agents passed beside the pinned 16. The
+        # closed census refuses a row outside the pinned
+        # set standing inside the table.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = (
+                "| Code review page | Same repo PR reviews "
+                "| Up to 17 parallel tasks | Roster narrative |"
+            )
+            self.assertIn(anchor, text)
+            planted = text.replace(
+                anchor,
+                "| Code review page | Step 3A small diff "
+                "roster | Up to 19 parallel agents | Effort "
+                "table |\n" + anchor,
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.inner.write_brief(root, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "R1 scope table carries a row outside "
+                    "the pinned census" in p
+                    and "Up to 19 parallel agents" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_r1_census_added_row_appended_fails(self):
+        # Repair pass four. The record plant appends the
+        # same row at the end of the brief, outside the
+        # table block, and the census reads a row in the
+        # R1 form wherever it stands.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Code review page | Step 3A small diff "
+                "roster | Up to 19 parallel agents | Effort "
+                "table |\n",
+            )
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "R1 scope table carries a row outside "
+                    "the pinned census" in p
+                    and "Up to 19 parallel agents" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_r1_census_dropped_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            row = (
+                "| Code review page | Local and file reviews "
+                "| 15 | Token efficiency table |\n"
+            )
+            self.assertIn(row, text)
+            self.inner.write_brief(root, text.replace(row, "", 1))
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "R1 scope table does not carry the "
+                    "pinned row" in p
+                    and "Local and file reviews" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_r1_census_restated_figure_in_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            planted = text.replace(
+                "Up to 16 parallel agents",
+                "Up to 19 parallel agents",
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.inner.write_brief(root, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "R1 scope table carries a row outside "
+                    "the pinned census" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertTrue(
+                any(
+                    "R1 scope table does not carry the "
+                    "pinned row" in p
+                    and "Step 3A small diff roster" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_wrapper_census_added_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = (
+                "| 3 | It completed with REQUEST_CHANGES "
+                "and fail-on request-changes set |"
+            )
+            self.assertIn(anchor, text)
+            planted = text.replace(
+                anchor,
+                anchor + "\n| 4 | It completed with "
+                "REQUEST_CHANGES and fail-on "
+                "request-changes set |",
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.inner.write_brief(root, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "wrapper exit table carries a row "
+                    "outside the pinned census" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_wrapper_census_dropped_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            row = (
+                "| 1 | It never reached a verdict because "
+                "a child failed or timed out or left no "
+                "composed artifact |\n"
+            )
+            self.assertIn(row, text)
+            self.inner.write_brief(root, text.replace(row, "", 1))
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any("wrapper exit 1" in p for p in problems),
+                problems,
+            )
+
+    def test_internal_census_added_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            anchor = (
+                "| 4 | Internal verify refusal at the "
+                "compose floor |"
+            )
+            self.assertIn(anchor, text)
+            planted = text.replace(
+                anchor,
+                anchor + "\n| 5 | Internal verify refusal "
+                "at the compose floor |",
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.inner.write_brief(root, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "internal verify exit table carries a "
+                    "row outside the pinned census" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_internal_census_restated_row_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            planted = text.replace(
+                "| 4 | Internal verify refusal at the "
+                "compose floor |",
+                "| 3 | Internal verify refusal at the "
+                "compose floor |",
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.inner.write_brief(root, planted)
+            problems = self.inner.problems(root)
+            self.assertTrue(
+                any(
+                    "internal verify exit table carries a "
+                    "row outside the pinned census" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_internal_verify_exit_restated_in_prose_fails(self):
+        problems = self.mod.negative_problems(
+            "The internal verify exit is 5."
+        )
+        self.assert_plant_kind(
+            problems, "internal verify exit")
+
+    def test_wrapper_exit_outside_set_in_prose_fails(self):
+        problems = self.mod.negative_problems(
+            "The wrapper exit 2 covers a broken tool."
+        )
+        self.assert_plant_kind(problems, "wrapper exit")
+
+    def test_wrapper_exit_list_with_outside_figure_fails(self):
+        problems = self.mod.negative_problems(
+            "Wrapper exits are 0, 1, 3, and 5."
+        )
+        self.assert_plant_kind(problems, "wrapper exit")
+
+    def test_wrapper_exit_list_true_form_holds(self):
+        self.assertEqual(
+            self.mod.negative_problems(
+                "Wrapper exits are 0, 1, and 3."),
+            [],
+        )
+
+    def test_wrapper_meaning_swapped_in_prose_fails(self):
+        problems = self.mod.negative_problems(
+            "The wrapper exit 0 means it never reached "
+            "a verdict."
+        )
+        self.assert_plant_kind(problems, "wrapper exit")
+
+    def test_internal_meaning_swapped_in_prose_fails(self):
+        problems = self.mod.negative_problems(
+            "The internal verify exit means the review "
+            "completed whatever it decided."
+        )
+        self.assert_plant_kind(
+            problems, "internal verify exit")
+
+    def test_exit_pairings_own_meanings_hold(self):
+        for sentence in (
+            "The wrapper exit 0 means the review completed "
+            "whatever it decided.",
+            "The wrapper exit 3 means it completed with "
+            "REQUEST_CHANGES and fail-on request-changes set.",
+            "The internal verify exit is 4, an internal "
+            "verify refusal at the compose floor.",
+            "The internal verify exit is not 5.",
+        ):
+            self.assertEqual(
+                self.mod.negative_problems(sentence),
+                [],
+                sentence,
+            )
+
+    def test_publication_caption_with_caption_lead_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | See caption |\n\n"
+                "Caption. The status stands published.\n",
+            )
+            self.assert_plant_kind(
+                self.inner.problems(root), "publication")
+
+    def test_publication_caption_with_bare_status_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | See caption |\n\n"
+                "Table caption. Published.\n",
+            )
+            self.assert_plant_kind(
+                self.inner.problems(root), "publication")
+
+    def test_publication_standalone_status_line_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | Open |\n\n"
+                "Published.\n",
+            )
+            self.assert_plant_kind(
+                self.inner.problems(root), "publication")
+
+    def test_publication_standalone_stands_line_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | Open |\n\n"
+                "The status stands published.\n",
+            )
+            self.assert_plant_kind(
+                self.inner.problems(root), "publication")
+
+    def test_publication_caption_after_prose_paragraph_holds(self):
+        # Repair pass four. A caption standing after an
+        # intervening prose paragraph stands outside the
+        # reading, and the scoping texts name it outside,
+        # so this form passes on purpose.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | See caption |\n\n"
+                "Some prose paragraph.\n\n"
+                "Table caption. The status stands "
+                "published.\n",
+            )
+            problems = self.inner.problems(root)
+            self.assertFalse(
+                any(
+                    "publication plant" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_publication_caption_honest_controls_hold(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | See caption |\n\n"
+                "Caption. The status stands open.\n",
+            )
+            problems = self.inner.problems(root)
+            self.assertFalse(
+                any(
+                    "publication plant" in p for p in problems
+                ),
+                problems,
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.plant_brief(
+                root,
+                "\n| Qwen marketplace | Open |\n\n"
+                "Not published.\n",
+            )
+            problems = self.inner.problems(root)
+            self.assertFalse(
+                any(
+                    "publication plant" in p for p in problems
+                ),
+                problems,
+            )
+
+
+class TestRepairPassFiveQwen(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckQwen()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def assert_plant_kind(self, problems, kind):
+        self.assertTrue(
+            any(
+                ("carries a %s plant in the sentence" % kind) in p
+                for p in problems
+            ),
+            problems,
+        )
+
+    def test_wrapper_exit_of_form_in_prose_fails(self):
+        # Repair pass five. The wrapper exit figure
+        # readings admitted the plain form only, so a
+        # figure standing after the word of in the exit
+        # of form stated a false membership no reading
+        # refused. The of form is an exit figure position
+        # in the wrapper reading now.
+        problems = self.mod.negative_problems(
+            "The wrapper exit of 2 covers a broken tool."
+        )
+        self.assert_plant_kind(problems, "wrapper exit")
+
+    def test_internal_verify_exit_of_form_in_prose_fails(self):
+        # Repair pass five. The internal verify reading
+        # admitted the plain form only, so its exit of
+        # form passed the same way. The of form is an
+        # exit figure position in that reading now.
+        problems = self.mod.negative_problems(
+            "The internal verify exit of 5 stands in "
+            "the record."
+        )
+        self.assert_plant_kind(
+            problems, "internal verify exit")

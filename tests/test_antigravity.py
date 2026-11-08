@@ -1254,3 +1254,77 @@ class TestCheckAntigravity(unittest.TestCase):
                 any("decision 4 statement" in p for p in problems),
                 problems,
             )
+
+    def test_a_live_hook_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nAn Antigravity product ran in "
+                "this build and verified the hook contract live.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verified the hook contract live" in p
+                    for p in problems), problems)
+
+    def test_a_live_hook_glance_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nAn Antigravity product ran "
+                "during this build and proved the hook wiring "
+                "works live.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verified the hook contract live" in p
+                    for p in problems), problems)
+
+    def test_a_live_hook_glance_claim_verb_swap_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nAn Antigravity product ran in "
+                "this build and confirmed the hook contract live.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verified the hook contract live" in p
+                    for p in problems), problems)
+
+    def test_a_live_hook_glance_guard_in_whilst_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run whilst Antigravity ran and verified the "
+                "hook contract live.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verified the hook contract live" in p
+                    for p in problems), problems)
+
+    def test_a_live_hook_glance_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "run while Antigravity ran and verified the "
+                "hook contract live.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("verified the hook contract live" in p
+                    for p in problems), problems)
+
+    def test_a_restated_stable_pin_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            problems = self.break_brief(
+                root,
+                "records the v0.65.0 stable pin",
+                "records the v0.99.0 stable pin")
+            self.assertTrue(
+                any("stable pin as v0.99.0" in p
+                    and "v0.65.0" in p for p in problems), problems)

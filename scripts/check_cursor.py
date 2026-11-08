@@ -4,8 +4,7 @@
 The brief at docs/cursor-plugin-brief.md exploits the Cursor
 Plugin manifest, the six component packaging rules, the Bugbot
 rules in .cursor/BUGBOT.md, and the .cursor/config/bugbot.yaml
-repo config, distributed through the manually reviewed Cursor
-Marketplace. Decision 4 binds this build like every other build.
+repo config. Decision 4 binds this build like every other build.
 The plugin and the Bugbot rules advise and never enforce, so this
 script pins the contract without a Cursor host. It requires the
 manifest to name the plugin in lowercase kebab-case with
@@ -28,6 +27,20 @@ The gate pins the plugin README under .cursor-plugin to the
 same shipped package position and refuses the same stale
 wording in that file, because the round 1 addendum found the
 claim surviving there after the root README was corrected.
+The round 5 repairs extend the stale wording refusal to the
+brief itself, pin the canonical T0 name set in rule B3 and in
+the shipped Bugbot rule B3, refuse operative content after
+the final Bugbot rule derivation note and any auto approve
+or auto merge claim or plainly worded merge claim in that
+file, pin the operative header sentence of the Bugbot YAML
+config, refuse a scoped Bugbot verified claim family in the
+brief beside its unverified pin, stated as Bugbot behaviour
+on a real pull request verified or confirmed or proven and
+read sentence by sentence with a negated claim clause
+stating no claim, and pin the README pinning block command
+in the form the brief states. Each of those families is
+narrow and named, and prose outside them stays a human
+review surface.
 """
 
 import json
@@ -343,6 +356,10 @@ PINNED = (
     ("the corrected layout run unverified",
      "a fresh desktop run of the corrected layout stands "
      "UNVERIFIED"),
+    ("the glance layout bound",
+     "The desktop load stands proven for the layout that "
+     "stood before the later correction, and a fresh desktop "
+     "run of the corrected layout stands unverified"),
 )
 
 # Brief fragments the desktop verification run of 2026-10-25
@@ -1778,6 +1795,23 @@ def readme_problems(root=None):
                 "Marketplace distribution claim %r"
                 % fragment
             )
+    joined = raw.replace("\\\n", "")
+    joined = re.sub(r"\s+", " ", joined)
+    pinning = (
+        "cp -r recognitio-pinned "
+        "~/.cursor/plugins/local/recognitio"
+    )
+    if pinning not in joined:
+        problems.append(
+            "README.md pinning block does not copy the pinned "
+            "repository folder with the command %r" % pinning
+        )
+    if "recognitio-pinned/.cursor-plugin" in joined:
+        problems.append(
+            "README.md pinning block copies "
+            "recognitio-pinned/.cursor-plugin instead of the "
+            "pinned repository folder"
+        )
     return problems
 
 
@@ -1825,6 +1859,381 @@ def decision_problems(root=None):
     return []
 
 
+T0_MEMBERS = (
+    ("the base names AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth",
+     "AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth"),
+    ("the Copilot instructions file name",
+     "the Copilot instructions file name"),
+    ("a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix",
+     "a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix"),
+    ("the .cursorrules file name", "the .cursorrules file name"),
+    ("a Cursor rules file under a .cursor folder",
+     "a Cursor rules file under a .cursor folder"),
+    ("a Claude rules file under a .claude/rules folder",
+     "a Claude rules file under a .claude/rules folder"),
+    ("a Kimi plugin manifest named kimi.plugin.json at any depth",
+     "A Kimi plugin manifest named kimi.plugin.json at any depth"),
+    ("a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder",
+     "a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder are flagged too"),
+    ("the rename flag for either name",
+     "A renamed file is flagged when either its old name or its new name stands in the set"),
+    ("a review packet output style under the output-styles folder of the plugin",
+     "A review packet output style under the output-styles folder of the plugin is flagged too"),
+)
+
+T0_SET_TEXT = (
+    "The name set is AGENTS.md and CLAUDE.md and SKILL.md and "
+    "GEMINI.md at any depth, the Copilot instructions file name, "
+    "a path specific Copilot instructions file under the "
+    "instructions folder of .github carrying the "
+    ".instructions.md suffix, the .cursorrules file name, a "
+    "Cursor rules file under a .cursor folder, and a Claude "
+    "rules file under a .claude/rules folder. A Kimi plugin "
+    "manifest named kimi.plugin.json at any depth and a Kimi "
+    "plugin agent, hook script or manifest under a .kimi-plugin "
+    "folder are flagged too. A renamed file is flagged when "
+    "either its old name or its new name stands in the set. A "
+    "review packet output style under the output-styles folder "
+    "of the plugin is flagged too."
+)
+
+
+def t0_set_problems(flat_block, surface):
+    """Problems with one rule block stating the canonical T0 set."""
+    problems = []
+    for label, fragment in T0_MEMBERS:
+        if fragment not in flat_block:
+            problems.append(
+                "%s does not state the canonical T0 member %s"
+                % (surface, label)
+            )
+    start = flat_block.find("The name set is")
+    if start < 0:
+        problems.append(
+            "%s does not state the canonical T0 name set" % surface
+        )
+    else:
+        end_marker = "of the plugin is flagged too."
+        end = flat_block.find(end_marker, start)
+        stated = (
+            flat_block[start:end + len(end_marker)]
+            if end >= 0 else ""
+        )
+        if stated != T0_SET_TEXT:
+            problems.append(
+                "%s states a name set that differs from the "
+                "canonical T0 set, with a member missing or added"
+                % surface
+            )
+    return problems
+
+
+def _claim_clause_negated(sentence, start):
+    """Whether a negation guards a claim from its own clause.
+
+    The clause runs from the last clause edge before the
+    claim, a comma or a semicolon or a but or however or
+    yet joint or a subordinating joint from the closed
+    class, after or although or because or before or
+    given that or if or in that or once or since or
+    though or unless or until or when or whenever or
+    whereas or wherever or whether or while or whilst
+    or seeing that or so that, to the claim itself. A
+    negation inside that stretch guards the claim, and
+    a negation in an earlier clause belongs to that
+    clause and guards nothing here. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for edge in re.finditer(
+        r",|;|\bbut\b|\bhowever\b|\byet\b|\bafter\b|\balthough\b"
+        r"|\bbecause\b|\bbefore\b|\bgiven that\b|\bif\b|\bin that\b"
+        r"|\bonce\b|\bsince\b|\bthough\b|\bunless\b|\buntil\b"
+        r"|\bwhen\b|\bwhenever\b|\bwhereas\b|\bwherever\b|\bwhether\b"
+        r"|\bwhile\b|\bwhilst\b|\bseeing that\b|\bso that\b",
+        prefix,
+    ):
+        cut = max(cut, edge.end())
+    return bool(
+        re.search(r"\b(not|no|never)\b|n't", prefix[cut:])
+    )
+
+
+def round5_cursor_problems(root=None):
+    """Round 5 problems for the brief, Bugbot tail and YAML header."""
+    root = ROOT if root is None else root
+    problems = []
+    raw = read_text(root / "docs" / "cursor-plugin-brief.md")
+    if raw is not None:
+        text = re.sub(r"\s+", " ", raw)
+        for fragment in README_STALE:
+            if fragment in text:
+                problems.append(
+                    "docs/cursor-plugin-brief.md states the stale "
+                    "Cursor Marketplace distribution claim %r"
+                    % fragment
+                )
+        # Repair pass. The verified check is a scoped
+        # negative family, not a literal membership test. A
+        # sentence states the claim when it joins the Bugbot
+        # subject and the pull request object to a verified
+        # or confirmed or proven verb form, and a negation
+        # in the claim clause states no claim. The honest
+        # unverified wording carries no such verb form.
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            low = sentence.lower()
+            verb = re.search(
+                r"\b(verified|confirmed|proven)\b", low)
+            if (
+                "bugbot" in low
+                and "pull request" in low
+                and verb
+                and not _claim_clause_negated(low, verb.start())
+            ):
+                problems.append(
+                    "docs/cursor-plugin-brief.md claims Bugbot "
+                    "behaviour on a real pull request is verified, "
+                    "beside its pinned unverified sentence"
+                )
+                break
+        section = rules_section(raw)
+        if section is not None:
+            for block in rule_blocks(section):
+                flat = re.sub(r"\s+", " ", block)
+                if "The name set is" in flat:
+                    problems.extend(t0_set_problems(
+                        flat, "docs/cursor-plugin-brief.md rule B3"))
+    bugbot = read_text(root / ".cursor" / "BUGBOT.md")
+    if bugbot is not None:
+        # Heading lines are structure, not claims, so the
+        # merge claim scan reads the file with its headings
+        # removed, the reading the ZCode gate uses for its
+        # own negative scan. A heading that carries a
+        # negation word would otherwise join the sentence
+        # after it and shelter the claim that follows.
+        flat_all = re.sub(
+            r"\s+", " ",
+            re.sub(r"(?m)^#{1,6} .*$", "", bugbot),
+        )
+        # Repair pass. The merge claim family covers the
+        # merge verb forms with a pull request object, with
+        # or without autonomy wording, beside the auto forms
+        # the first reading named. The reading runs at clause
+        # scope, and a clause that denies the claim or warns
+        # against it states no claim.
+        # Repair pass two. The object also stands in its
+        # abbreviated form, the word PRs, in the same active
+        # and passive forms, so a claim stated in the
+        # abbreviation the shipped briefs themselves use for
+        # the same object states the claim as well.
+        # Repair pass three. The family also covers the
+        # autonomy form, a merge verb joined in its clause
+        # to an autonomy marker, on its own or by itself or
+        # automatically or without asking or without human
+        # review, whatever the object is, a pronoun or a
+        # definite description included, with negation read
+        # at clause scope as above. A merge carried by
+        # reference with no autonomy claim and no spelled
+        # object stands outside the family.
+        merge_claim = False
+        for sentence in re.split(r"(?<=[.!?])\s+", flat_all):
+            low = sentence.lower()
+            clauses = re.split(r",\s+and\s+|,\s+|;\s*", low)
+            for clause in clauses:
+                if re.search(
+                    r"auto(?:matically)?\s+(?:approve|merge)"
+                    r"|approv\w+ and merg\w+"
+                    r"|auto approve|auto merge",
+                    clause,
+                ):
+                    merge_claim = True
+                    break
+                verb = re.search(r"\bmerg\w*\b", clause)
+                if not verb:
+                    continue
+                if "warn" in clause:
+                    continue
+                if re.search(
+                    r"\b(not|no|never)\b|n't",
+                    clause[:verb.start()],
+                ):
+                    continue
+                if re.search(
+                    r"\bmerg\w*\b[^.]{0,60}"
+                    r"\b(?:pull requests?|prs)\b", clause
+                ) or re.search(
+                    r"\b(?:pull requests?|prs)\b[^.]{0,60}"
+                    r"\bmerg\w*\b", clause
+                ):
+                    merge_claim = True
+                    break
+                if re.search(
+                    r"\bon its own\b|\bby itself\b"
+                    r"|\bautomatically\b|\bwithout asking\b"
+                    r"|\bwithout human review\b",
+                    clause,
+                ):
+                    merge_claim = True
+                    break
+            if merge_claim:
+                break
+        if merge_claim:
+            problems.append(
+                ".cursor/BUGBOT.md claims an auto approve or auto "
+                "merge behaviour, which its own final rule forbids"
+            )
+        section = rules_section(bugbot)
+        if section is not None:
+            blocks = rule_blocks(section)
+            for block in blocks:
+                flat = re.sub(r"\s+", " ", block)
+                if "The name set is" in flat:
+                    problems.extend(t0_set_problems(
+                        flat, ".cursor/BUGBOT.md rule B3"))
+            # Repair pass. The tail reading runs over
+            # everything after the final rule derivation
+            # note in the file, headings included, so
+            # operative content under a fresh heading after
+            # the final rule stands inside the reading. The
+            # last block reading stands beside it for a tail
+            # inside the final block itself.
+            # Repair pass two. The tail anchor is the
+            # derivation note of the final rule block as
+            # the rules are parsed, not the last derivation
+            # shaped marker standing in the file. A tail
+            # that closes with a fresh derivation note
+            # cannot move the anchor past its own operative
+            # content that way. Everything after the final
+            # rule note paragraph is judged as tail, and
+            # any content there except whitespace is the
+            # tail problem, headings and derivation shaped
+            # notes included.
+            # Repair pass three. The final rule derivation
+            # note paragraph may carry the derivation note
+            # and nothing else, so any further sentence
+            # standing inside that paragraph is the tail
+            # problem as well, and the reading judges the
+            # paragraph itself beside everything after it.
+            tail_found = False
+            headings = list(
+                re.finditer(r"(?m)^### B\d+\.", bugbot))
+            if headings:
+                note_start = bugbot.find(
+                    "Derives from", headings[-1].start())
+                if note_start >= 0:
+                    note_break = re.search(
+                        r"\n\s*\n", bugbot[note_start:])
+                    note_end = (
+                        note_start + note_break.end()
+                        if note_break else len(bugbot)
+                    )
+                    if bugbot[note_end:].strip():
+                        tail_found = True
+                    note_paragraph = re.sub(
+                        r"\s+", " ",
+                        bugbot[note_start:note_end])
+                    note_sentences = [
+                        part for part in re.split(
+                            r"(?<=[.!?])\s+", note_paragraph)
+                        if part.strip()
+                    ]
+                    if len(note_sentences) > 1:
+                        tail_found = True
+            if tail_found:
+                problems.append(
+                    ".cursor/BUGBOT.md carries operative "
+                    "content after the final rule block, "
+                    "past its derivation note"
+                )
+    # Round 5 second seat. Rule B4 restates the caps in its
+    # own sentences in both surfaces, bound to their
+    # figures, and no sentence in either surface may attach
+    # the combined figure to a single rule or the per rule
+    # figure to the combined rules. Repair pass three
+    # extends the exchange reading to the Bugbot surface
+    # beside the brief surface it already covered, in the
+    # additive form the Codex and Devin gates use. The
+    # reading runs at clause scope on both surfaces, so a
+    # sentence that binds both figures correctly, each in
+    # its own clause, stands clean, and a scope word and
+    # its figure split across clauses stand outside the
+    # reading.
+    for surface, surface_raw in (
+        ("docs/cursor-plugin-brief.md", raw),
+        (".cursor/BUGBOT.md", bugbot),
+    ):
+        if surface_raw is None:
+            continue
+        b4_start = surface_raw.find("### B4.")
+        b4_end = surface_raw.find("### B5.", b4_start)
+        b4_block = re.sub(
+            r"\s+", " ",
+            surface_raw[b4_start:b4_end] if b4_start >= 0 else "",
+        )
+        if "Each rule stays under 30,000 characters" not in b4_block:
+            problems.append(
+                "%s rule B4 does not bind the per rule cap "
+                "to 30,000 characters" % surface
+            )
+        if "combined rules stay under 100,000 characters" not in b4_block:
+            problems.append(
+                "%s rule B4 does not bind the combined cap "
+                "to 100,000 characters" % surface
+            )
+    for surface, surface_raw in (
+        ("docs/cursor-plugin-brief.md", raw),
+        (".cursor/BUGBOT.md", bugbot),
+    ):
+        if surface_raw is None:
+            continue
+        low = re.sub(r"\s+", " ", surface_raw.lower())
+        exchanged = False
+        for sentence in re.split(r"(?<=[.!?])\s+", low):
+            clauses = re.split(
+                r",\s+and\s+|,\s+|;\s*", sentence)
+            for clause in clauses:
+                if re.search(
+                    r"\bcombined\b[^.]{0,60}\b30,000\b", clause
+                ) or re.search(
+                    r"\b(each rule|per rule|single rule)\b[^.]{0,60}"
+                    r"\b100,000\b",
+                    clause,
+                ):
+                    exchanged = True
+                    break
+            if exchanged:
+                break
+        if exchanged:
+            problems.append(
+                "%s attaches a cap "
+                "figure to the wrong scope, the combined and "
+                "per rule caps exchanged" % surface
+            )
+    yaml_raw = read_text(root / ".cursor" / "config" / "bugbot.yaml")
+    if yaml_raw is not None:
+        flat_yaml = re.sub(r"\s+", " ", yaml_raw.replace("#", " "))
+        pinned = (
+            "It can lower the Autofix mode from the dashboard "
+            "setting, but it cannot raise it."
+        )
+        if pinned not in flat_yaml:
+            problems.append(
+                ".cursor/config/bugbot.yaml does not state its "
+                "operative header sentence that it can lower the "
+                "Autofix mode and cannot raise it"
+            )
+        if "can raise the Autofix mode" in flat_yaml:
+            problems.append(
+                ".cursor/config/bugbot.yaml claims it can raise "
+                "the Autofix mode, which its operative header "
+                "sentence forbids"
+            )
+    return problems
+
+
 def cursor_problems(root=None):
     """Every Build 10 Cursor plugin problem."""
     UTF8_UNREADABLE.clear()
@@ -1839,6 +2248,7 @@ def cursor_problems(root=None):
     problems.extend(readme_problems(root))
     problems.extend(plugin_readme_problems(root))
     problems.extend(decision_problems(root))
+    problems.extend(round5_cursor_problems(root))
     return repair_utf8_problems(problems)
 
 

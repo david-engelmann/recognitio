@@ -1400,6 +1400,145 @@ class TestCheckTestVacuity(unittest.TestCase):
             root = self.make_tree(tmp, {"test_x.py": body})
             self.assertEqual(self.problems(root), [])
 
+    def test_a_helper_in_another_class_is_not_followed(self):
+        # The guard follows helpers held in the same class
+        # only, a limit its docstring records. A test whose
+        # only assertion lives in a helper on another class
+        # is refused, and the refusal names the shapes this
+        # guard follows rather than claiming the test cannot
+        # fail at run time, because the delegated assertion
+        # does run there and can fail there. The round 5
+        # discharge refusal named eleven shipped tests of
+        # exactly this shape before their helpers moved
+        # into their own classes.
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "class InnerCase(unittest.TestCase):\n"
+            "    def assert_plant_kind(self, problems, kind):\n"
+            "        self.assertTrue(\n"
+            "            any(kind in p for p in problems),\n"
+            "            problems,\n"
+            "        )\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def setUp(self):\n"
+            "        self.inner = InnerCase()\n"
+            "\n"
+            "    def test_a_delegated_case(self):\n"
+            "        problems = self.mod.negative_problems(\n"
+            "            'The wrapper exit 2 covers a broken "
+            "tool.'\n"
+            "        )\n"
+            "        self.inner.assert_plant_kind(\n"
+            "            problems, 'wrapper exit')\n"
+        )
+        problems = self.guard_problems(body)
+        self.assertTrue(
+            any(
+                "no real assertion in a shape this guard "
+                "follows" in p
+                for p in problems
+            ),
+            problems,
+        )
+
+    def test_a_fixture_refusal_names_the_followed_shapes(self):
+        # The companion pin for the fixture refusal. The
+        # round 5 wording fix narrowed that refusal tail to
+        # the shapes this guard follows in the same edit as
+        # the assertion refusal, and this plant holds the
+        # scoped substring so a silent revert of the fixture
+        # string alone fails here. The body is the standing
+        # fixture plant shape, a real looking assertion that
+        # never reaches for a fixture.
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            '        self.assertTrue("x" in "xyz")\n'
+        )
+        problems = self.guard_problems(body)
+        self.assertTrue(
+            any(
+                "never touches a fixture in a shape this "
+                "guard follows" in p
+                for p in problems
+            ),
+            problems,
+        )
+
+    def test_an_empty_test_file_fails_the_guard(self):
+        # The discovery floor is per file as well as
+        # global. A test file truncated to nothing would
+        # otherwise pass in silence while the files around
+        # it still gave the global floor its methods, so
+        # the empty file is a problem by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_tree(
+                tmp,
+                {
+                    "test_real.py": REAL_TEST,
+                    "test_empty.py": "",
+                    "test_blank.py": "  \n\n  ",
+                },
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "test_empty.py" in p
+                    and "stands empty" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertTrue(
+                any(
+                    "test_blank.py" in p
+                    and "stands empty" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_container_literal_handed_to_a_helper_still_counts(self):
+        # A recorded limit, pinned rather than hidden. A
+        # test that hands its same class helper a container
+        # literal holding the very problems it expects, and
+        # asserts over that parameter inside the helper,
+        # pins nothing, because the helper passes on the
+        # literal alone. The guard credits it anyway,
+        # because what a container holds is not settled
+        # where a parameter binds it at a call site, a
+        # limit the guard docstring records with the spec
+        # lane diff review as the guard for the shape. If
+        # the guard ever learns to settle that binding,
+        # this test fails and the limit record must move
+        # with it.
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def assert_plant_kind(self, problems, "
+            "kind):\n"
+            "        self.assertTrue(\n"
+            "            any(kind in p for p in problems),\n"
+            "            problems,\n"
+            "        )\n"
+            "\n"
+            "    def test_a_quieted_case(self):\n"
+            "        self.assert_plant_kind(\n"
+            "            ['carries a figure plant in the "
+            "sentence'],\n"
+            "            'figure')\n"
+        )
+        self.assert_clean(body)
+
 
 if __name__ == "__main__":
     unittest.main()

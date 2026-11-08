@@ -226,6 +226,11 @@ def load_json(root, rel, problems, label):
         return None
     try:
         text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "the %s at %s cannot be read, it cannot be read "
+            "as UTF-8 text" % (label, rel))
+        return None
     except OSError:
         problems.append("the %s at %s is missing" % (label, rel))
         return None
@@ -577,7 +582,15 @@ def openai_yaml_problems(root, accent, problems):
                 "canonical skill copy, so the skill spellings can "
                 "drift" % tree
             )
-    outcome = parse_openai_yaml(canonical_bytes.decode("utf-8"))
+    try:
+        canonical_text = canonical_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "agents/openai.yaml cannot be read, it cannot be "
+            "read as UTF-8 text"
+        )
+        return
+    outcome = parse_openai_yaml(canonical_text)
     if outcome is None:
         problems.append(
             "agents/openai.yaml does not parse in the two level "
@@ -750,10 +763,82 @@ def brief_problems(root, problems):
         return
     try:
         raw = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "docs/codex-plugin-brief.md cannot be read, it "
+            "cannot be read as UTF-8 text")
+        return
     except OSError:
         problems.append("docs/codex-plugin-brief.md is missing")
         return
     text = " ".join(raw.split())
+    # Round 5 second seat. No sentence may claim that a
+    # universal plugin directory listing exists or that
+    # recognitio was submitted to one, which rule X6 denies.
+    # The reading covers listing and submission claims about
+    # the universal directory alone, and the pinned denial
+    # sentence states no claim and is skipped.
+    low = text.lower()
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        if "universal" not in sentence:
+            continue
+        if any(
+            guard in sentence
+            for guard in (
+                "no universal", "nothing in this build", "never",
+            )
+        ):
+            continue
+        if re.search(
+            r"\blisting exists\b"
+            r"|\bsubmitted to the universal\b"
+            r"|\bsubmission to the universal\b"
+            r"|\bstands listed\b"
+            r"|\bis listed in the universal\b"
+            r"|\blisting for recognitio\b",
+            sentence,
+        ):
+            problems.append(
+                "docs/codex-plugin-brief.md claims a universal "
+                "plugin directory listing, which rule X6 denies"
+            )
+            break
+    # Round 5 red team Major 2. The worked sum in the brief
+    # is re-derived from the shipped AGENTS.md, so a restated
+    # cap or figure is refused by name instead of leaving the
+    # sum false on its face.
+    agents_path = root / "AGENTS.md"
+    if agents_path.is_file():
+        file_bytes = len(agents_path.read_bytes())
+        cap = 32768
+        lost = file_bytes - cap
+        for stated in re.findall(
+                r"embeds at most ([\d,]+) bytes", text):
+            if int(stated.replace(",", "")) != cap:
+                problems.append(
+                    "docs/codex-plugin-brief.md states the "
+                    "AGENTS byte cap as %s, which differs from "
+                    "the re-derived cap of 32,768 bytes" % stated
+                )
+        for stated in re.findall(
+                r"This repo AGENTS\.md stands at ([\d,]+) bytes",
+                text):
+            if int(stated.replace(",", "")) != file_bytes:
+                problems.append(
+                    "docs/codex-plugin-brief.md states the "
+                    "AGENTS file at %s bytes, which differs from "
+                    "the measured %s bytes"
+                    % (stated, format(file_bytes, ","))
+                )
+        for stated in re.findall(
+                r"its last ([\d,]+) bytes never reach", text):
+            if int(stated.replace(",", "")) != lost:
+                problems.append(
+                    "docs/codex-plugin-brief.md states the lost "
+                    "bytes as %s, which differs from the "
+                    "re-derived difference of %s bytes"
+                    % (stated, format(lost, ","))
+                )
     section = rules_section(raw)
     if section is None:
         problems.append(
@@ -780,6 +865,11 @@ def brief_problems(root, problems):
         return
     try:
         record = decisions.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "docs/decisions.md cannot be read, it cannot be "
+            "read as UTF-8 text")
+        return
     except OSError:
         problems.append("docs/decisions.md is missing")
         return
@@ -810,6 +900,11 @@ def brief_problems(root, problems):
         return
     try:
         changelog_text = changelog.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "CHANGELOG.md cannot be read, it cannot be read "
+            "as UTF-8 text")
+        return
     except OSError:
         problems.append("CHANGELOG.md is missing")
         return
@@ -842,6 +937,11 @@ def brief_problems(root, problems):
         return
     try:
         index_text = index.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "docs/README.md cannot be read, it cannot be read "
+            "as UTF-8 text")
+        return
     except OSError:
         problems.append("docs/README.md is missing")
         return
@@ -857,6 +957,11 @@ def brief_problems(root, problems):
         return
     try:
         readme_text = readme.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "README.md cannot be read, it cannot be read as "
+            "UTF-8 text")
+        return
     except OSError:
         problems.append("README.md is missing")
         return
@@ -925,6 +1030,11 @@ def brief_problems(root, problems):
         return
     try:
         agents_text = agents.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        problems.append(
+            "AGENTS.md cannot be read, it cannot be read as "
+            "UTF-8 text")
+        return
     except OSError:
         problems.append("AGENTS.md is missing")
         return

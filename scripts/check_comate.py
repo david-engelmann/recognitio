@@ -1212,6 +1212,70 @@ def brief_problems(root, problems):
     problems.extend(
         contradiction_problems(text, "docs/comate-brief.md")
     )
+    # Round 5 second seat. The At a glance client version
+    # restatement is pinned to the version the client run
+    # section pins.
+    # Repair pass four. The glance reading checked only
+    # the at version form, so a restated version standing
+    # in the glance in another form, and the installer
+    # record and command line forms standing anywhere in
+    # the brief, passed beside the pinned statements. The
+    # glance now value checks every version token it
+    # carries, and the other shipped statement forms of
+    # the client version are value checked over the
+    # whole brief.
+    # Repair pass five. The whole brief side of the check
+    # covers the at version form, the installer record
+    # form with or without the word version standing
+    # before its figure, and the command line form with
+    # or without the client bundle words standing before
+    # its reports word. The glance token scan covers any
+    # version token standing inside the glance in any
+    # form. A version token standing outside the glance
+    # in no shipped statement form states no client
+    # version in this reading.
+    glance = text.split("**What is unverified**")[0]
+    for stated in re.findall(r"(\d+\.\d+\.\d+)", glance):
+        if stated != "3.11.5":
+            problems.append(
+                "docs/comate-brief.md At a glance restates the "
+                "client version as %s, which differs from the "
+                "pinned version 3.11.5" % stated
+            )
+    for stated in re.findall(r"at version (\d+\.\d+\.\d+)", text):
+        if stated != "3.11.5":
+            problems.append(
+                "docs/comate-brief.md restates the client "
+                "version as %s in the at version form, "
+                "which differs from the pinned version 3.11.5"
+                % stated
+            )
+    for stated in re.findall(
+            r"Comate AI IDE (?:version )?(\d+\.\d+\.\d+)", text):
+        if stated != "3.11.5":
+            problems.append(
+                "docs/comate-brief.md restates the client "
+                "version as %s in the installer record form, "
+                "which differs from the pinned version 3.11.5"
+                % stated
+            )
+    for stated in re.findall(
+            r"command line(?: in the client bundle)? reports "
+            r"(\d+\.\d+\.\d+)", text):
+        if stated != "3.11.5":
+            problems.append(
+                "docs/comate-brief.md restates the client "
+                "version as %s in the command line form, "
+                "which differs from the pinned version 3.11.5"
+                % stated
+            )
+    for stated in re.findall(r"recognition of over (\d+) tools", text):
+        if int(stated) != 20:
+            problems.append(
+                "docs/comate-brief.md states recognition of "
+                "over %s tools, which differs from the pinned "
+                "figure of over 20 tools" % stated
+            )
     for label, sentence in BRIEF_SENTENCES:
         if sentence not in text:
             problems.append(

@@ -90,7 +90,10 @@ class TestCheckPackage(unittest.TestCase):
         for entry in EXTENSION_PATHS:
             path = root / entry
             path.parent.mkdir(parents=True, exist_ok=True)
-            if entry == ".claude-plugin/plugin.json":
+            if entry in (
+                ".claude-plugin/plugin.json",
+                ".claude-plugin/marketplace.json",
+            ):
                 shutil.copyfile(ROOT / entry, path)
             else:
                 path.write_text("shape\n", encoding="utf-8")
@@ -1052,6 +1055,236 @@ class TestCheckPackage(unittest.TestCase):
             finally:
                 copy_mod.MANIFEST_FILES = original
             self.assertEqual(code, 1)
+
+
+class TestRound5Package(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckPackage()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_native_manifest_description_reversal_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            data = self.inner.read_native(root)
+            data["description"] = data["description"].replace(
+                "so install one entry or the other and never both.",
+                "so install both entries together.")
+            self.inner.write_native(root, data)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "native manifest description" in p
+                and "never both" in p for p in problems), problems)
+
+    def test_marketplace_entry_description_reversal_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            target = root / ".claude-plugin" / "marketplace.json"
+            shutil.copyfile(
+                ROOT / ".claude-plugin" / "marketplace.json", target)
+            data = json.loads(target.read_text(encoding="utf-8"))
+            entry = data["plugins"][0]
+            entry["description"] = entry["description"].replace(
+                "so install one entry or the other and never both.",
+                "so install both entries together.")
+            target.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "marketplace entry" in p and "never both" in p
+                for p in problems), problems)
+
+    def test_portable_description_relabel_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            data = self.inner.read_manifest(root)
+            data["description"] = data["description"].replace(
+                "This is the portable Agent Plugins 1.0.0 packaging of the skill.",
+                "This is the portable Cursor plugin packaging of the skill.")
+            self.inner.write_manifest(root, data)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "portable manifest description" in p
+                for p in problems), problems)
+
+    def test_native_install_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nThe package also installs natively "
+                "in Claude Code.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "also installs natively in Claude Code" in p
+                for p in problems), problems)
+
+    def test_mcp_file_ships_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nAn MCP file ships in the package.\n",
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "MCP file ships in the package" in p
+                for p in problems), problems)
+
+    def test_native_install_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nNative installation in Claude Code "
+                "is how the package ships today.\n",
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "installs natively in Claude Code" in p
+                for p in problems), problems)
+
+    def test_native_install_claim_with_now_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nThe package now installs natively "
+                "in Claude Code.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "installs natively in Claude Code" in p
+                for p in problems), problems)
+
+    def test_native_install_guard_in_in_that_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nThe brief never claims a native "
+                "route in that users install this package "
+                "natively inside Claude Code today.\n",
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "installs natively in Claude Code" in p
+                for p in problems), problems)
+
+    def test_native_install_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nThe brief never claims a native "
+                "route while users install this package "
+                "natively inside Claude Code today.\n",
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "installs natively in Claude Code" in p
+                for p in problems), problems)
+
+    def test_mcp_file_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text + "\n\nThe package includes an MCP file "
+                "for hosts that want one.\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "MCP file ships in the package" in p
+                for p in problems), problems)
+
+    def test_unparseable_native_manifest_names_its_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            path.write_text("shape\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "cannot be parsed" in p
+                and "description cannot be checked" in p
+                for p in problems), problems)
+
+    def test_unparseable_marketplace_names_its_description(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / ".claude-plugin" / "marketplace.json"
+            path.write_text("shape\n", encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "cannot be parsed" in p
+                and "description cannot be checked" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_manifest_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "agent-plugins-package" / "plugin.json"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            data, problem = self.mod.load_manifest(root)
+            self.assertIsNone(data)
+            self.assertIn("cannot be read", problem)
+            self.assertIn("UTF-8", problem)
+
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "cannot read docs/agent-plugins-brief.md" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatPackage(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckPackage()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_extension_key_renamed_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            data = self.inner.read_manifest(root)
+            ext = data["extensions"]["com.anthropic.claude-code"]
+            ext["manifestPath"] = ext.pop("nativeManifest")
+            self.inner.write_manifest(root, data)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "undeclared key" in p and "manifestPath" in p
+                for p in problems), problems)
+
+    def test_native_install_claim_after_honesty_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "agent-plugins-brief.md"
+            text = path.read_text(encoding="utf-8")
+            anchor = ("The package does not install natively in "
+                      "Claude Code on current evidence.")
+            self.assertIn(anchor, text)
+            path.write_text(
+                text.replace(
+                    anchor,
+                    anchor + " The package also installs "
+                    "natively in Claude Code.", 1),
+                encoding="utf-8")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "installs natively in Claude Code" in p
+                for p in problems), problems)
 
 
 if __name__ == "__main__":

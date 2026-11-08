@@ -24,7 +24,13 @@ the brief keeps reading as proven. The same reading pins the
 config path filters and the path instruction paths and the
 Markdown path instruction wording, so the operative review
 guidance those blocks carry cannot be weakened or deleted in
-silence either.
+silence either. The instruction wording pin covers the
+Markdown entry alone, because the brief states no wording
+for the other three entries, and for those entries the
+paths alone are pinned. Round 5 adds a negative family over
+the whole brief refusing a claim that high focus deepens
+the analysis, which the brief restraint test and Summary
+deny.
 """
 
 import re
@@ -342,8 +348,26 @@ def guidelines_problems(root=None):
 # summary is available, opens a clause the same way, so
 # it joins the reset forms in the same determiner led
 # shape.
+# Repair pass two. A subordinate joint opens a new clause
+# the same way, so the while and when and because and
+# since and whereas and although forms stand in the
+# reset list beside the older joints.
+# Repair pass three. The reset list now carries the
+# subordinating joint class as a closed set, after and
+# although and because and before and given that and if
+# and in that and once and since and though and unless
+# and until and when and whenever and whereas and
+# wherever and whether and while and whilst and seeing
+# that and so that. Bare as stands excluded from the
+# class, because its comparative use stands in shipped
+# prose the gate must pass.
 CLAUSE_RESET = (
     r";|\bbut\b|\bhowever\b|\byet\b"
+    r"|\bafter\b|\balthough\b|\bbecause\b|\bbefore\b"
+    r"|\bgiven that\b|\bif\b|\bin that\b|\bonce\b|\bsince\b"
+    r"|\bthough\b|\bunless\b|\buntil\b|\bwhen\b|\bwhenever\b"
+    r"|\bwhereas\b|\bwherever\b|\bwhether\b|\bwhile\b"
+    r"|\bwhilst\b|\bseeing that\b|\bso that\b"
     r"|,\s+and\s+(?:it|they|we|he|she|these|those"
     r"|linked source|deep scan)\b"
     r"|,\s+and\s+(?:the|a|an|this|that)\s+"
@@ -377,6 +401,12 @@ def _prefix_negated(low, start):
     Confirmation repair. A comma and clause opening on
     the claim's own noun subject, linked source or deep
     scan restated, is the same reset in noun form.
+
+    Repair pass three. Negation is credited only within
+    the claim's own clause, with clauses cut at the
+    subordinating joint class the reset list names, and
+    a guard carried by bare as or by a participial phrase
+    stands outside this reading.
     """
     prefix = low[:start]
     cut = 0
@@ -1011,6 +1041,163 @@ def config_problems(root=None):
     return problems
 
 
+T0_MEMBERS = (
+    ("the base names AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth",
+     "AGENTS.md and CLAUDE.md and SKILL.md and GEMINI.md at any depth"),
+    ("the Copilot instructions file name",
+     "the Copilot instructions file name"),
+    ("a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix",
+     "a path specific Copilot instructions file under the instructions folder of .github carrying the .instructions.md suffix"),
+    ("the .cursorrules file name", "the .cursorrules file name"),
+    ("a Cursor rules file under a .cursor folder",
+     "a Cursor rules file under a .cursor folder"),
+    ("a Claude rules file under a .claude/rules folder",
+     "a Claude rules file under a .claude/rules folder"),
+    ("a Kimi plugin manifest named kimi.plugin.json at any depth",
+     "A Kimi plugin manifest named kimi.plugin.json at any depth"),
+    ("a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder",
+     "a Kimi plugin agent, hook script or manifest under a .kimi-plugin folder are flagged too"),
+    ("the rename flag for either name",
+     "A renamed file is flagged when either its old name or its new name stands in the set"),
+    ("a review packet output style under the output-styles folder of the plugin",
+     "A review packet output style under the output-styles folder of the plugin is flagged too"),
+)
+
+T0_SET_TEXT = (
+    "The name set is AGENTS.md and CLAUDE.md and SKILL.md and "
+    "GEMINI.md at any depth, the Copilot instructions file name, "
+    "a path specific Copilot instructions file under the "
+    "instructions folder of .github carrying the "
+    ".instructions.md suffix, the .cursorrules file name, a "
+    "Cursor rules file under a .cursor folder, and a Claude "
+    "rules file under a .claude/rules folder. A Kimi plugin "
+    "manifest named kimi.plugin.json at any depth and a Kimi "
+    "plugin agent, hook script or manifest under a .kimi-plugin "
+    "folder are flagged too. A renamed file is flagged when "
+    "either its old name or its new name stands in the set. A "
+    "review packet output style under the output-styles folder "
+    "of the plugin is flagged too."
+)
+
+
+def _deeper_guarded(sentence, start):
+    """Whether a guard word covers a deeper claim, at clause scope.
+
+    The clause runs from the last clause reset before the
+    claim to the first clause reset after it, on the same
+    reset forms the linked reading uses. A guard word
+    standing in an unrelated clause of the same sentence
+    covers nothing here, and a guard word in the claim
+    clause itself covers the claim. Negation is credited
+    only within the claim's own clause, and a guard
+    carried by bare as or by a participial phrase stands
+    outside this reading.
+    """
+    prefix = sentence[:start]
+    cut = 0
+    for reset in re.finditer(CLAUSE_RESET, prefix):
+        cut = max(cut, reset.end())
+    end = len(sentence)
+    first = re.search(CLAUSE_RESET, sentence[start:])
+    if first is not None:
+        end = start + first.start()
+    clause = sentence[cut:end]
+    return any(
+        guard in clause
+        for guard in (
+            "not deepen", "never", "deny", "denies",
+            "mixes", "mix the two", "must not",
+        )
+    )
+
+
+def round5_coderabbit_problems(root=None):
+    """Round 5 problems for guideline G3 and the glance card.
+
+    The T0 family compares the G3 stated set against the
+    canonical set member by member and as a whole, and the
+    glance family refuses a live review claim in the family
+    the brief states stands unverified, stated as a live
+    CodeRabbit review verifying or confirming or proving
+    the guidelines, read sentence by sentence with a
+    negated claim clause stating no claim. Prose outside
+    those named families stays a human review surface.
+    """
+    root = ROOT if root is None else root
+    raw = read_text(root / "docs" / "coderabbit-review-brief.md")
+    if raw is None:
+        return []
+    problems = []
+    text = re.sub(r"\s+", " ", raw)
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        verb = re.search(r"\b(verif\w*|confirm\w*|prov\w*)\b", low)
+        if (
+            "coderabbit" in low
+            and re.search(r"\blive\b", low)
+            and re.search(r"\breview\b", low)
+            and verb
+            and not _prefix_negated(low, verb.start())
+        ):
+            problems.append(
+                "docs/coderabbit-review-brief.md claims a live "
+                "CodeRabbit review verified the guidelines, beside "
+                "its pinned unverified sentence"
+            )
+            break
+    section = guidelines_section(raw)
+    if section is not None:
+        for block in guideline_blocks(section):
+            flat = re.sub(r"\s+", " ", block)
+            if "The name set is" not in flat:
+                continue
+            for label, fragment in T0_MEMBERS:
+                if fragment not in flat:
+                    problems.append(
+                        "docs/coderabbit-review-brief.md guideline "
+                        "G3 does not state the canonical T0 member "
+                        "%s" % label
+                    )
+            start = flat.find("The name set is")
+            end_marker = "of the plugin is flagged too."
+            end = flat.find(end_marker, start)
+            stated = flat[start:end + len(end_marker)] if end >= 0 else ""
+            if stated != T0_SET_TEXT:
+                problems.append(
+                    "docs/coderabbit-review-brief.md guideline G3 "
+                    "states a name set that differs from the "
+                    "canonical T0 set, with a member missing or added"
+                )
+    # Round 5 second seat. No sentence may claim that high
+    # focus deepens the analysis. The reading runs over the
+    # whole brief, and a sentence that denies the claim, or
+    # warns that a reader may mix the two axes, states no
+    # claim and is skipped.
+    low = re.sub(r"\s+", " ", raw.lower())
+    for sentence in re.split(r"(?<=[.!?])\s+", low):
+        claimed = False
+        for match in re.finditer(r"\bdeep(er|en|ens|ening)\b", sentence):
+            # Repair pass. The shelter reading now runs at
+            # clause scope, as the sibling readings do, so a
+            # guard word standing in an unrelated clause of
+            # the same sentence shelters nothing, while a
+            # guard word in the claim clause still covers
+            # the claim.
+            if _deeper_guarded(sentence, match.start()):
+                continue
+            if re.search(r"\b(focus|analysis|review)\b", sentence):
+                claimed = True
+                break
+        if claimed:
+            problems.append(
+                "docs/coderabbit-review-brief.md claims a "
+                "deeper analysis at high focus, which its "
+                "focus table and Summary deny"
+            )
+            break
+    return problems
+
+
 def coderabbit_problems(root=None):
     """Every Build 11 CodeRabbit guidelines problem."""
     UTF8_UNREADABLE.clear()
@@ -1020,6 +1207,7 @@ def coderabbit_problems(root=None):
     problems.extend(linked_problems(root))
     problems.extend(decision_problems(root))
     problems.extend(config_problems(root))
+    problems.extend(round5_coderabbit_problems(root))
     return repair_utf8_problems(problems)
 
 

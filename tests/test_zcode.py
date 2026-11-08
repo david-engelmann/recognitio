@@ -6,8 +6,10 @@ the in client plugin marketplace distribution with the
 version bump rule, the portable v1 shape losing output
 styles and settings on ZCode, the register but not execute
 behavior for channels, lspServers, outputStyles, and
-settings, and the 1024 character description cap with the
-100KB body truncation, all with derivation notes pinned by
+settings, and the skill format limits, the SKILL.md
+frontmatter description capped at 1024 characters with the
+whole skill dropped on excess and a SKILL.md body over
+100KB truncated at load, all with derivation notes pinned by
 the gate at scripts/check_zcode.py. These tests prove the
 pin fires for a real reason on every load bearing claim the
 build names. A dropped pin, a dropped derivation note, a
@@ -194,8 +196,8 @@ class TestCheckZcode(unittest.TestCase):
             root = self.make_layout(tmp)
             problems = self.break_brief(
                 root,
-                "runs at most 1024 characters",
-                "runs at most 2048 characters",
+                "The SKILL.md frontmatter description is capped at 1024 characters",
+                "The SKILL.md frontmatter description is capped at 2048 characters",
             )
             self.assertTrue(
                 any("description cap" in p for p in problems),
@@ -231,25 +233,93 @@ class TestCheckZcode(unittest.TestCase):
             )
 
     def test_an_over_cap_description_fails(self):
+        # Round 5 spec Minor 1. The cap binds the skill
+        # frontmatter description, so the plant stands in a
+        # scratch layout skill with an over limit description.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            skill = root / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            text = skill.read_text(encoding="utf-8")
+            long_desc = "x" * 1025
+            broken, hits = re.subn(
+                r"(?m)^description: .*$",
+                "description: " + long_desc, text, count=1)
+            self.assertTrue(hits > 0)
+            self.assertNotEqual(broken, text)
+            skill.write_text(broken, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("over the 1024 limit" in p
+                    and "frontmatter description" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_a_manifest_description_live_claim_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             manifest = root / ".zcode-plugin" / "plugin.json"
             text = manifest.read_text(encoding="utf-8")
-            self.assertIn('"version": "1.3.0"', text)
-            long_desc = "x" * 1025
             manifest.write_text(
                 text.replace(
-                    "Pulls the relevant changes",
-                    long_desc,
-                    1,
-                ),
-                encoding="utf-8",
-            )
+                    "into one verified review packet.",
+                    "into one verified review packet. "
+                    "Verified live in the ZCode client.", 1),
+                encoding="utf-8")
             problems = self.problems(root)
             self.assertTrue(
-                any("over the 1024 limit" in p for p in problems),
-                problems,
-            )
+                any("not the pinned description" in p
+                    for p in problems), problems)
+
+    def test_a_live_client_glance_claim_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nA live ZCode client verified "
+                "the plugin behaviour in this build.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("live ZCode client verified" in p
+                    for p in problems), problems)
+
+    def test_a_live_client_glance_claim_reworded_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nA live ZCode client confirmed "
+                "the plugin behaviour in this build.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("live ZCode client verified" in p
+                    for p in problems), problems)
+
+    def test_a_live_client_glance_guard_in_whilst_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "check whilst a live ZCode client verified "
+                "the plugin behaviour in this build.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("live ZCode client verified" in p
+                    for p in problems), problems)
+
+    def test_a_live_client_glance_guard_in_while_clause_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            text = self.read_brief(root)
+            self.write_brief(
+                root, text + "\n\nThe brief never claims a "
+                "check while a live ZCode client verified "
+                "the plugin behaviour in this build.\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("live ZCode client verified" in p
+                    for p in problems), problems)
 
     def test_a_mismatched_manifest_version_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -714,6 +784,76 @@ class TestCheckZcode(unittest.TestCase):
                 ),
                 problems,
             )
+
+
+class TestRound5SecondSeatZcode(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckZcode()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_execution_synonym_sheltered_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nRegistered channels do not "
+                "execute on ZCode. Registration is the step "
+                "that switches a channel on.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "executing a registered plugin field" in p
+                for p in problems), problems)
+
+    def test_execution_synonym_plain_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nA registered channel runs "
+                "as live configuration from that point.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "executing a registered plugin field" in p
+                for p in problems), problems)
+
+    def test_execution_operates_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nRegistration activates a "
+                "channel, and the channel operates as live "
+                "configuration from that point.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "executing a registered plugin field" in p
+                for p in problems), problems)
+
+    def test_z3_portable_shape_restated_as_v2_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            self.inner.break_brief(
+                root,
+                "The portable v1 shape loses output styles and settings on",
+                "The portable v2 shape loses output styles and settings on")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "rule Z3 does not state the portable v1 shape" in p
+                for p in problems), problems)
+
+    def test_figure_exchange_additive_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe description is truncated "
+                "at 100KB and the body is capped at 1024 "
+                "characters.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "attaches a skill format figure to the wrong "
+                "surface" in p for p in problems), problems)
 
 
 if __name__ == "__main__":

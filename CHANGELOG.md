@@ -3548,6 +3548,43 @@ This unreleased work carries version 1.3.0.
   now scopes itself to range and commit runs, with a
   pull request packet named as carrying its fetch
   moment.
+- The provider gates of the capstone round 5 repair now
+  refuse the claims their briefs deny. The Cursor gate
+  reads the brief it certifies for the stale marketplace
+  distribution wording, pins the canonical T0 name set
+  whole in the Cursor, CodeRabbit and Codex rules, refuses
+  operative content past the final Bugbot rule and a
+  reversed Autofix header in the Bugbot config, and binds
+  the rule B4 caps to their figures. The ZCode gate
+  restates rule Z5 as the skill format limits, measures
+  the canonical skill frontmatter description against the
+  1024 character cap, and refuses execution synonyms and
+  exchanged format figures. The Qwen gate walks listing
+  files without a scratch exemption, refuses publication
+  claims, and pins the R1 scope table rows whole. The
+  package gate pins the manifest description fields word
+  for word and the extension key sets by name. The
+  CodeRabbit, Devin, Codex, Codex plugin, Copilot, Kimi
+  and Comate gates gained the matching negative families,
+  figure bindings and glance pins the round records name,
+  and undecodable readings in the Codex, Codex plugin and
+  package gates now name the file instead of raising.
+- The test vacuity guard now words its refusals within
+  the limits its docstring records, naming the shapes it
+  follows and the reach of its sight instead of claiming
+  a refused test cannot fail at run time, with the
+  narrowing recorded in the guard docstring beside the
+  limits themselves, the list literal limit at a
+  helper call site written into those limits in the
+  open, plants in the guard suite pinning the scoped
+  wording of both refusals and the list literal limit,
+  and the guard refusing a discovered test file that
+  stands empty by name, and the Qwen repair classes hold
+  their shared plant kind helper in their own classes
+  where the guard follows it, the shape the round 5
+  discharge refusal named eleven tests for before the
+  move.
+
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

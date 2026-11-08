@@ -800,5 +800,107 @@ class TestEmbeddingLossDisclosure(unittest.TestCase):
         )
 
 
+class TestRound5CodexPlugin(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCodexPlugin()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_a_restated_agents_cap_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read(root, "docs/codex-plugin-brief.md")
+            broken = text.replace(
+                "Codex embeds at most 32,768 bytes of a repo AGENTS.md",
+                "Codex embeds at most 65,536 bytes of a repo AGENTS.md", 1)
+            self.assertNotEqual(broken, text)
+            self.inner.write(root, "docs/codex-plugin-brief.md", broken)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "AGENTS byte cap as 65,536" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_json_file_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "brand" / "palette.json"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            problems = []
+            data = self.mod.load_json(
+                root, "docs/brand/palette.json", problems,
+                "brand palette record")
+            self.assertIsNone(data)
+            self.assertTrue(any(
+                "cannot be read" in p and "UTF-8" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_brief_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            path = root / "docs" / "codex-plugin-brief.md"
+            path.write_bytes(
+                (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                 ).read_bytes())
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "docs/codex-plugin-brief.md cannot be read" in p
+                for p in problems), problems)
+
+    def test_an_undecodable_openai_yaml_is_named_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            png = (ROOT / "docs" / "brand" / "recognitio-icon-512.png"
+                   ).read_bytes()
+            for rel in (
+                ".agents/skills/recognitio/agents/openai.yaml",
+                "agent-plugins-package/skills/recognitio/agents/openai.yaml",
+                ".cursor-plugin/skills/recognitio/agents/openai.yaml",
+            ):
+                (root / rel).write_bytes(png)
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "agents/openai.yaml cannot be read" in p
+                for p in problems), problems)
+
+
+class TestRound5SecondSeatCodexPlugin(unittest.TestCase):
+    def setUp(self):
+        self.inner = TestCheckCodexPlugin()
+        self.inner.setUp()
+        self.mod = self.inner.mod
+
+    def test_universal_listing_claim_in_summary_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/codex-plugin-brief.md"
+            text = self.inner.read(root, rel)
+            self.inner.write(
+                root, rel, text + "\n\nA universal plugin "
+                "directory listing exists for recognitio.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "claims a universal plugin directory listing" in p
+                for p in problems), problems)
+
+    def test_universal_submission_claim_inside_x6_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            rel = "docs/codex-plugin-brief.md"
+            text = self.inner.read(root, rel)
+            anchor = "submitted for recognitio."
+            self.assertIn(anchor, text)
+            self.inner.write(
+                root, rel, text.replace(
+                    anchor,
+                    anchor + " Recognitio was submitted to the "
+                    "universal plugin directory.", 1))
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "claims a universal plugin directory listing" in p
+                for p in problems), problems)
+
+
 if __name__ == "__main__":
     unittest.main()

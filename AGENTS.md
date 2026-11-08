@@ -315,9 +315,11 @@ not a gate.
   marketplace distribution with the version bump rule, the
   portable v1 shape losing output styles and settings on
   ZCode, the register but not execute behavior for channels,
-  lspServers, outputStyles, and settings, and the 1024
-  character description cap with the 100KB body truncation
-  are pinned by the gate at `scripts/check_zcode.py`, so the
+  lspServers, outputStyles, and settings, and the skill
+  format limits, the SKILL.md frontmatter description capped
+  at 1024 characters with the whole skill dropped on excess
+  and a SKILL.md body over 100KB truncated at load, are
+  pinned by the gate at `scripts/check_zcode.py`, so the
   scoped guidance cannot become a rival instruction source.
 - `docs/devin-playbook-brief.md` holds the brief for Build
   17, the Devin playbook and coordinator build. The
