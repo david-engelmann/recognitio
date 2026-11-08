@@ -3711,6 +3711,15 @@ This unreleased work carries version 1.3.0.
   the candidate count in the opening of the release
   file, and every current suite figure stated in
   authored prose reconciled against the loader count.
+- The reviewer persona no longer drifts from the
+  canonical skill text it mirrors. The packet check
+  order now stands in one shared sentence in both
+  files, naming the recognitio workflow rather than
+  a step that stands only in the skill, and the
+  persona boundary sentence matches the skill
+  sentence word for word, after the hosted gate
+  named both persona sentences as foreign to the
+  canonical set.
 
 ### Removed
 
