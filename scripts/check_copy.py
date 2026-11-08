@@ -300,6 +300,26 @@ def _opens_quote(text, index):
     return index == 0 or text[index - 1] in " \t,[{:"
 
 
+def _spanning_quote(text):
+    """The quote character a text leaves open, or None.
+
+    The scan asks after the first quote that opens a scalar,
+    under the same opening rule the YAML reading uses, whether
+    that scalar closes on the same text. A scalar that closes
+    is read whole by its own line, so only a scalar still open
+    at the end of the text carries state to the next line.
+    """
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char in "\"'" and _opens_quote(text, index):
+            if _quoted_end(text, index) is None:
+                return char
+            return None
+        index += 1
+    return None
+
+
 def _split_key(candidate, flow=False):
     """Split one YAML line into its key and value, or return None.
 
@@ -475,19 +495,47 @@ def prose_lines(path):
         return
     in_fence = False
     in_frontmatter = False
+    fm_open_quote = None
+    fm_block_indent = None
     for number, raw in enumerate(lines, start=1):
         stripped = raw.strip()
         if number == 1 and stripped == "---":
             in_frontmatter = True
             continue
         if in_frontmatter:
+            if fm_open_quote is not None:
+                # A line inside a spanning quoted scalar is
+                # prose in full, whatever shape its first words
+                # take, in the same reading the YAML prose
+                # reader gives such a line. Judging the line by
+                # its own shape would read a key shaped
+                # continuation as a key and judge only the words
+                # after its colon, so the colon itself and the
+                # words before it would escape the bar.
+                yield number, clean(raw)
+                if _closes_quote(raw, fm_open_quote):
+                    fm_open_quote = None
+                continue
+            indent = len(raw) - len(raw.lstrip())
+            if fm_block_indent is not None:
+                if stripped and indent <= fm_block_indent:
+                    fm_block_indent = None
+                else:
+                    if stripped:
+                        yield number, clean(raw)
+                    continue
             if stripped == "---":
                 in_frontmatter = False
             elif FRONTMATTER_KEY.match(raw):
                 # The key is syntax. The value after it stays prose.
-                yield number, clean(raw.split(":", 1)[1])
+                value = raw.split(":", 1)[1]
+                yield number, clean(value)
+                fm_open_quote = _spanning_quote(value)
+                if YAML_BLOCK.search(raw):
+                    fm_block_indent = indent
             else:
                 yield number, clean(raw)
+                fm_open_quote = _spanning_quote(raw)
             continue
         if stripped.startswith("```"):
             in_fence = not in_fence

@@ -6534,5 +6534,63 @@ class TestTerminalControlRefusal(unittest.TestCase):
         self.assertIsNone(reading("plain text"))
 
 
+class TestRound7ProgressAndStamp(unittest.TestCase):
+    """Round 7 dogfood repairs in the extractor.
+
+    A companion search that splits into batches says so on
+    stderr before the first batch runs, so a long gather on a
+    large tree is visible while it runs instead of silent
+    (dogfood Minor 2). The manifest names the diff algorithm
+    its counts rest on, so an independent recount knows the
+    setting it must reproduce (dogfood Note 2). Neither repair
+    moves a packet byte or a manifest count.
+    """
+
+    def test_a_multi_batch_search_announces_itself(self):
+        terms = ["term%02d" % index for index in range(30)]
+        corpus = "\n".join(terms) + "\n"
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"corpus.txt": corpus}])
+            head = git(repo, "rev-parse", "HEAD")
+            stream = io.StringIO()
+            with redirect_stderr(stream):
+                bulk = extract_mod.git_grep_bulk(repo, head, terms)
+            self.assertEqual(
+                stream.getvalue().count("gathering companions"), 1
+            )
+            self.assertIn(
+                "in 2 batches of at most 25 terms each",
+                stream.getvalue(),
+            )
+            for term in terms:
+                self.assertTrue(bulk.get(term), term)
+
+    def test_a_single_batch_search_stays_silent(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"corpus.txt": "alpha beta\n"}])
+            head = git(repo, "rev-parse", "HEAD")
+            stream = io.StringIO()
+            with redirect_stderr(stream):
+                extract_mod.git_grep_bulk(repo, head, ["alpha", "beta"])
+            self.assertEqual(stream.getvalue(), "")
+
+    def test_the_manifest_names_the_diff_algorithm(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"a.py": "def a():\n    return 1\n"}])
+            write_tree(repo, {"a.py": "def a():\n    return 2\n"})
+            commit_all(repo, "change a")
+            out = Path(tmp) / "out"
+            with redirect_stderr(io.StringIO()):
+                code = extract_mod.main([
+                    "--repo", str(repo), "--out", str(out),
+                    "--range", "HEAD~1..HEAD",
+                ])
+            self.assertEqual(code, 0)
+            manifest = json.loads(
+                (out / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["diff_algorithm"], "histogram")
+
+
 if __name__ == "__main__":
     unittest.main()

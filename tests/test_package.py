@@ -1289,5 +1289,64 @@ class TestRound5SecondSeatPackage(unittest.TestCase):
                 for p in problems), problems)
 
 
+class TestCopyFenceSpanningScalars(unittest.TestCase):
+    """Front matter scalars that span lines stay under the bar.
+
+    The Markdown front matter reader once judged only the
+    first line of a spanning scalar, so a banned mark on a
+    wrapped continuation line passed the gate while the same
+    shape in a YAML file failed (Round 7 red team plant D4).
+    The reader now carries the spanning state the YAML reader
+    already carried, and these tests fail if either shape
+    slips out from under the scan again.
+    """
+
+    def scan_text(self, text):
+        module = load_script("check_copy")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "page.md"
+            path.write_text(text, encoding="utf-8")
+            violations = []
+            module.scan(violations, path, module.prose_lines(path))
+            return violations
+
+    def test_a_colon_on_a_wrapped_quoted_scalar_line_fails(self):
+        violations = self.scan_text(
+            "---\n"
+            "description: \"The long description opens here\n"
+            "  and continues with a colon: inside it\"\n"
+            "---\n"
+            "\n"
+            "Body text.\n"
+        )
+        self.assertTrue(
+            any("colon" in item for item in violations), violations
+        )
+
+    def test_a_colon_inside_a_block_scalar_fails(self):
+        violations = self.scan_text(
+            "---\n"
+            "description: |\n"
+            "  The description carries a colon: inside it\n"
+            "---\n"
+            "\n"
+            "Body text.\n"
+        )
+        self.assertTrue(
+            any("colon" in item for item in violations), violations
+        )
+
+    def test_a_clean_wrapped_scalar_passes(self):
+        violations = self.scan_text(
+            "---\n"
+            "description: \"The long description opens here\n"
+            "  and continues without a mark inside it\"\n"
+            "---\n"
+            "\n"
+            "Body text.\n"
+        )
+        self.assertEqual(violations, [])
+
+
 if __name__ == "__main__":
     unittest.main()

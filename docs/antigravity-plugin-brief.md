@@ -47,6 +47,11 @@ decisions the contract states. The sentence above stands as
 the position this brief recorded before that script landed,
 and this correction is the current reading.
 
+The packet gate script named in this brief is the Antigravity
+PreToolUse hook script of this build, and it is not the spawn
+gate of the Claude Code mod, which is a different mechanism
+in a different harness.
+
 ## The plugin format
 
 The primary plugins page documents the plugin layout with

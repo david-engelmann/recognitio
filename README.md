@@ -13,7 +13,7 @@ For reviewers and the agents who assist them, judging a pull request or a commit
 
 [![CI passing](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/david-engelmann/recognitio/actions/workflows/ci.yml) [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-One recorded run. The session ran in Claude Code 2.1.314 with the recognitio mod installed, over OpenRouter with the model anthropic/claude-sonnet-5. Its first reviewer spawn is denied because no verified packet stands, and the packet is then built and its manifest verified flag confirmed true. The second spawn proceeds against the verified packet and its first completion fails on a provider credit error, two reviewer reports come back in parallel over part of the range, and a third targeted reviewer pass fills the gap they left. The session ends on a consolidated presentation of 15 findings with a verdict of Not blocking.
+One recorded run. The session ran in Claude Code 2.1.314 with the recognitio mod installed, over OpenRouter with the model anthropic/claude-sonnet-5. The mod is the plugin component that denies a reviewer spawn when no verified packet stands. Its first reviewer spawn is denied because no verified packet stands, and the packet is then built and its manifest verified flag confirmed true. The second spawn proceeds against the verified packet and its first completion fails on a provider credit error, two reviewer reports come back in parallel over part of the range, and a third targeted reviewer pass fills the gap they left. The session ends on a consolidated presentation of 15 findings with a verdict of Not blocking.
 
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-claude-code-verified-crop.png">
@@ -33,7 +33,7 @@ Each frame below comes from its own session over the hero range, one session in 
 <a href="docs/images/recognitio-session-claude-code-denial.png">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-claude-code-denial-phone.png">
-  <img alt="A Claude Code session showing the first reviewer spawn denied by the packet gate in red text." src="docs/images/recognitio-session-claude-code-denial.png" width="792">
+  <img alt="A Claude Code session showing the first reviewer spawn denied by the spawn gate in red text." src="docs/images/recognitio-session-claude-code-denial.png" width="792">
 </picture>
 </a>
 
@@ -105,7 +105,7 @@ extract.py \
 
 3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message.
 
-4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The `manifest.json` file beside it is the manifest receipt for the run.
+4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The packet file carries the title the pericope for the change, and the pericope is the packet itself. The `manifest.json` file beside it is the manifest receipt for the run.
 
 That is the whole first pass. The single commit flag takes HEAD or any commit you name, and pull request numbers and ranges swap into the same command, as Usage shows. Pin the clone to a reviewed commit SHA before you rely on it, as Install sets out.
 
@@ -444,7 +444,7 @@ extract.py \
   --out packet --repo .
 ```
 
-Re-review after new commits land, with the since ref riding along with any mode. The packet gains a section with the new commits and a range diff against the previous series, and a findings file marks each prior finding addressed or unaddressed, one per line in the form `path:line: text`.
+Re-review after new commits land, with the since ref riding along with any mode. The packet gains a section with the new commits and a range diff against the previous series, and a findings file marks each prior finding addressed or unaddressed. The findings file opens with a header naming its format version and the packet head and since anchor it was written for, then holds one finding per line in the form `path:line: text`, and a file whose header names another run, or that carries findings and no header at all, is refused.
 
 
 ```bash
@@ -459,7 +459,9 @@ extract.py \
 
 Two controls tune a run, a token budget that caps the packet size, counted with the per shape token estimate priced by character class, and a tier selection that adds only the tiers a review needs, with triage and the change always in. The budget keeps the drop set that fits and keeps the most content, shedding history before companions when the kept size ties, and a budget under one is refused before any output is touched.
 
-A run writes two files into the output directory. The packet file is the reading document, titled the pericope for the change. The pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The manifest file is the manifest receipt, with the resolved refs, the producing command, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message. The script at `scripts/check_packet.py` validates a packet directory before a review is stamped on it, checking the manifest against the schema at `scripts/packet-manifest.schema.json`, confirming the recorded refs, recounting the recorded change, and reading the packet body against the manifest and the recount, so a packet edited or invented after its run cannot keep the stamp on anything the repository grounds. The one passage the stamp does not recount is the passage of the history tier naming prior pull requests touching the most changed files, which the check holds against the record the manifest carries beside the packet rather than re-deriving it from the repository, because two environments can honestly report different live state for it. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit stamps in a checkout standing at that commit.
+A run writes two files into the output directory. The packet file is the reading document, titled the pericope for the change. The pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The manifest file is the manifest receipt, with the resolved refs, the producing command, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message.
+
+The script at `scripts/check_packet.py` validates a packet directory before a review is stamped on it, checking the manifest against the schema at `scripts/packet-manifest.schema.json`, confirming the recorded refs, recounting the recorded change, and reading the packet body against the manifest and the recount, so a packet edited or invented after its run cannot keep the stamp on anything the repository grounds. The one passage the stamp does not recount is the passage of the history tier naming prior pull requests touching the most changed files, which the check holds against the record the manifest carries beside the packet rather than re-deriving it from the repository, because two environments can honestly report different live state for it. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit stamps in a checkout standing at that commit.
 
 ## Going deeper
 

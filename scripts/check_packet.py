@@ -691,7 +691,12 @@ def repo_state_problems(repo):
     Returns the problem list and whether the state is fatal to
     the deep checks. A path that is not a readable repository and
     a shallow clone are fatal, because every recount from them
-    would blame the packet for the environment. A repository in
+    would blame the packet for the environment. A checkout with
+    uncommitted changes standing on tracked files is fatal for
+    the same reason, because the extractor this check loads and
+    the packet it reads stand in that same working tree, so a
+    disagreement it reported could belong to the checkout rather
+    than to the packet. A repository in
     the middle of a rebase is named without stopping the other
     checks, because its head is a transient position an abort
     will abandon and a continuation will move, and a stamp that
@@ -753,6 +758,26 @@ def repo_state_problems(repo):
                 % (repo, info_attributes)
             )
             return problems, True
+    # The dirty checkout reading stands after the attributes
+    # confinement above on purpose. A status run reads the
+    # info attributes file as part of its own machinery, so
+    # running it ahead of the confinement would block on a
+    # path that is not a regular file where the confinement
+    # refuses that path promptly by stat alone.
+    status = run_git(
+        repo, ["status", "--porcelain", "--untracked-files=no"]
+    )
+    if status is not None and status.strip():
+        problems.append(
+            "the checkout at %s is not clean, with uncommitted "
+            "changes standing on tracked files, so the files "
+            "this check loads and reads stand apart from the "
+            "recorded tree and a disagreement it reported could "
+            "belong to the checkout rather than to the packet. "
+            "Run the check from a clean checkout of the "
+            "recorded head" % repo
+        )
+        return problems, True
     git_dir_path = Path(git_dir.strip())
     if (git_dir_path / "rebase-merge").is_dir() or \
             (git_dir_path / "rebase-apply").is_dir():
@@ -1508,9 +1533,24 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
     for line in body[files_at + 1:numstat_at]:
         if not line.startswith("- "):
             continue
+        moved = re.match(
+            r"^- (.+) \((renamed|copied) from (.+?)"
+            r"(, instruction file)?(, credential file)?\)$",
+            line,
+        )
+        if moved:
+            listed.append((
+                moved.group(1),
+                moved.group(2),
+                bool(moved.group(4)),
+                bool(moved.group(5)),
+                moved.group(2),
+                moved.group(3),
+            ))
+            continue
         match = re.match(
-            r"^- (.+) \((%s)(, instruction file)?(, credential file)?"
-            r"(, (renamed|copied) from (.+))?\)$" % "|".join(STATUS_NAMES),
+            r"^- (.+) \((%s)(, instruction file)?(, credential file)?\)$"
+            % "|".join(STATUS_NAMES),
             line,
         )
         if not match:
@@ -1524,8 +1564,8 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
             match.group(2),
             bool(match.group(3)),
             bool(match.group(4)),
-            match.group(6),
-            match.group(7),
+            None,
+            None,
         ))
     expected = []
     for entry in manifest["files"]:

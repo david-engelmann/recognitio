@@ -2504,10 +2504,10 @@ def build_t0(files, commit_log, pr_info):
         marker = ", " + ", ".join(flags) if flags else ""
         if entry.get("old_path"):
             lines.append(
-                "- %s (%s%s, %s from %s)"
-                % (display_path(entry["path"]), entry["status"], marker,
+                "- %s (%s from %s%s)"
+                % (display_path(entry["path"]),
                    source_verb(entry),
-                   display_path(entry["old_path"]))
+                   display_path(entry["old_path"]), marker)
             )
         else:
             lines.append(
@@ -2802,6 +2802,20 @@ def git_grep_bulk(repo, head, terms):
             repo, head, searchable[0], term_count=len(unique)
         )
         return hits
+    batch_count = -(-len(searchable) // MAX_BULK_SEARCH_TERMS)
+    if batch_count > 1:
+        # A multi batch gather is the one run a user can wait
+        # on without any other sign of life, so the run names
+        # its size on stderr before the first batch starts.
+        # The packet itself carries no word of this, because
+        # the packet is a record of the change and not of the
+        # run that gathered it.
+        print(
+            "recognitio: gathering companions in %d batches "
+            "of at most %d terms each"
+            % (batch_count, MAX_BULK_SEARCH_TERMS),
+            file=sys.stderr,
+        )
     for start in range(0, len(searchable), MAX_BULK_SEARCH_TERMS):
         batch = searchable[start:start + MAX_BULK_SEARCH_TERMS]
         if len(batch) == 1:
@@ -4563,6 +4577,12 @@ def base_manifest(argv):
     return {
         "extractor": "recognitio extract.py",
         "version": EXTRACTOR_VERSION,
+        # The diff algorithm every count in the manifest was
+        # read under, named on the face of the manifest so an
+        # independent recount can pin the same setting rather
+        # than rediscover the divergence default git settings
+        # produce on churn heavy files.
+        "diff_algorithm": "histogram",
         "command": ["extract.py"] + list(argv),
         "created_utc": datetime.now(timezone.utc).isoformat(),
     }

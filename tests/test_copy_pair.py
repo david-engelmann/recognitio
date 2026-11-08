@@ -247,8 +247,8 @@ class TestCopyLabelling(CopyPairFixture):
                 "instruction_file"
             ] else ""
             self.assertIn(
-                "- %s (copied%s, copied from %s)"
-                % (path, marker, entry["old_path"]),
+                "- %s (copied from %s%s)"
+                % (path, entry["old_path"], marker),
                 self.packet,
             )
             self.assertIn(
@@ -263,7 +263,7 @@ class TestCopyLabelling(CopyPairFixture):
         entry = self.by_path["newname.py"]
         self.assertEqual(entry["status"], "renamed", entry)
         self.assertIn(
-            "- newname.py (renamed, renamed from oldname.py)",
+            "- newname.py (renamed from oldname.py)",
             self.packet,
         )
         self.assertIn("Renamed from: oldname.py", self.packet)
@@ -288,7 +288,7 @@ class TestInstructionFlagFromDestination(CopyPairFixture):
         self.assertEqual(entry["status"], "copied", entry)
         self.assertEqual(entry["old_path"], "AGENTS.md", entry)
         self.assertFalse(entry["instruction_file"], entry)
-        self.assertIn("- notes.txt (copied, copied from AGENTS.md)",
+        self.assertIn("- notes.txt (copied from AGENTS.md)",
                       self.packet)
 
     def test_copy_to_an_instruction_name_is_flagged_on_its_own_path(self):
@@ -325,9 +325,8 @@ class TestExtractorVerifierPair(CopyPairFixture):
         )
         text = (out / "packet.md").read_text(encoding="utf-8")
         text = text.replace(
-            "- notes.txt (copied, copied from AGENTS.md)",
-            "- notes.txt (copied, instruction file, "
-            "copied from AGENTS.md)",
+            "- notes.txt (copied from AGENTS.md)",
+            "- notes.txt (copied from AGENTS.md, instruction file)",
         )
         (out / "packet.md").write_text(text, encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
@@ -652,10 +651,10 @@ class TestCopyRenameHeaderWording(unittest.TestCase):
             ],
         )
         self.assertIn(
-            "copy1.py (copied, copied from orig.py)", packet
+            "copy1.py (copied from orig.py)", packet
         )
         self.assertIn(
-            "copy2.py (copied, copied from orig.py)", packet
+            "copy2.py (copied from orig.py)", packet
         )
         self.assertEqual(self.totals_of("mixed"), (1, 1))
 
@@ -768,6 +767,40 @@ class TestRenameLimitPin(unittest.TestCase):
 
     def test_the_rename_limit_pin_is_on_every_git_invocation(self):
         self.assertIn("diff.renameLimit=0", extract_mod.GIT_PIN)
+
+
+class TestT0MovedLineShape(CopyPairFixture):
+    """The triage line names a move once (dogfood Minor 1).
+
+    The line once carried the status and then the same fact
+    again as a prepositional phrase, so a renamed entry read
+    as renamed, renamed from. The line now carries the verb
+    and the source in one phrase. The manifest facts the line
+    rests on never moved, and the doubled form returning on
+    any moved entry fails here.
+    """
+
+    def test_moved_lines_name_the_move_once(self):
+        verbs = {"renamed": "renamed", "copied": "copied"}
+        for entry in self.manifest["files"]:
+            if entry["old_path"] is None:
+                continue
+            marker = (
+                ", instruction file" if entry["instruction_file"] else ""
+            )
+            self.assertIn(
+                "- %s (%s from %s%s)"
+                % (
+                    entry["path"],
+                    verbs[entry["status"]],
+                    entry["old_path"],
+                    marker,
+                ),
+                self.packet,
+                entry,
+            )
+        self.assertNotIn(", renamed from", self.packet)
+        self.assertNotIn(", copied from", self.packet)
 
 
 if __name__ == "__main__":

@@ -3445,5 +3445,32 @@ class TestRound3DisclosureDocs(unittest.TestCase):
         )
 
 
+class TestRound7DirtyCheckoutGuard(VerifierFixture):
+    """The checker names a dirty checkout as the cause.
+
+    A packet checked against a checkout carrying uncommitted
+    changes on tracked files once failed as a recount
+    disagreement naming a file and a field, with no hint the
+    checkout was the cause (dogfood Note 1). The state reading
+    now refuses that checkout by name. Untracked files do not
+    trip the guard, so a packet directory standing inside the
+    repository stays checkable.
+    """
+
+    def test_a_dirty_tracked_file_is_refused_by_name(self):
+        (self.repo / "b.py").write_text(
+            "def b():\n    return 99\n", encoding="utf-8"
+        )
+        code, err = self.run_check_captured(self.genuine)
+        self.assertEqual(code, 1)
+        self.assertIn("is not clean", err)
+
+    def test_an_untracked_file_does_not_trip_the_guard(self):
+        (self.repo / "scratch.txt").write_text(
+            "notes\n", encoding="utf-8"
+        )
+        self.assertEqual(self.run_check(self.genuine), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

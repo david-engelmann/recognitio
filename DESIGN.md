@@ -67,7 +67,7 @@ components:
 
 This file is the design system for storefront and landing pages, the Recognitio class of surface. It is a Persuade surface in Impeccable's mode terms, a page whose job is to explain a real product and earn a real install or purchase. Persuasion here never outruns evidence. The page sells only what the product does, shows only output the product produced, and claims only numbers the product's own records carry.
 
-A storefront adopts this file by replacing every PLACEHOLDER value in the front matter with a value extracted from its live stylesheet, in the same change that adopts the file. Until then the placeholders are deliberate. An invented hex code in a standard is worse than an honest gap, because lanes build from whatever the file says.
+This file stands adopted for the Recognitio repository page, and this adoption is its standing state. The token values in the front matter were extracted from the stylesheets the live page serves in the change that adopted the file, with the light theme carried as the canonical set, and they stand reconciled against the palette record under docs/brand in the repo. The spacing scale is the one part of the front matter that stands pre-filled as doctrine rather than extracted, carrying the house 4px scale the Layout section states. No placeholder values stand in this file. The instruction to replace placeholder values with extracted ones belongs to the unadopted template this file was adopted from, and it is spent.
 
 The working method is the pinned v1 Taste machinery, scoped to this surface only. The kit deliberately pins the v1 classics, the design read, the DESIGN_VARIANCE, MOTION_INTENSITY, and VISUAL_DENSITY dials, the tell bans, and the pre-flight check, because v1 is the version whose text was read and verified during the kit's research. Upstream now ships tasteskill 2.5.0 under a different method, and the kit does not adopt it. Before building, the lane runs the v1 design read, reads the page type, the audience, the vibe words, and the references, and states a one line design read. The dials start at the trust first preset in the Layout section. At most one clarifying question is asked, and only when the read is genuinely ambiguous.
 
@@ -77,7 +77,7 @@ This file carries no colors.primary token, deliberately. The accent token carrie
 
 One accent, locked. The accent is chosen once for the page, stated here as the accent token, and used for the primary action and the primary reading path only. No second accent appears in chrome, controls, or decoration. All color and font choices route through the front matter tokens, never through raw values in the stylesheet.
 
-Contrast meets 4.5 to 1 everywhere, including placeholder text and button text. The primary action's label must pass AA against its own background, checked on the render, not assumed. One waiver stands on the record for this adoption. The primary action pairs the ground text color on the accent background at 3.12 to 1, below the AA floor stated above, and the pairing stands as shipped and as extracted, recolored in neither direction, because the accent is the shipped brand accent and the ground is its shipped label color. There is no purple to blue gradient anywhere on the page, and no gradient text. Structural elements are quiet, color carries meaning or identity, never decoration.
+Contrast meets 4.5 to 1 everywhere on the page apart from the one waived pairing recorded in this section, including placeholder text and button text. The primary action's label must pass AA against its own background, checked on the render, not assumed, apart from the one waived pairing recorded below. One waiver stands on the record for this adoption. The primary action pairs the ground text color on the accent background at 3.12 to 1, below the AA floor stated above, and the pairing stands as shipped and as extracted, recolored in neither direction, because the accent is the shipped brand accent and the ground is its shipped label color. There is no purple to blue gradient anywhere on the page, and no gradient text. Structural elements are quiet, color carries meaning or identity, never decoration.
 
 ## Typography
 
@@ -93,7 +93,7 @@ The v1 Taste dials, as a working preset for a trust first product page.
 - MOTION_INTENSITY 2 to 3. Motion is present where the motion doctrine allows it and nowhere else.
 - VISUAL_DENSITY 4 to 5. Enough air for a first time reader, enough substance to respect a technical one.
 
-Spacing comes from the 4px based scale in the front matter. The spacing scale is deliberately pre-filled with the house 4px scale as doctrine, unlike the token values around it, which stand extracted from the shipped page and stated in the front matter above. The page never scrolls sideways. Overflow-x is clipped on html and body, image grids use minmax(0, 1fr) tracks, and nothing extends past the section edge at any audited width. Content is fully visible with scripting off.
+Spacing comes from the 4px based scale in the front matter, whose standing the Overview states once. The page never scrolls sideways. Overflow-x is clipped on html and body, image grids use minmax(0, 1fr) tracks, and nothing extends past the section edge at any audited width. Content is fully visible with scripting off.
 
 ## Elevation & Depth
 
