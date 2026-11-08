@@ -86,10 +86,18 @@ deny handler, the literal environment name, the plain dot
 receiver spelling and the path only
 file read at the module's call sites, the struck `onFailure`
 language and the withdrawn
-`--mod` flag, the mods API allowlist, the structural family
+`--mod` flag, the ban on the `disable-model-invocation` flag
+name in the module source, the mods API allowlist, the
+structural family
 census that refuses a module carrying a construct outside the
-shipped module's structural family, and the brief's stated
-limits. The eval integrity check reads the
+shipped module's structural family, the module's export
+surface, which is `register` and nothing else, the brief's
+stated limits and its pinned sentences, among them the
+marketplace entry and the live validation claim and the
+version floor and the seven named residuals, the existence
+of a host side test file under `hooks/`, and the marketplace
+copies of the module files and the licence, pinned byte for
+byte against their originals. The eval integrity check reads the
 checksum record at `evals/checksums.json` over the eval artefacts,
 the results file, the per pass notes and the corpus index, and
 fails on the first file whose bytes moved. The record loads

@@ -18,13 +18,15 @@ its manifest through a path only file read, must never use the
 struck onFailure
 language or the withdrawn --mod flag, and must call no mods API
 beyond the allowlist, so no model judgment can replace the
-deterministic manifest check. The call site pins read the
+deterministic manifest check. The module exports register
+and nothing else. The call site pins read the
 module with its comments stripped, so a comment quoting a call
 shape is not a call site. The mod brief at docs/mod-build7.md
 must state the second layer fail open as a limit, the in session
-gating boundary, the deployment gate check, and the unset
-disable-model-invocation. At least one *.test.ts file must exist
-for the host side test story.
+gating boundary, the deployment gate check, the unset
+disable-model-invocation, the version floor, and the seven
+named residuals of the contract. At least one *.test.ts file
+must exist for the host side test story.
 
 The mod also ships as its own entry in the Claude marketplace
 listing, sourced from the plugin folder at
@@ -77,15 +79,15 @@ def module_path():
     """The hooks module hooks/hooks.json names, or a problem."""
     if HOOKS_JSON.exists() and not HOOKS_JSON.is_file():
         return None, (
-            "cannot read hooks/hooks.json: "
+            "cannot read hooks/hooks.json, "
             "it is not a regular file"
         )
     try:
         data = strict_json_loads(HOOKS_JSON.read_text(encoding="utf-8"))
     except OSError as exc:
-        return None, "cannot read hooks/hooks.json: %s" % exc
+        return None, "cannot read hooks/hooks.json, %s" % exc
     except (json.JSONDecodeError, DuplicateKeyError) as exc:
-        return None, "hooks/hooks.json does not parse: %s" % exc
+        return None, "hooks/hooks.json does not parse, %s" % exc
     modules = data.get("modules")
     if not isinstance(modules, list) or len(modules) != 1 \
             or not isinstance(modules[0], str):
@@ -1747,22 +1749,6 @@ def _handler_outcome_items(code, entry, ranges):
         code, brace + 1, close, (entry[0], entry[1]), ranges)
 
 
-def _handler_outcomes(code, entry, ranges):
-    """The outcome expressions a handler range can produce.
-
-    A block body produces its return expressions, each
-    judged as belonging to this function rather than to a
-    function nested inside it. An expression body produces
-    the expression itself. A body with no outcome produces
-    an empty list, which no deny judgement can certify.
-    """
-    return [
-        value for kind, value, _ in _handler_outcome_items(
-            code, entry, ranges)
-        if kind == "value"
-    ]
-
-
 def _inline_outcome_items(arg):
     """Every exit outcome of an inline handler, or None.
 
@@ -1810,15 +1796,6 @@ def _inline_outcome_items(arg):
         for kind, value, pos in _outcome_items_in_block(
             inner, 0, len(inner), None, function_ranges(inner))
     ]
-
-
-def _inline_outcomes(arg):
-    """The outcome expressions of an inline handler, or None."""
-    items = _inline_outcome_items(arg)
-    if items is None:
-        return None
-    return [
-        value for kind, value, _ in items if kind == "value"]
 
 
 def _containing_scope(code, ranges, pos, exclude_span=None):
@@ -7499,6 +7476,65 @@ def family_problems(code):
     return problems
 
 
+def export_problems(code):
+    """Problems with the module's named export surface.
+
+    The module exports register and nothing else. An inline
+    export on a declaration and a trailing export list are
+    the two spellings the reading collects, and in a list
+    the exported name is the name after an as, the name a
+    consumer binds. A default word standing before a value
+    carries no name, so it stands outside this reading the
+    way it stands outside the name readings elsewhere in
+    this gate. The code stands stripped and decoded, and
+    an export word inside a literal is no export.
+    """
+    problems = []
+    exported = []
+    spans = literal_spans(code)
+    for match in re.finditer(r"\bexport\b", code):
+        if any(start <= match.start() <= end
+                for start, end in spans):
+            continue
+        rest = code[match.end():].lstrip()
+        if rest.startswith("{"):
+            brace = code.index("{", match.end())
+            close = matching_close(code, brace)
+            if close is None:
+                continue
+            for item in code[brace + 1:close].split(","):
+                item = item.strip()
+                if not item:
+                    continue
+                name = item.split(" as ")[-1].strip()
+                name = name.strip("'\"")
+                if name:
+                    exported.append(name)
+        elif rest.startswith("*"):
+            exported.append("*")
+        else:
+            declared = re.match(
+                r"(?:async\s+)?(?:function\s*\*?\s*|class\s+|"
+                r"const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)",
+                rest,
+            )
+            if declared:
+                exported.append(declared.group(1))
+    if "register" not in exported:
+        problems.append(
+            "the hooks module does not export register, so "
+            "the host has no registration entry to load"
+        )
+    for name in sorted(set(exported)):
+        if name != "register":
+            problems.append(
+                "the hooks module exports %s beside register, "
+                "so its surface is wider than the one "
+                "registration the contract pins" % name
+            )
+    return problems
+
+
 def module_problems(path):
     """Problems with the hooks module source."""
     problems = []
@@ -7512,6 +7548,7 @@ def module_problems(path):
     decoded = decode_identifier_escapes(stripped)
     problems.extend(family_problems(decoded))
     problems.extend(registration_problems(decoded))
+    problems.extend(export_problems(decoded))
     if "onFailure" in source:
         problems.append(
             "the hooks module uses the struck onFailure language, a "
@@ -7567,13 +7604,13 @@ def brief_problems():
     problems = []
     if BRIEF.exists() and not BRIEF.is_file():
         return [
-            "cannot read docs/mod-build7.md: "
+            "cannot read docs/mod-build7.md, "
             "it is not a regular file"
         ]
     try:
         raw = BRIEF.read_text(encoding="utf-8")
     except OSError as exc:
-        return ["cannot read docs/mod-build7.md: %s" % exc]
+        return ["cannot read docs/mod-build7.md, %s" % exc]
     text = re.sub(r"\s+", " ", raw)
     for sentence, label in (
         (LIMIT_SENTENCE, "the second layer fail open limit"),
@@ -7590,6 +7627,68 @@ def brief_problems():
             "with its agent.spawn hook named in the gating "
             "hooks report with its catch flag set",
             "the live validation claim",
+        ),
+        (
+            "The mod needs Claude Code v2.1.287 or later, the "
+            "first build with mods, and stands live tested "
+            "on 2.1.314",
+            "the version floor",
+        ),
+        (
+            "The gate reads a loop condition's shape, not its "
+            "value, so a loop condition that is constant in "
+            "fact but not in spelling, standing as a name the "
+            "module bound to a literal, as a member of a "
+            "literal, or against a bound no spelling can "
+            "reach, reads as state under the census while the "
+            "loop it heads never ends.",
+            "the loop condition residual",
+        ),
+        (
+            "A bare local call that never returns, standing "
+            "before the registration, reads as the delegation "
+            "the family tolerates while the registration it "
+            "precedes never runs.",
+            "the bare local call residual",
+        ),
+        (
+            "A call that writes into an object, reached "
+            "through a receiver whose identity the census "
+            "does not judge, an alias holding the constructor "
+            "or the constructor reached through the global "
+            "object, reads as a call on a name the census "
+            "leaves alone while the write lands the same way.",
+            "the write call through an unjudged receiver "
+            "residual",
+        ),
+        (
+            "A write through a member standing as one clause "
+            "of a comma sequence inside a returned value "
+            "reads as the value it stands in, since the write "
+            "readings judge statements and a sequence clause "
+            "is a value position.",
+            "the comma sequence write residual",
+        ),
+        (
+            "A handler standing under an export alias, or "
+            "under a differently cased export name beside the "
+            "name the registration binds, reads as the export "
+            "it stands under, since the readings judge the "
+            "names the module's own text binds.",
+            "the export alias residual",
+        ),
+        (
+            "A call to eval reached through a member chain "
+            "reads as a call on the receiver it stands "
+            "behind.",
+            "the member chain eval residual",
+        ),
+        (
+            "A regex literal spelled inside a template "
+            "literal's hole reads as the template it stands "
+            "in, since the slash judgement stands over "
+            "literal text and a hole is code.",
+            "the template hole regex residual",
         ),
     ):
         if sentence not in text:

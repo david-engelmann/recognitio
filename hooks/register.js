@@ -109,5 +109,3 @@ function catchSpawnFailure($, e, next) {
 export function register(on, options) {
   on("agent.spawn", gateSpawn).catch(catchSpawnFailure);
 }
-
-export { gateSpawn, catchSpawnFailure };

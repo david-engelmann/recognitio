@@ -3857,3 +3857,18 @@ This unreleased work carries version 1.3.0.
   the mods reference its catch handler limit rests
   on, and a past changelog figure that read in the
   present tense now reads scoped to its own landing.
+- The mod gate now pins the version floor the brief
+  and the mod README state, the seven named residual
+  sentences of the structural family passage, and the
+  module export surface, which is register and nothing
+  else, and the two handlers the module once exported
+  beside register stand removed from both copies of
+  the module. Five problem messages in the gate now
+  read in the comma form the file uses, with a census
+  test holding the problem messages of the gate free
+  of the colon form, and the two outcome wrapper
+  helpers nothing called stand deleted, with a census
+  test holding every function in the gate to a caller
+  or a named framework exception. The agent guidance
+  paragraph on this gate now names the full pin set
+  the gate carries.

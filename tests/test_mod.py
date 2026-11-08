@@ -12,9 +12,11 @@ limit in the brief. The disabled mods degradation is proved by
 running the shipped deterministic scripts with no mod loaded.
 """
 
+import ast
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -286,8 +288,6 @@ class ModDispatchTestCase(unittest.TestCase):
         # belongs to the host, so the deterministic proof is that
         # the shipped brief records it as a limit, pinned here and
         # by the gate script.
-        import re
-
         mod = load_script("check_mod")
         text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
         self.assertIn(mod.LIMIT_SENTENCE, text)
@@ -365,8 +365,6 @@ class ModContractTestCase(unittest.TestCase):
         # entry, and this test holds the same sentence the way
         # the limit sentence is held, so a brief that drops the
         # entry fails here in words, not only in the gate.
-        import re
-
         text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
         self.assertIn(
             "offers the mod as its own marketplace entry, named "
@@ -374,14 +372,612 @@ class ModContractTestCase(unittest.TestCase):
             text,
         )
 
+    def test_the_version_floor_sentence_stands_in_the_brief_and_the_readme(self):
+        # The floor is the first build with mods, and it stands
+        # stated in the brief and in the mod README. This test
+        # holds the sentence in both files the way the limit
+        # sentence is held, so a silent edit to either file
+        # fails here in words, not only in the gate.
+        floor = (
+            "The mod needs Claude Code v2.1.287 or later, the "
+            "first build with mods, and stands live tested "
+            "on 2.1.314"
+        )
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        self.assertIn(floor, text)
+        readme = re.sub(
+            r"\s+", " ",
+            (ROOT / "plugins" / "recognitio-mod" / "README.md")
+            .read_text(encoding="utf-8"),
+        )
+        self.assertIn(floor, readme)
+
+    def test_a_lowered_version_floor_fails_the_gate(self):
+        # The gate plant for the floor pin. Lowering the floor
+        # figure in the brief the gate reads must draw the
+        # version floor problem, so a brief that restates the
+        # floor at an earlier build fails the gate.
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        planted = text.replace("v2.1.287", "v2.1.200")
+        self.assertNotEqual(planted, text)
+        with tempfile.TemporaryDirectory() as tmp:
+            brief = Path(tmp) / "mod-build7.md"
+            brief.write_text(planted, encoding="utf-8")
+            self.mod.BRIEF = brief
+            problems = self.mod.brief_problems()
+        self.assertTrue(
+            any("version floor" in p for p in problems), problems
+        )
+
+    # The seven named residuals of the contract, verbatim as
+    # the brief states them, each with the label the gate
+    # names it under. The list is the finality boundary of
+    # the contract, so every sentence stands held here and
+    # planted against the gate below.
+    RESIDUAL_SENTENCES = (
+        (
+            "The gate reads a loop condition's shape, not its "
+            "value, so a loop condition that is constant in "
+            "fact but not in spelling, standing as a name the "
+            "module bound to a literal, as a member of a "
+            "literal, or against a bound no spelling can "
+            "reach, reads as state under the census while the "
+            "loop it heads never ends.",
+            "the loop condition residual",
+        ),
+        (
+            "A bare local call that never returns, standing "
+            "before the registration, reads as the delegation "
+            "the family tolerates while the registration it "
+            "precedes never runs.",
+            "the bare local call residual",
+        ),
+        (
+            "A call that writes into an object, reached "
+            "through a receiver whose identity the census "
+            "does not judge, an alias holding the constructor "
+            "or the constructor reached through the global "
+            "object, reads as a call on a name the census "
+            "leaves alone while the write lands the same way.",
+            "the write call through an unjudged receiver "
+            "residual",
+        ),
+        (
+            "A write through a member standing as one clause "
+            "of a comma sequence inside a returned value "
+            "reads as the value it stands in, since the write "
+            "readings judge statements and a sequence clause "
+            "is a value position.",
+            "the comma sequence write residual",
+        ),
+        (
+            "A handler standing under an export alias, or "
+            "under a differently cased export name beside the "
+            "name the registration binds, reads as the export "
+            "it stands under, since the readings judge the "
+            "names the module's own text binds.",
+            "the export alias residual",
+        ),
+        (
+            "A call to eval reached through a member chain "
+            "reads as a call on the receiver it stands "
+            "behind.",
+            "the member chain eval residual",
+        ),
+        (
+            "A regex literal spelled inside a template "
+            "literal's hole reads as the template it stands "
+            "in, since the slash judgement stands over "
+            "literal text and a hole is code.",
+            "the template hole regex residual",
+        ),
+    )
+
+    def test_the_named_residual_sentences_stand_in_the_brief(self):
+        # The residual sentences stand held the way the limit
+        # sentence is held, so a brief that drops or rewords
+        # one of them fails here in words.
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        for sentence, label in self.RESIDUAL_SENTENCES:
+            self.assertIn(sentence, text, label)
+
+    def test_a_deleted_named_residual_fails_the_gate(self):
+        # The gate plant for the residual pins. Deleting any
+        # one of the seven sentences from the brief the gate
+        # reads must draw that residual's problem, so the
+        # finality boundary cannot narrow in silence.
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        for sentence, label in self.RESIDUAL_SENTENCES:
+            planted = text.replace(sentence, "")
+            self.assertNotEqual(planted, text, label)
+            with tempfile.TemporaryDirectory() as tmp:
+                brief = Path(tmp) / "mod-build7.md"
+                brief.write_text(planted, encoding="utf-8")
+                self.mod.BRIEF = brief
+                problems = self.mod.brief_problems()
+            self.assertTrue(
+                any(label in p for p in problems),
+                (label, problems),
+            )
+
+    def test_the_gate_problem_messages_carry_no_banned_mark(self):
+        # The gate's problem messages follow the file's comma
+        # form, and this census holds them to it. An abstract
+        # syntax tree walk collects the string literals the
+        # gate passes as problems, in append calls on a
+        # problems list and in the returns of the problem
+        # functions, and it also collects the literals the
+        # gate delivers through the other shapes it uses, a
+        # literal passed as the message itself to a helper
+        # defined inside a problem function whose body
+        # appends or returns its argument as a problem, and a
+        # literal assigned to a variable a problem function
+        # then appends or returns or hands to such a helper,
+        # and refuses any carrying a colon, a semicolon, an
+        # em dash or an en dash, so a leftover or a fresh
+        # colon form fails the suite. The walk also reads the
+        # parts a built message is made from, a literal
+        # passed to a builder function whose return inserts
+        # its argument into a template it returns, and each
+        # module level constant that return inserts beside
+        # the argument, and a literal standing as one
+        # element of a container whose other element a
+        # delivered format draws through a loop name, and a
+        # literal fragment assigned to a name a delivered
+        # format inserts, whether the name stands assigned
+        # in the function itself or reaches its loop through
+        # a collection the function builds by adding parts,
+        # because each of those parts stands word for word
+        # in a message the gate delivers. The census never
+        # reads a docstring or any other string the gate
+        # holds, and a literal the gate uses only to match,
+        # to compare or to key a reading never stands in a
+        # delivered message and stays outside the walk. The
+        # walk proves itself live on the reader messages and
+        # on a message or a part from each widened shape
+        # first, so a walk that collected nothing or lost a
+        # shape cannot pass in silence.
+        source = (ROOT / "scripts" / "check_mod.py").read_text(
+            encoding="utf-8")
+        tree = ast.parse(source)
+        messages = []
+
+        def collect(node):
+            for child in ast.walk(node):
+                if isinstance(child, ast.Constant) and \
+                        isinstance(child.value, str):
+                    messages.append(child.value)
+
+        def collect_literal(node):
+            if isinstance(node, ast.Constant) and \
+                    isinstance(node.value, str):
+                messages.append(node.value)
+            elif isinstance(node, ast.BinOp):
+                collect_literal(node.left)
+                collect_literal(node.right)
+            elif isinstance(node, ast.JoinedStr):
+                for value in node.values:
+                    collect_literal(value)
+            elif isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+                for element in node.elts:
+                    collect_literal(element)
+            elif isinstance(node, ast.IfExp):
+                collect_literal(node.body)
+                collect_literal(node.orelse)
+            elif isinstance(node, ast.FormattedValue):
+                collect_literal(node.value)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and \
+                    isinstance(node.func, ast.Attribute) and \
+                    node.func.attr == "append" and \
+                    isinstance(node.func.value, ast.Name) and \
+                    "problem" in node.func.value.id:
+                for arg in node.args:
+                    collect(arg)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and \
+                    ("problem" in node.name
+                     or node.name == "module_path"):
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Return) and \
+                            child.value is not None:
+                        collect(child.value)
+        for function in ast.walk(tree):
+            if not isinstance(function, ast.FunctionDef) or \
+                    ("problem" not in function.name
+                     and function.name != "module_path"):
+                continue
+            helpers = {}
+            for child in function.body:
+                if not isinstance(child, ast.FunctionDef):
+                    continue
+                params = {arg.arg for arg in child.args.args}
+                delivers = False
+                for sub in ast.walk(child):
+                    if isinstance(sub, ast.Call) and \
+                            isinstance(sub.func, ast.Attribute) and \
+                            sub.func.attr == "append" and \
+                            isinstance(sub.func.value, ast.Name) and \
+                            "problem" in sub.func.value.id and \
+                            any(isinstance(arg, ast.Name)
+                                and arg.id in params
+                                for arg in sub.args):
+                        delivers = True
+                    if isinstance(sub, ast.Return) and \
+                            isinstance(sub.value, ast.Name) and \
+                            sub.value.id in params:
+                        delivers = True
+                if delivers:
+                    helpers[child.name] = params
+            for node in ast.walk(function):
+                if isinstance(node, ast.Call) and \
+                        isinstance(node.func, ast.Name) and \
+                        node.func.id in helpers:
+                    for arg in node.args:
+                        collect_literal(arg)
+            delivered = set()
+            for node in ast.walk(function):
+                if isinstance(node, ast.Call) and \
+                        isinstance(node.func, ast.Attribute) and \
+                        node.func.attr == "append" and \
+                        isinstance(node.func.value, ast.Name) and \
+                        "problem" in node.func.value.id:
+                    for arg in node.args:
+                        if isinstance(arg, ast.Name):
+                            delivered.add(arg.id)
+                if isinstance(node, ast.Return):
+                    if isinstance(node.value, ast.Name):
+                        delivered.add(node.value.id)
+                    elif isinstance(node.value,
+                                    (ast.List, ast.Tuple)):
+                        for element in node.value.elts:
+                            if isinstance(element, ast.Name):
+                                delivered.add(element.id)
+                if isinstance(node, ast.Call) and \
+                        isinstance(node.func, ast.Name) and \
+                        node.func.id in helpers:
+                    for arg in node.args:
+                        if isinstance(arg, ast.Name):
+                            delivered.add(arg.id)
+            for node in ast.walk(function):
+                if isinstance(node, ast.Assign) and \
+                        len(node.targets) == 1 and \
+                        isinstance(node.targets[0], ast.Name) and \
+                        node.targets[0].id in delivered:
+                    collect_literal(node.value)
+        module_constants = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and \
+                    len(node.targets) == 1 and \
+                    isinstance(node.targets[0], ast.Name):
+                module_constants[node.targets[0].id] = node.value
+        returned_builder_calls = set()
+        for function in ast.walk(tree):
+            if isinstance(function, ast.FunctionDef) and \
+                    "problem" in function.name:
+                for child in ast.walk(function):
+                    if isinstance(child, ast.Return) and \
+                            isinstance(child.value, ast.Call):
+                        returned_builder_calls.add(id(child.value))
+        builders = {}
+        for function in ast.walk(tree):
+            if not isinstance(function, ast.FunctionDef):
+                continue
+            params = [arg.arg for arg in function.args.args]
+            for child in ast.walk(function):
+                if not isinstance(child, ast.Return) or \
+                        child.value is None:
+                    continue
+                interpolated = set()
+                if isinstance(child.value, ast.BinOp) and \
+                        isinstance(child.value.op, ast.Mod):
+                    interpolated = {
+                        name.id
+                        for name in ast.walk(child.value.right)
+                        if isinstance(name, ast.Name)}
+                elif isinstance(child.value, ast.JoinedStr):
+                    for value in child.value.values:
+                        if isinstance(value, ast.FormattedValue):
+                            interpolated.update(
+                                name.id
+                                for name in ast.walk(value.value)
+                                if isinstance(name, ast.Name))
+                inserted = [name for name in params
+                            if name in interpolated]
+                if inserted:
+                    builders[function.name] = {
+                        name: params.index(name)
+                        for name in inserted}
+                    for name in interpolated:
+                        if name not in params and \
+                                name in module_constants:
+                            collect_literal(module_constants[name])
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and \
+                    isinstance(node.func, ast.Name) and \
+                    node.func.id in builders and \
+                    id(node) not in returned_builder_calls:
+                for position in builders[node.func.id].values():
+                    if position < len(node.args):
+                        collect_literal(node.args[position])
+        for function in ast.walk(tree):
+            if not isinstance(function, ast.FunctionDef) or \
+                    ("problem" not in function.name
+                     and function.name != "module_path"):
+                continue
+            helpers = {
+                child.name for child in function.body
+                if isinstance(child, ast.FunctionDef)}
+            delivered = set()
+            delivered_exprs = []
+            for node in ast.walk(function):
+                if isinstance(node, ast.Call) and \
+                        isinstance(node.func, ast.Attribute) and \
+                        node.func.attr == "append" and \
+                        isinstance(node.func.value, ast.Name) and \
+                        "problem" in node.func.value.id:
+                    delivered_exprs.extend(node.args)
+                    for arg in node.args:
+                        if isinstance(arg, ast.Name):
+                            delivered.add(arg.id)
+                if isinstance(node, ast.Return) and \
+                        node.value is not None:
+                    delivered_exprs.append(node.value)
+                    if isinstance(node.value, ast.Name):
+                        delivered.add(node.value.id)
+                    elif isinstance(node.value,
+                                    (ast.List, ast.Tuple)):
+                        for element in node.value.elts:
+                            if isinstance(element, ast.Name):
+                                delivered.add(element.id)
+                if isinstance(node, ast.Call) and \
+                        isinstance(node.func, ast.Name) and \
+                        node.func.id in helpers:
+                    delivered_exprs.extend(node.args)
+                    for arg in node.args:
+                        if isinstance(arg, ast.Name):
+                            delivered.add(arg.id)
+            for node in ast.walk(function):
+                if isinstance(node, ast.Assign) and \
+                        len(node.targets) == 1 and \
+                        isinstance(node.targets[0], ast.Name) and \
+                        node.targets[0].id in delivered:
+                    delivered_exprs.append(node.value)
+            interpolated = set()
+            for expr in delivered_exprs:
+                for sub in ast.walk(expr):
+                    if isinstance(sub, ast.BinOp) and \
+                            isinstance(sub.op, ast.Mod):
+                        interpolated.update(
+                            name.id for name in ast.walk(sub.right)
+                            if isinstance(name, ast.Name))
+                    elif isinstance(sub, ast.FormattedValue):
+                        interpolated.update(
+                            name.id for name in ast.walk(sub.value)
+                            if isinstance(name, ast.Name))
+            if not interpolated:
+                continue
+            for node in ast.walk(function):
+                if isinstance(node, ast.Assign) and \
+                        len(node.targets) == 1 and \
+                        isinstance(node.targets[0], ast.Name) and \
+                        node.targets[0].id in interpolated:
+                    collect_literal(node.value)
+            for node in ast.walk(function):
+                if not isinstance(node, ast.For):
+                    continue
+                if isinstance(node.target, ast.Tuple):
+                    targets = [
+                        element.id
+                        if isinstance(element, ast.Name) else None
+                        for element in node.target.elts]
+                elif isinstance(node.target, ast.Name):
+                    targets = [node.target.id]
+                else:
+                    continue
+                for index, target in enumerate(targets):
+                    if target is None or \
+                            target not in interpolated:
+                        continue
+                    if isinstance(node.iter, (ast.Tuple, ast.List)):
+                        for inner in node.iter.elts:
+                            if isinstance(inner,
+                                           (ast.Tuple, ast.List)) and \
+                                    index < len(inner.elts):
+                                collect_literal(inner.elts[index])
+                    collection = None
+                    if isinstance(node.iter, ast.Name):
+                        collection = node.iter.id
+                    elif isinstance(node.iter, ast.Call) and \
+                            isinstance(node.iter.func, ast.Name) and \
+                            node.iter.func.id in (
+                                "sorted", "list", "tuple", "set",
+                                "reversed") and \
+                            node.iter.args and \
+                            isinstance(node.iter.args[0], ast.Name):
+                        collection = node.iter.args[0].id
+                    if collection is not None:
+                        for sub in ast.walk(function):
+                            if isinstance(sub, ast.Call) and \
+                                    isinstance(sub.func,
+                                               ast.Attribute) and \
+                                    sub.func.attr in (
+                                        "add", "append") and \
+                                    isinstance(sub.func.value,
+                                               ast.Name) and \
+                                    sub.func.value.id == collection:
+                                for arg in sub.args:
+                                    collect_literal(arg)
+        self.assertGreater(len(messages), 96)
+        self.assertTrue(
+            any(m.startswith("cannot read hooks/hooks.json")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "the agent.spawn hook carries no .catch handler")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "the hooks module calls $ itself through "
+                "an optional call")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "the hooks module reaches the mods API through "
+                "a computed or optional")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "the hooks module reaches the mods API through "
+                "a receiver other than")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "the hooks module binds $ itself to another name")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith("a labelled")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith(
+                "a handler name %s standing alone")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m.startswith("stands outside")
+                for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m == "the version floor" for m in messages),
+            messages,
+        )
+        self.assertTrue(
+            any(m == "$.%s.%s" for m in messages),
+            messages,
+        )
+        self.assertGreaterEqual(
+            sum(1 for m in messages if m == "$."),
+            2,
+            messages,
+        )
+        for message in messages:
+            for mark in (":", ";", "\u2014", "\u2013"):
+                self.assertNotIn(mark, message)
+
+    def test_no_gate_function_stands_defined_but_uncalled(self):
+        # A helper nothing calls is dead code a reader must
+        # carry, and this census refuses one. An abstract
+        # syntax tree walk counts every call by name in the
+        # gate against every function it defines, and the
+        # only names allowed to stand uncalled are the two
+        # the frameworks call, the strict JSON parser
+        # callback, which the parser calls through the
+        # object_pairs_hook argument and never by name in
+        # this file, and the slash context constructor,
+        # which runs when its class is instantiated and
+        # never by its own name.
+        source = (ROOT / "scripts" / "check_mod.py").read_text(
+            encoding="utf-8")
+        tree = ast.parse(source)
+        defined = [
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef,
+                                 ast.AsyncFunctionDef))
+        ]
+        calls = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = None
+                if isinstance(func, ast.Name):
+                    name = func.id
+                elif isinstance(func, ast.Attribute):
+                    name = func.attr
+                if name is not None:
+                    calls[name] = calls.get(name, 0) + 1
+        allowlisted = {"reject", "__init__"}
+        for name in allowlisted:
+            self.assertIn(name, defined)
+            self.assertEqual(calls.get(name, 0), 0, name)
+        self.assertIn("_handler_outcome_items", defined)
+        self.assertGreater(
+            calls.get("_handler_outcome_items", 0), 0)
+        uncalled = [
+            name for name in defined
+            if calls.get(name, 0) == 0 and name not in allowlisted
+        ]
+        self.assertEqual(uncalled, [])
+
+    def test_the_module_exports_register_and_nothing_else(self):
+        # The shipped module's named export surface is the
+        # one name the contract pins, judged by the gate
+        # reading on the stripped and decoded source the
+        # gate itself reads.
+        text = MODULE.read_text(encoding="utf-8")
+        decoded = self.mod.decode_identifier_escapes(
+            self.mod.strip_comments(text))
+        self.assertEqual(self.mod.export_problems(decoded), [])
+
+    def test_a_trailing_export_list_fails_the_export_pin(self):
+        # Both trailing list shapes widen the surface, the
+        # two handler list the module once shipped and a
+        # single handler list, and each must draw the export
+        # problem.
+        text = MODULE.read_text(encoding="utf-8")
+        for listing in (
+            "export { gateSpawn, catchSpawnFailure };",
+            "export { gateSpawn };",
+        ):
+            broken = text.rstrip("\n") + "\n\n" + listing + "\n"
+            self.assertNotEqual(broken, text)
+            problems = self.problems_for(broken)
+            self.assertTrue(
+                any("exports gateSpawn beside register" in p
+                    for p in problems),
+                problems,
+            )
+
+    def test_an_inline_export_on_a_handler_fails_the_export_pin(self):
+        # The inline idiom widens the surface the same way,
+        # on either handler, and each spelling must draw the
+        # export problem.
+        text = MODULE.read_text(encoding="utf-8")
+        for plain, exported in (
+            ("async function gateSpawn", "export async function gateSpawn"),
+            ("function catchSpawnFailure", "export function catchSpawnFailure"),
+        ):
+            broken = text.replace(plain, exported)
+            self.assertNotEqual(broken, text)
+            problems = self.problems_for(broken)
+            self.assertTrue(
+                any("beside register" in p for p in problems),
+                problems,
+            )
+
     def test_the_brief_names_the_untraced_provenance_class(self):
         # The outside the promise statement in the brief names
         # the one class of values the walk does not trace, by
         # the productions that make them and both placements
         # they can stand in, so a brief that drops or narrows
         # the clause fails here in words.
-        import re
-
         text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
         self.assertIn(
             "an options object the walk does not trace, one "
