@@ -35,7 +35,7 @@ Files changed: 1
 
 ### Files
 
-- book.py (renamed, renamed from ledger.py)
+- book.py (renamed from ledger.py)
 
 ### Numstat
 
