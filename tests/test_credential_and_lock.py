@@ -1454,20 +1454,49 @@ class TestOutputLockLimb(unittest.TestCase):
             tmp_a.mkdir()
             tmp_b = Path(tmp) / "tmpB"
             tmp_b.mkdir()
-            os.environ["TMPDIR"] = str(tmp_a)
-            first = mod.OutputTarget(out.resolve())
-            first.acquire_lock()
-            try:
-                second = self.acquire_in_subprocess(
-                    out.resolve(), tmp_b)
-                self.assertNotEqual(second.returncode, 0, second.stdout)
-                self.assertIn(
-                    "another recognitio run", second.stderr)
-            finally:
-                first.close()
-            third = self.acquire_in_subprocess(out.resolve(), tmp_b)
-            self.assertEqual(third.returncode, 0, third.stderr)
-            self.assertIn("LOCK ACQUIRED", third.stdout)
+            # The environment write stands inside a patch dict,
+            # so the value the process held before this test is
+            # restored when the block closes. The directory the
+            # value names is deleted with the fixture directory,
+            # and an unrestored write left every later test in
+            # the worker reading a TMPDIR that named a path
+            # which no longer stood.
+            with mock.patch.dict(os.environ, {"TMPDIR": str(tmp_a)}):
+                first = mod.OutputTarget(out.resolve())
+                first.acquire_lock()
+                try:
+                    second = self.acquire_in_subprocess(
+                        out.resolve(), tmp_b)
+                    self.assertNotEqual(
+                        second.returncode, 0, second.stdout)
+                    self.assertIn(
+                        "another recognitio run", second.stderr)
+                finally:
+                    first.close()
+                third = self.acquire_in_subprocess(out.resolve(), tmp_b)
+                self.assertEqual(third.returncode, 0, third.stderr)
+                self.assertIn("LOCK ACQUIRED", third.stdout)
+
+    def test_the_lock_test_leaves_the_process_environment_standing(self):
+        # Round 9 standards Major 1. The lock test above writes
+        # the process TMPDIR, so this test runs it in place and
+        # then reads the process environment and the tempfile
+        # module cache, which must stand exactly as they stood
+        # before it ran. Reverting the scoped write in the lock
+        # test to a bare assignment fails this test, because
+        # the value it leaves behind names the fixture
+        # directory the lock test deletes on its way out. The
+        # tempfile cache is warmed before it is read, so the
+        # comparison stands even when this test runs alone in
+        # a fresh process where nothing has read it yet.
+        tempfile.gettempdir()
+        before_env = os.environ.get("TMPDIR")
+        before_tempdir = tempfile.tempdir
+        self.test_a_second_run_is_refused_across_temporary_directories()
+        self.assertEqual(os.environ.get("TMPDIR"), before_env)
+        self.assertEqual(tempfile.tempdir, before_tempdir)
+        if before_env is not None:
+            self.assertTrue(Path(before_env).is_dir())
 
     def lock_files_inside(self, out):
         return sorted(out.glob(".recognitio.lock"))

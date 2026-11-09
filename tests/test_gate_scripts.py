@@ -383,6 +383,28 @@ class TestCheckCopy(unittest.TestCase):
         self.assertTrue(authored)
         self.assertTrue(authored_yaml)
         self.assertEqual(authored - covered, set())
+        # Round 9 spec Minor 1. The completeness reading above
+        # shares the exclusion predicate with the discovery it
+        # measures, so a file the predicate wrongly excludes is
+        # invisible on both sides and this pair can stand while
+        # a prose file escapes the fence. The public directory
+        # set the predicate is built on is pinned here as a
+        # literal, and the covered count stands under a floor
+        # counted on the Round 9 tree, so dropping an entry
+        # from the set or silently excluding a covered file
+        # breaks one of these two pins by name.
+        self.assertEqual(
+            self.mod._PUBLIC_DOT_DIRS,
+            (".github", ".agents", ".claude", ".claude-plugin",
+             ".cursor", ".cursor-plugin", ".antigravity",
+             ".zcode-plugin"),
+        )
+        self.assertGreaterEqual(
+            len(covered), 77,
+            "the copy fence covers fewer prose files than the "
+            "77 the Round 9 tree holds, so a covered file left "
+            "the fence silently",
+        )
         comment_covered = {
             str(p.relative_to(ROOT)) for p in self.mod.COMMENT_FILES
         }
@@ -1687,6 +1709,24 @@ class TestCheckSkill(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("over the %d limit" % self.mod.SKILL_TEXT_LIMIT, err)
         self.assertIn("references file", err)
+
+    def test_the_skill_text_limit_stands_at_sixteen_thousand(self):
+        # Round 9 spec Minor 2. The boundary tests in this class
+        # build every plant from the module constant, so raising
+        # the constant moves the plants and the expectations
+        # with it and the class stays green while the shipped
+        # skill drifts toward the host reattachment cut the
+        # check_skill comment names. The value stands pinned
+        # here as a literal, and one plant built from the same
+        # literal fails at one character past it, so the check
+        # that enforces the buffer is itself held to it.
+        self.assertEqual(self.mod.SKILL_TEXT_LIMIT, 16000)
+        head = "---\nname: recognitio\ndescription: a packet\n---\n\n"
+        text = head + "x" * (16001 - len(head))
+        self.assertEqual(len(text), 16001)
+        code, err = self.run_main_on_skill_text(text)
+        self.assertEqual(code, 1)
+        self.assertIn("over the 16000 limit", err)
 
     def test_a_multibyte_skill_file_past_the_byte_limit_fails(self):
         head = "---\nname: recognitio\ndescription: a packet\n---\n\n"
@@ -5362,6 +5402,7 @@ class TestCheckPacket(unittest.TestCase):
     def setUp(self):
         self.mod = load_script("check_packet")
         self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.repo = Path(self.tmp.name) / "repo"
         self.repo.mkdir()
         git(self.repo, "init", "-b", "main")
@@ -5410,9 +5451,6 @@ class TestCheckPacket(unittest.TestCase):
             self.assertNotIn(name, env)
         self.assertEqual(env["GIT_NO_REPLACE_OBJECTS"], "1")
         self.assertIn("PATH", env)
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def clone_packet(self, name):
         out = Path(self.tmp.name) / name
@@ -5754,6 +5792,27 @@ class TestCheckEvals(unittest.TestCase):
             self.assertIn(
                 "evals/tasks/task-02/planted.md", problems[0]
             )
+
+    def test_an_unrecorded_eval_artefact_fails_naming_its_file(self):
+        # Round 9 red team Major G8. The checksum tests above
+        # plant edits to files the record already names, so a
+        # gate that iterated only over the recorded names would
+        # pass them all while a covered artefact added to the
+        # tree with no record entry walked out unseen. The
+        # shipped gate walks the union of the record and the
+        # tree, and this plant holds the direction.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target = (
+                root / "evals" / "tasks" / "task-01" / "extra-note.md"
+            )
+            target.write_text("an unrecorded note\n", encoding="utf-8")
+            problems = self.mod.checksum_problems(root)
+            self.assertEqual(len(problems), 1)
+            self.assertIn(
+                "evals/tasks/task-01/extra-note.md", problems[0]
+            )
+            self.assertIn("no entry in the checksum record", problems[0])
 
     def test_a_results_cell_edit_fails_the_totals_check(self):
         with RetryingTemporaryDirectory() as tmp:

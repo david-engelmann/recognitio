@@ -50,6 +50,49 @@ def load_at(path, name):
 
 extract_mod = load_at(EXTRACT_PATH, "extract_for_config_pinning_tests")
 check_mod = load_at(CHECK_PATH, "check_packet_for_config_pinning_tests")
+evals_mod = load_at(
+    ROOT / "scripts" / "check_evals.py", "check_evals_for_pinning_tests"
+)
+
+# The extractor pin list in full, spelled out as data. The
+# full pin tests below read this list for exact equality,
+# so a change here is a deliberate restatement and not a
+# drift.
+EXTRACTOR_GIT_PIN = [
+    "-c", "core.quotepath=false",
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "color.ui=false",
+    "-c", "color.diff=false",
+    "-c", "color.grep=false",
+    "-c", "color.status=false",
+    "-c", "grep.column=false",
+    "-c", "diff.interHunkContext=0",
+    "-c", "diff.renameLimit=0",
+    "-c", "diff.algorithm=histogram",
+    "-c", "diff.ignoreSubmodules=none",
+    "-c", "diff.submodule=short",
+    "-c", "core.abbrev=7",
+    "-c", "i18n.logOutputEncoding=UTF-8",
+    "-c", "core.attributesFile=",
+    "-c", "attr.tree=",
+]
+
+# The eval gate carries a narrower pin for its own git
+# reads, the nine knobs below, and the narrowness is
+# deliberate. It stands pinned as its own literal list so
+# it can only change by restatement.
+EVALS_GIT_PIN = [
+    "-c", "core.quotepath=false",
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "color.ui=false",
+    "-c", "color.diff=false",
+    "-c", "color.status=false",
+    "-c", "color.grep=false",
+    "-c", "grep.column=false",
+    "-c", "diff.interHunkContext=0",
+]
 
 
 class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
@@ -207,6 +250,28 @@ class TestPinLists(unittest.TestCase):
 
     def test_the_packet_check_pin_list_matches_the_extractor(self):
         self.assertEqual(check_mod.GIT_PIN, extract_mod.GIT_PIN)
+
+    def test_the_extractor_pin_list_stands_in_full(self):
+        # Round 9 spec Note 1. The needles test above reads
+        # the joined list for membership, so a knob dropped
+        # from the list, renamed, or moved out of order
+        # passes it while the pin the packet is built under
+        # changes. The list stands here in full and in
+        # order, and the packet checker copy is held equal
+        # to it by the test above.
+        self.assertEqual(extract_mod.GIT_PIN, EXTRACTOR_GIT_PIN)
+        self.assertEqual(check_mod.GIT_PIN, EXTRACTOR_GIT_PIN)
+
+    def test_the_eval_gate_pin_list_stands_as_its_own_list(self):
+        # The eval gate's copy was never compared against
+        # any pin before this round. It is a narrower list
+        # by design, covering the reads that gate performs,
+        # and it stands pinned as that list so widening or
+        # narrowing it is a restatement and not a drift.
+        # The two colour knobs stand in the other order
+        # from the extractor list, which is part of the
+        # shipped shape this pin records.
+        self.assertEqual(evals_mod.GIT_PIN, EVALS_GIT_PIN)
 
     def test_the_stat_fallback_carries_width_pins(self):
         calls = []

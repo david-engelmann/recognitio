@@ -316,6 +316,84 @@ class TestFabricationBattery(VerifierFixture):
         self.save_packet(out, new)
         self.assertEqual(self.run_check(out), 1)
 
+    def test_a_contents_sentence_lying_about_the_totals_fails(self):
+        # Round 9 red team Minor P3. The contents sentence
+        # above is rewritten wholesale, so a totals feed that
+        # stopped counting additions would pass it while the
+        # sentence still agreed with the broken totals. This
+        # plant rewrites only the added lines figure in the
+        # sentence, down by exactly the additions of the
+        # first file, and leaves every record true, so the
+        # only readings that can refuse it are the ones that
+        # count the records and compare the sentence against
+        # the count.
+        out = self.clone("tampertotals")
+        manifest = self.manifest(out)
+        total = sum(entry["additions"] for entry in manifest["files"])
+        first = manifest["files"][0]["additions"]
+        text = self.packet_text(out)
+        match = re.search(r"\d+ added lines", text)
+        self.assertIsNotNone(match)
+        self.assertEqual(int(match.group(0).split()[0]), total)
+        new = text[:match.start()] + "%d added lines" % (total - first) \
+            + text[match.end():]
+        self.assertNotEqual(new, text)
+        self.save_packet(out, new)
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_a_manifest_missing_a_recounted_file_fails(self):
+        # Round 9 red team Minor P2. Fabrications in this
+        # class edit records or add to them, and the recount
+        # direction that names a file the manifest lacks was
+        # covered only as a side effect. This plant removes
+        # one file entry from the manifest of a genuine
+        # packet and nothing else, and the recount must name
+        # the missing entry by its own direction.
+        out = self.clone("tampermissing")
+        manifest = self.manifest(out)
+        dropped = manifest["files"].pop()
+        self.save_manifest(out, manifest)
+        problems, _recount = check_mod.recount_problems(
+            self.repo, manifest, extract_mod
+        )
+        self.assertTrue(
+            any(
+                "holds a file the manifest does not receipt"
+                in problem
+                and dropped["path"] in problem
+                for problem in problems
+            ),
+            problems,
+        )
+        self.assertEqual(self.run_check(out), 1)
+
+    def test_a_manifest_receipting_a_file_the_recount_lacks_fails(self):
+        # Round 9 red team Minor P2, the other direction.
+        # The plant above removes a manifest entry, and this
+        # one adds an entry for a file the recorded range
+        # does not hold, and the recount must name the added
+        # entry by its own direction. The reading is called
+        # directly, because a whole run refusal would also
+        # arrive by way of the totals the added entry leaves
+        # stale, and would prove less about this direction.
+        out = self.clone("tamperadded")
+        manifest = self.manifest(out)
+        added = dict(manifest["files"][0])
+        added["path"] = "ghost/added_by_hand.py"
+        manifest["files"].append(added)
+        problems, _recount = check_mod.recount_problems(
+            self.repo, manifest, extract_mod
+        )
+        self.assertTrue(
+            any(
+                "receipts a file the recount of the recorded "
+                "range does not hold" in problem
+                and added["path"] in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
     def test_rewritten_manifest_counts_fail(self):
         out = self.clone("tampercounts")
         manifest = self.manifest(out)
@@ -1361,7 +1439,22 @@ class TestManifestSchema(unittest.TestCase):
         self.assertIn("files", schema["required"])
 
     def test_a_genuine_manifest_shape_validates(self):
-        manifest = {
+        manifest = self.genuine_manifest()
+        self.assertEqual(check_mod.manifest_schema_problems(manifest), [])
+
+    def test_schema_rejects_a_missing_key(self):
+        problems = check_mod.manifest_schema_problems({"verified": True})
+        self.assertTrue(problems)
+
+    def test_schema_rejects_an_extra_key(self):
+        manifest = {"verified": True, "surprise": 1}
+        problems = check_mod.manifest_schema_problems(manifest)
+        self.assertTrue(
+            any("surprise" in problem for problem in problems), problems
+        )
+
+    def genuine_manifest(self):
+        return {
             "extractor": "recognitio extract.py",
             "version": extract_mod.EXTRACTOR_VERSION,
             "command": ["extract.py", "--range", "A..B"],
@@ -1401,18 +1494,53 @@ class TestManifestSchema(unittest.TestCase):
             "cap_notes": [],
             "verified": True,
             "discrepancies": [],
+            "diff_algorithm": "histogram",
         }
-        self.assertEqual(check_mod.manifest_schema_problems(manifest), [])
 
-    def test_schema_rejects_a_missing_key(self):
-        problems = check_mod.manifest_schema_problems({"verified": True})
-        self.assertTrue(problems)
-
-    def test_schema_rejects_an_extra_key(self):
-        manifest = {"verified": True, "surprise": 1}
+    def test_schema_rejects_a_boolean_where_an_integer_stands(self):
+        # Round 9 red team Minor P7. The schema type check
+        # excludes the boolean from the integer on purpose,
+        # because JSON reads true as a number in Python, and
+        # no plant stood on that exclusion. A boolean in an
+        # integer field must name a problem here.
+        manifest = self.genuine_manifest()
+        manifest["files"][0]["additions"] = True
         problems = check_mod.manifest_schema_problems(manifest)
         self.assertTrue(
-            any("surprise" in problem for problem in problems), problems
+            any("additions" in problem for problem in problems),
+            problems,
+        )
+        # The control. The same manifest without the boolean
+        # validates clean, so the refusal above turns on the
+        # boolean and not on the builder shape.
+        self.assertEqual(
+            check_mod.manifest_schema_problems(self.genuine_manifest()),
+            [],
+        )
+
+    def test_a_pr_state_with_a_trailing_newline_fails_the_schema(self):
+        # Round 9 red team Minor P6, second field. The pull
+        # request state pattern is the other anchored pattern
+        # with no trailing newline plant. The genuine
+        # manifest above carries no pull request, so this
+        # plant stands on the literal builder with a pull
+        # request object whose state carries the newline.
+        manifest = self.genuine_manifest()
+        manifest["pr"] = {
+            "number": 7, "title": "A change",
+            "spec_references": [], "state": "open\n",
+            "state_as_of": "2026-10-27T00:00:00+00:00",
+        }
+        problems = check_mod.manifest_schema_problems(manifest)
+        self.assertTrue(
+            any("state" in problem for problem in problems),
+            problems,
+        )
+        # The control. The same pull request object with a
+        # clean state validates.
+        manifest["pr"]["state"] = "open"
+        self.assertEqual(
+            check_mod.manifest_schema_problems(manifest), []
         )
 
     def test_the_strict_reader_refuses_a_repeated_key(self):
@@ -2035,6 +2163,39 @@ class TestRound27Budget(Round27Fixture):
         self.save_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
 
+    def test_two_drops_recorded_in_the_wrong_order_fail(self):
+        # Round 9 red team Minor P4. The drop plants in this
+        # class stand one at a time or duplicated, so a shed
+        # order check that stopped comparing the recorded
+        # order against the canonical order would pass them
+        # all. The fixture range cannot shed both optional
+        # tiers in one run, because a budget below the core
+        # is refused outright, so this plant records the
+        # second drop by hand on the budgeted packet above,
+        # in the wrong order, and reads the budget account
+        # on its own. A whole run refusal would prove less,
+        # because the tier receipt and receipt readings also
+        # refuse a hand recorded drop, whatever its order.
+        out = self.clone("orderforge", self.make_budgeted())
+        manifest = self.manifest(out)
+        dropped = manifest["budget"]["dropped"]
+        self.assertEqual(
+            [entry["tier"] for entry in dropped], ["T3"]
+        )
+        manifest["budget"]["dropped"] = [
+            {"tier": "T2", "reason": dropped[0]["reason"]},
+            dropped[0],
+        ]
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "records its drops in the order T2, T3, but "
+                "the budget sheds T3 before T2" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
 
 class TestRound27Command(Round27Fixture):
     """Finding 6. The recorded command is read back whole."""
@@ -2247,6 +2408,16 @@ class TestRound27DisplayAndSchema(Round27Fixture):
     def test_a_label_reduced_to_a_newline_fails_the_schema(self):
         self.schema_mutation_is_refused(
             lambda m: m.update({"label": "\n"})
+        )
+
+    def test_a_created_time_with_a_trailing_newline_fails_the_schema(self):
+        # Round 9 red team Minor P6. The four plants above
+        # cover four of the anchored patterns, and the
+        # creation time pattern stood unplanted, so a match
+        # that stopped anchoring the whole value would pass
+        # them while a padded time walked through.
+        self.schema_mutation_is_refused(
+            lambda m: m.update({"created_utc": m["created_utc"] + "\n"})
         )
 
 

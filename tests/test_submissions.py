@@ -2615,7 +2615,6 @@ class TestCheckSubmissions(unittest.TestCase):
         # measurement, so a file added or removed, or the
         # largest files growing, fails here until the pack is
         # restated.
-        import re
         import subprocess
 
         listed = subprocess.check_output(

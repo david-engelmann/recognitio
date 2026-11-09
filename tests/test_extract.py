@@ -207,6 +207,7 @@ def read_manifest(out):
 class Fixture(unittest.TestCase):
     def setUp(self):
         self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.repo = Path(self.tmp.name) / "repo"
         init_repo(self.repo)
         write_tree(self.repo, {
@@ -223,9 +224,6 @@ class Fixture(unittest.TestCase):
         self.first_feature_commit = git(self.repo, "rev-parse", "HEAD")
         (self.repo / "module.py").write_text(MODULE_V3)
         commit_all(self.repo, "edit beta")
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def run_extract(self, *extra):
         out = Path(self.tmp.name) / ("out%d" % len(list(Path(self.tmp.name).glob('out*'))))
@@ -1210,6 +1208,28 @@ class TestBinaryAndAttributeMarking(unittest.TestCase):
                 any(e["path"] == "blob.bin" for e in manifest["exclusions"])
             )
 
+    def test_a_decodable_file_holding_a_nul_byte_is_binary(self):
+        # Round 9 red team Minor X3. The binary fixtures in
+        # this class fail the text decode first, so the NUL
+        # byte rule inside the text reading stood unplanted.
+        # This file decodes as UTF-8 cleanly and is binary
+        # on the NUL rule alone, so removing that rule turns
+        # it into text and this test names the change.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n", "data.txt": "one\n\x00two\n"},
+                {"a.py": "x = 2\n", "data.txt": "one\n\x00three\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            entry = [f for f in manifest["files"] if f["path"] == "data.txt"]
+            self.assertEqual(len(entry), 1)
+            self.assertTrue(entry[0]["binary"])
+            self.assertIn("binary file", entry[0]["placeholder"])
+
     def test_latin1_source_does_not_crash(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
@@ -1497,6 +1517,7 @@ class TestPullRequestMode(Fixture):
 class TestBudget(unittest.TestCase):
     def setUp(self):
         self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.repo = make_repo(self.tmp.name, [
             {
                 "module.py": MODULE_V1,
@@ -1506,8 +1527,52 @@ class TestBudget(unittest.TestCase):
             {"module.py": MODULE_V2},
         ])
 
-    def tearDown(self):
-        self.tmp.cleanup()
+    def test_a_budget_at_the_exact_emitted_measure_fits(self):
+        # Round 9 red team Minor X8. Every budget plant in
+        # this class leaves slack or sheds by a wide step,
+        # so a fit check that demanded strictly less than
+        # the budget would pass them all while a budget set
+        # at the exact measure of the packet it accepts shed
+        # a tier it had room for. A run under a budget names
+        # the budget in its own packet, one token of header
+        # the unbudgeted run does not carry, so the exact
+        # measure of the budgeted packet stands one above
+        # the estimate the unbudgeted run records. A second
+        # run at that exact figure must keep every tier, and
+        # its recorded estimate must equal the budget it was
+        # accepted under.
+        full_out = Path(self.tmp.name) / "full"
+        result = run_extract_cli(
+            self.repo, full_out, "--range", "HEAD~1..HEAD"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        full = read_manifest(full_out)
+        estimate = full["budget"]["estimated_tokens"]
+        exact_out = Path(self.tmp.name) / "exact"
+        result = run_extract_cli(
+            self.repo, exact_out, "--range", "HEAD~1..HEAD",
+            "--budget", str(estimate + 1),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        exact = read_manifest(exact_out)
+        self.assertEqual(exact["budget"]["dropped"], [])
+        self.assertEqual(
+            exact["budget"]["estimated_tokens"], estimate + 1
+        )
+        self.assertEqual(
+            exact["budget"]["estimated_tokens"],
+            extract_mod.estimate_tokens(
+                (exact_out / "packet.md").read_text(
+                    encoding="utf-8", errors="surrogateescape"
+                )
+            ),
+        )
+        for tier in ("T0", "T1", "T2", "T3"):
+            self.assertEqual(
+                exact["tiers"][tier]["state"],
+                full["tiers"][tier]["state"],
+                tier,
+            )
 
     def test_budget_that_fits_keeps_every_tier(self):
         out = Path(self.tmp.name) / "fits"
@@ -1603,6 +1668,20 @@ class TestTierSelection(Fixture):
         out = Path(self.tmp.name) / "bad"
         result = run_extract_cli(
             self.repo, out, "--range", "main...feature", "--tiers", "3"
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_tiers_selector_cannot_drop_the_context_tier_alone(self):
+        # Round 9 red team Minor X1. The refusal above drops
+        # both core tiers together, so a selector check that
+        # stopped requiring the context tier would pass it
+        # while a request for the change and its history
+        # alone went through. This request keeps the change
+        # and drops only the context tier, and the run must
+        # refuse it, as the sibling above is refused.
+        out = Path(self.tmp.name) / "bad2"
+        result = run_extract_cli(
+            self.repo, out, "--range", "main...feature", "--tiers", "0,2"
         )
         self.assertEqual(result.returncode, 2, result.stderr)
 
@@ -2763,6 +2842,7 @@ class TestParseFailureReceipts(unittest.TestCase):
 
     def setUp(self):
         self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.repo = make_repo(self.tmp.name, [
             {"a.py": "x = 1\n"},
             {"a.py": "x = 2\n"},
@@ -2775,9 +2855,6 @@ class TestParseFailureReceipts(unittest.TestCase):
         self.assertTrue(read_manifest(self.out)["verified"])
         self.packet_bytes = (self.out / "packet.md").read_bytes()
         self.manifest_bytes = (self.out / "manifest.json").read_bytes()
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def assert_previous_packet_intact(self):
         self.assertEqual(
@@ -2853,6 +2930,42 @@ class TestGeneratedMarkerTiming(unittest.TestCase):
                 },
                 {
                     "gen.py": (
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v2-secret"\n'
+                    )
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("v2-secret", packet)
+            entry = manifest["files"][0]
+            self.assertIn("generated file", entry["placeholder"])
+
+    def test_marker_on_a_later_head_line_still_withholds_the_diff(self):
+        # Round 9 red team Minor X4. The plants above put the
+        # marker on the first line, so a scan narrowed to the
+        # first line would pass them while a marker standing
+        # a few lines down stopped exempting its file. The
+        # scan window runs to the fifth line, and this
+        # marker stands on the third.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v1"\n'
+                    )
+                },
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
                         "# Code generated by the build. DO NOT EDIT.\n"
                         'VALUE = "v2-secret"\n'
                     )

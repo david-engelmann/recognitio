@@ -455,6 +455,7 @@ class TestCopyRenameHeaderWording(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = RetryingTemporaryDirectory()
+        cls.addClassCleanup(cls.tmp.cleanup)
         root = cls.tmp.name
         cls.cases = {
             "graded": extract_header_case(
@@ -476,10 +477,6 @@ class TestCopyRenameHeaderWording(unittest.TestCase):
                 root, "mixed", build_mixed_repo
             ),
         }
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmp.cleanup()
 
     def entry_of(self, label, path):
         _repo, _out, manifest, _packet = self.cases[label]

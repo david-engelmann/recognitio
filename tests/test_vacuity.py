@@ -136,9 +136,6 @@ class TestCheckTestVacuity(unittest.TestCase):
             )
 
     def test_the_floor_refusal_exits_nonzero_without_the_success_line(self):
-        import contextlib
-        import io
-
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "root"
             root.mkdir()
@@ -1536,6 +1533,305 @@ class TestCheckTestVacuity(unittest.TestCase):
             "            ['carries a figure plant in the "
             "sentence'],\n"
             "            'figure')\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_patch_imported_under_an_alias_fails(self):
+        # Round 9 red team Blocker B1, first spelling. The
+        # patch form imported under another name hands back
+        # the same mock, so a test asserting only on its
+        # call state argues about the stand in.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch as swap\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        with swap('some.module.run') as m:\n"
+            "            m()\n"
+            "            self.assertTrue(m.called)\n"
+            "            self.assertEqual(m.call_count, 1)\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_patch_object_under_an_alias_fails(self):
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch as swap\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        with swap.object(Path, 'name') as m:\n"
+            "            m()\n"
+            "            self.assertTrue(m.called)\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_patcher_started_by_hand_fails(self):
+        # Round 9 red team Blocker B1, second spelling. A
+        # patcher built from a patch form hands its mock
+        # back through the start call, so the name the
+        # start call binds is a mock on the same reading.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        patcher = patch('some.module.run')\n"
+            "        m = patcher.start()\n"
+            "        m()\n"
+            "        self.assertTrue(m.called)\n"
+            "        self.assertEqual(m.call_count, 1)\n"
+            "        patcher.stop()\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_patch_reached_through_a_module_alias_fails(self):
+        # Round 9 confirmation repair. The mock module
+        # itself bound under an alias by a from import
+        # hands its patch forms under that root, the same
+        # binding a dotted import under an alias makes, so
+        # a test asserting only on the mock call state is
+        # refused the same way.
+        body = (
+            "import unittest\n"
+            "from unittest import mock as umock\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        with umock.patch('some.module.run') as m:\n"
+            "            m()\n"
+            "            self.assertTrue(m.called)\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_helper_returning_a_bound_constant_fails(self):
+        # Round 9 confirmation repair, second seat. A
+        # helper that binds a constant to a name and hands
+        # the name back hands back the constant, so a test
+        # asserting the call against that constant argues
+        # about constants alone in the same way.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def pinned(self):\n"
+            "        value = 'abc'\n"
+            "        return value\n"
+            "\n"
+            "    def test_a_quieted_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        self.assertEqual(self.pinned(), 'abc')\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_patch_form_bound_to_a_plain_name_is_a_limit(self):
+        # Round 9 red team delta confirmation. A patch
+        # form handed on to a plain name by assignment
+        # stands outside the guard reading by its recorded
+        # limit, in the same family as a mock constructor
+        # bound the same way, so this body passes clean and
+        # pins the limit where it stands.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "from unittest.mock import patch as swap\n"
+            "ROOT = Path('.')\n"
+            "swap2 = swap\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        with swap2('some.module.run') as m:\n"
+            "            m()\n"
+            "            self.assertTrue(m.called)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_mock_only_test_under_a_wrapper_is_a_limit(self):
+        # Round 9 red team delta confirmation. A patch
+        # decorator stacked over a hand written wrapper
+        # leaves the parameter binding to the wrapper, and
+        # the guard docstring records that a mock only test
+        # in this shape passes while pinning nothing, so
+        # this body passes clean and pins the limit.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "from unittest.mock import patch\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def inject(fn):\n"
+            "    def wrapper(self):\n"
+            "        return fn(self, 'real-value')\n"
+            "    return wrapper\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    @patch('some.module.run')\n"
+            "    @inject\n"
+            "    def test_a_quieted_case(self, supplied, m):\n"
+            "        touched = ROOT.name\n"
+            "        m()\n"
+            "        self.assertTrue(m.called)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_patcher_started_in_one_expression_fails(self):
+        # Round 9 confirmation repair. A patch form started
+        # in the same expression that builds it hands back
+        # the same mock a named patcher hands back through
+        # its start call, so the name that start call binds
+        # is a mock on the same reading.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_mocked_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        m = patch('some.module.run').start()\n"
+            "        m()\n"
+            "        self.assertTrue(m.called)\n"
+            "        self.assertEqual(m.call_count, 1)\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_mock_handed_in_by_a_patch_decorator_fails(self):
+        # Round 9 red team Blocker B1, third spelling. A
+        # patch form in the decorator list hands its mock
+        # in as the method argument it binds, the shape
+        # the guard docstring names as a patch stand in.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    @patch('some.module.run')\n"
+            "    def test_a_mocked_case(self, m):\n"
+            "        touched = ROOT.name\n"
+            "        m()\n"
+            "        self.assertTrue(m.called)\n"
+            "        self.assertEqual(m.call_count, 1)\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_patch_dict_under_an_alias_still_passes(self):
+        # The control in the other direction. The dict
+        # spelling under an import alias still binds the
+        # patched mapping itself, so an assertion about
+        # its entries keeps its credit.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch as swap\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_dict_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        config = {'mode': 'old'}\n"
+            "        with swap.dict(\n"
+            "            config, {'mode': 'new'}\n"
+            "        ) as bound:\n"
+            "            self.assertEqual(bound['mode'], 'new')\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_decorator_mock_beside_a_real_assertion_passes(self):
+        # The control. A stand in handed in by a patch
+        # decorator stands beside an assertion on a real
+        # return, and the second assertion keeps the test
+        # standing.
+        body = (
+            "import unittest\n"
+            "from unittest.mock import patch\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def measure(text):\n"
+            "    return len(text)\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    @patch('some.module.run')\n"
+            "    def test_a_mixed_case(self, m):\n"
+            "        touched = ROOT.name\n"
+            "        m()\n"
+            "        self.assertTrue(m.called)\n"
+            "        self.assertEqual(measure(touched), 0)\n"
+        )
+        self.assert_clean(body)
+
+    def test_a_constant_laundered_through_a_helper_return_fails(self):
+        # Round 9 red team Blocker B2. A same class helper
+        # whose returns all settle as constants hands back
+        # constants alone, so an assertion comparing its
+        # call against a literal argues about nothing.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def pinned(self):\n"
+            "        return 'abc'\n"
+            "\n"
+            "    def test_a_quieted_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        self.assertEqual(self.pinned(), 'abc')\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_helper_returning_a_fixture_read_still_passes(self):
+        # The control in the other direction. A helper
+        # that hands back what it read from a fixture
+        # returns a value the reading cannot settle, so
+        # the assertion over its call keeps its credit.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def pinned(self):\n"
+            "        return ROOT.name\n"
+            "\n"
+            "    def test_a_case(self):\n"
+            "        touched = ROOT.name\n"
+            "        self.assertEqual(self.pinned(), 'abc')\n"
         )
         self.assert_clean(body)
 

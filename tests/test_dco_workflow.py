@@ -102,6 +102,7 @@ class TestDcoWorkflow(unittest.TestCase):
 
     def setUp(self):
         self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.repo = Path(self.tmp.name) / "repo"
         self.repo.mkdir()
         git(self.repo, "init", "-b", "main")
@@ -123,9 +124,6 @@ class TestDcoWorkflow(unittest.TestCase):
                 self.assertTrue(stripped.endswith("; then"))
                 self.pipeline = stripped[len("if ! "):-len("; then")]
         self.assertIsNotNone(self.pipeline)
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     def commit_message(self, name, message):
         msg = Path(self.tmp.name) / name

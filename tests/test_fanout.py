@@ -995,9 +995,8 @@ class PersonaDirPinTestCase(unittest.TestCase):
     """R17-RT-02. The agents directory holds exactly the declared file."""
 
     def setUp(self):
-        import sys
-
         sys.path.insert(0, str(ROOT / "tests"))
+        self.addCleanup(sys.path.remove, str(ROOT / "tests"))
         from test_gate_scripts import load_script
 
         self.persona = load_script("check_persona")
@@ -1045,9 +1044,8 @@ class IsolationQuoteTestCase(unittest.TestCase):
     """R17-ST-01. The isolation pin accepts every legal quoting."""
 
     def setUp(self):
-        import sys
-
         sys.path.insert(0, str(ROOT / "tests"))
+        self.addCleanup(sys.path.remove, str(ROOT / "tests"))
         from test_gate_scripts import load_script
 
         self.persona = load_script("check_persona")

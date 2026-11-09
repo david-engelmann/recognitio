@@ -3726,6 +3726,42 @@ This unreleased work carries version 1.3.0.
   named both persona sentences as foreign to the
   canonical set.
 
+- The test vacuity guard now follows the patch forms a
+  test can reach its mocks through when the patch name
+  arrives under an import alias, when a patcher is
+  started by hand, and when a patch decorator hands its
+  mock in as a method argument, and it settles a value a
+  same class helper hands back where every return of
+  that helper settles as a constant, a return reached
+  through a name the helper bound to a constant among
+  them, and its limits now name two shapes they did not
+  before, a patch form bound first to a plain name and a
+  patch decorator stacked over a hand written wrapper,
+  so a test asserting
+  only over such a value is refused the way a test
+  asserting over a bare literal is. The guard docstring
+  records both followings and the refusal of an
+  assertion over constants alone. The suite stands
+  strengthened in the same change. A lock test no longer
+  leaves the process temporary directory setting naming
+  a directory its fixture deleted, seven fixture classes
+  rest their cleanup on registered cleanups that run
+  when setup fails partway, two fan out setups restore
+  the module search path they extend, and new plants
+  hold the copy fence public directory set and the
+  skill size limit and the git pin lists as literals,
+  the eval checksum direction for an unrecorded
+  artefact, the budget fit at the exact emitted
+  measure, the tier selector refusal of a lone context
+  drop, the NUL byte rule on a decodable file, the
+  generated marker window past the first line, and the
+  packet checker readings for the recount in both of
+  its directions, a contents sentence lying about the
+  totals, two drops recorded out of order, a creation
+  time and a pull request state carrying a trailing
+  newline, and a boolean standing where an integer
+  belongs.
+
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

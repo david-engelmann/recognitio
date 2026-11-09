@@ -204,6 +204,7 @@ class ChainFixture(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = RetryingTemporaryDirectory()
+        cls.addClassCleanup(cls.tmp.cleanup)
         base_dir = Path(cls.tmp.name)
         repo = base_dir / "repo"
         repo.mkdir()
@@ -257,10 +258,6 @@ class ChainFixture(unittest.TestCase):
         cls.repo = repo
         cls.fanout = load_script("check_fanout")
         cls.headless = load_script("check_headless")
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmp.cleanup()
 
     def write_record(self, record, name="case"):
         run_dir = self.dir / ("run-" + name)
