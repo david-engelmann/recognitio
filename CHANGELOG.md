@@ -3809,7 +3809,13 @@ This unreleased work carries version 1.3.0.
   rests the thirty minutes on the measured whole gate
   span of hosted run 42636057863 on the round 9 head,
   with the recorded 380 second discover measurement
-  kept as history.
+  kept as history. A repair pass on the landed round 10
+  head restates the timeout comment so the suite figure
+  stands on one line where its pin reads it, and the
+  binary and generated packet test builds one more
+  commit of its own, so the depth its since anchor
+  names is a depth the fixture itself made, in shallow
+  checkouts as in full ones.
 
 ### Removed
 

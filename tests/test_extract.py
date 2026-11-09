@@ -4130,6 +4130,7 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
     def test_packet_over_binary_and_generated_changes_is_clean(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
+                {"seed.txt": "seed\n"},
                 {
                     "a.py": "x = 1\n",
                     "blob.bin": bytes(range(256)),
@@ -4147,8 +4148,11 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
                     ),
                 },
             ])
+            base = git(repo, "rev-parse", "HEAD~2")
             out = Path(tmp) / "out"
-            result = run_extract_cli(repo, out, "--commit", "HEAD", "--since", "HEAD~2")
+            result = run_extract_cli(
+                repo, out, "--commit", "HEAD", "--since", base
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             packet = (out / "packet.md").read_text()
             self.assertIn("binary file of 256 bytes", packet)
