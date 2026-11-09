@@ -636,7 +636,15 @@ class TestDirectorySealingAndEncoding(VerifierFixture):
         self.assertEqual(self.run_check(spelling), 0)
         self.assertEqual(self.run_check(resolved), 0)
 
-    def test_a_non_utf8_filename_packet_fails(self):
+    def test_a_non_utf8_filename_packet_decodes_and_stamps(self):
+        # Round 10 item A. The byte in this file name is not
+        # valid UTF-8, and before this pass the packet carried
+        # it raw, so the packet file itself did not decode and
+        # the stamp refused a packet its extractor had stamped
+        # verified. The name now stands in the packet under
+        # the display escape both sides share, the packet
+        # decodes, and the stamp accepts it, while the
+        # manifest keeps the true path as data.
         repo = Path(self.tmp.name) / "nonutf8repo"
         init_repo(repo)
         (repo / "plain.py").write_text("x = 1\n", encoding="utf-8")
@@ -652,11 +660,12 @@ class TestDirectorySealingAndEncoding(VerifierFixture):
             repo, Path(self.tmp.name) / "nonutf8pkt",
             "--range", "HEAD~1..HEAD",
         )
-        with self.assertRaises(UnicodeDecodeError):
-            (out / "packet.md").read_bytes().decode("utf-8")
+        text = (out / "packet.md").read_bytes().decode("utf-8")
+        self.assertIn("bad\\udcfffile.py", text)
+        self.assertTrue(self.manifest(out)["verified"])
         with redirect_stderr(io.StringIO()):
             self.assertEqual(
-                check_mod.main([str(out), "--repo", str(repo)]), 1
+                check_mod.main([str(out), "--repo", str(repo)]), 0
             )
 
     def test_a_forged_command_range_fails(self):

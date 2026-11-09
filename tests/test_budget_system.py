@@ -49,6 +49,47 @@ extract_mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(extract_mod)
 
 
+class TestShippedPacketEstimates(unittest.TestCase):
+    """Every shipped packet states the figure the estimator gives.
+
+    Round 10 standards Minor 1. Eval task 06 stated 1379 in its
+    receipt and its manifest where the shipped estimator gives
+    1377 on its own text, a stale figure left by a hand edit.
+    The packet estimate is a fixed point of the estimator over
+    the packet text, so a stated figure that disagrees with a
+    fresh estimate of the same text is stale by construction,
+    and every shipped packet in the tree must recompute exact.
+    """
+
+    PACKET_DIRS = (
+        ["evals/tasks/task-0%d" % i for i in range(1, 7)]
+        + ["workflows/proof-run", "examples/example-packet-991ac6a"]
+    )
+
+    def test_every_shipped_packet_recomputes_to_its_stated_figure(self):
+        for rel in self.PACKET_DIRS:
+            folder = ROOT / rel
+            packet = (folder / "packet.md").read_text(
+                encoding="utf-8"
+            )
+            manifest = json.loads(
+                (folder / "manifest.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            match = re.search(
+                r"^Packet estimate in tokens: (\d+)$", packet, re.M
+            )
+            self.assertIsNotNone(match, rel)
+            stated = int(match.group(1))
+            self.assertEqual(
+                extract_mod.estimate_tokens(packet), stated, rel
+            )
+            self.assertEqual(
+                manifest["budget"]["estimated_tokens"], stated, rel
+            )
+
+
 class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
     cleanup_attempts = 5
     cleanup_delay_seconds = 0.1

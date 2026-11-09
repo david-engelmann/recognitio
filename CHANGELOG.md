@@ -922,9 +922,9 @@ This unreleased work carries version 1.3.0.
   record carries dated repair notes, and the mod
   README leads with its contract over its filming log
   with the denial still under its assets folder. The
-  README word count stands at 4,557 words by the
-  stated method, up from 4,167 at the landing head,
-  and the growth is stated here in the open under the
+  README word count was recorded at 4,557 words at
+  that landing, up from 4,167 at the landing head
+  before it, and the growth is stated here in the open under the
   charter rule, because the evidence obligations in
   the review reports required the added sentences.
   The weighed page total stands at 820,122 bytes
@@ -3761,6 +3761,55 @@ This unreleased work carries version 1.3.0.
   time and a pull request state carrying a trailing
   newline, and a boolean standing where an integer
   belongs.
+- The round 10 repair pass over the three audit seats.
+  Packet text now stands in one canonical spelling from
+  the extractor through the packet check, so a NUL inside
+  a changed line and a byte that is not valid UTF-8 are
+  named the same way on every surface, a packet the
+  extractor stamps verified is itself valid UTF-8, and a
+  file that changed from binary content to text no longer
+  refuses the run on the control bytes of its old binary
+  form, because the transition reading names those bytes
+  beside the NULs it already named. The budget refusal
+  now names the settled size of its smallest packet, the
+  fixed point of the budget spelling the emitted packet
+  carries, so a rerun at that size is accepted with the
+  packet measuring exactly the named size and a rerun one
+  token below it refuses naming the same size. The packet
+  check rebuilds the commit list in the same canonical
+  spelling the extractor builds it in, so a commit whose
+  stored subject carries a byte that is not valid UTF-8
+  passes the check the extractor stamps, and the page
+  weight gate reads an attribute name in either letter
+  case, as HTML does.
+  The cap notes of the history tier name cap and total
+  in one shape across the family, covering the evolution
+  functions, the blame ranges, the capped line history
+  and the spec references of a pull request body, and
+  the skill text states the spec reference cap of five.
+  The README page weight gate counts a local image
+  carried by a single quoted attribute, by a reference
+  style Markdown image and by every candidate of a
+  srcset, and the repaired weighing still reads 820,122
+  on the current README. Endpoints that share no
+  history refuse in plain words naming that case, and a
+  re-review whose ranges hold no pairable commits says
+  so beside the raw listing. The generated file scan
+  window stands stated as the first five lines where
+  the extractor documents the treatment, with the
+  boundary pinned by tests on both sides. The prior
+  pull requests sentence states unavailability without
+  guessing at its cause, and the shipped packets that
+  carry the sentence stand regenerated or restated,
+  eval task 06 first restated at the 1377 its own text
+  measures under the shipped estimator and then
+  restated with the rest at the sentence repair. The
+  timeout comment in the CI workflow drops the
+  extrapolated discover figure that did not derive and
+  rests the thirty minutes on the measured whole gate
+  span of hosted run 42636057863 on the round 9 head,
+  with the recorded 380 second discover measurement
+  kept as history.
 
 ### Removed
 

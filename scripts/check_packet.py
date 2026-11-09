@@ -1037,6 +1037,8 @@ def display_path(path):
             out.append("\\x%02x" % ord(char))
         elif char in ("\u0085", "\u2028", "\u2029"):
             out.append("\\u%04x" % ord(char))
+        elif 0xD800 <= ord(char) <= 0xDFFF:
+            out.append("\\u%04x" % ord(char))
         elif char in (
             "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
             "\u2066", "\u2067", "\u2068", "\u2069",
@@ -1655,6 +1657,15 @@ def triage_problems(packet_text, manifest, fresh_change, extractor):
                 # recount compares against the masked spelling
                 # of the same commit log.
                 commit_text = extractor.mask_credential_text(
+                    commit_text
+                )
+            if hasattr(extractor, "sanitize_packet_text"):
+                # The triage tier also stands in the canonical
+                # packet spelling as it is built, so the recount
+                # compares against that spelling of the same
+                # commit log, the one that names an undecodable
+                # byte or a NUL byte instead of carrying it raw.
+                commit_text = extractor.sanitize_packet_text(
                     commit_text
                 )
             if "\n".join(block) != commit_text:

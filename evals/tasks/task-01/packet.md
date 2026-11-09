@@ -150,7 +150,7 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
-Prior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.
+Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
 
@@ -158,7 +158,7 @@ Prior pull requests are unavailable in this environment. The GitHub CLI is missi
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1354
+Packet estimate in tokens: 1339
 
 T0 included at about 65 tokens across 1 files
 
@@ -166,7 +166,7 @@ T1 included at about 137 tokens across 1 files
 
 T2 included at about 249 tokens across 1 files
 
-T3 included at about 428 tokens across 1 files
+T3 included at about 413 tokens across 1 files
 
 No tier was dropped.
 

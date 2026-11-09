@@ -1,8 +1,10 @@
+import base64
 import copy
 import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -1534,13 +1536,14 @@ class TestBudget(unittest.TestCase):
         # the budget would pass them all while a budget set
         # at the exact measure of the packet it accepts shed
         # a tier it had room for. A run under a budget names
-        # the budget in its own packet, one token of header
-        # the unbudgeted run does not carry, so the exact
-        # measure of the budgeted packet stands one above
-        # the estimate the unbudgeted run records. A second
-        # run at that exact figure must keep every tier, and
-        # its recorded estimate must equal the budget it was
-        # accepted under.
+        # the budget in its own packet, so the exact measure
+        # of the budgeted packet is found from a budgeted run
+        # itself. A second run at that exact figure must keep
+        # every tier, and its recorded estimate must equal
+        # the budget it was accepted under. Round 10 recalibrated
+        # the finding of the figure, because the cross run
+        # delta the old calibration assumed moved with the
+        # packet text it priced.
         full_out = Path(self.tmp.name) / "full"
         result = run_extract_cli(
             self.repo, full_out, "--range", "HEAD~1..HEAD"
@@ -1548,16 +1551,25 @@ class TestBudget(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         full = read_manifest(full_out)
         estimate = full["budget"]["estimated_tokens"]
+        probe_out = Path(self.tmp.name) / "probe"
+        result = run_extract_cli(
+            self.repo, probe_out, "--range", "HEAD~1..HEAD",
+            "--budget", str(estimate + 10),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        probe = read_manifest(probe_out)
+        self.assertEqual(probe["budget"]["dropped"], [])
+        estimate = probe["budget"]["estimated_tokens"]
         exact_out = Path(self.tmp.name) / "exact"
         result = run_extract_cli(
             self.repo, exact_out, "--range", "HEAD~1..HEAD",
-            "--budget", str(estimate + 1),
+            "--budget", str(estimate),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         exact = read_manifest(exact_out)
         self.assertEqual(exact["budget"]["dropped"], [])
         self.assertEqual(
-            exact["budget"]["estimated_tokens"], estimate + 1
+            exact["budget"]["estimated_tokens"], estimate
         )
         self.assertEqual(
             exact["budget"]["estimated_tokens"],
@@ -1573,6 +1585,66 @@ class TestBudget(unittest.TestCase):
                 full["tiers"][tier]["state"],
                 tier,
             )
+
+    def test_a_refusal_names_a_size_a_rerun_accepts(self):
+        # Round 10 spec Minor 1 and its confirmation
+        # residual. The measured candidate embeds the budget
+        # numeral in its receipt and in its dropped tier
+        # lines, so a size measured under one spelling is
+        # refused or accepted under another on the strength
+        # of the numeral alone. The refusal now names the
+        # settled size, the fixed point of that spelling, so
+        # the rerun at that size is accepted with its packet
+        # measuring exactly the named size, and a rerun one
+        # token below it refuses naming the same size again.
+        # The failure manifest and the refusal sentence must
+        # name the same figure.
+        out = Path(self.tmp.name) / "tiny"
+        result = run_extract_cli(
+            self.repo, out, "--range", "HEAD~1..HEAD",
+            "--budget", "10",
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        match = re.search(
+            r"smallest packet this selection can emit measures "
+            r"about (\d+) tokens",
+            result.stderr,
+        )
+        self.assertIsNotNone(match, result.stderr)
+        named = int(match.group(1))
+        manifest = read_manifest(out)
+        self.assertEqual(
+            manifest["budget"]["estimated_tokens"], named,
+            manifest["budget"],
+        )
+        rerun_out = Path(self.tmp.name) / "rerun"
+        rerun = run_extract_cli(
+            self.repo, rerun_out, "--range", "HEAD~1..HEAD",
+            "--budget", str(named),
+        )
+        self.assertEqual(rerun.returncode, 0, rerun.stderr)
+        rerun_manifest = read_manifest(rerun_out)
+        self.assertTrue(
+            rerun_manifest["verified"],
+            rerun_manifest["discrepancies"],
+        )
+        self.assertEqual(
+            rerun_manifest["budget"]["estimated_tokens"], named,
+            rerun_manifest["budget"],
+        )
+        below_out = Path(self.tmp.name) / "below"
+        below = run_extract_cli(
+            self.repo, below_out, "--range", "HEAD~1..HEAD",
+            "--budget", str(named - 1),
+        )
+        self.assertEqual(below.returncode, 2, below.stderr)
+        below_match = re.search(
+            r"smallest packet this selection can emit measures "
+            r"about (\d+) tokens",
+            below.stderr,
+        )
+        self.assertIsNotNone(below_match, below.stderr)
+        self.assertEqual(int(below_match.group(1)), named)
 
     def test_budget_that_fits_keeps_every_tier(self):
         out = Path(self.tmp.name) / "fits"
@@ -2478,6 +2550,39 @@ class TestTierContent(unittest.TestCase):
             packet = (out / "packet.md").read_text()
             self.assertIn("Prior pull requests are unavailable", packet)
 
+    def test_prior_prs_sentence_names_no_guessed_cause(self):
+        # Round 10 spec Note 1. The unavailable sentence once
+        # named the CLI or the checkout shape as the reason,
+        # which is a guess about the environment the run
+        # cannot make. The sentence now states unavailability
+        # and nothing about its cause.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"module.py": MODULE_V1},
+                {"module.py": MODULE_V2},
+            ])
+            bindir = Path(tmp) / "bin"
+            bindir.mkdir()
+            (bindir / "git").symlink_to(subprocess.run(
+                ["which", "git"], capture_output=True, text=True
+            ).stdout.strip())
+            env = dict(os.environ)
+            env["PATH"] = str(bindir)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD", env=env
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "Prior pull requests are unavailable in this "
+                "environment, so no pull request history was "
+                "gathered.",
+                packet,
+            )
+            self.assertNotIn("GitHub CLI is missing", packet)
+            self.assertNotIn("not a GitHub checkout", packet)
+
 
 class TestReplaceRefs(unittest.TestCase):
     """A replace ref must not swap the content under review (N1)."""
@@ -2982,6 +3087,85 @@ class TestGeneratedMarkerTiming(unittest.TestCase):
             self.assertIn("generated file", entry["placeholder"])
 
 
+    def test_marker_on_the_fifth_line_still_withholds_the_diff(self):
+        # Round 10 red team Minor 8. The scan window is the
+        # first five lines, stated in the extractor where the
+        # generated treatment is documented. A marker standing
+        # on the fifth line stands inside the window.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
+                        "STAMP = 2\n"
+                        "MODE = 3\n"
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v1"\n'
+                    )
+                },
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
+                        "STAMP = 2\n"
+                        "MODE = 3\n"
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v2-secret"\n'
+                    )
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("v2-secret", packet)
+            entry = manifest["files"][0]
+            self.assertIn("generated file", entry["placeholder"])
+
+    def test_marker_on_the_sixth_line_does_not_withhold_the_diff(self):
+        # The other side of the round 10 Minor 8 boundary. A
+        # marker standing on the sixth line stands outside the
+        # stated window, so the diff is shown in full and no
+        # placeholder stands in its place.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
+                        "STAMP = 2\n"
+                        "MODE = 3\n"
+                        "EXTRA = 4\n"
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v1"\n'
+                    )
+                },
+                {
+                    "gen.py": (
+                        '"""Build output."""\n'
+                        "VERSION = 1\n"
+                        "STAMP = 2\n"
+                        "MODE = 3\n"
+                        "EXTRA = 4\n"
+                        "# Code generated by the build. DO NOT EDIT.\n"
+                        'VALUE = "v2-shown"\n'
+                    )
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("v2-shown", packet)
+            entry = manifest["files"][0]
+            self.assertIsNone(entry["placeholder"])
+
+
 class TestFenceSafety(unittest.TestCase):
     """A pull request body cannot forge packet sections (N9)."""
 
@@ -3127,6 +3311,181 @@ class TestReReviewTraces(unittest.TestCase):
             packet = (out / "packet.md").read_text()
             self.assertIn("Findings addressed: 0 of 100", packet)
             self.assertIn("Findings capped at 100 of 250", packet)
+
+
+class TestRound10CapNotesAndRefusals(unittest.TestCase):
+    """Cap notes name cap and total, and refusals speak plainly.
+
+    Round 10 spec Minor 2 and standards Minor 2 cover the cap
+    notes that once cut in silence or named no total, red team
+    Minor 5 the orphan endpoint refusal that carried no words,
+    and red team Minor 6 the range diff section that printed
+    one unpaired dash line and nothing else.
+    """
+
+    def test_evolution_cap_note_names_cap_and_total(self):
+        base_body = "".join(
+            "def func%d():\n    return %d\n\n\n" % (i, i)
+            for i in range(4)
+        )
+        head_body = "".join(
+            "def func%d():\n    return %d\n\n\n" % (i, i + 100)
+            for i in range(4)
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": base_body},
+                {"mod.py": head_body},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "Cap note: evolution functions capped at 3 of 4.",
+                packet,
+            )
+            manifest = read_manifest(out)
+            self.assertIn(
+                "evolution functions capped at 3 of 4",
+                manifest["cap_notes"],
+            )
+
+    def test_blame_ranges_cap_note_names_its_total(self):
+        body = "".join("line%03d = %d\n" % (i, i) for i in range(120))
+        changed = body
+        for i in range(5, 120, 10):
+            changed = changed.replace(
+                "line%03d = %d" % (i, i), "line%03d = %d" % (i, i + 500)
+            )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": body},
+                {"mod.py": changed},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertIn(
+                "blame ranges capped at %d of 12"
+                % extract_mod.MAX_BLAME_RANGES,
+                manifest["cap_notes"],
+            )
+
+    def test_history_cap_note_names_cap_and_total(self):
+        body = "".join(
+            "line%03d = %d  # padding padding padding padding\n" % (i, i)
+            for i in range(200)
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "def target():\n" + body},
+                {"mod.py": "def target():\n" + body.replace(
+                    "line000 = 0", "line000 = 99")},
+                {"mod.py": "def target():\n" + body.replace(
+                    "line001 = 1", "line001 = 98")},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~2..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            match = re.search(
+                r"history for target capped at %d of (\d+)"
+                % extract_mod.MAX_LOG_L_CHARS,
+                packet,
+            )
+            self.assertIsNotNone(match, packet)
+            self.assertGreater(
+                int(match.group(1)), extract_mod.MAX_LOG_L_CHARS
+            )
+
+    def test_spec_references_cap_line_names_cap_and_total(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"module.py": "x = 1\n"},
+                {"module.py": "x = 2\n"},
+            ])
+            base = git(repo, "rev-parse", "HEAD~1")
+            head = git(repo, "rev-parse", "HEAD")
+            body = (
+                "Implements https://example.com/a and "
+                "https://example.com/b and https://example.com/c "
+                "and https://example.com/d and "
+                "https://example.com/e and https://example.com/f "
+                "and closes #42."
+            )
+            view = json.dumps({
+                "baseRefOid": base,
+                "headRefOid": head,
+                "baseRefName": "main",
+                "headRefName": "main",
+                "title": "A change",
+                "body": body,
+                "state": "OPEN",
+            })
+            bindir = Path(tmp) / "bin"
+            bindir.mkdir()
+            gh = bindir / "gh"
+            gh.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "if sys.argv[1:3] == ['pr', 'view']:\n"
+                "    print(%r)\n"
+                "else:\n"
+                "    print('[]')\n" % view
+            )
+            gh.chmod(0o755)
+            env = dict(os.environ)
+            env["PATH"] = str(bindir) + os.pathsep + env["PATH"]
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--pr", "7", env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Spec references capped at 5 of 7.", packet)
+            manifest = read_manifest(out)
+            self.assertEqual(
+                len(manifest["pr"]["spec_references"]),
+                extract_mod.MAX_SPEC_REFERENCES,
+            )
+
+    def test_orphan_endpoints_refuse_in_the_tools_own_words(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"a.py": "x = 1\n"}])
+            git(repo, "checkout", "--orphan", "orphan")
+            git(repo, "rm", "-rf", ".")
+            write_tree(repo, {"b.py": "y = 2\n"})
+            commit_all(repo, "an unrelated root")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "main..orphan"
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("share no history", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            manifest = read_manifest(out)
+            self.assertFalse(manifest["verified"])
+            self.assertIn("share no history", manifest["error"])
+
+    def test_range_diff_with_no_pairable_commits_says_so(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"a.py": "x = 1\n"},
+                {"a.py": "x = 2\n"},
+                {"a.py": "x = 3\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--commit", "HEAD", "--since", "HEAD~2"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"], manifest["discrepancies"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "No commits pair between the two ranges", packet
+            )
+            self.assertIn("-------", packet)
 
 
 class TestFindingsFileTypes(unittest.TestCase):
@@ -3596,6 +3955,171 @@ class TestRound1BinaryToText(unittest.TestCase):
             self.assertIn("hello = 1", packet_bytes.decode("utf-8"))
 
 
+class TestRound10EncodingIntegrity(unittest.TestCase):
+    """Publish, manifest, receipt and recount price one text.
+
+    Round 10 red team Majors 1, 2 and 4. A NUL inside a changed
+    text line was named by the publish path but not by the
+    checker recount, so body and receipt disagreed. Invalid
+    UTF-8 in a source file rode through surrogate escapes into
+    a packet that was not itself valid UTF-8 under a verified
+    manifest. A genuine PNG replaced by text refused the whole
+    run on the substitute byte in its signature, because the
+    sanitiser named only NUL. Each plant below must end with a
+    verified packet the shipped checker accepts and packet
+    bytes that decode as UTF-8.
+    """
+
+    def run_and_check(self, repo, out):
+        result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(out)
+        self.assertTrue(manifest["verified"], manifest["discrepancies"])
+        packet_bytes = (out / "packet.md").read_bytes()
+        packet_bytes.decode("utf-8")
+        self.assertNotIn(b"\x00", packet_bytes)
+        check = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "check_packet.py"),
+                str(out), "--repo", str(repo),
+            ],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+        return manifest, packet_bytes.decode("utf-8")
+
+    def test_nul_at_the_chunk_boundary_offsets_verifies(self):
+        # The boundary offsets are 8191 and 8192 of one long
+        # changed line, the two sides of the early scan window
+        # the binary reading judges text by.
+        for offset in (8191, 8192):
+            with RetryingTemporaryDirectory() as tmp:
+                line = 'x = "' + "a" * 9000 + '"\n'
+                repo = make_repo(tmp, [{"big.py": line}])
+                data = bytearray((repo / "big.py").read_bytes())
+                data[offset] = 0
+                (repo / "big.py").write_bytes(bytes(data))
+                commit_all(repo, "plant a NUL at offset %d" % offset)
+                out = Path(tmp) / "out"
+                _manifest, packet = self.run_and_check(repo, out)
+                self.assertIn("[NUL]", packet)
+
+    def test_invalid_utf8_in_a_changed_file_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"conf.py": b'name = "ok"\nvalue = 1\n'},
+                {"conf.py": b'name = "ok"\nvalue = 2\n'
+                            b'note = "caf\xff\xfe"\n'},
+            ])
+            out = Path(tmp) / "out"
+            _manifest, packet = self.run_and_check(repo, out)
+            self.assertIn("[0xFF]", packet)
+            self.assertIn("[0xFE]", packet)
+
+    def test_a_genuine_png_replaced_by_text_verifies(self):
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlE"
+            "QVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"img.png": png, "a.py": "x = 1\n"},
+                {"img.png": "this is now text\nsecond line\n"},
+            ])
+            out = Path(tmp) / "out"
+            manifest, packet = self.run_and_check(repo, out)
+            self.assertIn("[SUB]", packet)
+            entry = [
+                f for f in manifest["files"] if f["path"] == "img.png"
+            ][0]
+            self.assertTrue(entry["binary_transition"])
+
+    def test_text_replaced_by_binary_still_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"data.py": "hello = 1\nworld = 2\n"},
+                {"data.py": b"old\x00line\nsecond\x00line\n"},
+            ])
+            out = Path(tmp) / "out"
+            manifest, _packet = self.run_and_check(repo, out)
+            entry = [
+                f for f in manifest["files"] if f["path"] == "data.py"
+            ][0]
+            self.assertTrue(entry["binary"])
+
+    def test_a_commit_subject_with_an_undecodable_byte_verifies(self):
+        # Round 10 red team confirmation Major 1. The
+        # extractor spelled the triage tier through the
+        # canonical pass while the packet check rebuilt the
+        # commit list from its own reading with only the
+        # credential masking applied, so a commit whose
+        # stored subject carries a byte that is not valid
+        # UTF-8 earned a verified packet the check refused.
+        # The ordinary commit routes recode such a byte
+        # before storage, so the commit object here is
+        # written by hand through the plumbing.
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "value = 1\n"},
+                {"mod.py": "value = 2\n"},
+            ])
+            env = scrubbed_git_env()
+            index = Path(tmp) / "hand-index"
+            env["GIT_INDEX_FILE"] = str(index)
+
+            def hand_git(*args, data=None):
+                result = subprocess.run(
+                    ["git", "-C", str(repo)] + list(args),
+                    env=env, input=data, capture_output=True,
+                )
+                self.assertEqual(
+                    result.returncode, 0, result.stderr
+                )
+                return result.stdout.strip()
+
+            hand_git("read-tree", "HEAD")
+            blob = hand_git(
+                "hash-object", "-w", "--stdin",
+                data=b"value = 3\n",
+            ).decode()
+            hand_git(
+                "update-index", "--cacheinfo",
+                "100644,%s,mod.py" % blob,
+            )
+            tree = hand_git("write-tree").decode()
+            parent_result = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                env=scrubbed_git_env(), capture_output=True,
+            )
+            parent = parent_result.stdout.decode().strip()
+            commit_object = (
+                "tree %s\nparent %s\n"
+                "author Test User <test@example.com> "
+                "1700000000 +0000\n"
+                "committer Test User <test@example.com> "
+                "1700000000 +0000\n\n"
+                % (tree, parent)
+            ).encode() + b"subject with a \xff byte\n"
+            sha = hand_git(
+                "hash-object", "-t", "commit", "-w", "--stdin",
+                data=commit_object,
+            ).decode()
+            clean = subprocess.run(
+                ["git", "-C", str(repo), "update-ref", "HEAD", sha],
+                env=scrubbed_git_env(), capture_output=True,
+            )
+            self.assertEqual(clean.returncode, 0, clean.stderr)
+            clean = subprocess.run(
+                ["git", "-C", str(repo), "reset", "--hard", "HEAD"],
+                env=scrubbed_git_env(), capture_output=True,
+            )
+            self.assertEqual(clean.returncode, 0, clean.stderr)
+            out = Path(tmp) / "out"
+            _manifest, packet = self.run_and_check(repo, out)
+            self.assertIn("[0xFF]", packet)
+
+
 class TestRound1GeneratedPacketCopy(unittest.TestCase):
     """Generated packet prose carries no banned marks."""
 
@@ -3624,7 +4148,7 @@ class TestRound1GeneratedPacketCopy(unittest.TestCase):
                 },
             ])
             out = Path(tmp) / "out"
-            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            result = run_extract_cli(repo, out, "--commit", "HEAD", "--since", "HEAD~2")
             self.assertEqual(result.returncode, 0, result.stderr)
             packet = (out / "packet.md").read_text()
             self.assertIn("binary file of 256 bytes", packet)

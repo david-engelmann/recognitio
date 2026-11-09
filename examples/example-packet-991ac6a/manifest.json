@@ -11,7 +11,7 @@
     "--repo",
     "."
   ],
-  "created_utc": "2026-11-08T18:47:18.172794+00:00",
+  "created_utc": "2026-11-09T16:57:23.217456+00:00",
   "mode": "commit",
   "label": "commit 991ac6ae80d3",
   "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
@@ -83,8 +83,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 1859,
-      "emitted_tokens": 1859,
+      "estimated_tokens": 1851,
+      "emitted_tokens": 1851,
       "files": 2
     }
   },
@@ -97,14 +97,14 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 6017,
+    "estimated_tokens": 6009,
     "dropped": []
   },
   "cap_notes": [
-    "history for semantic_problems capped"
+    "history for semantic_problems capped at 4000 of 17427"
   ],
   "verified": true,
   "discrepancies": [],
   "findings_sha256": null,
-  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
 }

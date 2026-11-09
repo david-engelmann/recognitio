@@ -83,8 +83,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 629,
-      "emitted_tokens": 629,
+      "estimated_tokens": 614,
+      "emitted_tokens": 614,
       "files": 2
     }
   },
@@ -97,12 +97,12 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1727,
+    "estimated_tokens": 1712,
     "dropped": []
   },
   "cap_notes": [],
   "verified": true,
   "discrepancies": [],
   "findings_sha256": null,
-  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment. The GitHub CLI is missing or this clone is not a GitHub checkout, so no pull request history was gathered.\n"
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
 }

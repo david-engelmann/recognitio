@@ -4640,6 +4640,81 @@ class TestWp5SessionScreenshots(unittest.TestCase):
             self.assertIn(name, record)
 
 
+def readme_page_weight_refs(readme):
+    """Every local image reference a README page carries.
+
+    The weighed forms are the inline Markdown image, the
+    reference style Markdown image whose target stands in a
+    definition line, and the HTML image attributes in either
+    quote spelling. A srcset contributes every one of its
+    candidates, not only the first, because the browser may
+    fetch any of them. External targets stand outside the
+    weighing, as they always have.
+    """
+    refs = []
+    refs += re.findall(r"!\[[^\]]*\]\((docs/[^)\s]+)[^)]*\)", readme)
+    definitions = {}
+    for match in re.finditer(
+        r"^\s{0,3}\[([^\]]+)\]:\s*<?(docs/[^\s>]+)>?",
+        readme, re.M,
+    ):
+        label = " ".join(match.group(1).split()).lower()
+        definitions[label] = match.group(2)
+    for match in re.finditer(r"!\[([^\]]*)\]\[([^\]]*)\]", readme):
+        label = match.group(2) or match.group(1)
+        label = " ".join(label.split()).lower()
+        if label in definitions:
+            refs.append(definitions[label])
+    for match in re.finditer(r"!\[([^\]]+)\](?![\[(])", readme):
+        label = " ".join(match.group(1).split()).lower()
+        if label in definitions:
+            refs.append(definitions[label])
+    for match in re.finditer(
+        r"\bsrc\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
+    ):
+        value = match.group(1) or match.group(2)
+        if value.startswith("docs/"):
+            refs.append(value)
+    for match in re.finditer(
+        r"\bsrcset\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
+    ):
+        value = match.group(1) or match.group(2)
+        for candidate in value.split(","):
+            fields = candidate.split()
+            if fields and fields[0].startswith("docs/"):
+                refs.append(fields[0])
+    return refs
+
+
+def readme_page_weight(root, readme):
+    """The weighed total of one README text against one root.
+
+    A src may carry a fragment, as the two wordmark images
+    carry their GitHub theme fragments. A fragment is a
+    rendering instruction and not part of the file path, so
+    it is stripped before the file is weighed. Each local
+    asset is weighed once however many forms carry it. A
+    reference naming a file that does not stand under the
+    root fails by name here, so a weighing can never surface
+    as a bare file error from the stat call.
+    """
+    unique = list(
+        dict.fromkeys(
+            ref.split("#", 1)[0]
+            for ref in readme_page_weight_refs(readme)
+        )
+    )
+    total = 0
+    for ref in unique:
+        if not (root / ref).is_file():
+            raise AssertionError(
+                "the README page weight reference %s names no "
+                "file under the weighed root" % ref
+            )
+        total += (root / ref).stat().st_size
+    return total
+
+
 class TestBrandAssets(unittest.TestCase):
     """The visual round 8 brand asset gate.
 
@@ -4933,21 +5008,67 @@ class TestBrandAssets(unittest.TestCase):
 
     def test_the_readme_page_weight_sits_under_its_ceiling(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        refs = re.findall(r"!\[[^\]]*\]\((docs/[^)]+)\)", readme)
-        refs += re.findall(
-            r"(?:src|srcset)=\"(docs/[^\"]+)\"", readme
-        )
-        # A src may carry a fragment, as the two wordmark
-        # images carry their GitHub theme fragments. A
-        # fragment is a rendering instruction and not part
-        # of the file path, so it is stripped before the
-        # file is weighed.
-        unique = list(
-            dict.fromkeys(ref.split("#", 1)[0] for ref in refs)
-        )
-        total = sum((ROOT / ref).stat().st_size for ref in unique)
+        total = readme_page_weight(ROOT, readme)
         self.assertLessEqual(total, self.PAGE_CEILING)
         self.assertEqual(total, 820122)
+
+    def test_the_page_weight_weighs_every_carried_form(self):
+        # Round 10 red team Major 3 and Minor 7. The weighing
+        # once read only double quoted attributes and inline
+        # Markdown images, and it read a whole srcset value as
+        # one path, so a single quoted src, a reference style
+        # image and the later candidates of a srcset carried
+        # weight the gate never counted, and a multi candidate
+        # srcset opening on a docs path died as an uncaught
+        # file error instead of rendering a verdict.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            sizes = {
+                "docs/a.png": 100,
+                "docs/b.png": 200,
+                "docs/c.png": 400,
+                "docs/d.png": 800,
+                "docs/e.png": 1600,
+            }
+            for name, size in sizes.items():
+                (root / name).write_bytes(b"x" * size)
+            readme = "\n".join([
+                "<img src='docs/a.png'>",
+                "![the b picture][bref]",
+                "",
+                "[bref]: docs/b.png",
+                "",
+                '<source srcset="docs/c.png 1x, docs/d.png 2x">',
+                "",
+                "![the a picture again](docs/a.png)",
+                "",
+                '<img src="https://example.com/outside.png">',
+                "",
+                '<IMG SRC="docs/e.png">',
+            ])
+            # The a picture stands under two forms and weighs
+            # once. The external target weighs nothing. The e
+            # picture stands behind an uppercase attribute
+            # name, which HTML reads the same as its lowercase
+            # spelling, and the weighing reads it the same way.
+            self.assertEqual(
+                readme_page_weight(root, readme),
+                100 + 200 + 400 + 800 + 1600,
+            )
+
+    def test_a_srcset_naming_a_missing_file_fails_by_name(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "here.png").write_bytes(b"x" * 10)
+            readme = (
+                '<source srcset="docs/here.png 1x, '
+                'docs/gone.png 2x">'
+            )
+            with self.assertRaises(AssertionError) as caught:
+                readme_page_weight(root, readme)
+            self.assertIn("docs/gone.png", str(caught.exception))
 
 
 class TestCanonicalSkillLayout(unittest.TestCase):

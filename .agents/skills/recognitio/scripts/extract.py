@@ -292,6 +292,16 @@ def display_path(path):
             # name carrying one would print a second line that
             # looks like packet structure to those readers.
             out.append("\\u%04x" % ord(char))
+        elif 0xD800 <= ord(char) <= 0xDFFF:
+            # A name carrying a byte that is not valid UTF-8
+            # rides through the git readings as a surrogate
+            # escape, and a packet printing it raw is not itself
+            # valid UTF-8, so no reader could decode the packet
+            # that names the file. The byte is spelled with the
+            # same escape the separators above take, so the name
+            # stands in the packet as inert text and the manifest
+            # keeps the true path as data.
+            out.append("\\u%04x" % ord(char))
         elif char in (
             "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
             "\u2066", "\u2067", "\u2068", "\u2069",
@@ -350,18 +360,95 @@ def terminal_control_character(text):
     return None
 
 
+SURROGATE_BYTE_RE = re.compile("[\udc80-\udcff]")
+
+
+def surrogate_byte_name(char):
+    """The bracketed name of one surrogate escaped byte."""
+    return "[0x%02X]" % (ord(char) - 0xDC00)
+
+
 def sanitize_packet_text(text):
-    """Keep raw NUL bytes out of packet text.
+    """Keep raw NUL bytes and undecodable bytes out of packet text.
 
     A blob that turns from binary to text is shown through a text
     diff, and the old side of that diff can carry raw NUL bytes
     into a document every downstream tool reads as Markdown text.
     The byte is named instead of carried, which changes no line
-    count because the replacement holds no newline.
+    count because the replacement holds no newline. A byte that
+    is not valid UTF-8 rides through the git readings under a
+    surrogate escape, and a packet carrying that escape is not
+    itself valid UTF-8, so the escape is named by its byte the
+    same way, and every surface that builds, prices or recounts
+    packet text sees the one canonical spelling this function
+    returns.
     """
     if not text:
         return text
-    return text.replace("\x00", "[NUL]")
+    text = text.replace("\x00", "[NUL]")
+    if SURROGATE_BYTE_RE.search(text):
+        text = SURROGATE_BYTE_RE.sub(
+            lambda match: surrogate_byte_name(match.group(0)), text
+        )
+    return text
+
+
+# The control bytes a binary signature can carry, named the way
+# the NUL naming above names NUL. A blob that turns from binary
+# to text is shown through a text diff whose old side prints the
+# binary form's own bytes as text, and a genuine binary signature
+# carries control bytes beside its NULs, so the binary transition
+# reading names every control byte it can meet instead of
+# refusing the whole run on a byte its own sanitiser exists to
+# name. Tab and newline stand unnamed because they are the text
+# structure itself, and a carriage return standing ahead of a
+# newline stands with them as a CRLF ending.
+BINARY_CONTROL_NAMES = {
+    0x00: "[NUL]", 0x01: "[SOH]", 0x02: "[STX]", 0x03: "[ETX]",
+    0x04: "[EOT]", 0x05: "[ENQ]", 0x06: "[ACK]", 0x07: "[BEL]",
+    0x08: "[BS]", 0x0B: "[VT]", 0x0C: "[FF]", 0x0E: "[SO]",
+    0x0F: "[SI]", 0x10: "[DLE]", 0x11: "[DC1]", 0x12: "[DC2]",
+    0x13: "[DC3]", 0x14: "[DC4]", 0x15: "[NAK]", 0x16: "[SYN]",
+    0x17: "[ETB]", 0x18: "[CAN]", 0x19: "[EM]", 0x1A: "[SUB]",
+    0x1B: "[ESC]", 0x1C: "[FS]", 0x1D: "[GS]", 0x1E: "[RS]",
+    0x1F: "[US]", 0x7F: "[DEL]",
+}
+
+
+def sanitize_binary_transition_text(text):
+    """Name the control bytes of a binary form shown as text.
+
+    Only the per file text reading of a file that changed from
+    binary content to text passes through here. Ordinary text
+    keeps the ordinary refusal for its control characters,
+    because a genuine text file carrying an escape or a lone
+    carriage return is a different fault than a binary signature
+    standing on the deleted side of a transition diff. A carriage
+    return standing ahead of a newline keeps its CRLF reading,
+    and one standing alone is named like the rest.
+    """
+    if not text:
+        return text
+    text = sanitize_packet_text(text)
+    out = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        code = ord(char)
+        if char == "\r":
+            if index + 1 < len(text) and text[index + 1] == "\n":
+                out.append(char)
+            else:
+                out.append("[CR]")
+            index += 1
+            continue
+        name = BINARY_CONTROL_NAMES.get(code)
+        if name is not None:
+            out.append(name)
+        else:
+            out.append(char)
+        index += 1
+    return "".join(out)
 
 
 # Credential shaped values are masked wherever packet text is
@@ -632,7 +719,22 @@ def rev_parse(repo, ref):
 
 
 def merge_base(repo, left, right):
-    return run_git(repo, ["merge-base", left, right]).stdout.strip()
+    result = run_git(
+        repo, ["merge-base", left, right], check=False
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        # Two endpoints with no common ancestor have no merge
+        # base, and git answers that case with a bare failure
+        # and no words of its own. The refusal names the case
+        # itself, because a packet built between unrelated
+        # histories would read as a change it is not.
+        raise GitError(
+            "the endpoints %s and %s share no history, so they "
+            "have no merge base and no packet can be built "
+            "between them. Name two revisions that share an "
+            "ancestor, then run again" % (left[:12], right[:12])
+        )
+    return result.stdout.strip()
 
 
 def is_shallow(repo):
@@ -953,8 +1055,8 @@ def resolve_pr(repo, args, since_sha):
     }
 
 
-def find_spec_references(body):
-    """Collect the links and issue references a PR body carries."""
+def find_all_spec_references(body):
+    """Every link and issue reference a PR body carries, uncapped."""
     refs = []
     for match in URL_RE.finditer(body):
         ref = match.group(0).rstrip(".,;")
@@ -964,7 +1066,19 @@ def find_spec_references(body):
         ref = "#" + match.group(1)
         if ref not in refs:
             refs.append(ref)
-    return refs[:MAX_SPEC_REFERENCES]
+    return refs
+
+
+def find_spec_references(body):
+    """Collect the links and issue references a PR body carries.
+
+    The list the manifest records is capped at
+    MAX_SPEC_REFERENCES. The triage tier counts the uncapped
+    list beside it, so a body carrying more references than
+    the cap states the total it was cut from instead of
+    letting the cap pass in silence.
+    """
+    return find_all_spec_references(body)[:MAX_SPEC_REFERENCES]
 
 
 def resolve_range(repo, args, since_sha):
@@ -1355,8 +1469,22 @@ def fetch_change(repo, diff_base, head):
     ).stdout
     files = parse_name_status_z(status_text)
     stats, binary_paths = parse_numstat_z(numstat_text)
-    chunks = pair_diff_chunks(files, split_diff(full_diff))
-    precise = pair_diff_chunks(files, split_diff(precise_diff))
+    # Every chunk the fetch returns stands in the one canonical
+    # spelling sanitize_packet_text gives it, so the body the
+    # packet prints, the tiers the budget prices and the recount
+    # the packet check rebuilds all measure the same text.
+    chunks = {
+        path: sanitize_packet_text(chunk)
+        for path, chunk in pair_diff_chunks(
+            files, split_diff(full_diff)
+        ).items()
+    }
+    precise = {
+        path: sanitize_packet_text(chunk)
+        for path, chunk in pair_diff_chunks(
+            files, split_diff(precise_diff)
+        ).items()
+    }
     return {
         "files": files,
         "stats": stats,
@@ -1455,7 +1583,9 @@ def per_file_text_diff(repo, diff_base, head, entry, context_flag):
             "the per file diff for %s holds no section the entry "
             "owns, so it cannot be measured as text" % entry["path"]
         )
-    return restore_status_header_wording(paired[entry["path"]], entry)
+    return sanitize_packet_text(
+        restore_status_header_wording(paired[entry["path"]], entry)
+    )
 
 
 def per_file_text_numstat(repo, diff_base, head, entry):
@@ -1482,7 +1612,15 @@ def per_file_text_numstat(repo, diff_base, head, entry):
 
 
 def has_generated_marker(content):
-    """True when a file's first lines carry the do not edit marker."""
+    """True when a file's first five lines carry the marker.
+
+    The scan window is the first five lines of the file. A do
+    not edit marker standing deeper than the fifth line does
+    not exempt the file, and its diff is shown in full. The
+    window is a stated limit of the generated treatment, held
+    narrow because a marker buried in a file body is prose
+    about generation as often as it is a generation claim.
+    """
     if content is None:
         return False
     for line in content.splitlines()[:5]:
@@ -1566,12 +1704,35 @@ def measure_binary_entry(repo, diff_base, head, entry, chunks, precise):
             "shown_as_text": False,
         }
         return (0, 0), receipt
-    text_chunk = sanitize_packet_text(
-        per_file_text_diff(repo, diff_base, head, entry, "-W")
+    base_path = entry["old_path"] or path
+    base_data = None
+    if entry["status"] not in ("added", "deleted"):
+        base_data = file_bytes(repo, diff_base, base_path)
+    binary_transition = (
+        base_data is not None and not looks_textual(base_data)
     )
-    zero_chunk = sanitize_packet_text(
-        per_file_text_diff(repo, diff_base, head, entry, "-U0")
-    )
+    # The reading of a file that changed from binary content to
+    # text names the control bytes of its binary form, because
+    # the deleted side of its diff prints that form as text and
+    # a genuine binary signature carries control bytes beside
+    # its NULs. A file git calls binary only through the tree
+    # attributes is genuine text on both sides, so its reading
+    # keeps the ordinary spelling and the ordinary refusal for
+    # any control character it carries.
+    if binary_transition:
+        text_chunk = sanitize_binary_transition_text(
+            per_file_text_diff(repo, diff_base, head, entry, "-W")
+        )
+        zero_chunk = sanitize_binary_transition_text(
+            per_file_text_diff(repo, diff_base, head, entry, "-U0")
+        )
+    else:
+        text_chunk = sanitize_packet_text(
+            per_file_text_diff(repo, diff_base, head, entry, "-W")
+        )
+        zero_chunk = sanitize_packet_text(
+            per_file_text_diff(repo, diff_base, head, entry, "-U0")
+        )
     chunks[path] = text_chunk
     precise[path] = zero_chunk
     # Git's own count, read with the text flag, is the
@@ -1582,11 +1743,7 @@ def measure_binary_entry(repo, diff_base, head, entry, chunks, precise):
         counts = measured
     else:
         counts = count_chunk_lines(zero_chunk)
-    base_path = entry["old_path"] or path
-    base_data = None
-    if entry["status"] not in ("added", "deleted"):
-        base_data = file_bytes(repo, diff_base, base_path)
-    if base_data is not None and not looks_textual(base_data):
+    if binary_transition:
         entry["binary_transition"] = True
         receipt = {
             "path": path,
@@ -2473,6 +2630,12 @@ def build_t0(files, commit_log, pr_info):
                 "Spec references found in the body: %s"
                 % ", ".join(pr_info["spec_references"])
             )
+            total_refs = len(find_all_spec_references(pr_info["body"]))
+            if total_refs > MAX_SPEC_REFERENCES:
+                lines.append(
+                    "Spec references capped at %d of %d."
+                    % (MAX_SPEC_REFERENCES, total_refs)
+                )
         else:
             lines.append("No spec reference was found in the pull request body.")
         lines.append("")
@@ -2542,7 +2705,10 @@ def build_t0(files, commit_log, pr_info):
     lines.append(commit_text)
     lines.append(fence)
     lines.append("")
-    return "\n".join(lines)
+    # Every tier text stands in the one canonical spelling on
+    # return, so the text the budget prices and the text the
+    # packet check rebuilds are the same text byte for byte.
+    return sanitize_packet_text("\n".join(lines))
 
 
 def build_t1(files, chunks):
@@ -2582,8 +2748,7 @@ def build_t1(files, chunks):
         lines.append(shown)
         lines.append(fence)
         lines.append("")
-    return mask_credential_text("\n".join(lines))
-
+    return sanitize_packet_text(mask_credential_text("\n".join(lines)))
 
 
 def parse_grep_z(stdout, rev):
@@ -3127,7 +3292,9 @@ def build_t2(repo, head, files, functions_by_file):
     if not sources:
         lines.append("No changed source files, so no companions were gathered.")
         lines.append("")
-        return mask_credential_text("\n".join(lines)), notes, 0
+        return sanitize_packet_text(
+            mask_credential_text("\n".join(lines))
+        ), notes, 0
     hits_by_term = git_grep_bulk(
         repo, head, companion_terms(files, functions_by_file)
     )
@@ -3144,7 +3311,9 @@ def build_t2(repo, head, files, functions_by_file):
         repo, head, files, functions_by_file, notes, hits_by_term
     ))
     lines.extend(render_notes(notes))
-    return mask_credential_text("\n".join(lines)), notes, len(sources)
+    return sanitize_packet_text(
+        mask_credential_text("\n".join(lines))
+    ), notes, len(sources)
 
 
 def find_function_span(content_lines, name, path):
@@ -3254,6 +3423,12 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
     lines.append("### Blame summary for changed ranges")
     lines.append("")
     range_count = 0
+    # The note the cap below appends names the total it cuts
+    # from, counted over the same files the section walks.
+    total_ranges = sum(
+        len(ranges_by_file.get(entry["path"], []))
+        for entry in top_files
+    )
     git_dir = blame_git_dir(repo)
     for entry in top_files:
         path = entry["path"]
@@ -3263,7 +3438,10 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
         tally = {}
         for start, end in ranges:
             if range_count >= MAX_BLAME_RANGES:
-                notes.append("blame ranges capped at %d" % MAX_BLAME_RANGES)
+                notes.append(
+                    "blame ranges capped at %d of %d"
+                    % (MAX_BLAME_RANGES, total_ranges)
+                )
                 break
             range_count += 1
             result = run_blame(repo, git_dir, head, start, end, path)
@@ -3679,51 +3857,65 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
     lines = []
     lines.append("### Recent evolution of changed functions")
     lines.append("")
-    log_count = 0
+    # The eligible functions are gathered first, so the cap
+    # below knows the total it cuts from and can state it in
+    # its note, in the same shape its sibling cap notes carry.
+    eligible = []
     for entry in top_files:
-        if log_count >= MAX_LOG_L_FUNCTIONS:
-            break
         path = entry["path"]
         content = show_file(repo, head, path)
         if content is None:
             continue
         content_lines = content.splitlines()
         for name in functions_by_file.get(path, []):
-            if log_count >= MAX_LOG_L_FUNCTIONS:
-                break
             span = find_function_span(content_lines, name, path)
             if span is None:
                 continue
-            log_count += 1
-            result = run_git(
-                repo,
-                ["log"] + DIFF_FLAGS
-                + ["-L", "%d,%d:%s" % (span[0], span[1], path),
-                   "--format=commit %h %s", head],
-                check=False,
-                global_flags=["--attr-source=" + head],
-            )
-            lines.append("#### %s in %s" % (name, display_path(path)))
+            eligible.append((entry, name, span))
+    log_count = 0
+    for entry, name, span in eligible:
+        if log_count >= MAX_LOG_L_FUNCTIONS:
+            break
+        path = entry["path"]
+        log_count += 1
+        result = run_git(
+            repo,
+            ["log"] + DIFF_FLAGS
+            + ["-L", "%d,%d:%s" % (span[0], span[1], path),
+               "--format=commit %h %s", head],
+            check=False,
+            global_flags=["--attr-source=" + head],
+        )
+        lines.append("#### %s in %s" % (name, display_path(path)))
+        lines.append("")
+        if result.returncode != 0:
+            lines.append("No history available for this function.")
             lines.append("")
-            if result.returncode != 0:
-                lines.append("No history available for this function.")
-                lines.append("")
-                continue
-            text, capped = cap_text(
-                anchor_history_insertions(
-                    repo,
-                    canonical_history_text(result.stdout.rstrip()),
-                    path,
-                ),
-                MAX_LOG_L_CHARS,
-                "history for %s" % name, mark=False,
+            continue
+        history_source = anchor_history_insertions(
+            repo,
+            canonical_history_text(result.stdout.rstrip()),
+            path,
+        )
+        text, capped = cap_text(
+            history_source,
+            MAX_LOG_L_CHARS,
+            "history for %s" % name, mark=False,
+        )
+        if capped:
+            notes.append(
+                "history for %s capped at %d of %d"
+                % (name, MAX_LOG_L_CHARS, len(history_source))
             )
-            if capped:
-                notes.append("history for %s capped" % name)
-            lines.append("```")
-            lines.append(text)
-            lines.append("```")
-            lines.append("")
+        lines.append("```")
+        lines.append(text)
+        lines.append("```")
+        lines.append("")
+    if len(eligible) > MAX_LOG_L_FUNCTIONS:
+        notes.append(
+            "evolution functions capped at %d of %d"
+            % (MAX_LOG_L_FUNCTIONS, len(eligible))
+        )
     if log_count == 0:
         lines.append("No changed functions had traceable history.")
         lines.append("")
@@ -3797,8 +3989,7 @@ def prior_prs_section(repo, top_files):
     found = prior_prs(repo, paths) if paths else []
     if found is None:
         lines.append(
-            "Prior pull requests are unavailable in this environment. The "
-            "GitHub CLI is missing or this clone is not a GitHub checkout, "
+            "Prior pull requests are unavailable in this environment, "
             "so no pull request history was gathered."
         )
         lines.append("")
@@ -3842,14 +4033,18 @@ def build_t3(repo, head, files, stats, ranges_by_file, functions_by_file):
     if not top_files:
         lines.append("No files with history to summarise.")
         lines.append("")
-        return mask_credential_text("\n".join(lines)), notes, 0
+        return sanitize_packet_text(
+            mask_credential_text("\n".join(lines))
+        ), notes, 0
     lines.extend(blame_section(repo, head, top_files, ranges_by_file, notes))
     lines.extend(
         evolution_section(repo, head, top_files, functions_by_file, notes)
     )
     lines.extend(prior_prs_section(repo, top_files))
     lines.extend(render_notes(notes))
-    return mask_credential_text("\n".join(lines)), notes, len(top_files)
+    return sanitize_packet_text(
+        mask_credential_text("\n".join(lines))
+    ), notes, len(top_files)
 
 
 def normalize_finding_path(path):
@@ -4238,6 +4433,14 @@ def findings_accounting(repo, diff_base, since, head, findings):
     return lines
 
 
+# One line of range diff output. The two commit indexes stand at
+# the two ends with the pairing mark between them, and a dash
+# stands for the side whose range holds no commit to pair.
+RANGE_DIFF_LINE_RE = re.compile(
+    r"^\s*(\S+):\s+\S+\s+[<>=!]\s+(\S+):"
+)
+
+
 def build_rereview(repo, diff_base, head, since, findings,
                    findings_given=False):
     lines = []
@@ -4259,7 +4462,9 @@ def build_rereview(repo, diff_base, head, since, findings,
             "change, and nothing here claims otherwise." % since
         )
         lines.append("")
-        return mask_credential_text("\n".join(lines))
+        return sanitize_packet_text(
+            mask_credential_text("\n".join(lines))
+        )
     commits = run_git(
         repo, ["log", "--oneline", "--reverse", "%s..%s" % (since, head)]
     ).stdout
@@ -4290,11 +4495,27 @@ def build_rereview(repo, diff_base, head, since, findings,
         global_flags=["--attr-source=" + EMPTY_TREE],
     )
     lines.append("```")
+    unpaired_only = False
     if result.returncode == 0 and result.stdout.strip():
         text, _capped = cap_text(
             result.stdout.rstrip(), MAX_RANGE_DIFF_CHARS, "range diff"
         )
         lines.append(text)
+        # A range diff line pairs two commits or carries one
+        # commit unpaired, with a dash standing where the other
+        # range holds nothing for it. When every line stands
+        # unpaired the raw listing alone reads as damage, so the
+        # section says in plain words below that no commits pair.
+        pairing_lines = [
+            match for match in (
+                RANGE_DIFF_LINE_RE.match(row)
+                for row in text.splitlines()
+            ) if match
+        ]
+        unpaired_only = bool(pairing_lines) and all(
+            match.group(1) == "-" or match.group(2) == "-"
+            for match in pairing_lines
+        )
     else:
         # The fallback stat stands under the same pins as every
         # other diff reading, and its widths are pinned in its
@@ -4317,6 +4538,14 @@ def build_rereview(repo, diff_base, head, since, findings,
         lines.append(delta.rstrip() if delta.strip() else "(no changes)")
     lines.append("```")
     lines.append("")
+    if unpaired_only:
+        lines.append(
+            "No commits pair between the two ranges, so the "
+            "listing above shows the commits of one range "
+            "unpaired rather than matched against commits of "
+            "the other."
+        )
+        lines.append("")
     if findings:
         lines.extend(
             findings_accounting(repo, diff_base, since, head, findings)
@@ -4334,7 +4563,9 @@ def build_rereview(repo, diff_base, head, since, findings,
     # The commits since list and the range diff print commit
     # text and file text the change carries, so the whole
     # section stands masked like the tier returns.
-    return mask_credential_text("\n".join(lines))
+    return sanitize_packet_text(
+        mask_credential_text("\n".join(lines))
+    )
 
 
 def verify_counts(repo, diff_base, head, manifest_files):
@@ -5654,6 +5885,49 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
         )
         return estimate
 
+    def spelled_measure(candidate, size):
+        info = tier_accounting(
+            selected,
+            {item["tier"] for item in candidate},
+            tier_texts,
+            tier_files,
+        )
+        spelled = [
+            {
+                "tier": item["tier"],
+                "reason": "budget of %d tokens" % size,
+            }
+            for item in candidate
+        ]
+        _packet, estimate = build_packet_text(
+            header_provisional, tier_texts, rereview, info,
+            spelled, size, True, [], counts,
+        )
+        return estimate
+
+    def settled_core_size(candidate):
+        # The size a refusal names must be a property of the
+        # change alone, and it must be a size a rerun accepts
+        # with its emitted packet measuring exactly that size.
+        # The packet a candidate emits names the budget it was
+        # given in its receipt and in its dropped tier lines,
+        # so the emitted size shifts with the digit shape of
+        # the budget spelling it carries, and neither the given
+        # budget nor a fixed canonical spelling names a size
+        # that survives its own rerun at every digit shape.
+        # The settled size is the fixed point of that spelling,
+        # found by measuring the candidate under the spelling
+        # of the size the previous measure named until the
+        # measure stops moving. The climb is monotone because a
+        # wider numeral never prices cheaper, and it settles
+        # within one step per digit width the size can carry.
+        size = spelled_measure(candidate, 0)
+        while True:
+            settled = spelled_measure(candidate, size)
+            if settled <= size:
+                return size
+            size = settled
+
     optional = [tier for tier in ("T3", "T2") if tier in selected]
     reason = "budget of %d tokens" % args.budget
     sizes = {
@@ -5661,8 +5935,8 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
         for tier in ("T0", "T1", "T2", "T3")
     }
     core_candidate = candidate_drops(set(optional))
-    core = measure(core_candidate)
-    if core > args.budget:
+    if measure(core_candidate) > args.budget:
+        core = settled_core_size(core_candidate)
         rest = core - sizes["T0"] - sizes["T1"]
         message = (
             "The smallest packet this selection can emit measures "

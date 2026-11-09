@@ -21,13 +21,15 @@ jobs:
     # before pushing, word for word. CI is a backstop, not a gate.
     # The timeout holds the whole gate with room to spare. The test
     # discover alone took 380 seconds on the runner at 2,344 tests
-    # in run 302, the suite now stands at 2,849 tests by the loader
-    # count on this tree, and 24 gate scripts plus the smoke script
-    # run behind the discover, so the old ten minutes cancelled
-    # the job inside the
-    # gate step before any verdict could stand. Thirty minutes is
-    # several times the extrapolated discover run of about 400
-    # seconds and still bounds a hung job.
+    # in run 302, and that measurement stands as history. The suite
+    # now stands at 2,867 tests by the loader count on this tree,
+    # and 24 gate scripts plus the smoke script run behind the
+    # discover, so the old ten minutes cancelled the job inside
+    # the gate step before any verdict could stand. On hosted run
+    # 42636057863 on the round 9 head the whole gate step ran
+    # about 945 seconds on Python 3.10 and about 1,014 seconds on
+    # Python 3.12. Thirty minutes bounds that measured whole gate
+    # span with room to spare and still bounds a hung job.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
