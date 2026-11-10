@@ -4037,3 +4037,25 @@ This unreleased work carries version 1.3.0.
   or a named framework exception. The agent guidance
   paragraph on this gate now names the full pin set
   the gate carries.
+- The packet check now holds the budget account
+  against the budget pass that produced it. A
+  packet whose settled estimate stands over the
+  budget its manifest records is refused, and a
+  packet that records a dropped tier under a
+  budget the full packet fits is refused, because
+  that budget never required a drop. The manifest
+  schema now requires the four fields the
+  extractor writes on every run beside the fields
+  it already required, the diff algorithm, the
+  findings hash, the prior pull requests passage
+  and the per file credential flag. A git read
+  that times out or cannot start now names that
+  cause in the packet check in place of the not a
+  readable repository sentence the genuine case
+  keeps, and the schema type refusal names the
+  type the schema wants. The blame summary cap
+  note names the total it cuts from, as its
+  sibling notes do, and the blame ranges cap note
+  stands once in the manifest list of a packet
+  whose capped ranges spread over more than one
+  of the most changed files.

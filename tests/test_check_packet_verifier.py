@@ -1480,7 +1480,7 @@ class TestManifestSchema(unittest.TestCase):
                 "status_code": "M", "additions": 1, "deletions": 1,
                 "hunks": 1, "binary": False, "attribute_text": False,
                 "binary_transition": False, "placeholder": None,
-                "instruction_file": False,
+                "instruction_file": False, "credential_file": False,
             }],
             "exclusions": [],
             "selected_tiers": ["T0", "T1", "T2", "T3"],
@@ -1504,6 +1504,8 @@ class TestManifestSchema(unittest.TestCase):
             "verified": True,
             "discrepancies": [],
             "diff_algorithm": "histogram",
+            "findings_sha256": None,
+            "prior_pull_requests_passage": None,
         }
 
     def test_schema_rejects_a_boolean_where_an_integer_stands(self):
@@ -1525,6 +1527,22 @@ class TestManifestSchema(unittest.TestCase):
         self.assertEqual(
             check_mod.manifest_schema_problems(self.genuine_manifest()),
             [],
+        )
+
+    def test_schema_type_refusal_names_the_wanted_type(self):
+        # Round 13 standards Note 3. The wrong type refusal
+        # named the field and the rule and not the type the
+        # schema wants, so a caller had to open the schema
+        # to learn it. The refusal now names the type.
+        manifest = self.genuine_manifest()
+        manifest["files"][0]["additions"] = "1"
+        problems = check_mod.manifest_schema_problems(manifest)
+        self.assertTrue(
+            any(
+                "additions" in problem and "integer" in problem
+                for problem in problems
+            ),
+            problems,
         )
 
     def test_a_pr_state_with_a_trailing_newline_fails_the_schema(self):
@@ -3716,6 +3734,330 @@ class TestRound12GraftStamp(VerifierFixture):
         code, err = self.run_check_captured(self.genuine)
         self.assertEqual(code, 0)
         self.assertIn("is a directory", err)
+
+
+class TestRound13BudgetAccount(unittest.TestCase):
+    """Round 13. The budget account is held against the budget pass.
+
+    The plants stand on the shipped example packet pair. Its
+    genuine figures are a packet estimate of 6031 tokens with
+    the history tier settled at 1853 tokens, and the dropped
+    plant settles its packet estimate the way the red team
+    record describes, by measuring the packet with the
+    history tier standing as its dropped placeholder, so the
+    figures below are settled figures and not round numbers
+    invented for the test.
+    """
+
+    EXAMPLE = ROOT / "examples" / "example-packet-991ac6a"
+
+    def example_manifest(self):
+        return json.loads(
+            (self.EXAMPLE / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def dropped_example(self, budget):
+        manifest = self.example_manifest()
+        text = (self.EXAMPLE / "packet.md").read_text(encoding="utf-8")
+        span = check_mod.section_span(text, "## T3 History")
+        body = span[:-1] if span.endswith("\n") else span
+        settled = extract_mod.estimate_tokens(text) \
+            - extract_mod.estimate_tokens(body) \
+            + extract_mod.estimate_tokens(
+                extract_mod.tier_placeholder("T3", "dropped")
+            )
+        manifest["budget"]["budget_tokens"] = budget
+        manifest["budget"]["estimated_tokens"] = settled
+        manifest["budget"]["dropped"] = [
+            {"tier": "T3", "reason": "budget of %d tokens" % budget}
+        ]
+        manifest["tiers"]["T3"]["state"] = "dropped"
+        manifest["tiers"]["T3"]["included"] = False
+        manifest["tiers"]["T3"]["emitted_tokens"] = \
+            extract_mod.estimate_tokens(
+                extract_mod.tier_placeholder("T3", "dropped")
+            )
+        manifest["command"] = manifest["command"] + [
+            "--budget", str(budget)
+        ]
+        return manifest
+
+    def test_the_genuine_example_packet_passes_the_budget_reading(self):
+        manifest = self.example_manifest()
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 6031)
+        self.assertEqual(check_mod.budget_problems(manifest), [])
+
+    def test_an_estimate_over_its_recorded_budget_is_refused(self):
+        # Red team Minor 1, plant a6. No tier drops, the
+        # recorded budget stands at 5000, and the settled
+        # packet estimate stands at the genuine 6031.
+        manifest = self.example_manifest()
+        manifest["budget"]["budget_tokens"] = 5000
+        manifest["command"] = manifest["command"] + [
+            "--budget", "5000"
+        ]
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "packet estimate of 6031 tokens exceeds the "
+                "budget of 5000 tokens" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_drop_under_a_budget_the_full_packet_fits_is_refused(self):
+        # Red team Major 1, plant a5. The history tier stands
+        # dropped under a recorded budget of 7000, while the
+        # restored packet, settled estimate plus the settled
+        # dropped tier size, stands inside that budget.
+        manifest = self.dropped_example(7000)
+        restored = manifest["budget"]["estimated_tokens"] \
+            + manifest["tiers"]["T3"]["estimated_tokens"]
+        self.assertLessEqual(restored, 7000)
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "does not exceed that budget, so the budget "
+                "never required a drop" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_drop_under_a_budget_the_full_packet_breaks_passes(self):
+        # The control for the drop reading. The same settled
+        # dropped packet under a budget of 5000 fits as it
+        # stands, and its restored size stands over the
+        # budget, so no budget problem stands against it.
+        manifest = self.dropped_example(5000)
+        restored = manifest["budget"]["estimated_tokens"] \
+            + manifest["tiers"]["T3"]["estimated_tokens"]
+        self.assertGreater(restored, 5000)
+        self.assertLessEqual(
+            manifest["budget"]["estimated_tokens"], 5000
+        )
+        self.assertEqual(check_mod.budget_problems(manifest), [])
+
+
+class TestRound13SchemaRequiredFields(unittest.TestCase):
+    """Round 13. The schema requires every field the extractor emits."""
+
+    EXAMPLE = ROOT / "examples" / "example-packet-991ac6a"
+
+    def example_manifest(self):
+        return json.loads(
+            (self.EXAMPLE / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def problems_without(self, field):
+        manifest = self.example_manifest()
+        del manifest[field]
+        return check_mod.manifest_schema_problems(manifest)
+
+    def test_the_genuine_example_manifest_validates(self):
+        self.assertEqual(
+            check_mod.manifest_schema_problems(self.example_manifest()),
+            [],
+        )
+
+    def test_a_manifest_without_diff_algorithm_is_refused(self):
+        problems = self.problems_without("diff_algorithm")
+        self.assertTrue(
+            any("diff_algorithm" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_manifest_without_findings_sha256_is_refused(self):
+        problems = self.problems_without("findings_sha256")
+        self.assertTrue(
+            any("findings_sha256" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_manifest_without_prior_passage_is_refused(self):
+        problems = self.problems_without("prior_pull_requests_passage")
+        self.assertTrue(
+            any(
+                "prior_pull_requests_passage" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_file_record_without_credential_file_is_refused(self):
+        manifest = self.example_manifest()
+        for record in manifest["files"]:
+            del record["credential_file"]
+        problems = check_mod.manifest_schema_problems(manifest)
+        self.assertTrue(
+            any("credential_file" in problem for problem in problems),
+            problems,
+        )
+
+
+class TestRound13GitFailureKinds(unittest.TestCase):
+    """Round 13. A timed out or unstarted git read names its own cause."""
+
+    def with_fake_run(self, run, call):
+        original = check_mod.subprocess
+        check_mod.subprocess = SimpleNamespace(
+            run=run, TimeoutExpired=subprocess.TimeoutExpired
+        )
+        try:
+            return call()
+        finally:
+            check_mod.subprocess = original
+
+    @staticmethod
+    def timed_out_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired("git", 120)
+
+    @staticmethod
+    def unstarted_run(*args, **kwargs):
+        raise OSError("git executable missing")
+
+    @staticmethod
+    def refusing_run(*args, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+    def test_a_timed_out_repository_read_names_the_limit(self):
+        problems, fatal = self.with_fake_run(
+            self.timed_out_run,
+            lambda: check_mod.repo_state_problems("/repo"),
+        )
+        self.assertTrue(fatal)
+        self.assertTrue(
+            any(
+                "timed out after 120 seconds" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any(
+                "not a readable git repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_an_unstarted_repository_read_names_the_start_failure(self):
+        problems, fatal = self.with_fake_run(
+            self.unstarted_run,
+            lambda: check_mod.repo_state_problems("/repo"),
+        )
+        self.assertTrue(fatal)
+        self.assertTrue(
+            any(
+                "could not be started" in problem
+                and "git executable missing" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any(
+                "not a readable git repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_refused_repository_read_keeps_the_genuine_sentence(self):
+        problems, fatal = self.with_fake_run(
+            self.refusing_run,
+            lambda: check_mod.repo_state_problems("/repo"),
+        )
+        self.assertTrue(fatal)
+        self.assertTrue(
+            any(
+                "is not a readable git repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_timed_out_head_read_names_the_limit(self):
+        head, wording = self.with_fake_run(
+            self.timed_out_run,
+            lambda: check_mod.current_head_reading("/repo"),
+        )
+        self.assertIsNone(head)
+        self.assertIn("timed out after 120 seconds", wording)
+
+    def test_an_unstarted_head_read_names_the_start_failure(self):
+        head, wording = self.with_fake_run(
+            self.unstarted_run,
+            lambda: check_mod.current_head_reading("/repo"),
+        )
+        self.assertIsNone(head)
+        self.assertIn("could not be started", wording)
+        self.assertIn("git executable missing", wording)
+
+    def test_a_refused_head_read_carries_no_failure_wording(self):
+        head, wording = self.with_fake_run(
+            self.refusing_run,
+            lambda: check_mod.current_head_reading("/repo"),
+        )
+        self.assertIsNone(head)
+        self.assertIsNone(wording)
+
+    def ref_manifest(self):
+        return {
+            "base": None, "head": "a" * 40, "merge_base": None,
+            "mode": "commit", "since": None,
+        }
+
+    def test_a_timed_out_commit_read_names_the_limit(self):
+        problems = self.with_fake_run(
+            self.timed_out_run,
+            lambda: check_mod.ref_problems(
+                "/repo", self.ref_manifest(), None, None
+            ),
+        )
+        self.assertTrue(
+            any(
+                "timed out after 120 seconds" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any("is not a commit" in problem for problem in problems),
+            problems,
+        )
+
+    def test_an_unstarted_commit_read_names_the_start_failure(self):
+        problems = self.with_fake_run(
+            self.unstarted_run,
+            lambda: check_mod.ref_problems(
+                "/repo", self.ref_manifest(), None, None
+            ),
+        )
+        self.assertTrue(
+            any(
+                "could not be started" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+        self.assertFalse(
+            any("is not a commit" in problem for problem in problems),
+            problems,
+        )
+
+    def test_a_refused_commit_read_keeps_the_genuine_sentence(self):
+        problems = self.with_fake_run(
+            self.refusing_run,
+            lambda: check_mod.ref_problems(
+                "/repo", self.ref_manifest(), None, None
+            ),
+        )
+        self.assertTrue(
+            any("is not a commit in" in problem for problem in problems),
+            problems,
+        )
 
 
 if __name__ == "__main__":

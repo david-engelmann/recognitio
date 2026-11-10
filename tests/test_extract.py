@@ -3374,6 +3374,79 @@ class TestRound10CapNotesAndRefusals(unittest.TestCase):
                 manifest["cap_notes"],
             )
 
+    def test_blame_ranges_note_stands_once_in_the_manifest(self):
+        # Round 13 spec Note 3. The ranges cap is reached
+        # inside the first file the blame section walks, and
+        # the second file meets the standing cap on its first
+        # range, which recorded the same note a second time in
+        # the manifest list the packet prints once.
+        body = "".join("line%03d = %d\n" % (i, i) for i in range(120))
+        changed = body
+        for i in range(5, 120, 10):
+            changed = changed.replace(
+                "line%03d = %d" % (i, i), "line%03d = %d" % (i, i + 500)
+            )
+        other = "".join("row%03d = %d\n" % (i, i) for i in range(40))
+        other_changed = other.replace(
+            "row005 = 5", "row005 = 505"
+        ).replace("row025 = 25", "row025 = 525")
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": body, "other.py": other},
+                {"mod.py": changed, "other.py": other_changed},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            note = (
+                "blame ranges capped at %d of 14"
+                % extract_mod.MAX_BLAME_RANGES
+            )
+            self.assertEqual(manifest["cap_notes"].count(note), 1)
+
+    def test_blame_summary_cap_note_names_its_total(self):
+        # Round 13 spec Note 2. The blame summary cap note
+        # named its cap alone where every sibling note names
+        # the total it cuts from, and the summary length
+        # stands in hand at the append site.
+        repo_lines = [
+            "line%03d = %d" % (i, i) for i in range(120)
+        ]
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"mod.py": "\n".join(repo_lines) + "\n"})
+            commit_all(repo, "base")
+            for author in range(12):
+                for offset in range(10):
+                    index = author * 10 + offset
+                    repo_lines[index] = "line%03d = %d" % (
+                        index, index + 500,
+                    )
+                write_tree(
+                    repo, {"mod.py": "\n".join(repo_lines) + "\n"}
+                )
+                git(repo, "add", "-A")
+                git(
+                    repo,
+                    "-c", "user.name=Author %02d" % author,
+                    "-c",
+                    "user.email=author%02d@example.com" % author,
+                    "commit", "-m", "step %d" % author,
+                )
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~12..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            note = (
+                "blame summary for mod.py capped at %d of 12 entries"
+                % extract_mod.MAX_BLAME_SUMMARY_LINES
+            )
+            self.assertIn(note, manifest["cap_notes"])
+
     def test_history_cap_note_names_cap_and_total(self):
         body = "".join(
             "line%03d = %d  # padding padding padding padding\n" % (i, i)

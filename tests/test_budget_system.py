@@ -653,6 +653,90 @@ class TestDroppedHistoryPortability(unittest.TestCase):
             "dropped T3 tier", result.stdout + result.stderr
         )
 
+    def test_a_shed_packet_relabelled_with_a_roomy_budget_is_refused(self):
+        # Round 13 red team Major 1, plant a5, discharged end
+        # to end. A genuine shed packet is relabelled with a
+        # budget the full packet fits, settled consistently
+        # across the manifest account, the recorded command
+        # and the closing receipt, so every older reading
+        # still passes and only the necessity reading can
+        # refuse it.
+        out = self.build_shed_packet()
+        forged = Path(self.tmp.name) / "roomy"
+        shutil.copytree(out, forged)
+        manifest = read_manifest(forged)
+        genuine_budget = manifest["budget"]["budget_tokens"]
+        tier = manifest["tiers"]["T3"]
+        restored = (
+            manifest["budget"]["estimated_tokens"]
+            + tier["estimated_tokens"] - tier["emitted_tokens"]
+        )
+        raised = restored + 500
+        manifest["budget"]["budget_tokens"] = raised
+        manifest["budget"]["dropped"][0]["reason"] = (
+            "budget of %d tokens" % raised
+        )
+        command = manifest["command"]
+        flag = command.index("--budget")
+        command[flag + 1] = str(raised)
+        (forged / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
+        packet = (forged / "packet.md").read_text()
+        packet = packet.replace(
+            "Budget in tokens: %d" % genuine_budget,
+            "Budget in tokens: %d" % raised,
+        )
+        packet = packet.replace(
+            "Dropped T3 because of the budget of %d tokens."
+            % genuine_budget,
+            "Dropped T3 because of the budget of %d tokens."
+            % raised,
+        )
+        (forged / "packet.md").write_text(packet)
+        result = run_check(forged, self.repo, env=self.env_for("one"))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            "never required a drop", result.stdout + result.stderr
+        )
+
+    def test_a_full_packet_over_its_recorded_budget_is_refused(self):
+        # Round 13 red team Minor 1, plant a6, discharged end
+        # to end. A genuine full packet is relabelled with a
+        # budget under its own settled estimate, settled
+        # consistently across the manifest account, the
+        # recorded command and the closing receipt.
+        full = Path(self.tmp.name) / "full-a6"
+        result = run_extract(
+            self.repo, full, "--range", "HEAD~1..HEAD",
+            env=self.env_for("one"),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        forged = Path(self.tmp.name) / "over-budget"
+        shutil.copytree(full, forged)
+        manifest = read_manifest(forged)
+        estimate = manifest["budget"]["estimated_tokens"]
+        budget = estimate - 200
+        self.assertGreater(budget, 0)
+        manifest["budget"]["budget_tokens"] = budget
+        manifest["command"] = manifest["command"] + [
+            "--budget", str(budget),
+        ]
+        (forged / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
+        packet = (forged / "packet.md").read_text()
+        packet = packet.replace(
+            "Budget in tokens: none set",
+            "Budget in tokens: %d" % budget,
+        )
+        (forged / "packet.md").write_text(packet)
+        result = run_check(forged, self.repo, env=self.env_for("one"))
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            "exceeds the budget", result.stdout + result.stderr
+        )
+
 
 class TestStandingPacketPreserved(unittest.TestCase):
     """Closure 5. No budget run replaces a standing verified packet."""

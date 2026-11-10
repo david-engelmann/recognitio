@@ -160,8 +160,16 @@ def scrubbed_child_env():
     return env
 
 
-def run_git(repo, args):
-    """Run one pinned git read and return its stdout or None."""
+def run_git_detailed(repo, args):
+    """Run one pinned git read and return its stdout and failure kind.
+
+    The second value is None on success and otherwise names the
+    kind of failure, timeout for a read that hit the stated
+    limit, process for a git process that could not be started,
+    and exit for a git process that ran and refused. Callers
+    that must name the true cause read the kind from here, and
+    callers that only need the output read it through run_git.
+    """
     try:
         result = subprocess.run(
             ["git", "--no-pager", "--no-replace-objects",
@@ -172,16 +180,71 @@ def run_git(repo, args):
             env=scrubbed_child_env(),
             timeout=PROCESS_TIMEOUT_SECONDS,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+    except subprocess.TimeoutExpired:
+        return None, ("timeout", None)
+    except OSError as exc:
+        return None, ("process", exc)
     if result.returncode != 0:
+        return None, ("exit", result.returncode)
+    return result.stdout, None
+
+
+def run_git(repo, args):
+    """Run one pinned git read and return its stdout or None."""
+    out, _failure = run_git_detailed(repo, args)
+    return out
+
+
+def git_failure_wording(failure, subject):
+    """The refusal wording for a timed out or unstarted git read.
+
+    Returns None for a failure kind that carries its own
+    wording at the call site, namely a git process that ran
+    and refused, which the genuine case already names. A
+    timeout names the limit it hit and a process failure
+    names the start failure, so neither is reported as the
+    genuine case it is not.
+    """
+    if failure is None:
         return None
-    return result.stdout
+    kind, detail = failure
+    if kind == "timeout":
+        return (
+            "the git read for %s timed out after %d seconds, "
+            "so that reading cannot be checked. Wait for the "
+            "repository to answer, then run the check again"
+            % (subject, PROCESS_TIMEOUT_SECONDS)
+        )
+    if kind == "process":
+        return (
+            "the git process for %s could not be started "
+            "(%s), so that reading cannot be checked. Repair "
+            "the git installation or the path to it, then run "
+            "the check again" % (subject, detail)
+        )
+    return None
 
 
 def current_head(repo):
     out = run_git(repo, ["rev-parse", "HEAD"])
     return out.strip() if out is not None else None
+
+
+def current_head_reading(repo):
+    """The current head and the failure wording when it cannot be read.
+
+    Returns the head and None on success, None and the wording
+    for a timed out or unstarted git read, and None and None
+    for a repository whose git read ran and found no head,
+    which the caller names in its own sentence.
+    """
+    out, failure = run_git_detailed(repo, ["rev-parse", "HEAD"])
+    if out is not None:
+        return out.strip(), None
+    wording = git_failure_wording(
+        failure, "the head of the repository at %s" % repo
+    )
+    return None, wording
 
 
 class DuplicateKeyError(ValueError):
@@ -381,9 +444,15 @@ def schema_problems_at(value, schema, root_schema, where):
         )
     declared = schema.get("type")
     if declared is not None and not _type_matches(value, declared):
+        if isinstance(declared, list):
+            wanted = "one of %s" % ", ".join(
+                str(item) for item in declared
+            )
+        else:
+            wanted = str(declared)
         problems.append(
             "the manifest value at %s has the wrong type for its "
-            "schema" % where
+            "schema, which names %s there" % (where, wanted)
         )
         return problems
     if isinstance(value, str):
@@ -708,8 +777,16 @@ def repo_state_problems(repo, notes=None):
     as settled.
     """
     problems = []
-    git_dir = run_git(repo, ["rev-parse", "--absolute-git-dir"])
+    git_dir, git_failure = run_git_detailed(
+        repo, ["rev-parse", "--absolute-git-dir"]
+    )
     if git_dir is None:
+        failure_wording = git_failure_wording(
+            git_failure, "the repository at %s" % repo
+        )
+        if failure_wording is not None:
+            problems.append(failure_wording)
+            return problems, True
         problems.append(
             "the path %s is not a readable git repository, so the "
             "recorded refs cannot be checked against it" % repo
@@ -1223,6 +1300,28 @@ def is_commit(repo, ref):
     return run_git(repo, ["cat-file", "-e", ref + "^{commit}"]) is not None
 
 
+def commit_reading(repo, ref):
+    """Whether a ref is a commit and the failure wording when unread.
+
+    Returns True and None for a commit, False and None for a
+    ref the repository reading ran against and refused, and
+    False and the distinct wording for a timed out or
+    unstarted git read, so that case is never reported as a
+    ref that is not a commit.
+    """
+    if not isinstance(ref, str) or not HEX40.match(ref):
+        return False, None
+    out, failure = run_git_detailed(
+        repo, ["cat-file", "-e", ref + "^{commit}"]
+    )
+    if out is not None:
+        return True, None
+    wording = git_failure_wording(
+        failure, "the recorded ref %s" % ref
+    )
+    return False, wording
+
+
 def git_merge_base(repo, base, head):
     out = run_git(repo, ["merge-base", base, head])
     return out.strip() if out is not None else None
@@ -1234,10 +1333,16 @@ def ref_problems(repo, manifest, expect_base, expect_merge_base):
     head = manifest.get("head")
     merge_base = manifest.get("merge_base")
     mode = manifest.get("mode")
-    if not is_commit(repo, head):
+    head_is_commit, head_failure = commit_reading(repo, head)
+    if not head_is_commit:
+        if head_failure is not None:
+            problems.append(head_failure)
+            return problems
         problems.append(
             "the manifest records head %s, which is not a commit in "
-            "the repository" % head
+            "the repository. Check the packet against the "
+            "repository the run read, or rebuild the packet from "
+            "that repository" % head
         )
         return problems
     if base is None:
@@ -1259,17 +1364,25 @@ def ref_problems(repo, manifest, expect_base, expect_merge_base):
                 "repository"
             )
     else:
-        if not is_commit(repo, base):
+        base_is_commit, base_failure = commit_reading(repo, base)
+        if not base_is_commit:
+            if base_failure is not None:
+                problems.append(base_failure)
+                return problems
             problems.append(
                 "the manifest records base %s, which is not a "
-                "commit in the repository" % base
+                "commit in the repository. Check the packet "
+                "against the repository the run read, or rebuild "
+                "the packet from that repository" % base
             )
             return problems
         computed = git_merge_base(repo, base, head)
         if computed is None:
             problems.append(
                 "the recorded base and head share no merge base in "
-                "the repository"
+                "the repository. Fetch the full history of both "
+                "into this repository, or rebuild the packet from "
+                "a repository that holds their shared history"
             )
         elif merge_base != computed:
             problems.append(
@@ -1283,11 +1396,18 @@ def ref_problems(repo, manifest, expect_base, expect_merge_base):
                 "merge base is not its base"
             )
     since = manifest.get("since")
-    if since is not None and not is_commit(repo, since):
-        problems.append(
-            "the manifest records since %s, which is not a commit "
-            "in the repository" % since
-        )
+    if since is not None:
+        since_is_commit, since_failure = commit_reading(repo, since)
+        if not since_is_commit:
+            if since_failure is not None:
+                problems.append(since_failure)
+            else:
+                problems.append(
+                    "the manifest records since %s, which is not a commit "
+                    "in the repository. Check the packet against "
+                    "the repository the run read, or rebuild the "
+                    "packet from that repository" % since
+                )
     if expect_base is not None and base != expect_base:
         problems.append(
             "the manifest records base %s but the review names "
@@ -1337,7 +1457,9 @@ def recount_problems(repo, manifest, extractor):
     except Exception as exc:
         return [
             "the recount of the recorded change could not run "
-            "(%s)" % exc
+            "(%s), so that reading cannot be checked. Run the "
+            "check again once the cause it names is repaired"
+            % exc
         ], None
     recorded = manifest["files"]
     fresh_by_path = {entry["path"]: entry for entry in fresh_records}
@@ -1395,7 +1517,9 @@ def recount_problems(repo, manifest, extractor):
         )
     except Exception as exc:
         problems.append(
-            "the verification recount could not run (%s)" % exc
+            "the verification recount could not run (%s), so "
+            "that reading cannot be checked. Run the check "
+            "again once the cause it names is repaired" % exc
         )
     else:
         for item in discrepancies:
@@ -2088,6 +2212,22 @@ def budget_problems(manifest):
     account itself records. The size of a dropped tier is
     recounted in the rebuild pass, which is the only place the
     tier text can be measured again.
+
+    Two further readings hold the account against the budget
+    pass that supposedly produced it, using the figures the
+    other readings settle. The packet estimate is settled
+    against the packet measure in the receipt reading, and a
+    dropped tier size is settled against the rebuilt tier in
+    the rebuild pass, so a stamp that survives every reading
+    has compared settled figures here. A packet whose settled
+    estimate stands over its recorded budget is a packet the
+    budget pass would never have accepted. A packet that
+    records drops while the packet with its dropped tiers
+    restored, settled as the settled estimate plus the
+    settled sizes of the dropped tiers, still stands inside
+    its recorded budget is a packet whose budget never
+    required a drop, because the budget pass keeps the drop
+    set that drops nothing whenever that set fits.
     """
     problems = []
     budget = manifest["budget"]
@@ -2123,6 +2263,42 @@ def budget_problems(manifest):
                     "account itself records"
                     % (item["tier"], ascii(item["reason"])[:60],
                        wanted_reason)
+                )
+        if budget["estimated_tokens"] > budget_tokens:
+            problems.append(
+                "the manifest packet estimate of %d tokens "
+                "exceeds the budget of %d tokens the manifest "
+                "records, and the budget pass accepts only a "
+                "packet that measures inside its budget"
+                % (budget["estimated_tokens"], budget_tokens)
+            )
+        if dropped:
+            tiers = manifest.get("tiers") or {}
+            restored = budget["estimated_tokens"] + sum(
+                tiers[item["tier"]]["estimated_tokens"]
+                for item in dropped
+                if isinstance(tiers.get(item["tier"]), dict)
+                and isinstance(
+                    tiers[item["tier"]].get("estimated_tokens"), int
+                )
+            )
+            settled_drops = [
+                item for item in dropped
+                if isinstance(tiers.get(item["tier"]), dict)
+                and isinstance(
+                    tiers[item["tier"]].get("estimated_tokens"), int
+                )
+            ]
+            if len(settled_drops) == len(dropped) and \
+                    restored <= budget_tokens:
+                problems.append(
+                    "the manifest budget account records dropped "
+                    "tiers under a budget of %d tokens, but the "
+                    "packet with the dropped tiers restored "
+                    "measures about %d tokens, which does not "
+                    "exceed that budget, so the budget never "
+                    "required a drop"
+                    % (budget_tokens, restored)
                 )
     return problems
 
@@ -3087,7 +3263,9 @@ def rereview_problems(packet_text, manifest, repo, extractor,
             )
         except Exception as exc:
             return [
-                "the re-review rebuild could not run (%s)" % exc
+                "the re-review rebuild could not run (%s), so "
+                "that reading cannot be checked. Run the check "
+                "again once the cause it names is repaired" % exc
             ]
         if span != expected:
             problems.append(
@@ -3117,7 +3295,9 @@ def rereview_problems(packet_text, manifest, repo, extractor,
         )
     except Exception as exc:
         problems.append(
-            "the re-review rebuild could not run (%s)" % exc
+            "the re-review rebuild could not run (%s), so that "
+            "reading cannot be checked. Run the check again "
+            "once the cause it names is repaired" % exc
         )
         return problems
     if span != expected:
@@ -3528,7 +3708,9 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
                     )
     except Exception as exc:
         problems.append(
-            "the tier rebuild could not run (%s)" % exc
+            "the tier rebuild could not run (%s), so that "
+            "reading cannot be checked. Run the check again "
+            "once the cause it names is repaired" % exc
         )
         return problems
     if manifest.get("cap_notes") != notes:
@@ -3660,7 +3842,9 @@ def whole_section_problems(packet_text, manifest, extractor):
             )
     except Exception as exc:
         problems.append(
-            "the framing section rebuild could not run (%s)" % exc
+            "the framing section rebuild could not run (%s), "
+            "so that reading cannot be checked. Run the check "
+            "again once the cause it names is repaired" % exc
         )
     return problems
 
@@ -3822,7 +4006,8 @@ def main(argv=None):
         problems.append(
             "there is no packet.md in %s, so the directory holds "
             "no packet for this check to read and nothing in it "
-            "can be stamped" % packet_dir
+            "can be stamped. Name the directory the run wrote "
+            "the packet into" % packet_dir
         )
     elif packet_path.stat().st_size == 0:
         problems.append(
@@ -3861,7 +4046,9 @@ def main(argv=None):
         problems.append(
             "there is no manifest.json in %s, so the directory "
             "holds no manifest receipt for this check to read "
-            "and nothing in it can be stamped" % packet_dir
+            "and nothing in it can be stamped. Name the "
+            "directory the run wrote the manifest into"
+            % packet_dir
         )
     else:
         try:
@@ -3932,13 +4119,18 @@ def main(argv=None):
         problems.extend(state_problems)
         head = None
         if not state_fatal:
-            head = current_head(args.repo)
+            head, head_failure = current_head_reading(args.repo)
             if head is None:
-                problems.append(
-                    "the repository at %s has no readable head "
-                    "commit, so the recorded head cannot be "
-                    "checked against it" % args.repo
-                )
+                if head_failure is not None:
+                    problems.append(head_failure)
+                else:
+                    problems.append(
+                        "the repository at %s has no readable head "
+                        "commit, so the recorded head cannot be "
+                        "checked against it. Open the repository "
+                        "at a commit, then run the check again"
+                        % args.repo
+                    )
             elif recorded != head:
                 problems.append(
                     "the manifest records head %s but the "

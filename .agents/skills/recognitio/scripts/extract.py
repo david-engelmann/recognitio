@@ -4283,10 +4283,12 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
         tally = {}
         for start, end in ranges:
             if range_count >= MAX_BLAME_RANGES:
-                notes.append(
+                ranges_note = (
                     "blame ranges capped at %d of %d"
                     % (MAX_BLAME_RANGES, total_ranges)
                 )
+                if ranges_note not in notes:
+                    notes.append(ranges_note)
                 break
             range_count += 1
             result = run_blame(repo, git_dir, head, start, end, path)
@@ -4312,8 +4314,11 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
         summary = sorted(tally.items(), key=lambda item: -item[1])
         if len(summary) > MAX_BLAME_SUMMARY_LINES:
             notes.append(
-                "blame summary for %s capped at %d entries"
-                % (display_path(path), MAX_BLAME_SUMMARY_LINES)
+                "blame summary for %s capped at %d of %d entries"
+                % (
+                    display_path(path), MAX_BLAME_SUMMARY_LINES,
+                    len(summary),
+                )
             )
             summary = summary[:MAX_BLAME_SUMMARY_LINES]
         lines.append("```")
