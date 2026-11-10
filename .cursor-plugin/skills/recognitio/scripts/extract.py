@@ -112,6 +112,19 @@ FUNC_PATTERNS = [
 
 CLASS_PATTERN = re.compile(r"class\s+([A-Za-z_][A-Za-z0-9_]*)")
 
+# A definition may carry a leading module system prefix that no
+# definition pattern names. The export word of the ES module shape
+# and its re-export form are stripped from a line before the
+# definition patterns read it, in the name gathering, in the
+# definition check and in the span search alike, so a name defined
+# behind the prefix is gathered and searched for exactly as a name
+# defined without it. The strip takes the prefix at the start of
+# the stripped line and nothing else, so a line that merely
+# mentions the word in its body keeps its reading.
+_DEFINITION_PREFIX_RE = re.compile(
+    r"^(?:export\s+(?:default\s+)?|export\s*\{\s*\}\s*from\s+\S+\s+)"
+)
+
 IMPORT_PATTERNS = {
     ".py": re.compile(r"^\s*(import\s+\S|from\s+\S+\s+import)"),
     ".js": re.compile(r"^\s*(import\s|const\s+.*=\s*require\(|let\s+.*=\s*require\(|var\s+.*=\s*require\()"),
@@ -329,14 +342,18 @@ def terminal_control_character(text):
     does not name, and a line whose head its own tail overwrites.
     The text a reader then sees is not the text the recount
     counted. The refused set is the escape character, the C0
-    controls other than tab and newline, and the delete
+    controls other than tab and newline and the vertical tab
+    and the form feed, and the delete
     character. A carriage return is refused only where
     it stands alone, because a carriage return standing ahead of
     a newline is the CRLF ending a genuine file can carry, while
     a carriage return inside a line is the overwrite shape
     itself. Tab stands because it is ordinary source text, and
     newline stands because it is the line structure of the text
-    itself. The C1 controls stand outside the set, because in a
+    itself. The vertical tab and the form feed stand beside
+    them, because a terminal prints both as spacing and acts
+    on neither, and genuine source text carries both, the form
+    feed as a page break in a comment. The C1 controls stand outside the set, because in a
     packet they arrive as UTF-8 characters no terminal acts on
     as controls, the single bytes that name them in an eight
     bit encoding cannot stand in a packet the check can decode
@@ -353,7 +370,7 @@ def terminal_control_character(text):
             if index + 1 < len(text) and text[index + 1] == "\n":
                 continue
             return char
-        if code < 32 and char not in ("\t", "\n"):
+        if code < 32 and char not in ("\t", "\n", "\x0b", "\x0c"):
             return char
         if code == 127:
             return char
@@ -509,6 +526,142 @@ def decode_bytes(data):
     return data.decode("utf-8", "surrogateescape")
 
 
+def companion_lines(text):
+    """The lines of one decoded companion carrier.
+
+    The byte search counts lines by newline alone, so the
+    companion reading splits on the newline alone as well. A
+    split on every boundary the string rules know would cut a
+    legacy encoded carrier at its accented bytes and renumber
+    every line after the first, and the context blocks would
+    then print rows under line numbers the search never used.
+    A carriage return standing at a line end is part of the
+    line ending and not of the line. A vertical tab or a form
+    feed standing inside a row is named in brackets where it
+    stands, the same naming the packet builder gives a NUL,
+    because the packet level terminal reading admits both
+    characters as spacing while the packet check recount reads
+    companion lines through this same split, so the named form
+    is the one form both sides count.
+    """
+    rows = text.split("\n")
+    if rows and rows[-1] == "":
+        rows.pop()
+    cleaned = []
+    for row in rows:
+        if row.endswith("\r"):
+            row = row[:-1]
+        cleaned.append(
+            row.replace("\x0b", "[VT]").replace("\x0c", "[FF]")
+        )
+    return cleaned
+
+
+def companion_read_text(data):
+    """Decode one companion carrier file for its context lines.
+
+    Companion evidence is read through this one reader by the call
+    sites tier and by the packet check recount alike, so a carrier
+    the two disagree on cannot slip between them. Bytes that are
+    valid UTF-8 read as themselves. A file standing in UTF-16 with
+    a byte order mark reads as its decoded text, but only when the
+    decoded text still reads as text. The still text reading asks
+    the decoded text to encode as UTF-8, to hold no control
+    character other than the ones text itself uses, the tab and
+    the line breaks and the NUL a string value can carry, and to
+    hold at least one character from a script this skill is
+    written for, a Latin letter or a Greek letter or a Cyrillic
+    letter or a kana or a Hangul syllable standing beside no
+    character from the ideograph extension block, or a Han
+    character from the common ideograph block with every
+    character of the text standing in that block or as a
+    space or as a digit or as one of the characters code
+    text is punctuated with and no character from the
+    extension
+    block beside it, because a mark standing in front of a
+    plain body pairs its bytes into wide characters across
+    scripts and blocks, into kana beside ideographs and
+    into symbols and unassigned points no text mixes in,
+    and some pair in any long plain body lands in the
+    control range besides. The control reading refuses only
+    the control characters no source text carries, the
+    escape and the bell and their kin, because the tab and
+    the line breaks and the form feed and the vertical tab
+    and the NUL a string value can carry all stand in
+    genuine text, the form feed as a page break in a
+    comment and the rest inside values.
+    Genuine UTF-16 text written for this skill to read stands
+    in one of those scripts, and it can hold a literal NUL
+    inside a string value. Anything else is converted byte
+    for byte into characters of that byte value, so a legacy encoded
+    carrier, one accented byte in a Latin 1 comment being the
+    common shape, keeps every line it carries and its ASCII lines
+    read exactly as written. Returns None only when no bytes stand,
+    or when the bytes carry a NUL outside a UTF-16 reading, because
+    a carrier with a NUL in it is a binary file and no line of it is
+    source evidence however its bytes align.
+    """
+    if data is None:
+        return None
+    if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
+        try:
+            decoded = data.decode("utf-16")
+        except UnicodeDecodeError:
+            decoded = None
+        accepted = False
+        if decoded is not None:
+            try:
+                decoded.encode("utf-8")
+                has_extension = any(
+                    "\u3400" <= char <= "\u4dbf" for char in decoded
+                )
+                accepted = not any(
+                    unicodedata.category(char) == "Cc"
+                    and char not in "\x00\t\n\r\x0b\x0c"
+                    for char in decoded
+                ) and (
+                    any(
+                        unicodedata.name(char, "").startswith(
+                            ("LATIN ", "GREEK ", "CYRILLIC ")
+                        )
+                        for char in decoded
+                    )
+                    or (
+                        not has_extension
+                        and any(
+                            unicodedata.name(char, "").startswith(
+                                ("HIRAGANA ", "KATAKANA ", "HANGUL ")
+                            )
+                            for char in decoded
+                        )
+                    )
+                    or (
+                        not has_extension
+                        and any(
+                            "\u4e00" <= char <= "\u9fff"
+                            for char in decoded
+                        )
+                        and all(
+                            "\u4e00" <= char <= "\u9fff"
+                            or char.isspace()
+                            or char.isdigit()
+                            or char in "=+*(){}[]<>:;,.!?/\\_-\"'`#@$%^&|~"
+                            for char in decoded
+                        )
+                    )
+                )
+            except UnicodeEncodeError:
+                accepted = False
+        if accepted:
+            return decoded
+    if b"\x00" in data:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1")
+
+
 # Git location variables are scrubbed from the child environment. An
 # exported GIT_DIR defeats git -C, so an extractor launched from a git
 # hook or a configured shell would silently read a different
@@ -529,6 +682,12 @@ GIT_LOCATION_VARS = (
     "GIT_NAMESPACE",
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
+    # The graft file variable hands every child a grafts file of
+    # the caller's choosing, which rewrites the parentage of the
+    # history the packet certifies while the packet keeps the real
+    # head name. It is scrubbed here and a clone carrying its own
+    # grafts file is refused where the inputs are resolved.
+    "GIT_GRAFT_FILE",
 )
 
 # Driver and configuration variables are scrubbed beside the location
@@ -768,8 +927,48 @@ def estimate_tokens(text):
     base of 600 plus 120 per character and 200 more per character
     past eight, because a real tokenizer splits long runs finer
     than short words. A run of eight or more copies of one
-    character is priced at 100 per character, because a real
-    tokenizer merges repeats. A character outside ASCII is priced
+    character is priced at 500 per character when the character
+    is not a digit, because a real tokenizer merges repeats of
+    a letter only a little on most letters, at about one token
+    per two characters, while its best merging letters merge
+    eight copies into one token. A repeated digit run is priced by the digit
+    rule instead, at 600 per character, because a real tokenizer
+    splits digit runs into groups of at most three digits before
+    any merge step, so a digit run costs at least one token per
+    three characters and no merge price can stand for it. A run
+    carrying digit groups embedded in letter stretches is
+    priced at one token per three digits in each group plus
+    the letter rate on each stretch, the letter rate standing
+    at the plain letter rate with a floor of a quarter token
+    per letter, when the run carries at least eight letters
+    in all, when no word in it is spelled with a capital
+    after a small letter, and when every digit group stands
+    in a letter stretch of at least four or at an edge of the
+    run beside such a stretch, because a real tokenizer reads
+    an embedded group at that rate between the letter tokens
+    of a spelled run, while a run spelled with capitals
+    inside its words keeps the digit rule below and a run of
+    unspelled letters prices under whichever of these
+    readings reaches it and stands on the named limit below
+    wherever the tokenizer splits its letters one by one. A
+    run whose every character is a hex character and which
+    carries at least one letter and whose digit groups earn
+    the embedded price prices at the greater of that price
+    and the hex rate of 700 per character, because a hash
+    fragment reads as hex pairs, while a hex run earning no
+    embedded price keeps the isolated or digit price below,
+    so an alternating run of the same characters keeps the
+    price its pair splits earn. A run
+    carrying an isolated digit, one digit standing apart from
+    every other digit in its run, is priced at 750 per character
+    with a floor of one token per digit it carries and one token
+    per group of three characters in its letter stretches,
+    because the
+    pre-tokeniser splits digit groups from letter groups at every
+    boundary and a run broken by isolated digits merges nowhere,
+    as the measured identifier family carrying isolated digits
+    shows at between two thirds and one token per character.
+    A character outside ASCII is priced
     by its encoded length, one whole token at two bytes or fewer,
     1200 thousandths at three bytes and 2400 thousandths at four
     bytes, because a tokenizer works on the encoded bytes and the
@@ -784,6 +983,26 @@ def estimate_tokens(text):
     real count between 0.49 and 1.35 times this estimate, so
     the estimate never underprices a measured family by a
     multiple and never overprices one by more than about twice.
+    Three families stand outside that band as named limits. A run
+    of unspelled letters, a keyboard walk or a run of rare
+    letters standing alone or beside a digit group, prices
+    under the letter or embedded or digit readings while a
+    real tokenizer splits such letters one by one, so its real
+    count can stand up to about 5.1 times the estimate, the
+    worst measured shape standing space separated at that
+    figure. A run of hex letters spelling an ordinary
+    word carries no digits and prices at the hex rate while a
+    real tokenizer reads the word whole, and a run of one
+    repeated letter on a best merging letter prices at the
+    repeated rate while a real tokenizer merges eight copies
+    into one token, so the real count of either can stand
+    down to about 0.24 times the estimate. A text built from
+    one repeated mark or whitespace character prices at the
+    mark or blank rate while a real tokenizer merges such
+    runs far harder or splits them finer, so its real count
+    can stand far outside the band in either direction, down
+    to about 0.02 times the estimate on a repeated dash and
+    up to about 3.1 times on a repeated tab.
     It is still an estimate and not a tokenizer, and every surface
     that names a budget names this method beside it.
     """
@@ -824,9 +1043,209 @@ def estimate_tokens(text):
             run = text[index:end]
             size = len(run)
             if len(set(run)) == 1 and size >= 8:
-                total += 100 * size
+                # A run of one repeated digit is priced by the
+                # digit rule below and never reaches this branch,
+                # because a real tokenizer splits a digit run into
+                # groups of at most three digits before any merge
+                # step, so each group costs at least one token and
+                # a digit run costs at least one token per three
+                # characters. A repeated non digit character prices
+                # at half a token per character, because a real
+                # tokenizer merges a repeated letter at about one
+                # token per two characters on most letters, while
+                # its best merging letters merge eight copies into
+                # one token and stand on the named limit below the
+                # band, and the half token price stands inside the
+                # measured band on every other letter.
+                if run[0].isdigit():
+                    total += 600 * size
+                else:
+                    total += 500 * size
             elif any(item.isdigit() for item in run):
-                if size == 1:
+                digit_count = sum(1 for item in run if item.isdigit())
+                # A digit group standing in a letter stretch of
+                # at least four, or at an edge of the run beside
+                # such a stretch, is an embedded group, the base64
+                # and version suffix shape, when the run carries
+                # at least eight letters in all and no word in it
+                # is spelled with a capital after a small letter.
+                # A real tokenizer reads one
+                # such group at one token per three digits and
+                # reads the letter stretches around it as letter
+                # text, so a run whose digit groups are all
+                # embedded prices at that group rate plus the
+                # letter rate on each stretch, and never reaches
+                # the isolated or flat digit prices below. A run
+                # whose words are spelled with capitals inside
+                # them keeps the digit rule below, because its
+                # letter stretches are not read as plain words,
+                # and a run of unspelled letters keeps it on the
+                # named limit the docstring above states.
+                digit_groups = []
+                group_start = None
+                for offset, item in enumerate(run):
+                    if item.isdigit():
+                        if group_start is None:
+                            group_start = offset
+                    elif group_start is not None:
+                        digit_groups.append((group_start, offset))
+                        group_start = None
+                if group_start is not None:
+                    digit_groups.append((group_start, size))
+                # A run whose every character is a hex character
+                # and carries at least one letter carries a hex
+                # price beside its other prices, because a mixed
+                # run like deadbeef1234 is a hash fragment and the
+                # tokenizer reads its letters as hex pairs. The
+                # run whose digit groups earn the embedded price
+                # prices at the greater of that price and the hex
+                # rate, so a hash fragment keeps the hex price,
+                # while a run earning no embedded price keeps the
+                # isolated or digit price below, so an alternating
+                # run the tokenizer splits pair by pair keeps its
+                # alternating price.
+                embedded_cost = None
+                hex_cost = None
+                if all(
+                    item in "0123456789abcdefABCDEF" for item in run
+                ) and any(item.isalpha() for item in run):
+                    hex_cost = 700 * size
+                if digit_groups and (
+                    size - digit_count >= 8
+                    and not any(
+                        item.isupper()
+                        for offset, item in enumerate(run)
+                        if not item.isdigit()
+                        and offset
+                        and run[offset - 1].islower()
+                    )
+                ):
+                    embedded = True
+                    for spot, (gs, ge) in enumerate(digit_groups):
+                        before = gs - (
+                            digit_groups[spot - 1][1] if spot else 0
+                        )
+                        after = (
+                            digit_groups[spot + 1][0]
+                            if spot + 1 < len(digit_groups)
+                            else size
+                        ) - ge
+                        if before == 0 and after == 0:
+                            embedded = False
+                            break
+                        if not (
+                            (before >= 4 or before == 0)
+                            and (after >= 4 or after == 0)
+                        ):
+                            embedded = False
+                            break
+                    if embedded:
+                        embedded_cost = sum(
+                            1000 * -(-(ge - gs) // 3)
+                            for gs, ge in digit_groups
+                        )
+                        stretch_start = 0
+                        for gs, ge in digit_groups + [(size, size)]:
+                            stretch = gs - stretch_start
+                            if stretch:
+                                embedded_cost += max(
+                                    600 + 120 * stretch
+                                    + 200 * max(0, stretch - 8),
+                                    250 * stretch,
+                                )
+                            stretch_start = ge
+                if hex_cost is not None and embedded_cost is not None:
+                    embedded_cost = max(embedded_cost, hex_cost)
+                # An isolated digit is a digit the scan below
+                # counts as standing apart. An interior digit
+                # counts with exactly one non digit on each side
+                # of it, the alternating pair shape, or with at
+                # least two non digits on each side of it. An
+                # edge digit counts with at least two non digits
+                # on its inner side, in a run of three characters
+                # or fewer or with at least two non digits on
+                # its outer side as well. The first digit of a
+                # lone digit pair standing inside a letter
+                # stretch of at least four letters on each side
+                # counts as well. A run whose every digit group
+                # stands embedded was priced by the branch
+                # above, which takes precedence over this price.
+                # A run carrying even one isolated digit never
+                # merges around it, because the pre-tokeniser
+                # splits digit groups from letter groups at
+                # every boundary, and the measured identifier
+                # family carrying isolated digits stands between
+                # two thirds and one whole token per character,
+                # so the run prices at 750 per character with a
+                # floor of one token per digit plus one token
+                # per group of at least three characters standing
+                # in a letter stretch of at least three. Sparser
+                # shapes with no isolated digit keep the digit
+                # rule below, whose shapes the audit band
+                # measured inside its bounds.
+                digit_positions = [
+                    offset for offset, item in enumerate(run)
+                    if item.isdigit()
+                ]
+                isolated = 0
+                for spot, offset in enumerate(digit_positions):
+                    prev_gap = (
+                        offset if spot == 0
+                        else offset - digit_positions[spot - 1] - 1
+                    )
+                    next_gap = (
+                        size - offset - 1
+                        if spot == len(digit_positions) - 1
+                        else digit_positions[spot + 1] - offset - 1
+                    )
+                    inner = spot not in (0, len(digit_positions) - 1)
+                    if inner and prev_gap == 1 and next_gap == 1:
+                        # An interior digit with exactly one
+                        # non digit on each side repeats as a
+                        # period two digit and letter pair across
+                        # the whole run, the alternating shape
+                        # the measured family prices at one token
+                        # per character.
+                        isolated += 1
+                    elif prev_gap >= 2 and next_gap >= 2:
+                        isolated += 1
+                    elif spot == 0 and next_gap >= 2 and (
+                        size <= 3 or prev_gap >= 2
+                    ):
+                        isolated += 1
+                    elif (
+                        spot == len(digit_positions) - 1
+                        and prev_gap >= 2
+                        and (size <= 3 or next_gap >= 2)
+                    ):
+                        isolated += 1
+                    elif (
+                        spot == 0
+                        and digit_count == 2
+                        and next_gap == 0
+                        and prev_gap >= 4
+                        and size - digit_positions[-1] - 1 >= 4
+                    ):
+                        # A lone digit pair standing inside a
+                        # long letter stretch, with at least
+                        # four letters on each side of it, stands
+                        # apart in the same way, the version
+                        # suffix and infix shape.
+                        isolated += 1
+                if embedded_cost is not None:
+                    total += embedded_cost
+                elif isolated:
+                    group_floor = 0
+                    run_start = 0
+                    for offset in digit_positions + [size]:
+                        if offset - run_start >= 3:
+                            group_floor += -(-(offset - run_start) // 3)
+                        run_start = offset + 1
+                    total += max(
+                        750 * size,
+                        1000 * (digit_count + group_floor),
+                    )
+                elif size == 1:
                     total += 800
                 elif size == 2:
                     total += 1500
@@ -925,6 +1344,64 @@ def refuse_shallow(repo):
             "the local clone is shallow, so its history is truncated and no "
             "packet built from it can be trusted. Fetch the full history "
             "first, for example with git fetch --unshallow, then run again"
+        )
+
+
+def refuse_grafts(repo):
+    """Refuse a clone carrying an effective graft.
+
+    A graft rewrites the parentage git reports for a commit, so
+    a packet built in a clone carrying one certifies the grafted
+    change under the name of the real commit, and the recount
+    reads through the same graft and agrees with it. Replace
+    objects are refused for the same reason at every invocation,
+    and the attributes file in the same info directory is refused
+    beside this one. A grafts file holding only comments and
+    blank lines grafts nothing and does not refuse the run. A
+    graft handed in through the caller environment never reaches
+    a child, because the graft file variable stands in the scrub
+    list, so the file this refusal reads is the clone's own.
+    """
+    common = run_git(
+        repo, ["rev-parse", "--git-common-dir"], check=False
+    )
+    if common.returncode != 0 or not common.stdout.strip():
+        return
+    common_path = Path(common.stdout.strip())
+    if not common_path.is_absolute():
+        common_path = Path(repo) / common_path
+    grafts = common_path / "info" / "grafts"
+    try:
+        graft_mode = os.stat(grafts).st_mode
+    except OSError:
+        return
+    if stat.S_ISFIFO(graft_mode):
+        raise GitError(
+            "the clone carries a named pipe at %s and git reads "
+            "that path as its grafts file, so the git calls this "
+            "run makes would block on opening it. Remove the "
+            "pipe, then run again" % grafts
+        )
+    if not grafts.is_file():
+        return
+    try:
+        text = grafts.read_text(
+            encoding="utf-8", errors="surrogateescape"
+        )
+    except OSError:
+        return
+    effective = [
+        line for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if effective:
+        raise GitError(
+            "the clone carries grafts in %s and a graft rewrites "
+            "the parentage of the history the packet certifies "
+            "while the packet keeps the real head name, so no "
+            "packet built in this clone can certify the change of "
+            "the commit it names. Empty or remove that file, "
+            "then run again" % grafts
         )
 
 
@@ -1135,6 +1612,7 @@ def resolve_commit(repo, args, since_sha):
 def resolve_inputs(repo, args):
     """Return a dict with mode, refs, merge base, label, since and pr."""
     refuse_shallow(repo)
+    refuse_grafts(repo)
     refuse_info_attributes(repo)
     since_sha = rev_parse(repo, args.since) if args.since else None
     if args.pr is not None:
@@ -1365,6 +1843,7 @@ def extract_function_names(chunk):
             probe = line[1:].strip()
         else:
             continue
+        probe = _DEFINITION_PREFIX_RE.sub("", probe, count=1)
         for pattern in FUNC_PATTERNS:
             match = pattern.match(probe)
             if match:
@@ -1373,6 +1852,145 @@ def extract_function_names(chunk):
                     names.append(name)
     return names
 
+def companion_stems(entry):
+    """Search stems for one source entry, each in both Unicode forms.
+
+    A changed module whose file name stands in the tree in one
+    normalisation form is mentioned in test files and callers in
+    the other form as routinely as in its own, because the tools
+    that write file names and the tools that write file contents
+    do not all write the same form. The tier therefore searches
+    every stem in both its composed and its decomposed spelling,
+    and credits a hit under either spelling to the stem it names.
+    """
+    stems = [Path(entry["path"]).stem]
+    if entry.get("old_path") and entry.get("status") == "renamed":
+        stems.append(Path(entry["old_path"]).stem)
+    forms = []
+    for stem in stems:
+        for form in (
+            unicodedata.normalize("NFC", stem),
+            unicodedata.normalize("NFD", stem),
+        ):
+            if form not in forms:
+                forms.append(form)
+    return forms
+
+
+def own_spelling_stems(entry, head_paths):
+    """The spellings under which one entry's stem is gathered.
+
+    The own spelling always stands. The other normalisation
+    spelling stands beside it only while no other file at the
+    head carries that spelling as its own stem, because when
+    two real files carry the two spellings of one name, a
+    mention under the other spelling names the other file, and
+    crediting it to this entry would present a test of one
+    module as evidence about another that merely renders the
+    same.
+    """
+    forms = companion_stems(entry)
+    if len(forms) < 2:
+        return forms
+    own = unicodedata.normalize("NFC", Path(entry["path"]).stem)
+    others = {
+        unicodedata.normalize("NFC", Path(path).stem)
+        for path in head_paths
+        if path != entry["path"]
+    }
+    if own in others:
+        return [Path(entry["path"]).stem]
+    return forms
+
+
+def _is_word_char(char):
+    """A word character under the Unicode reading of a line.
+
+    Letters and digits and marks and the underscore are word
+    characters, so a term standing inside a longer identifier
+    whose extra letters are accented is inside a word and is not
+    credited as an occurrence of the term. ASCII letters and
+    digits and the underscore keep the word status they have
+    always had here.
+    """
+    if char == "_":
+        return True
+    category = unicodedata.category(char)
+    return category[0] in ("L", "N", "M")
+
+
+def _term_spelling_matches(term, content):
+    """Whether a term word matches a line in the term's own spelling."""
+    if not term:
+        return False
+    start = 0
+    while True:
+        index = content.find(term, start)
+        if index == -1:
+            return False
+        before_ok = index == 0 or not _is_word_char(content[index - 1])
+        after = index + len(term)
+        after_ok = after == len(content) or not _is_word_char(content[after])
+        if before_ok and after_ok:
+            return True
+        start = index + 1
+
+
+_TERM_OTHER_FORMS = {}
+
+
+def _term_other_forms(term):
+    """The term's other normalisation forms, computed once per term.
+
+    The companion matcher asks this of every term for every line
+    it reads, and a wide carrier holds tens of thousands of
+    lines, so the forms are cached by term for the whole run
+    instead of being recomputed for every pair.
+    """
+    forms = _TERM_OTHER_FORMS.get(term)
+    if forms is None:
+        forms = []
+        for form in (
+            unicodedata.normalize("NFC", term),
+            unicodedata.normalize("NFD", term),
+        ):
+            if form != term and form not in forms:
+                forms.append(form)
+        forms = tuple(forms)
+        _TERM_OTHER_FORMS[term] = forms
+    return forms
+
+
+def term_matches_line(term, content):
+    """Whether a fixed term word matches inside one line of content.
+
+    This mirrors the word match the grep flags ask git for, so a
+    bulk search can hand each candidate line to the terms it truly
+    matches. The grep word rule checks both ends of every match,
+    whatever characters the term itself begins or ends with. The
+    character before the match and the character after it must
+    each be a non word character or the edge of the line, so a
+    term that begins with a dot or ends with a hyphen is held to
+    the same boundaries as a plain name.
+
+    The boundary reading is the Unicode reading. A character that
+    is a letter or a digit or a mark in any script is a word
+    character, so an accented letter standing against the match
+    holds the boundary shut in the same way an ASCII letter does.
+    A term is also credited when its other normalisation form
+    word matches the line, because a name written in one form is
+    the same name written in the other, and the search layer
+    runs both spellings of every gathered term for the same
+    reason.
+    """
+    if not term:
+        return False
+    if _term_spelling_matches(term, content):
+        return True
+    for form in _term_other_forms(term):
+        if _term_spelling_matches(form, content):
+            return True
+    return False
 
 
 def file_bytes(repo, ref, path):
@@ -1415,6 +2033,18 @@ def decode_text(data):
 
 def show_file(repo, head, path):
     return decode_text(file_bytes(repo, head, path))
+
+
+def show_companion_file(repo, head, path):
+    """The companion reading of one file at a head.
+
+    The call sites tier reads its context lines and the imports
+    tier reads its import lines through this reader, so a carrier
+    whose bytes are not valid UTF-8 keeps the evidence it carries
+    instead of dropping whole sections in silence. The change
+    tier reads through show_file and keeps its strict rule.
+    """
+    return companion_read_text(file_bytes(repo, head, path))
 
 
 def fetch_change(repo, diff_base, head):
@@ -2897,38 +3527,6 @@ def git_grep_lines(repo, head, term, fixed=True, term_count=None):
     return hits
 
 
-_WORD_CHARS = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-)
-
-
-def term_matches_line(term, content):
-    """Whether a fixed term word matches inside one line of content.
-
-    This mirrors the word match the grep flags ask git for, so a
-    bulk search can hand each candidate line to the terms it truly
-    matches. The grep word rule checks both ends of every match,
-    whatever characters the term itself begins or ends with. The
-    character before the match and the character after it must
-    each be a non word character or the edge of the line, so a
-    term that begins with a dot or ends with a hyphen is held to
-    the same boundaries as a plain name.
-    """
-    if not term:
-        return False
-    start = 0
-    while True:
-        index = content.find(term, start)
-        if index == -1:
-            return False
-        before_ok = index == 0 or content[index - 1] not in _WORD_CHARS
-        after = index + len(term)
-        after_ok = after == len(content) or content[after] not in _WORD_CHARS
-        if before_ok and after_ok:
-            return True
-        start = index + 1
-
-
 def git_grep_bulk(repo, head, terms):
     """Return hits per term from batched searches over the whole tree.
 
@@ -2966,7 +3564,7 @@ def git_grep_bulk(repo, head, terms):
         hits[searchable[0]] = git_grep_lines(
             repo, head, searchable[0], term_count=len(unique)
         )
-        return hits
+        return _merge_utf16_hits(repo, head, hits, searchable)
     batch_count = -(-len(searchable) // MAX_BULK_SEARCH_TERMS)
     if batch_count > 1:
         # A multi batch gather is the one run a user can wait
@@ -3015,7 +3613,184 @@ def git_grep_bulk(repo, head, terms):
                 matched_by_content[content] = matched
             for term in matched:
                 hits[term].append((path, lineno, content))
+    return _merge_utf16_hits(repo, head, hits, searchable)
+
+
+def _merge_utf16_hits(repo, head, hits, terms):
+    """Fold the UTF-16 carrier hits into the gathered hits.
+
+    The UTF-16 scan runs once per gather rather than once per
+    batch, so its cost does not grow with the batch count. Its
+    hits merge by path and line, so a line the byte search also
+    returned stands once in the per term order its path and line
+    give it.
+    """
+    extra = utf16_companion_hits(
+        repo, head, terms, tree_entries_at_head(repo, head)
+    )
+    for term, found in extra.items():
+        if found:
+            hits[term] = sorted(
+                set(hits.get(term, [])) | set(found)
+            )
     return hits
+
+
+def tree_entries_at_head(repo, head):
+    """The entries standing in the tree at a head, as tuples.
+
+    Each tuple carries the mode, the object type, the object id
+    and the path of one entry, read from the one recursive
+    listing of the tree. The companion readers that walk the
+    whole tree share this reader, so the listing is parsed in
+    one place and a scope decision about modes is made once.
+    """
+    result = run_git(
+        repo, ["ls-tree", "-r", "-z", head], check=False,
+        global_flags=["--attr-source=" + head],
+    )
+    if result.returncode != 0:
+        return []
+    entries = []
+    for record in result.stdout.split("\0"):
+        if not record.strip():
+            continue
+        meta, _, path = record.partition("\t")
+        fields = meta.split()
+        if len(fields) >= 3:
+            entries.append((fields[0], fields[1], fields[2], path))
+    return entries
+
+
+def blob_bytes_batch(repo, wanted, limit=None):
+    """The bytes of many blobs, read through one git process.
+
+    The wanted map carries an object id for each key the caller
+    wants back, and the result carries the bytes under the same
+    keys, with a key absent when its object cannot be read. One
+    cat-file batch process serves the whole map, so reading a
+    tree of carriers costs one process rather than one process
+    per file. A caller that needs only the head of each blob
+    passes a limit, and each value then stands truncated at
+    that many bytes with nothing more of the blob read, because
+    the batch stream is drained by count alone.
+    """
+    found = {}
+    if not wanted:
+        return found
+    argv = (
+        ["git", "--no-pager", "--no-replace-objects",
+         "--literal-pathspecs", "-C", str(repo)] + GIT_PIN
+        + ["cat-file", "--batch"]
+    )
+    try:
+        proc = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            env=scrubbed_child_env(),
+        )
+    except OSError:
+        return found
+    stream = proc.stdout
+    try:
+        for key, oid in wanted.items():
+            proc.stdin.write((oid + "\n").encode("utf-8"))
+            proc.stdin.flush()
+            header = stream.readline().decode("utf-8", "replace").split()
+            if len(header) < 3 or header[1] != "blob":
+                if len(header) >= 2 and header[1] == "missing":
+                    continue
+                break
+            try:
+                size = int(header[2])
+            except ValueError:
+                break
+            if limit is None:
+                data = stream.read(size)
+                stream.read(1)
+                if len(data) == size:
+                    found[key] = data
+            else:
+                take = min(size, limit)
+                data = stream.read(take)
+                remaining = size - take + 1
+                while remaining > 0:
+                    chunk = stream.read(min(remaining, 1 << 20))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                if len(data) == take:
+                    found[key] = data
+    except (OSError, ValueError):
+        pass
+    finally:
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass
+        try:
+            stream.close()
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=30)
+        except Exception:
+            proc.kill()
+    return found
+
+
+def utf16_companion_hits(repo, head, terms, head_entries=None):
+    """Hits standing inside UTF-16 carriers at a head.
+
+    The byte search the companion tier runs cannot match a plain
+    term inside a file saved in UTF-16, because that form
+   interleaves a NUL byte after every ASCII character, so a
+    carrier in that form would read as carrying nothing and the
+    sections would print their absence sentences over live
+    evidence. Files are detected by the byte order mark git
+    itself leaves visible, read through the reader,
+    and their decoded lines are matched with the same word rule
+    the byte search applies, so a hit is a hit by the same
+    standard. The scan reads the first bytes of every regular
+    file in the tree once through one batch process, because a
+    byte order mark stands inside the first bytes a UTF-16
+    writing tool emits, and a file whose first bytes carry
+    mark costs that short read and no decode. A carrier whose
+    mark stands is then read in full through the ordinary blob
+    reader. A carrier written in UTF-16 with no mark is not
+    read as UTF-16 anywhere in this tier, and the absence
+    sentences the sections print are scoped to marked and
+    plain carriers on that point in the skill reference.
+    The head entries arrive from the caller in entry tuple
+    form, the listing the merge helper already read, and the
+    scan lists the tree itself only when none stand.
+    """
+    extra = {term: [] for term in terms}
+    prefixes = {}
+    wanted = {}
+    entries = (
+        head_entries
+        if head_entries is not None
+        else tree_entries_at_head(repo, head)
+    )
+    for mode, kind, oid, path in entries:
+        if kind == "blob" and mode in ("100644", "100755"):
+            wanted[path] = oid
+    prefixes = blob_bytes_batch(repo, wanted, limit=7)
+    for path, data in prefixes.items():
+        if not (data.startswith(b"\xff\xfe")
+                or data.startswith(b"\xfe\xff")):
+            continue
+        full = file_bytes(repo, head, path)
+        if full is None:
+            continue
+        text = companion_read_text(full)
+        if text is None:
+            continue
+        for lineno, line in enumerate(companion_lines(text), start=1):
+            for term in terms:
+                if term_matches_line(term, line):
+                    extra[term].append((path, lineno, line))
+    return extra
 
 
 def is_test_path(path):
@@ -3035,29 +3810,42 @@ def source_entries(files):
     return [entry for entry in files if Path(entry["path"]).suffix in SOURCE_EXTS]
 
 
-def companion_terms(files, functions_by_file):
+def companion_terms(files, functions_by_file, head_entries=()):
     """Every search term the companion tier needs, gathered once."""
     terms = []
     for entry in source_entries(files):
-        terms.append(Path(entry["path"]).stem)
-        if entry.get("old_path") and entry.get("status") == "renamed":
-            # A paired rename carries its old name only in the old
-            # path field of its single entry. The old stem is a
-            # search term beside the new stem, in the same way the
-            # findings accounting keys its ranges by the old side,
-            # or a test file that still mentions the module under
-            # its old name is never found and the test files section
-            # can print a false absence over it. A copied entry
-            # carries an old path too, and its old module still
-            # exists under that name, so its mentions are not
-            # evidence about the copy and no old stem is searched.
-            terms.append(Path(entry["old_path"]).stem)
+        # A stem is gathered in both of its Unicode normalisation
+        # spellings, so a mention written in the other form is found
+        # under the spelling it stands in, unless another file at
+        # the head carries that name as its own stem, in which case
+        # the gather keeps to the entry's own spelling. Function
+        # names keep the single spelling their definition carries,
+        # and the matcher still credits the other form where a line
+        # carries it.
+        terms.extend(own_spelling_stems(entry, head_entries))
         terms.extend(functions_by_file.get(entry["path"], []))
     return terms
 
 
+def gitlinks_at_head(repo, head):
+    """The gitlink paths standing in the tree at a head.
+
+    A submodule holds its content in its own repository, and the
+    companion search reads the reviewed tree alone, so a caller
+    inside a submodule is outside the search rather than absent
+    from it. The sections that print absence sentences name the
+    gitlinks standing at the head beside the sentence, so the
+    absence is scoped to the tree the search reads.
+    """
+    return [
+        path
+        for mode, _kind, _oid, path in tree_entries_at_head(repo, head)
+        if mode == "160000"
+    ]
+
+
 def call_sites_section(repo, head, files, functions_by_file, notes,
-                       hits_by_term=None):
+                       hits_by_term=None, gitlinks=()):
     lines = []
     content_cache = {}
     if hits_by_term is None:
@@ -3067,11 +3855,11 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
 
     def context_block(path, lineno):
         if path not in content_cache:
-            content_cache[path] = show_file(repo, head, path)
+            content_cache[path] = show_companion_file(repo, head, path)
         content = content_cache[path]
         if content is None:
             return None
-        rows = content.splitlines()
+        rows = companion_lines(content)
         start = max(1, lineno - 1)
         end = min(len(rows), lineno + 1)
         block = []
@@ -3088,7 +3876,18 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
             lines.append("### Call sites for %s in %s" % (name, display_path(path)))
             lines.append("")
             if not hits:
-                lines.append("No call sites found outside the changed file.")
+                lines.append(
+                    "No call sites found outside the changed file."
+                )
+                if gitlinks:
+                    lines.append(
+                        "The search reads the reviewed tree alone. "
+                        "Submodule content under %s stands outside "
+                        "it and was not searched."
+                        % ", ".join(
+                            display_path(item) for item in gitlinks
+                        )
+                    )
                 lines.append("")
                 continue
             shown = hits[:MAX_CALL_SITES_PER_FUNCTION]
@@ -3098,13 +3897,31 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
                     % (name, len(shown), len(hits))
                 )
             lines.append("```")
+            dropped = 0
+            dropped_paths = []
             for hit_path, hit_line, _content in shown:
                 block = context_block(hit_path, hit_line)
                 if block:
                     lines.append(block)
                     lines.append("")
+                else:
+                    dropped += 1
+                    if hit_path not in dropped_paths:
+                        dropped_paths.append(hit_path)
             lines.append("```")
             lines.append("")
+            if dropped:
+                notes.append(
+                    "call site contexts in %s could not be read and "
+                    "were not shown for %d of %d shown hits"
+                    % (
+                        ", ".join(
+                            display_path(item) for item in dropped_paths
+                        ),
+                        dropped,
+                        len(shown),
+                    )
+                )
     return lines
 
 
@@ -3120,12 +3937,12 @@ def imports_section(repo, head, files, notes):
         pattern = IMPORT_PATTERNS.get(Path(path).suffix)
         if pattern is None:
             continue
-        content = show_file(repo, head, path)
+        content = show_companion_file(repo, head, path)
         if content is None:
             continue
         in_go_block = False
         found = []
-        for number, row in enumerate(content.splitlines(), start=1):
+        for number, row in enumerate(companion_lines(content), start=1):
             stripped = row.strip()
             if Path(path).suffix == ".go":
                 if stripped.startswith("import ("):
@@ -3161,16 +3978,17 @@ def imports_section(repo, head, files, notes):
 
 
 def line_defines(line, name):
+    probe = _DEFINITION_PREFIX_RE.sub("", line.strip(), count=1)
     for pattern in FUNC_PATTERNS:
-        match = pattern.match(line.strip())
+        match = pattern.match(probe)
         if match and match.group(1) == name:
             return True
-    match = CLASS_PATTERN.match(line.strip())
+    match = CLASS_PATTERN.match(probe)
     return bool(match and match.group(1) == name)
 
 
 def definitions_section(repo, head, files, functions_by_file, notes,
-                        hits_by_term=None):
+                        hits_by_term=None, gitlinks=()):
     lines = []
     lines.append("### Definitions of changed names elsewhere")
     lines.append("")
@@ -3213,12 +4031,19 @@ def definitions_section(repo, head, files, functions_by_file, notes,
             "No definitions of the changed names were found outside the "
             "changed files."
         )
+        if gitlinks:
+            lines.append(
+                "The search reads the reviewed tree alone. Submodule "
+                "content under %s stands outside it and was not "
+                "searched."
+                % ", ".join(display_path(item) for item in gitlinks)
+            )
         lines.append("")
     return lines
 
 
 def test_files_section(repo, head, files, functions_by_file, notes,
-                       hits_by_term=None):
+                       hits_by_term=None, gitlinks=()):
     lines = []
     test_hits = {}
     changed_paths = [entry["path"] for entry in files]
@@ -3227,10 +4052,15 @@ def test_files_section(repo, head, files, functions_by_file, notes,
             repo, head, companion_terms(files, functions_by_file)
         )
     for entry in source_entries(files):
-        stem = Path(entry["path"]).stem
-        terms = [stem]
-        if entry.get("old_path") and entry.get("status") == "renamed":
-            terms.append(Path(entry["old_path"]).stem)
+        # The stem stands under both of its normalisation
+        # spellings in the gathered hits, and a hit under either
+        # spelling is evidence about the one stem, as the gather
+        # in companion_stems states.
+        terms = list(own_spelling_stems(
+            entry,
+            [entry_path[3] for entry_path
+             in tree_entries_at_head(repo, head)],
+        ))
         terms.extend(functions_by_file.get(entry["path"], []))
         for term in terms:
             for hit_path, hit_line, content in hits_by_term.get(term, []):
@@ -3251,6 +4081,13 @@ def test_files_section(repo, head, files, functions_by_file, notes,
     lines.append("")
     if not test_hits:
         lines.append("No test files mention the changed modules or functions.")
+        if gitlinks:
+            lines.append(
+                "The search reads the reviewed tree alone. Submodule "
+                "content under %s stands outside it and was not "
+                "searched."
+                % ", ".join(display_path(item) for item in gitlinks)
+            )
         lines.append("")
         return lines
     test_paths = sorted(test_hits)
@@ -3295,20 +4132,27 @@ def build_t2(repo, head, files, functions_by_file):
         return sanitize_packet_text(
             mask_credential_text("\n".join(lines))
         ), notes, 0
+    head_paths = [
+        entry[3] for entry in tree_entries_at_head(repo, head)
+    ]
     hits_by_term = git_grep_bulk(
-        repo, head, companion_terms(files, functions_by_file)
+        repo, head, companion_terms(files, functions_by_file, head_paths)
     )
+    gitlinks = gitlinks_at_head(repo, head)
     lines.extend(call_sites_section(
-        repo, head, files, functions_by_file, notes, hits_by_term
+        repo, head, files, functions_by_file, notes, hits_by_term,
+        gitlinks,
     ))
     lines.extend(imports_section(repo, head, files, notes))
     lines.extend(
         definitions_section(
-            repo, head, files, functions_by_file, notes, hits_by_term
+            repo, head, files, functions_by_file, notes, hits_by_term,
+            gitlinks,
         )
     )
     lines.extend(test_files_section(
-        repo, head, files, functions_by_file, notes, hits_by_term
+        repo, head, files, functions_by_file, notes, hits_by_term,
+        gitlinks,
     ))
     lines.extend(render_notes(notes))
     return sanitize_packet_text(
@@ -3319,8 +4163,9 @@ def build_t2(repo, head, files, functions_by_file):
 def find_function_span(content_lines, name, path):
     start = None
     for index, line in enumerate(content_lines):
+        probe = _DEFINITION_PREFIX_RE.sub("", line.strip(), count=1)
         for pattern in FUNC_PATTERNS:
-            match = pattern.search(line)
+            match = pattern.match(probe)
             if match and match.group(1) == name:
                 start = index
                 break
@@ -6131,6 +6976,100 @@ def assemble_manifest(argv, args, resolved, head, manifest_files,
     return manifest
 
 
+def is_missing_object_failure(message):
+    """Whether a failure message names a missing object read.
+
+    A partial clone whose promisor is gone fails its first read
+    of a missing object with the git words for that one object,
+    and the extractor rewords that one shape into its own voice
+    at the failure paths. Any other failure keeps its own words.
+    """
+    return "unable to read " in message or "missing object" in message
+
+
+def common_dir_path(repo):
+    """The clone's common git directory as a Path, or None."""
+    result = run_git(
+        repo, ["rev-parse", "--git-common-dir"], check=False
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    common_path = Path(result.stdout.strip())
+    if not common_path.is_absolute():
+        common_path = Path(repo) / common_path
+    return common_path
+
+
+def repo_is_partial(repo):
+    """Whether the clone carries the marks of a partial clone.
+
+    A partial clone records its filter in its config under a
+    promisor remote and keeps a promisor record beside each
+    pack it fetched under that filter. Either mark is proof
+    enough that missing objects belong to the partial shape
+    rather than to damage, and neither mark stands in a whole
+    clone, so the missing object rewording keys on them. A
+    promisor record counts only when the pack or index of the
+    same stem stands beside it, because a record left behind
+    after its pack is gone is a stale mark in a whole clone and
+    not proof of the partial shape.
+    """
+    result = run_git(
+        repo, ["config", "--get-regexp", r"^remote\..*\.promisor$"],
+        check=False,
+    )
+    if result.returncode == 0 and "true" in result.stdout:
+        return True
+    common_path = common_dir_path(repo)
+    if common_path is None:
+        return False
+    pack_dir = common_path / "objects" / "pack"
+    try:
+        for promisor_path in pack_dir.glob("*.promisor"):
+            stem = promisor_path.name[: -len(".promisor")]
+            if (pack_dir / (stem + ".pack")).exists() or \
+                    (pack_dir / (stem + ".idx")).exists():
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def failure_message(exc, repo):
+    """The message a failed run publishes, reworded where it fits.
+
+    A missing object failure in a clone that carries the marks
+    of a partial clone is reworded into the tool's voice by the
+    remedy helper. Every other failure keeps its own words, so
+    a damaged whole clone is never diagnosed as a partial one.
+    """
+    message = str(exc)
+    if is_missing_object_failure(message) and repo_is_partial(repo):
+        return missing_object_remedy(message) or message
+    return message
+
+
+def missing_object_remedy(message):
+    """The tool voice form of a missing object failure, or None.
+
+    The named cause is the partial clone shape, a clone that
+    stands in a partial state whose missing objects no promisor
+    can now fetch, and the named remedy is to restore the
+    promisor remote or to fetch the missing objects, then run
+    again. A failure that names no missing object returns None
+    and keeps its own message.
+    """
+    if not is_missing_object_failure(message):
+        return None
+    return (
+        "the clone is partial and objects it needs are missing "
+        "with no promisor left to fetch them from, so no packet "
+        "can be built from it. Restore the promisor remote or "
+        "fetch the missing objects, then run again. The git "
+        "failure underneath stands in full below. %s" % message
+    )
+
+
 def run_pipeline(args, repo, target, argv, prepared=None):
     if prepared is not None:
         resolved, findings, change = prepared
@@ -6239,8 +7178,8 @@ def run_pipeline(args, repo, target, argv, prepared=None):
         )
         return 3
     print(
-        "recognitio: packet written to %s with %d files, verified"
-        % (target.path, len(files))
+        "recognitio: packet written to %s with %s, verified"
+        % (target.path, _counted(len(files), "file", "files"))
     )
     return 0
 
@@ -6366,13 +7305,14 @@ def main(argv=None):
                 diff_base = EMPTY_TREE
             change = fetch_change(repo, diff_base, resolved["head"])
         except GitError as exc:
+            message = failure_message(exc, repo)
             try:
                 target.acquire_lock()
             except OutputRefusal as lock_exc:
                 print("recognitio: %s" % lock_exc, file=sys.stderr)
             else:
-                publish_failure_quietly(target, raw_argv, str(exc))
-            print("recognitio: %s" % exc, file=sys.stderr)
+                publish_failure_quietly(target, raw_argv, message)
+            print("recognitio: %s" % message, file=sys.stderr)
             return 2
         try:
             target.acquire_lock()
@@ -6386,8 +7326,9 @@ def main(argv=None):
                 prepared=(resolved, findings, change),
             )
         except GitError as exc:
-            publish_failure_quietly(target, raw_argv, str(exc))
-            print("recognitio: %s" % exc, file=sys.stderr)
+            message = failure_message(exc, repo)
+            publish_failure_quietly(target, raw_argv, message)
+            print("recognitio: %s" % message, file=sys.stderr)
             return 2
         except OutputRefusal as exc:
             print("recognitio: %s" % exc, file=sys.stderr)

@@ -235,7 +235,7 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1804
+Packet estimate in tokens: 1824
 
 T0 included at about 79 tokens across 2 files
 
@@ -243,7 +243,7 @@ T1 included at about 261 tokens across 2 files
 
 T2 included at about 315 tokens across 2 files
 
-T3 included at about 674 tokens across 2 files
+T3 included at about 676 tokens across 2 files
 
 No tier was dropped.
 

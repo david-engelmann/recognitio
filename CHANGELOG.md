@@ -3837,6 +3837,60 @@ This unreleased work carries version 1.3.0.
   suite figure in the CI timeout comment moves to the
   counted 2,869.
 
+- The capstone round 12 extraction repairs. A clone
+  carrying an effective graft now refuses at input
+  resolution in the tool own words, and the packet
+  check refuses to stamp from such a clone, because a
+  graft rewrites the parentage a packet certifies
+  under the real head name. The companion tier reads
+  a carrier whose bytes are not valid UTF-8 byte for
+  byte and a carrier saved in UTF-16 decoded, so one
+  legacy byte or one editor save format no longer
+  drops its call sites in silence. A changed module
+  is searched under both normalisation forms of its
+  name, except where two files at the head carry the
+  two spellings of one stem as their own names, where
+  its own spelling alone is searched because the other
+  spelling names the other file, and the word boundary
+  of a match is read in Unicode, so a mention in the
+  other form is found
+  and a name standing inside a longer identifier is
+  no longer credited as a call. Definitions carrying
+  a leading export word are gathered and searched
+  like any other definition. Where a submodule stands
+  in the tree, the companion absence sentences name
+  it as standing outside the search. The token
+  estimate prices a repeated digit run by the digit
+  rule instead of the merged repeat price, prices a
+  digit group standing in a letter stretch at one
+  token per three digits, and prices an alternating
+  digit and letter run at the rate its measured family
+  carries, and the budget reference restates its band
+  on the measured families with repeated digit runs
+  named apart. A partial clone whose promisor is gone
+  now fails in words that name the shape and the
+  remedy. A companion carrier whose bytes carry a NUL
+  outside a UTF-16 reading yields no companion lines
+  and its dropped contexts are named in the packet
+  cap notes, a mark led decoding is accepted only
+  when the decoded text still reads as text, and the
+  packet check scrubs a caller graft file from its
+  own children and warns rather than refuses where
+  the grafts path stands as a directory. A marked
+  carrier holding a form feed or a vertical tab
+  keeps its evidence, the characters named in
+  brackets in its companion lines and admitted as
+  spacing by the packet terminal reading in both
+  tools. The estimate also prices a repeated letter
+  run at half a token per character, prices a hex
+  run whose digit groups earn the embedded price at
+  the greater of that price and the hex rate, and
+  names two limit families beside its band, an
+  unspelled letter run standing alone or beside a
+  digit group at up to about 5.1 times its estimate
+  and a hex letter word or a best merging repeated
+  letter at down to about 0.24 times.
+
 ### Removed
 
 - The 1.3.0 release draft and its highlights graphic are

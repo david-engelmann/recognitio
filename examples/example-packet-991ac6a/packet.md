@@ -597,7 +597,7 @@ Cap note: history for semantic_problems capped at 4000 of 17427.
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 6009
+Packet estimate in tokens: 6031
 
 T0 included at about 114 tokens across 2 files
 
@@ -605,7 +605,7 @@ T1 included at about 3285 tokens across 2 files
 
 T2 included at about 323 tokens across 2 files
 
-T3 included at about 1851 tokens across 2 files
+T3 included at about 1853 tokens across 2 files
 
 No tier was dropped.
 

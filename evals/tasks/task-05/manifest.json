@@ -83,8 +83,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 674,
-      "emitted_tokens": 674,
+      "estimated_tokens": 676,
+      "emitted_tokens": 676,
       "files": 2
     }
   },
@@ -97,7 +97,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1804,
+    "estimated_tokens": 1824,
     "dropped": []
   },
   "cap_notes": [],

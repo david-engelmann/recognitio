@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -7231,6 +7232,569 @@ class TestRound7ProgressAndStamp(unittest.TestCase):
                 (out / "manifest.json").read_text(encoding="utf-8")
             )
             self.assertEqual(manifest["diff_algorithm"], "histogram")
+
+
+class TestRound12CompanionsAndGrafts(unittest.TestCase):
+    """Round 12 repairs on the companion tier and the graft refusal."""
+
+    def test_latin1_caller_keeps_its_call_site_contexts(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        b"from mod import helper\nprint(helper(41))\n"
+                        b"# cafe\xe9 note\n"
+                    ),
+                    "tests/test_mod.py": (
+                        "from mod import helper\ndef test_h():\n"
+                        "    assert helper(1) == 2\n"
+                    ),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:2: print(helper(41))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_latin1_changed_file_keeps_its_imports(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": (
+                        b"import os\n# cafe\xe9\ndef helper(x):\n"
+                        b"    return x + 1\n"
+                    ),
+                },
+                {
+                    "mod.py": (
+                        b"import os\nimport sys\n# cafe\xe9\n"
+                        b"def helper(x):\n    return x + 2\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn("import sys", packet)
+            self.assertNotIn(
+                "No import lines were found in the changed source "
+                "files.", packet
+            )
+
+    def test_utf16_carriers_keep_their_call_sites_and_test_mentions(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        "from mod import helper\nprint(helper(42))\n"
+                    ).encode("utf-16"),
+                    "tests/test_mod.py": (
+                        "from mod import helper\ndef test_h():\n"
+                        "    assert helper(1) == 2\n"
+                    ).encode("utf-16"),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:2: print(helper(42))", packet)
+            self.assertIn("tests/test_mod.py", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+            self.assertNotIn(
+                "No test files mention the changed modules or "
+                "functions.", packet
+            )
+
+    def test_submodule_absence_sentences_name_the_gitlink(self):
+        with RetryingTemporaryDirectory() as tmp:
+            sub = make_repo(str(Path(tmp) / "subroot"), [
+                {"subcaller.py": "from mod import helper\nprint(helper(55))\n"},
+            ])
+            repo = make_repo(tmp, [
+                {"mod.py": "def helper(x):\n    return x + 1\n"},
+            ])
+            git(
+                repo, "-c", "protocol.file.allow=always",
+                "submodule", "add", "-q", str(sub), "vendor/sub",
+            )
+            commit_all(repo, "add submodule")
+            write_tree(repo, {"mod.py": "def helper(x):\n    return x + 2\n"})
+            commit_all(repo, "change")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~2..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("No call sites found outside the changed file.", packet)
+            self.assertIn("vendor/sub", packet)
+            self.assertIn("was not searched", packet)
+
+    def test_test_file_in_the_other_normalisation_form_is_found(self):
+        with RetryingTemporaryDirectory() as tmp:
+            composed = unicodedata.normalize("NFC", "caf\u00e9")
+            decomposed = unicodedata.normalize("NFD", "caf\u00e9")
+            repo = make_repo(tmp, [
+                {
+                    decomposed + ".py": "VALUE = 1\n",
+                    "tests/test_cafe.py": (
+                        "from %s import VALUE\n\ndef test_v():\n"
+                        "    assert VALUE == 1\n" % composed
+                    ),
+                },
+                {decomposed + ".py": "VALUE = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("tests/test_cafe.py", packet)
+            self.assertNotIn(
+                "No test files mention the changed modules or "
+                "functions.", packet
+            )
+
+    def test_export_prefixed_definitions_are_gathered(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.ts": (
+                        "export function helper(x: number): number {\n"
+                        "  return x + 1;\n}\n\n"
+                        "export const other = (y: number): number => "
+                        "y + 1;\n"
+                    ),
+                    "caller.ts": (
+                        "import { helper, other } from './mod';\n"
+                        "console.log(helper(1));\nconsole.log(other(2));\n"
+                    ),
+                    "plain.js": (
+                        "function plainHelper(x) {\n  return x + 1;\n}\n"
+                    ),
+                    "plaincaller.js": "console.log(plainHelper(9));\n",
+                },
+                {
+                    "mod.ts": (
+                        "export function helper(x: number): number {\n"
+                        "  return x + 2;\n}\n\n"
+                        "export const other = (y: number): number => "
+                        "y + 2;\n"
+                    ),
+                    "plain.js": (
+                        "function plainHelper(x) {\n  return x + 2;\n}\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Call sites for helper", packet)
+            self.assertIn("Call sites for other", packet)
+            self.assertIn("console.log(helper(1))", packet)
+            self.assertIn("console.log(other(2))", packet)
+            self.assertIn("Call sites for plainHelper", packet)
+
+    def test_unicode_identifier_is_not_credited_as_a_call_site(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "uni.py": "caféhelper(1)\nhelper(2)\n",
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            hits = extract_mod.git_grep_lines(repo, head, "helper")
+            credited = [
+                (path, lineno) for path, lineno, _c in hits
+                if path == "uni.py"
+            ]
+            self.assertEqual(credited, [("uni.py", 2)])
+            bulk = extract_mod.git_grep_bulk(repo, head, ["helper", "mod"])
+            bulk_credited = [
+                (path, lineno) for path, lineno, _c in bulk["helper"]
+                if path == "uni.py"
+            ]
+            self.assertEqual(bulk_credited, [("uni.py", 2)])
+
+    def build_grafted_repo(self, tmp):
+        repo = make_repo(tmp, [
+            {"one.py": "A = 1\n", "two.py": "B = 1\n"},
+            {"one.py": "A = 2\n", "two.py": "B = 2\n"},
+        ])
+        head = git(repo, "rev-parse", "HEAD")
+        orphan = make_repo(str(Path(tmp) / "orphan"), [
+            {"seed.py": "S = 1\n"},
+        ])
+        orphan_head = git(orphan, "rev-parse", "HEAD")
+        git(repo, "fetch", "-q", str(orphan), "main")
+        return repo, head, orphan_head
+
+    def test_info_grafts_refuse_the_run(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, head, orphan_head = self.build_grafted_repo(tmp)
+            grafts = repo / ".git" / "info" / "grafts"
+            grafts.parent.mkdir(parents=True, exist_ok=True)
+            grafts.write_text("%s %s\n" % (head, orphan_head))
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--commit", "HEAD")
+            self.assertEqual(result.returncode, 2, result.stdout)
+            self.assertIn("grafts", result.stderr)
+            self.assertIn("Empty or remove that file", result.stderr)
+            manifest = read_manifest(out)
+            self.assertFalse(manifest["verified"])
+
+    def test_comment_only_grafts_file_does_not_refuse(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, head, orphan_head = self.build_grafted_repo(tmp)
+            grafts = repo / ".git" / "info" / "grafts"
+            grafts.parent.mkdir(parents=True, exist_ok=True)
+            grafts.write_text("# a note, no grafts\n\n")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--commit", "HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"])
+            self.assertEqual(manifest["base"], git(repo, "rev-parse", "HEAD~1"))
+
+    def test_caller_graft_file_never_reaches_a_child(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, head, orphan_head = self.build_grafted_repo(tmp)
+            graft_file = Path(tmp) / "caller-grafts"
+            graft_file.write_text("%s %s\n" % (head, orphan_head))
+            env = dict(os.environ)
+            env["GIT_GRAFT_FILE"] = str(graft_file)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--commit", "HEAD", env=env
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"])
+            self.assertEqual(manifest["base"], git(repo, "rev-parse", "HEAD~1"))
+            self.assertEqual(len(manifest["files"]), 2)
+
+    def test_success_line_counts_one_file_in_the_singular(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "VALUE = 1\n"},
+                {"mod.py": "VALUE = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("with 1 file, verified", result.stdout)
+            self.assertNotIn("with 1 files", result.stdout)
+
+    def test_an_executable_utf16_carrier_keeps_its_call_sites(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "runner.py": (
+                        "from mod import helper\nprint(helper(43))\n"
+                    ).encode("utf-16"),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            (repo / "runner.py").chmod(0o755)
+            commit_all(repo, "make the carrier executable")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~2..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("runner.py:2: print(helper(43))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_indented_and_class_exports_are_definitions(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.ts": (
+                        "if (true) {\n"
+                        "  export function nested(x: number): number {\n"
+                        "    return x + 1;\n  }\n}\n\n"
+                        "export class Widget {\n  render() {\n"
+                        "    return 1;\n  }\n}\n"
+                    ),
+                    "caller.ts": (
+                        "import { nested, Widget } from './mod';\n"
+                        "console.log(nested(1));\n"
+                        "console.log(new Widget());\n"
+                    ),
+                },
+                {
+                    "mod.ts": (
+                        "if (true) {\n"
+                        "  export function nested(x: number): number {\n"
+                        "    return x + 2;\n  }\n}\n\n"
+                        "export class Widget {\n  render() {\n"
+                        "    return 2;\n  }\n}\n"
+                    ),
+                },
+            ])
+            lines = (repo / "mod.ts").read_text().splitlines()
+            self.assertTrue(extract_mod.line_defines(lines[6], "Widget"))
+            span = extract_mod.find_function_span(lines, "nested", "mod.ts")
+            self.assertIsNotNone(span)
+            self.assertEqual(span[0], 2)
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Call sites for nested", packet)
+            self.assertIn("console.log(nested(1))", packet)
+
+    def test_an_unreadable_context_block_is_noted_not_silent(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": "from mod import helper\nprint(helper(41))\n",
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            files = [{
+                "path": "mod.py", "status": "modified",
+                "old_path": None, "shown": True,
+            }]
+            notes = []
+            original = extract_mod.show_companion_file
+            extract_mod.show_companion_file = lambda r, h, p: None
+            try:
+                extract_mod.call_sites_section(
+                    repo, head, files, {"mod.py": ["helper"]}, notes,
+                    hits_by_term={
+                        "helper": [("caller.py", 2, "print(helper(41))")],
+                    },
+                )
+            finally:
+                extract_mod.show_companion_file = original
+            self.assertTrue(
+                any("could not be read" in note for note in notes), notes
+            )
+
+
+    def test_binary_caller_context_matches_the_byte_search_lines(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        b"\xff\xd8\xff\xe0" + b"\x85" * 10
+                        + b"\nprint(helper(99))\nlast\n"
+                    ),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:2: print(helper(99))", packet)
+            self.assertIn("caller.py:3: last", packet)
+            rows = re.findall(r"caller\.py:(\d+):", packet)
+            self.assertEqual(sorted(set(rows)), ["1", "2", "3"])
+
+    def test_a_mark_before_plain_text_keeps_its_call_sites(self):
+        with RetryingTemporaryDirectory() as tmp:
+            body = b"from mod import helper\nprint(helper(7))\n"
+            self.assertEqual(len(body) % 2, 0)
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": b"\xff\xfe" + body,
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:2: print(helper(7))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_a_normal_form_collision_keeps_the_other_file_uncredited(self):
+        with RetryingTemporaryDirectory() as tmp:
+            composed = unicodedata.normalize("NFC", "caf\u00e9")
+            decomposed = unicodedata.normalize("NFD", "caf\u00e9")
+            repo = make_repo(tmp, [
+                {
+                    composed + ".py": "VALUE = 100\n",
+                    decomposed + ".py": "VALUE = 1\n",
+                    "tests/test_cafe.py": (
+                        "from %s import VALUE\n\n"
+                        "def test_v():\n    assert VALUE == 100\n"
+                        % composed
+                    ),
+                },
+                {decomposed + ".py": "VALUE = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("tests/test_cafe.py", packet)
+            self.assertIn(
+                "No test files mention the changed modules or "
+                "functions.", packet
+            )
+
+    def test_a_collision_mirror_credits_the_changed_spelling(self):
+        with RetryingTemporaryDirectory() as tmp:
+            composed = unicodedata.normalize("NFC", "caf\u00e9")
+            decomposed = unicodedata.normalize("NFD", "caf\u00e9")
+            repo = make_repo(tmp, [
+                {
+                    composed + ".py": "VALUE = 100\n",
+                    decomposed + ".py": "VALUE = 1\n",
+                    "tests/test_cafe.py": (
+                        "from %s import VALUE\n\n"
+                        "def test_v():\n    assert VALUE == 1\n"
+                        % decomposed
+                    ),
+                },
+                {decomposed + ".py": "VALUE = 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("tests/test_cafe.py", packet)
+            self.assertNotIn(
+                "No test files mention the changed modules or "
+                "functions.", packet
+            )
+
+
+    def test_a_mark_before_plain_text_reads_the_body_not_the_mojibake(self):
+        with RetryingTemporaryDirectory() as tmp:
+            body = (
+                b"batch A0 codes\n"
+                b"from mod import helper\nprint(helper(66))\n"
+            )
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": b"\xff\xfe" + body,
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:3: print(helper(66))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_a_utf16_carrier_holding_a_form_feed_keeps_its_call(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        "from mod import helper\n"
+                        "# page\fbreak\n"
+                        "print(helper(69))\n"
+                    ).encode("utf-16"),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("print(helper(69))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_a_utf16_carrier_holding_a_nul_character_keeps_its_call(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        "from mod import helper\n"
+                        "S = 'a\x00b'\n"
+                        "print(helper(68))\n"
+                    ).encode("utf-16"),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("print(helper(68))", packet)
+            self.assertNotIn(
+                "No call sites found outside the changed file.", packet
+            )
+
+    def test_an_unreadable_carrier_note_names_the_carrier(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": "from mod import helper\nprint(helper(41))\n",
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            files = [{
+                "path": "mod.py", "status": "modified",
+                "old_path": None, "shown": True,
+            }]
+            notes = []
+            original = extract_mod.show_companion_file
+            extract_mod.show_companion_file = lambda r, h, p: None
+            try:
+                extract_mod.call_sites_section(
+                    repo, head, files, {"mod.py": ["helper"]}, notes,
+                    hits_by_term={
+                        "helper": [("caller.py", 2, "print(helper(41))")],
+                    },
+                )
+            finally:
+                extract_mod.show_companion_file = original
+            self.assertTrue(
+                any("caller.py" in note for note in notes), notes
+            )
+            self.assertTrue(
+                any("could not be read" in note for note in notes), notes
+            )
 
 
 if __name__ == "__main__":

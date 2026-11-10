@@ -82,6 +82,7 @@ GIT_SCRUB_VARS = (
     "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_COMMON_DIR",
+    "GIT_GRAFT_FILE",
     "GIT_NAMESPACE",
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
@@ -685,11 +686,14 @@ def created_problems(manifest, repo=None):
     return problems
 
 
-def repo_state_problems(repo):
+def repo_state_problems(repo, notes=None):
     """Read the state of the repository the stamp is asked against.
 
     Returns the problem list and whether the state is fatal to
-    the deep checks. A path that is not a readable repository and
+    the deep checks. A grafts path standing as a directory is
+    carried in the caller supplied notes list when one is given,
+    because git reads no grafts from a directory and that state
+    does not stand in the way of a stamp. A path that is not a readable repository and
     a shallow clone are fatal, because every recount from them
     would blame the packet for the environment. A checkout with
     uncommitted changes standing on tracked files is fatal for
@@ -756,6 +760,63 @@ def repo_state_problems(repo):
                 "cannot be stamped from this clone. Empty or "
                 "remove that file, then run the check again"
                 % (repo, info_attributes)
+            )
+            return problems, True
+        # The grafts reading stands beside the attributes reading
+        # for the same reason. A graft rewrites the parentage the
+        # recount reads, so a recount in a grafted clone would
+        # agree with a grafted packet and stamp the wrong change
+        # under the real head name. The graft file variable never
+        # reaches a child of this script, so the file read here is
+        # the clone its own. A grafts path that is not a regular
+        # file is refused by stat, before any git call could block
+        # on opening it, as the attributes path above is handled.
+        grafts = common_path / "info" / "grafts"
+        grafts_is_directory = grafts.is_dir()
+        if grafts_is_directory:
+            directory_note = (
+                "the repository grafts in %s is a directory, and "
+                "git reads no grafts from a directory, so the "
+                "parentage the recount reads stands as the tree "
+                "records it and the packet can be stamped from "
+                "this clone while the directory stands. The "
+                "extractor reads the same state the same way"
+                % grafts
+            )
+            if notes is None:
+                problems.append(directory_note)
+            else:
+                notes.append(directory_note)
+        if not grafts_is_directory and grafts.exists() and \
+                not grafts.is_file():
+            problems.append(
+                "the repository grafts in %s cannot be read, "
+                "it is not a regular file, so the recount cannot "
+                "trust the parentage it reads and the packet "
+                "cannot be stamped from this clone. Remove that "
+                "path, then run the check again" % grafts
+            )
+            return problems, True
+        try:
+            grafts_text = "" if grafts_is_directory else \
+                grafts.read_text(
+                    encoding="utf-8", errors="surrogateescape"
+                )
+        except OSError:
+            grafts_text = ""
+        if any(
+            line.strip() and not line.lstrip().startswith("#")
+            for line in grafts_text.splitlines()
+        ):
+            problems.append(
+                "the repository at %s carries grafts in %s and a "
+                "graft rewrites the parentage of the history the "
+                "packet certifies while the packet keeps the real "
+                "head name, so the recount cannot certify the "
+                "change of the commit it names and the packet "
+                "cannot be stamped from this clone. Empty or "
+                "remove that file, then run the check again"
+                % (repo, grafts)
             )
             return problems, True
     # The dirty checkout reading stands after the attributes
@@ -1058,7 +1119,8 @@ def terminal_control_character(text):
     these, and this copy is the stamp side of the same rule, so
     a packet built by any other means is refused here as well.
     The refused set is the escape character, the C0 controls
-    other than tab and newline, and the delete character. A
+    other than tab and newline and the vertical tab and the
+    form feed, and the delete character. A
     carriage return is refused only where it stands alone,
     because a carriage return standing ahead of a newline is
     the CRLF ending a genuine file can carry, while a carriage
@@ -1075,7 +1137,7 @@ def terminal_control_character(text):
             if index + 1 < len(text) and text[index + 1] == "\n":
                 continue
             return char
-        if code < 32 and char not in ("\t", "\n"):
+        if code < 32 and char not in ("\t", "\n", "\x0b", "\x0c"):
             return char
         if code == 127:
             return char
@@ -3863,7 +3925,10 @@ def main(argv=None):
                 "built it recorded a recount that failed"
             )
         recorded = manifest.get("head")
-        state_problems, state_fatal = repo_state_problems(args.repo)
+        state_notes = []
+        state_problems, state_fatal = repo_state_problems(
+            args.repo, notes=state_notes
+        )
         problems.extend(state_problems)
         head = None
         if not state_fatal:
@@ -3957,7 +4022,7 @@ def main(argv=None):
         for problem in problems:
             print("check_packet: %s" % problem, file=sys.stderr)
         return 1
-    for warning in command_warnings(manifest, args.repo):
+    for warning in state_notes + command_warnings(manifest, args.repo):
         print("check_packet: warning: %s" % warning, file=sys.stderr)
     if args.expect_base is None and args.expect_merge_base is None:
         expectation = (

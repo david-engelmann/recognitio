@@ -293,7 +293,7 @@ class TestEstimatorShapes(unittest.TestCase):
         self.assert_priced(text, 55)
 
     def test_repeated_character_run(self):
-        self.assert_priced("a" * 4200, 525)
+        self.assert_priced("a" * 4200, 1050)
 
     def test_the_method_is_named_in_the_help(self):
         result = subprocess.run(
@@ -675,6 +675,277 @@ class TestStandingPacketPreserved(unittest.TestCase):
                     manifest_before,
                 )
                 self.assertTrue(read_manifest(out)["verified"])
+
+
+class TestRound12EstimatorAndPartialClone(unittest.TestCase):
+    """Round 12 repairs on the digit run price and the partial clone."""
+
+    def test_repeated_digit_runs_price_by_the_digit_rule(self):
+        # A run of 20000 zeros carries 6667 real cl100k tokens and
+        # a run of 9000 sevens carries 3000, because the tokenizer
+        # splits digit runs into groups of at most three digits.
+        # The estimate must stand within a factor of two of the
+        # real count on both runs, where the merged repeat price
+        # stood at a third of it.
+        for text, real_tokens in (("0" * 20000, 6667), ("7" * 9000, 3000)):
+            estimate = extract_mod.estimate_tokens(text)
+            self.assertGreaterEqual(estimate * 2, real_tokens, text[:1])
+            self.assertLessEqual(estimate, real_tokens * 2, text[:1])
+
+    def test_repeated_letter_runs_keep_the_merge_price(self):
+        estimate = extract_mod.estimate_tokens("a" * 20000)
+        self.assertLessEqual(estimate, 525 * 40)
+        self.assertGreaterEqual(estimate, 4000)
+
+    def test_a_digit_run_packet_is_not_admitted_under_its_real_size(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir(parents=True)
+            git(repo, "init", "-b", "main")
+            git(repo, "config", "user.email", "test@example.com")
+            git(repo, "config", "user.name", "Test User")
+            git(repo, "config", "commit.gpgsign", "false")
+            (repo / "seed.txt").write_text("seed\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "seed")
+            (repo / "data.txt").write_text("0" * 20000 + "\n" + "7" * 9000 + "\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "digit runs")
+            out = Path(tmp) / "out"
+            result = run_extract(
+                repo, out, "--range", "HEAD~1..HEAD", "--budget", "4000"
+            )
+            self.assertEqual(result.returncode, 2, result.stdout)
+            self.assertIn("smallest packet", result.stderr)
+            self.assertFalse(read_manifest(out)["verified"])
+
+    def test_missing_object_remedy_names_the_partial_shape(self):
+        message = (
+            "git diff --name-status failed with exit 128: "
+            "fatal: unable to read a6f1d25c019fe7aaad0412888d9d6c7933656817"
+        )
+        remedy = extract_mod.missing_object_remedy(message)
+        self.assertIsNotNone(remedy)
+        self.assertIn("partial", remedy)
+        self.assertIn("promisor", remedy)
+        self.assertIn("unable to read", remedy)
+        self.assertIsNone(
+            extract_mod.missing_object_remedy("some other failure")
+        )
+
+    def test_a_partial_clone_with_its_promisor_cut_names_the_remedy(self):
+        with RetryingTemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            source.mkdir(parents=True)
+            git(source, "init", "-b", "main")
+            git(source, "config", "user.email", "test@example.com")
+            git(source, "config", "user.name", "Test User")
+            git(source, "config", "commit.gpgsign", "false")
+            (source / "mod.py").write_text("VALUE = 1\n")
+            git(source, "add", "-A")
+            git(source, "commit", "-m", "one")
+            (source / "mod.py").write_text("VALUE = 2\n")
+            git(source, "add", "-A")
+            git(source, "commit", "-m", "two")
+            (source / "base.py").write_text("VALUE = 0\n")
+            git(source, "add", "-A")
+            git(source, "commit", "-m", "three")
+            # A bare server that honours the filter, because a
+            # plain local clone ignores it and a file server
+            # without the allowance silently serves whole objects.
+            server = Path(tmp) / "server.git"
+            server.mkdir(parents=True)
+            git(server, "init", "--bare")
+            git(server, "config", "uploadpack.allowFilter", "true")
+            git(source, "push", "-q", str(server), "main")
+            git(server, "symbolic-ref", "HEAD", "refs/heads/main")
+            clone = Path(tmp) / "clone"
+            clone_env = scrubbed_git_env()
+            clone_env["GIT_CONFIG_COUNT"] = "1"
+            clone_env["GIT_CONFIG_KEY_0"] = "protocol.version"
+            clone_env["GIT_CONFIG_VALUE_0"] = "2"
+            result = subprocess.run(
+                ["git", "clone", "-q", "--filter=blob:none",
+                 "--no-checkout", "file://" + str(server), str(clone)],
+                env=clone_env, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                git(clone, "config", "remote.origin.promisor"), "true"
+            )
+            # The promisor assertions read the object store
+            # without lazy fetching, because a promisor lookup
+            # that fetched the blob would heal the very hole the
+            # fixture exists to keep open.
+            present = subprocess.run(
+                ["git", "-C", str(clone), "cat-file",
+                 "--batch-all-objects", "--batch-check"],
+                env=scrubbed_git_env(), capture_output=True, text=True,
+            )
+            self.assertNotIn(" blob ", present.stdout)
+            git(clone, "remote", "remove", "origin")
+            out = Path(tmp) / "out"
+            failed = run_extract(clone, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(failed.returncode, 2, failed.stdout)
+            self.assertIn("partial", failed.stderr)
+            self.assertIn("promisor", failed.stderr)
+            self.assertFalse(read_manifest(out)["verified"])
+    def test_a_damaged_whole_clone_is_not_diagnosed_as_partial(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir(parents=True)
+            git(repo, "init", "-b", "main")
+            git(repo, "config", "user.email", "test@example.com")
+            git(repo, "config", "user.name", "Test User")
+            git(repo, "config", "commit.gpgsign", "false")
+            (repo / "mod.py").write_text("VALUE = 1\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "one")
+            blob = git(repo, "rev-parse", "HEAD:mod.py")
+            (repo / "mod.py").write_text("VALUE = 2\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "two")
+            self.assertFalse(extract_mod.repo_is_partial(repo))
+            loose = (
+                repo / ".git" / "objects" / blob[:2] / blob[2:]
+            )
+            loose.unlink()
+            out = Path(tmp) / "out"
+            failed = run_extract(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(failed.returncode, 2, failed.stdout)
+            self.assertNotIn("promisor", failed.stderr)
+            self.assertNotIn("the clone is partial", failed.stderr)
+            self.assertFalse(read_manifest(out)["verified"])
+
+
+    def assert_inside_the_estimator_band(self, text, real_tokens):
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            49 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 135 * estimate,
+            "estimate %d underprices real %d" % (estimate, real_tokens),
+        )
+
+    def test_alternating_digit_letter_runs_price_inside_the_band(self):
+        # The cl100k counts recorded for these shapes stand in
+        # the round record. An alternating digit and letter run
+        # merges nowhere, so it carries one real token per
+        # character, where the flat digit rule priced three
+        # fifths of one and admitted packets over budget.
+        self.assert_inside_the_estimator_band("1z" * 10000, 20000)
+        self.assert_inside_the_estimator_band("A1B2C3D4" * 2500, 20000)
+
+    def test_embedded_digit_groups_price_inside_the_band(self):
+        # A digit group standing in a long letter stretch reads
+        # as one token per three digits between letter tokens,
+        # so the repeated word shapes carry about two real
+        # tokens per ten characters, where the flat digit rule
+        # priced three times that on the first two shapes.
+        self.assert_inside_the_estimator_band("base64data" * 2000, 4001)
+        self.assert_inside_the_estimator_band("database64" * 2000, 4000)
+        self.assert_inside_the_estimator_band("file2024report" * 1000, 4000)
+
+    def test_an_alternating_packet_is_refused_under_its_real_size(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir(parents=True)
+            git(repo, "init", "-b", "main")
+            git(repo, "config", "user.email", "test@example.com")
+            git(repo, "config", "user.name", "Test User")
+            git(repo, "config", "commit.gpgsign", "false")
+            (repo / "seed.txt").write_text("seed\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "seed")
+            (repo / "data.txt").write_text("1z" * 10000 + "\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "alternating run")
+            out = Path(tmp) / "out"
+            result = run_extract(
+                repo, out, "--range", "HEAD~1..HEAD", "--budget", "14000"
+            )
+            self.assertEqual(result.returncode, 2, result.stdout)
+            self.assertIn("smallest packet", result.stderr)
+            self.assertFalse(read_manifest(out)["verified"])
+
+    def test_a_stale_promisor_mark_does_not_name_the_partial_shape(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            repo.mkdir(parents=True)
+            git(repo, "init", "-b", "main")
+            git(repo, "config", "user.email", "test@example.com")
+            git(repo, "config", "user.name", "Test User")
+            git(repo, "config", "commit.gpgsign", "false")
+            (repo / "mod.py").write_text("VALUE = 1\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "one")
+            blob = git(repo, "rev-parse", "HEAD:mod.py")
+            (repo / "mod.py").write_text("VALUE = 2\n")
+            git(repo, "add", "-A")
+            git(repo, "commit", "-m", "two")
+            stale = (
+                repo / ".git" / "objects" / "pack" / "pack-stale.promisor"
+            )
+            stale.write_bytes(b"")
+            self.assertFalse(extract_mod.repo_is_partial(repo))
+            loose = (
+                repo / ".git" / "objects" / blob[:2] / blob[2:]
+            )
+            loose.unlink()
+            out = Path(tmp) / "out"
+            failed = run_extract(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(failed.returncode, 2, failed.stdout)
+            self.assertNotIn("promisor", failed.stderr)
+            self.assertNotIn("the clone is partial", failed.stderr)
+            self.assertFalse(read_manifest(out)["verified"])
+
+
+
+    def assert_inside_the_unspelled_limit(self, text, real_tokens):
+        # The named limit for unspelled letter runs. The real
+        # count may stand up to about 5.1 times the estimate,
+        # and the overprice side keeps the band floor.
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            49 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 510 * estimate,
+            "estimate %d underprices real %d past the named "
+            "limit" % (estimate, real_tokens),
+        )
+
+    def test_unspelled_runs_stand_on_the_named_limit(self):
+        # A keyboard walk and a rare letter run carry digit
+        # groups a tokenizer splits letter by letter, so they
+        # stand outside the band and on the named limit the
+        # estimator docstring prints, at the real counts the
+        # round record carries. The capitalised spelled run
+        # beside them prices inside the band.
+        self.assert_inside_the_unspelled_limit(
+            "zxcvbnm1234" * 1500, 10500)
+        self.assert_inside_the_unspelled_limit(
+            "qxvzbnpj64" * 2000, 10000)
+        self.assert_inside_the_unspelled_limit(
+            "fzqgkxjxjv1" * 2000, 22000)
+        self.assert_inside_the_unspelled_limit(
+            "jwqjzvq" * 2000, 14000)
+        self.assert_inside_the_unspelled_limit(
+            "zvzqo " * 2000, 10001)
+        self.assert_inside_the_estimator_band("aBcD1234" * 2500, 15000)
+
+    def test_repeated_letter_runs_price_at_the_half_token_rate(self):
+        # A repeated letter merges only a little in a real
+        # tokenizer, from one token per letter down to about
+        # one per four characters on the best merging letters,
+        # at the counts the round record carries. The half
+        # token price stands inside the band on the worst
+        # merging letter and on the best.
+        self.assert_inside_the_estimator_band("g" * 20000, 10000)
+        self.assert_inside_the_estimator_band("b" * 20000, 5000)
 
 
 if __name__ == "__main__":

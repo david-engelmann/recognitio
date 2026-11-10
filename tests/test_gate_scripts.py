@@ -8960,12 +8960,12 @@ class TestTreeFigureCensus(unittest.TestCase):
     # tree the pack describes.
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
-        "The repo holds 267 files and tens of megabytes in "
+        "The repo holds 271 files and tens of megabytes in "
         "total, as restated on 2026-11-10 against the tree "
         "that now holds that count."
     )
     CAP = (
-        "at 267 files against a cap of 512 files"
+        "at 271 files against a cap of 512 files"
     )
     LARGEST = (
         "Its largest file is the demo recording at "
@@ -8976,8 +8976,8 @@ class TestTreeFigureCensus(unittest.TestCase):
         mod = load_script("check_submissions")
         measured = mod.tree_measurements(ROOT)
         self.assertIsNotNone(measured)
-        self.assertEqual(measured["count"], 267)
-        self.assertEqual(measured["scan_files"], 267)
+        self.assertEqual(measured["count"], 271)
+        self.assertEqual(measured["scan_files"], 271)
         self.assertEqual(measured["largest_size"], 24222065)
         self.assertEqual(
             measured["largest_plain_path"],

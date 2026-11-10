@@ -2107,7 +2107,7 @@ class TestRound27Budget(Round27Fixture):
     def make_budgeted(self, name="budget27"):
         return extract_packet(
             self.repo, Path(self.tmp.name) / name,
-            "--range", "HEAD~2..HEAD", "--budget", "1000",
+            "--range", "HEAD~2..HEAD", "--budget", "1100",
         )
 
     def test_a_forged_budget_with_a_matching_receipt_line_fails(self):
@@ -2117,9 +2117,9 @@ class TestRound27Budget(Round27Fixture):
         manifest["budget"]["budget_tokens"] = 31337
         self.save_manifest(out, manifest)
         text = self.packet_text(out)
-        self.assertIn("Budget in tokens: 1000", text)
+        self.assertIn("Budget in tokens: 1100", text)
         self.save_packet(out, text.replace(
-            "Budget in tokens: 1000", "Budget in tokens: 31337"
+            "Budget in tokens: 1100", "Budget in tokens: 31337"
         ))
         self.fix_accounting(out)
         self.assertEqual(self.run_check(out), 1)
@@ -2130,7 +2130,7 @@ class TestRound27Budget(Round27Fixture):
         dropped = manifest["budget"]["dropped"]
         self.assertTrue(dropped)
         tier = dropped[0]["tier"]
-        genuine_line = "Dropped %s because of the budget of 1000 tokens." % tier
+        genuine_line = "Dropped %s because of the budget of 1100 tokens." % tier
         forged_line = "Dropped %s because of the a security redaction order." % tier
         dropped[0]["reason"] = "a security redaction order"
         self.save_manifest(out, manifest)
@@ -2177,14 +2177,16 @@ class TestRound27Budget(Round27Fixture):
         # class stand one at a time or duplicated, so a shed
         # order check that stopped comparing the recorded
         # order against the canonical order would pass them
-        # all. The fixture range cannot shed both optional
-        # tiers in one run, because a budget below the core
-        # is refused outright, so this plant records the
-        # second drop by hand on the budgeted packet above,
-        # in the wrong order, and reads the budget account
-        # on its own. A whole run refusal would prove less,
-        # because the tier receipt and receipt readings also
-        # refuse a hand recorded drop, whatever its order.
+        # all. The fixture range at this budget sheds the
+        # history tier alone, because the packet keeping
+        # the companions tier measures under it while the
+        # whole packet does not, so this
+        # plant records the second drop by hand on the
+        # budgeted packet above, in the wrong order, and
+        # reads the budget account on its own. A whole run
+        # refusal would prove less, because the tier receipt
+        # and receipt readings also refuse a hand recorded
+        # drop, whatever its order.
         out = self.clone("orderforge", self.make_budgeted())
         manifest = self.manifest(out)
         dropped = manifest["budget"]["dropped"]
@@ -3650,6 +3652,70 @@ class TestRound7DirtyCheckoutGuard(VerifierFixture):
             "notes\n", encoding="utf-8"
         )
         self.assertEqual(self.run_check(self.genuine), 0)
+
+
+class TestRound12GraftStamp(VerifierFixture):
+    """Round 12. A grafted clone cannot stamp a packet."""
+
+    def plant_graft(self):
+        orphan = Path(self.tmp.name) / "orphan"
+        init_repo(orphan)
+        (orphan / "seed.py").write_text("S = 1\n", encoding="utf-8")
+        orphan_head = commit_all(orphan, "orphan root")
+        git(self.repo, "fetch", "-q", str(orphan), "main")
+        grafts = self.repo / ".git" / "info" / "grafts"
+        grafts.parent.mkdir(parents=True, exist_ok=True)
+        grafts.write_text(
+            "%s %s\n" % (self.head, orphan_head), encoding="utf-8"
+        )
+        return grafts
+
+    def test_a_grafted_clone_refuses_the_stamp(self):
+        self.plant_graft()
+        code, err = self.run_check_captured(self.genuine)
+        self.assertEqual(code, 1)
+        self.assertIn("grafts", err)
+
+    def test_a_comment_only_grafts_file_still_stamps(self):
+        grafts = self.repo / ".git" / "info" / "grafts"
+        grafts.parent.mkdir(parents=True, exist_ok=True)
+        grafts.write_text("# a note, no grafts\n\n", encoding="utf-8")
+        self.assertEqual(self.run_check(self.genuine), 0)
+
+    def test_removing_the_graft_restores_the_stamp(self):
+        grafts = self.plant_graft()
+        self.assertEqual(self.run_check(self.genuine), 1)
+        grafts.unlink()
+        self.assertEqual(self.run_check(self.genuine), 0)
+
+
+    def test_a_caller_graft_file_never_reaches_the_stamp(self):
+        orphan = Path(self.tmp.name) / "orphan"
+        init_repo(orphan)
+        (orphan / "seed.py").write_text("S = 1\n", encoding="utf-8")
+        orphan_head = commit_all(orphan, "orphan root")
+        git(self.repo, "fetch", "-q", str(orphan), "main")
+        caller_grafts = Path(self.tmp.name) / "caller-grafts"
+        caller_grafts.write_text(
+            "%s %s\n" % (self.head, orphan_head), encoding="utf-8"
+        )
+        previous = os.environ.get("GIT_GRAFT_FILE")
+        os.environ["GIT_GRAFT_FILE"] = str(caller_grafts)
+        try:
+            code = self.run_check(self.genuine)
+        finally:
+            if previous is None:
+                del os.environ["GIT_GRAFT_FILE"]
+            else:
+                os.environ["GIT_GRAFT_FILE"] = previous
+        self.assertEqual(code, 0)
+
+    def test_a_grafts_directory_still_stamps_with_a_warning(self):
+        grafts = self.repo / ".git" / "info" / "grafts"
+        grafts.mkdir(parents=True, exist_ok=True)
+        code, err = self.run_check_captured(self.genuine)
+        self.assertEqual(code, 0)
+        self.assertIn("is a directory", err)
 
 
 if __name__ == "__main__":

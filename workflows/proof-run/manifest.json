@@ -99,8 +99,8 @@
     "T1": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 489,
-      "emitted_tokens": 489,
+      "estimated_tokens": 492,
+      "emitted_tokens": 492,
       "files": 4
     },
     "T2": {
@@ -127,7 +127,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 2194,
+    "estimated_tokens": 2215,
     "dropped": []
   },
   "cap_notes": [

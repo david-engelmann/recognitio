@@ -47,8 +47,8 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 65,
-      "emitted_tokens": 65,
+      "estimated_tokens": 66,
+      "emitted_tokens": 66,
       "files": 1
     },
     "T1": {
@@ -68,8 +68,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 415,
-      "emitted_tokens": 415,
+      "estimated_tokens": 418,
+      "emitted_tokens": 418,
       "files": 1
     }
   },
@@ -82,7 +82,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1356,
+    "estimated_tokens": 1390,
     "dropped": []
   },
   "cap_notes": [],
