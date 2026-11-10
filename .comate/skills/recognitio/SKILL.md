@@ -9,9 +9,9 @@ background: false
 
 ## Purpose
 
-Recognitio assembles what a reviewer reads. It takes a pull request, a commit range, or a single commit and builds one packet that holds the change together with the context a careful human reviewer would go and find. It makes no judgement about the code. Judgement sits with the review skill downstream.
+Recognitio assembles what a reviewer reads. It takes a pull request, a commit range, or a single commit and builds one packet that holds the change together with the context a careful human reviewer would go and find. It makes no judgement about the code. Judgement belongs to the review skill that reads the packet.
 
-A reviewer reads the change inside its enclosing function, follows the changed names to their call sites, checks the tests that touch the changed module, and looks at who shaped these lines before. Recognitio gathers all of that, counts it, and proves that nothing is missing.
+A reviewer reads the change inside its enclosing function, follows the changed names to their call sites, checks the tests that touch the changed module, and looks at who shaped these lines before. Recognitio gathers all of that ahead of time, counts it, and proves that nothing is missing.
 
 ## Input modes
 
@@ -21,16 +21,16 @@ A since ref can ride with any mode for re-review.
 - Range mode takes two refs, A..B or A...B, and extracts what the second proposes against their merge base. It certifies the branch against that merge base, not a later one.
 - Commit mode takes one commit and extracts it against its parent. A root commit extracts against the empty tree and its manifest records no merge base.
 
-Extraction always runs against the local clone. The hosted API diff is never trusted, because hosted diffs cap out and drop files without saying so. Local git holds the full history. A shallow clone is refused outright, because truncated history would let the packet describe a boundary commit as the whole tree.
+Extraction always runs against the local clone. The hosted API diff is never trusted, because hosted diffs cap out and drop files without saying so. Local git has no file count cap and holds the full history. A shallow clone is refused outright, because truncated history would let the packet describe a boundary commit as the whole tree.
 
 ## Workflow
 
-1. Resolve the refs and confirm the base, the head and the merge base resolve in the local clone. Stop and report when a ref does not resolve.
+1. Resolve the refs and confirm the base, the head and the merge base resolve in the local clone. Stop when a ref does not resolve.
 2. Choose the tiers and a budget sized to the change.
 3. Run the extractor script with the chosen mode, an output directory, and the tier and budget choices from step 2.
-4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step. In range and commit runs the packet is the deterministic surface and the manifest stamp moves, while a pull request packet carries its fetch moment and can move.
+4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step. In range and commit runs the packet is deterministic and the manifest stamp moves, while a pull request packet carries its fetch moment and can move.
 5. Hand the packet to the review skill when verification passed. Stop and say exactly what is missing when verification failed.
-6. Record the three refs from the manifest wherever the review is recorded, so it can be reproduced later.
+6. Record the three refs from the manifest wherever the review is recorded, so it can be reproduced.
 
 Run the commands from the repository root.
 
@@ -41,13 +41,13 @@ python3 .agents/skills/recognitio/scripts/extract.py --commit HEAD --out packet 
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
 
-In a forked subagent, the return carries only the packet directory, the verified flag, and the three refs, and the reviewer opens the packet itself, never a copy.
+In a forked subagent, the return carries only the packet directory, the verified flag, and the three refs, and the reviewer opens the packet itself.
 
 ## Choosing tiers
 
 - A small change gets every tier and no budget.
 - A medium change gets every tier and a sized budget.
-- A large change gets a tier selection (see the tier model below). Run once with `--tiers 0-1`, then again per area with the companion and history tiers where depth is needed.
+- A large change gets a tier selection (see the tier model below). Run once with `--tiers 0-1`, then per area with the companion and history tiers where depth is needed.
 - A change whose smallest packet exceeds the budget is too large for one packet. Split it by directory or module instead of raising the budget.
 
 ## Fanning out
@@ -56,11 +56,11 @@ Each lane takes its own slice of the change tier and the matching companion and 
 
 ## Escalation
 
-When a call site shows a caller the packet gathered no context for, re-run with the history tier or a wider budget and say so in the gate report. When verification fails, escalation is forbidden until the failure is explained.
+When a call site shows a caller the packet gathered no context for, re-run with the history tier or a wider budget and say so in the gate report. When verification fails, escalation waits until the failure is explained.
 
 ## Stamping the gate report
 
-A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit therefore stamps in a checkout standing at that commit.
+A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet for a named commit therefore stamps in a checkout at that commit.
 
 ## The tier model
 
@@ -75,7 +75,7 @@ The packet is built in four tiers and a closing recount receipt, and each tier i
   A companion search that fails ends the run with a failure receipt rather than reporting nothing was found. The search is line based and pattern based, so a definition split across lines or in a language outside the five the patterns know will not be found.
 - T3 holds history. It carries a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them. It checks the three most changed files against the thirty most recent pull requests, shows at most five matches, and states its window. When the CLI cannot name them, the tier says so.
 
-A token budget is priced by the per shape token estimate named in references/budget-system.md, with the accounting over the whole packet. Over budget, the script keeps the drop set leaving the fullest packet inside the budget and records the drops. T0 and T1 never drop. If even the smallest packet exceeds the budget, the script refuses, naming the true tier sizes, and never replaces a verified packet at the output. A tier selection separately controls which companion and history tiers are gathered, and the budget can only shed tiers the selection kept. The T2 and T3 headings stand in every packet. An ungathered tier carries one placeholder sentence, either Not selected for this run. The change in T1 is complete. or Dropped under the token budget. The change in T1 is complete. Cap notes stand under a Cap notes block in their tier.
+A token budget is priced by the per shape token estimate named in references/budget-system.md, with the accounting over the whole packet. Over budget, the script keeps the drop set leaving the fullest packet inside the budget and records the drops. T0 and T1 never drop. If even the smallest packet exceeds the budget, the script refuses, naming the true tier sizes, and never replaces a verified packet at the output. A tier selection separately controls which companion and history tiers are gathered, and the budget can only shed tiers the selection kept. The T2 and T3 headings stand in every packet. An ungathered tier carries one placeholder sentence, either Not selected for this run. The change in T1 is complete. or Dropped under the token budget. The change in T1 is complete. Cap notes stand under a Cap notes block in the tier they belong to.
 
 ## Completeness discipline
 
