@@ -3816,6 +3816,15 @@ This unreleased work carries version 1.3.0.
   commit of its own, so the depth its since anchor
   names is a depth the fixture itself made, in shallow
   checkouts as in full ones.
+- The capstone round 11 restatements. The Claude
+  submission pack now carries the supersession scoping
+  sentence the capstone recorded over the closing
+  statements of the three finished programmes, a pin
+  in the gate script suite holds that sentence word
+  for word beside a census that reads the measured
+  tree figures against the pack sentences, and the
+  suite figure in the CI timeout comment moves to the
+  counted 2,869.
 
 ### Removed
 

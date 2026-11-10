@@ -103,7 +103,7 @@ PACK_PINS = {
         "held 255 files",
         "at 255 files against a cap of 512 files",
         "demo recording at 607,309 bytes",
-        "tests/test_gate_scripts.py at 314,101 bytes",
+        "tests/test_gate_scripts.py at 317,704 bytes",
         "scan over all 255 files in the tree",
     ),
     PORTABLE_PACK: (

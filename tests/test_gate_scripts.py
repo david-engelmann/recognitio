@@ -7670,5 +7670,86 @@ class TestPersonaBuild(unittest.TestCase):
         self.assertIn(ROOT / "docs" / "reviewer-persona.md", found)
 
 
+class TestCapstoneSupersessionPin(unittest.TestCase):
+    # Capstone Round 11. The closing documents of the three
+    # finished programmes each stated the closing state of
+    # their own moment in the present tense, and the capstone
+    # answered with one dated supersession line per document.
+    # The three lines stand in the programme records outside
+    # the tree and carry no gate pin. This pin holds the
+    # fourth statement of the set, the dated scoping sentence
+    # the round added to the Claude submission pack, which
+    # names the three lines and the records that carry them,
+    # so the pack cannot claim the scoping in silence once
+    # the scoping itself is gone or reworded.
+    PACK = ROOT / "docs" / "submission-claude.md"
+    SCOPING = (
+        "The closing statements this pack rests on stand "
+        "scoped by the supersession lines recorded in "
+        "capstone Round 11 in the final certification of "
+        "the 300 round programme, in the burn down addendum "
+        "to that certification, and in the storefront "
+        "certification summary, each line scoping its own "
+        "closing figures to the head they were earned on."
+    )
+
+    def test_the_supersession_scoping_sentence_stands_pinned(self):
+        text = self.PACK.read_text(encoding="utf-8")
+        flat = " ".join(text.split())
+        self.assertEqual(flat.count(self.SCOPING), 1)
+
+
+class TestTreeFigureCensus(unittest.TestCase):
+    # Capstone Round 11. The Claude pack states the tree
+    # figures in its size paragraph, the repo file count and
+    # the cap the count holds under and the largest file and
+    # the largest file that is not an image or a font, and
+    # the submissions gate re-derives those figures from the
+    # tree it is given and judges the pack sentences against
+    # them. That gate reads a synthetic layout in its own
+    # tests and the shipped tree in its shipped tree run, so
+    # no test read the measured figures off the shipped tree
+    # and set them beside the pack sentences as the gate
+    # derives them. This census closes that gap, so a tree
+    # the gate reads green in its layout form cannot carry a
+    # pack whose stated figures disagree with the shipped
+    # tree the pack describes.
+    PACK = ROOT / "docs" / "submission-claude.md"
+    COUNT = (
+        "The repo holds 255 files and a few megabytes in "
+        "total, as restated on 2026-11-08 against the tree "
+        "that now holds that count."
+    )
+    CAP = (
+        "at 255 files against a cap of 512 files"
+    )
+    LARGEST = (
+        "Its largest file is the demo recording at "
+        "607,309 bytes"
+    )
+
+    def test_the_pack_tree_figures_match_the_measured_tree(self):
+        mod = load_script("check_submissions")
+        measured = mod.tree_measurements(ROOT)
+        self.assertIsNotNone(measured)
+        self.assertEqual(measured["count"], 255)
+        self.assertEqual(measured["scan_files"], 255)
+        self.assertEqual(measured["largest_size"], 607309)
+        self.assertEqual(
+            measured["largest_plain_path"],
+            "tests/test_gate_scripts.py",
+        )
+        text = self.PACK.read_text(encoding="utf-8")
+        flat = " ".join(text.split())
+        for sentence in (self.COUNT, self.CAP, self.LARGEST):
+            self.assertEqual(flat.count(sentence), 1, sentence)
+        plain = (
+            "Its largest file that is not an image or a font "
+            "is tests/test_gate_scripts.py at %s bytes"
+            % format(measured["largest_plain_size"], ",")
+        )
+        self.assertEqual(flat.count(plain), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -154,14 +154,14 @@ would name. The root README runs to thousands of words, far
 past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
-**Partly met, the size limits.** The repo holds 255 files and a
+**Partly met, the size limits.** The closing statements this pack rests on stand scoped by the supersession lines recorded in capstone Round 11 in the final certification of the 300 round programme, in the burn down addendum to that certification, and in the storefront certification summary, each line scoping its own closing figures to the head they were earned on. The repo holds 255 files and a
 few megabytes in total, as restated on 2026-11-08 against
 the tree that now holds that count. Its largest file is the
 demo recording at 607,309 bytes, well under the 5 MiB file
 limit. The file count also holds under the cap the
 checklist holds for a reviewer, at 255 files against a cap
 of 512 files. Its largest file that is not an image or a
-font is tests/test_gate_scripts.py at 314,101 bytes, over
+font is tests/test_gate_scripts.py at 317,704 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files, so this one limit stands unmet while the
 other limits in this item hold. Its tracked extensions run
