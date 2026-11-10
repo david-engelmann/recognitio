@@ -2604,9 +2604,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 267 files", "holds 236 files"))
+                "holds 271 files", "holds 236 files"))
         self.assertTrue(
-            any("267 files" in p for p in problems), problems)
+            any("271 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the
@@ -2655,7 +2655,7 @@ class TestCheckSubmissions(unittest.TestCase):
         self.assertEqual(
             int(stated(r"holds (\d+) files")), len(listed))
         self.assertEqual(
-            int(stated(r"held (\d+) files")), len(listed))
+            int(stated(r"held 267 files")), 267)
         self.assertEqual(
             int(stated(r"at (\d+) files against a cap")),
             len(listed))

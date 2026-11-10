@@ -129,6 +129,7 @@ GIT_SCRUB_VARS = (
     "GIT_NAMESPACE",
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
+    "GIT_GRAFT_FILE",
 )
 # The same driver and configuration scrub the extractor runs under.
 # Configuration supplied through the environment can define a driver
