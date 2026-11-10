@@ -2836,7 +2836,14 @@ class TestPassageAgreement(Round3CaptureFixture):
         self.save_manifest(out, manifest)
         code, stamp, err = self.run_stamp(out)
         self.assertEqual(code, 1, stamp + err)
-        self.assertIn(self.MISMATCH, err)
+        # The schema reading now names this field as required, so
+        # the refusal stands at that earlier gate, before the
+        # passage agreement reading the nulled shape still draws.
+        self.assertIn(
+            "missing a key its schema requires, "
+            "prior_pull_requests_passage",
+            err,
+        )
         self.assertNotIn("is verified", stamp)
 
     def test_a_passage_with_a_different_field_refuses(self):
