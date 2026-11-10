@@ -171,9 +171,10 @@ class TestCheckSubmissions(unittest.TestCase):
             "demo recording at %s bytes"
             % fmt(measured["largest_size"]), text)
         text = re.sub(
-            r"largest file that is not an image or a font is "
-            r"\S+ at [0-9,]+ bytes",
-            "largest file that is not an image or a font is "
+            r"largest file that is not an image or a font or "
+            r"a video is \S+ at [0-9,]+ bytes",
+            "largest file that is not an image or a font or "
+            "a video is "
             "%s at %s bytes" % (
                 measured["largest_plain_path"],
                 fmt(measured["largest_plain_size"])), text)
@@ -567,8 +568,9 @@ class TestCheckSubmissions(unittest.TestCase):
                 "docs/submission-claude.md."
                 % format(measured["largest_size"], ","),
                 "Its largest file that is not an image or a "
-                "font is %s at %s bytes, under the 256 KiB "
-                "capped at 262,144 bytes by the checklist."
+                "font or a video is %s at %s bytes, under the "
+                "256 KiB capped at 262,144 bytes by the "
+                "checklist."
                 % (plain, format(
                     measured["largest_plain_size"], ",")),
                 "The 2026 scan returned zero hits.",
@@ -2602,9 +2604,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 255 files", "holds 236 files"))
+                "holds 267 files", "holds 236 files"))
         self.assertTrue(
-            any("255 files" in p for p in problems), problems)
+            any("267 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the
@@ -2630,14 +2632,15 @@ class TestCheckSubmissions(unittest.TestCase):
             )
             sizes.append((size, rel))
         sizes.sort(reverse=True)
-        image_or_font = {
+        media_suffixes = {
             ".gif", ".png", ".svg", ".jpg", ".jpeg", ".webp",
             ".ico", ".ttf", ".otf", ".woff", ".woff2",
+            ".mp4", ".webm",
         }
         largest = sizes[0]
         largest_plain = next(
             entry for entry in sizes
-            if Path(entry[1]).suffix.lower() not in image_or_font
+            if Path(entry[1]).suffix.lower() not in media_suffixes
         )
         text = re.sub(
             r"\s+", " ",

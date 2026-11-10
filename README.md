@@ -15,62 +15,64 @@ For reviewers and the agents who assist them, judging a pull request or a commit
 
 One recorded run. The session ran in Claude Code 2.1.314 with the recognitio mod installed, over OpenRouter with the model anthropic/claude-sonnet-5. The mod is the plugin component that denies a reviewer spawn when no verified packet stands. Its first reviewer spawn is denied because no verified packet stands, and the packet is then built and its manifest verified flag confirmed true. The second spawn proceeds against the verified packet and its first completion fails on a provider credit error, two reviewer reports come back in parallel over part of the range, and a third targeted reviewer pass fills the gap they left. The session ends on a consolidated presentation of 15 findings with a verdict of Not blocking.
 
+<a href="docs/images/recognitio-claude-code-demo.mp4">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-claude-code-verified-crop.png">
   <img alt="A Claude Code session denied a reviewer spawn, then verified its packet and ended on a verdict of Not blocking." src="docs/images/recognitio-claude-code-demo.gif" width="792">
 </picture>
+</a>
 
 On a narrow screen it shows the top of the poster frame, the manifest verified flag confirmed true and the second spawn under it, with two lines cut mid word at the right edge of the crop.
 
-A session in Claude Code 2.1.314 with the recognitio mod installed reviews the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff. Its capture record stands at [docs/images/capture-record.md](docs/images/capture-record.md). The recording is that session as it happened, cut for pace only, with idle spans shortened and no frame reordered or redrawn, and [one frame of it stands as a still](docs/images/recognitio-claude-code-poster.png) at the packet check moment, and [a short cut of it](docs/images/recognitio-claude-code-demo-short.gif) covers the denial, the packet build and the verified moment.
+A session in Claude Code 2.1.314 with the recognitio mod installed reviews the change from `365da81e` to `ecdda4c8` in this repository, 28 files and 3,233 lines of diff. Its capture record stands at [docs/images/capture-record.md](docs/images/capture-record.md). The recording is that session as it happened, cut for pace only, with idle spans shortened and no frame reordered or redrawn, and [one frame of it stands as a still](docs/images/recognitio-claude-code-poster.png) at the packet check moment, and [a short cut of it](docs/images/recognitio-claude-code-demo-short.gif) covers the denial, the packet build and the verified moment. The preview above links to [the full film of the session](docs/images/recognitio-claude-code-demo.mp4), a video of the same session in continuous motion at full colour, cut to its seven beats from ask to verdict with its windows named in the capture record, and the same film stands in [WebM form](docs/images/recognitio-claude-code-demo.webm) beside it.
 
 **Four harnesses, one range**
 
-Each frame below comes from its own session over the hero range, one session in each harness. On a narrow screen each frame gives way to a band cut from the same frame, and the full frame stands one click away behind it.
+Each frame below comes from its own session over the hero range, one session in each harness. On a narrow screen each frame gives way to a band cut from the same frame, and its clip stands behind it. Each frame also links to a short video clip of its own session at the moment the frame shows, and the clip plays on its file page.
 
 **Claude Code**
 
-<a href="docs/images/recognitio-session-claude-code-denial.png">
+<a href="docs/images/recognitio-session-claude-code-denial-video.mp4">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-claude-code-denial-phone.png">
   <img alt="A Claude Code session showing the first reviewer spawn denied by the spawn gate in red text." src="docs/images/recognitio-session-claude-code-denial.png" width="792">
 </picture>
 </a>
 
-The denial moment of the hero session, rendered from its cast at 80 seconds, with the spawn denied in red because no packet stands yet. [The capture record](docs/images/capture-record.md) under the Claude Code hero session tells its story.
+The denial moment of the hero session, rendered from its cast at 80 seconds, with the spawn denied in red because no packet stands yet. The clip behind this frame plays that moment of the session in motion. [The capture record](docs/images/capture-record.md) under the Claude Code hero session tells its story.
 
 **Codex**
 
-<a href="docs/images/recognitio-session-codex-verified.png">
+<a href="docs/images/recognitio-session-codex-verified-video.mp4">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-codex-verified-phone.png">
   <img alt="A Codex session summary stating the packet for the range is verified true, above its short review of the change." src="docs/images/recognitio-session-codex-verified.png" width="792">
 </picture>
 </a>
 
-Codex CLI 0.164.0-alpha.9 over OpenRouter. Its packet check passed and its manifest read verified true, and the session worked from the skill copy in the workspace of the clone under review after an explicit invocation. The rest of this session is in [the capture record](docs/images/capture-record.md) under the Codex proof strip session.
+Codex CLI 0.164.0-alpha.9 over OpenRouter. Its packet check passed and its manifest read verified true, and the session worked from the skill copy in the workspace of the clone under review after an explicit invocation. The clip behind this frame plays the close of that session, where its summary states the packet verified. The rest of this session is in [the capture record](docs/images/capture-record.md) under the Codex proof strip session.
 
 **Cursor**
 
-<a href="docs/images/recognitio-cursor-agent-poster.png">
+<a href="docs/images/recognitio-session-cursor-packet-check-video.mp4">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-cursor-agent-poster-phone.png">
   <img alt="A Cursor agent session at the moment its packet check passes, with the manifest showing 28 files and verified true." src="docs/images/recognitio-cursor-agent-poster.png" width="792">
 </picture>
 </a>
 
-The first money shot session at its packet check moment, a frame the page carried before this hero. Read this session in [the capture record](docs/images/capture-record.md) under the Cursor agent money shot.
+The first money shot session at its packet check moment, a frame the page carried before this hero. The clip behind this frame plays the packet check and the manifest read in motion, and [the full film of this session](docs/images/recognitio-cursor-agent-demo.mp4) stands in the repo as well, cut to its six beats with its windows named in the capture record, with its [WebM form](docs/images/recognitio-cursor-agent-demo.webm) beside it. Read this session in [the capture record](docs/images/capture-record.md) under the Cursor agent money shot.
 
 **Qwen Code**
 
-<a href="docs/images/recognitio-session-qwen-summary.png">
+<a href="docs/images/recognitio-session-qwen-summary-video.mp4">
 <picture>
   <source media="(max-width: 480px)" srcset="docs/images/recognitio-session-qwen-summary-phone.png">
   <img alt="A Qwen Code session summary closing on a high quality verified packet, ready for review." src="docs/images/recognitio-session-qwen-summary.png" width="792">
 </picture>
 </a>
 
-Qwen Code 0.26.4 over OpenRouter with the model qwen/qwen3-coder, at the summary screen where its review closes on the verified packet. The extractor the session ran by shell was the copy in the workspace of the clone under review, whose bytes differ from the extractor in this tree. That limit is stated in [the capture record](docs/images/capture-record.md) under the Qwen proof strip session.
+Qwen Code 0.26.4 over OpenRouter with the model qwen/qwen3-coder, at the summary screen where its review closes on the verified packet. The clip behind this frame plays that closing summary in motion. The extractor the session ran by shell was the copy in the workspace of the clone under review, whose bytes differ from the extractor in this tree. That limit is stated in [the capture record](docs/images/capture-record.md) under the Qwen proof strip session.
 
 <img alt="Paired eval chart. The packet pass found 8 of 8 planted defects and the raw diff pass found 4 of 8." src="docs/images/eval-chart.svg" width="720">
 

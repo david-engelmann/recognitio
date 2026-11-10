@@ -26,7 +26,7 @@ silence the way SC3 kept doing.
 The figure half re-derives the load bearing figures in the
 Claude pack from the tree itself. The file count, the largest
 file and its size, the largest file that is not an image or a
-font and its size, the file count the credential scan
+font or a video and its size, the file count the credential scan
 ran over, counted by the tree walk the scan itself reads,
 with the scan itself, and the three frontmatter
 description lengths the component check names all stand
@@ -99,12 +99,12 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 255 files",
-        "held 255 files",
-        "at 255 files against a cap of 512 files",
-        "demo recording at 607,309 bytes",
-        "tests/test_gate_scripts.py at 317,704 bytes",
-        "scan over all 255 files in the tree",
+        "holds 267 files",
+        "held 267 files",
+        "at 267 files against a cap of 512 files",
+        "demo recording at 24,222,065 bytes",
+        "tests/test_gate_scripts.py at 366,788 bytes",
+        "scan over all 267 files in the tree",
     ),
     PORTABLE_PACK: (
         "six month cycle",
@@ -349,12 +349,35 @@ def claude_entry_problems(rel, market, plugin, problems):
     return entry
 
 
-IMAGE_FONT_SUFFIXES = {
+# The media suffixes the largest plain file figure sets
+# aside. The set held image and font suffixes until the
+# video standard programme added the two video forms, and
+# the pack sentence that names this class names all three
+# classes with it.
+MEDIA_SUFFIXES = {
     ".gif", ".png", ".svg", ".jpg", ".jpeg", ".ico",
     ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".mp4", ".webm",
 }
 
 DEMO_RECORDING = "docs/images/recognitio-cursor-agent-demo.gif"
+
+# The demo recordings a largest file figure may name. The
+# hero sessions ship as a GIF preview and as MP4 and WebM
+# films, and the largest file in the tree is whichever of
+# these forms weighs most, so the figure check holds the
+# measured largest file to this set rather than to one
+# form. The video standard programme made the Claude Code
+# WebM the largest of them.
+DEMO_RECORDINGS = {
+    "docs/images/recognitio-claude-code-demo.gif",
+    "docs/images/recognitio-claude-code-demo.mp4",
+    "docs/images/recognitio-claude-code-demo.webm",
+    "docs/images/recognitio-claude-code-demo-short.gif",
+    "docs/images/recognitio-cursor-agent-demo.gif",
+    "docs/images/recognitio-cursor-agent-demo.mp4",
+    "docs/images/recognitio-cursor-agent-demo.webm",
+}
 
 # The private key header shape stands in the same spelling
 # the extractor mask uses, any capitalised qualifier before
@@ -441,7 +464,7 @@ def tree_measurements(root):
     largest = max(files, key=lambda item: item[1])
     plain = [
         item for item in files
-        if Path(item[0]).suffix.lower() not in IMAGE_FONT_SUFFIXES
+        if Path(item[0]).suffix.lower() not in MEDIA_SUFFIXES
     ]
     largest_plain = max(plain, key=lambda item: item[1])
     scan_hits = 0
@@ -1122,7 +1145,7 @@ def figure_problems(root, problems):
         unverifiable("largest file figure")
     for largest in largest_matches:
         claimed = int(largest.group(1).replace(",", ""))
-        if measured["largest_path"] != DEMO_RECORDING or \
+        if measured["largest_path"] not in DEMO_RECORDINGS or \
                 claimed != measured["largest_size"]:
             problems.append(
                 "%s states the largest file is the demo "
@@ -1131,8 +1154,8 @@ def figure_problems(root, problems):
                 % (CLAUDE_PACK, largest.group(1),
                    measured["largest_path"], measured["largest_size"]))
     plain_matches = list(re.finditer(
-        r"largest file that is not an image or a font is "
-        r"(\S+) at ([0-9,]+) bytes", text, re.IGNORECASE))
+        r"largest file that is not an image or a font or a "
+        r"video is (\S+) at ([0-9,]+) bytes", text, re.IGNORECASE))
     if not plain_matches:
         unverifiable("largest plain file figure")
     for plain in plain_matches:
@@ -1141,8 +1164,8 @@ def figure_problems(root, problems):
                 claimed != measured["largest_plain_size"]:
             problems.append(
                 "%s states the largest file that is not an "
-                "image or a font is %s at %s bytes and the "
-                "tree measures %s at %d bytes"
+                "image or a font or a video is %s at %s bytes "
+                "and the tree measures %s at %d bytes"
                 % (CLAUDE_PACK, plain.group(1), plain.group(2),
                    measured["largest_plain_path"],
                    measured["largest_plain_size"]))
@@ -1278,7 +1301,7 @@ def figure_problems(root, problems):
                 int(match.group(1).replace(",", "")))
         for match in re.finditer(
                 r"largest file that is not an image or a font "
-                r"is (\S+) at ([0-9,]+) bytes",
+                r"or a video is (\S+) at ([0-9,]+) bytes",
                 sentence, re.IGNORECASE):
             covered["plain"].add(
                 int(match.group(2).replace(",", "")))

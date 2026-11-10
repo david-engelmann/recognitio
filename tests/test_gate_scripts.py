@@ -4191,8 +4191,18 @@ class TestDemoAssets(unittest.TestCase):
         # and then embeds. The visual fix pass added a phone
         # width source in front of each output style still,
         # and each source stands in the list ahead of the
-        # still it replaces on a narrow screen. No retired
-        # asset name may return to the page.
+        # still it replaces on a narrow screen. The links
+        # and the embeds are collected as two passes, every
+        # bracketed link in page order and then every src and
+        # srcset in page order. The video standard programme
+        # wrapped the hero preview and each proof frame in a
+        # link to its film or clip. Those wrapped anchors are
+        # HTML hrefs, which the bracketed link pass never
+        # collects, so they stand in no list here and
+        # TestVideoForms pins them instead. The bracketed
+        # film links the lead in and the Cursor caption carry
+        # stand in the link pass at their page positions
+        # below. No retired asset name may return to the page.
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         refs = re.findall(r"\]\((docs/images/[^)]+)\)", readme)
         refs += re.findall(
@@ -4204,8 +4214,12 @@ class TestDemoAssets(unittest.TestCase):
                 "docs/images/capture-record.md",
                 "docs/images/recognitio-claude-code-poster.png",
                 "docs/images/recognitio-claude-code-demo-short.gif",
+                "docs/images/recognitio-claude-code-demo.mp4",
+                "docs/images/recognitio-claude-code-demo.webm",
                 "docs/images/capture-record.md",
                 "docs/images/capture-record.md",
+                "docs/images/recognitio-cursor-agent-demo.mp4",
+                "docs/images/recognitio-cursor-agent-demo.webm",
                 "docs/images/capture-record.md",
                 "docs/images/capture-record.md",
                 "docs/images/capture-record.md",
@@ -4233,6 +4247,1236 @@ class TestDemoAssets(unittest.TestCase):
         for name in self.RETIRED:
             self.assertNotIn(name, readme)
         self.assertNotIn("recognitio-demo-terminal", readme)
+
+
+def _mp4_facts(path):
+    """Return video facts for one MP4 file.
+
+    The probe reads the ISO box structure with the standard
+    library only and returns width and height and duration
+    in seconds and the video sample count and the total
+    video sample bytes the sample size table names. It
+    walks the boxes to the moov box, reads the movie header
+    timescale and duration, and walks to the first video
+    track's sample entry for its width and height. The
+    sample entry must carry a codec record the probe
+    parses in full, holding a version and a sequence
+    parameter set and a picture parameter set, and the
+    timing and size tables must name samples and bytes.
+    The probe then lays every sample out through the
+    chunk tables and requires each one to stand inside
+    a media data box, so a file whose tables claim bytes
+    its media boxes do not hold cannot pass either. The
+    probe then reads the head of every placed sample as
+    a coded unit, holding each unit length inside its
+    sample and each unit header inside the coded unit
+    types, and requires the first sample to tile into
+    units whole and to hold a picture unit, so a media
+    box of unwritten bytes cannot pass however honest
+    its tables stand. A header shell with no frames
+    cannot pass. Every box on every walk must end inside the bytes the
+    walk reads, so a file cut short fails here rather than
+    passing on its surviving header. A file that does not
+    carry this structure is not an MP4 the gate can
+    certify, and the probe fails here rather than passing
+    it unexamined. Malformed input fails as an
+    AssertionError, because the probe's verdict is the only
+    thing its callers read.
+    """
+    raw = path.read_bytes()
+    try:
+        return _mp4_facts_inner(raw)
+    except (IndexError, struct.error):
+        raise AssertionError("the MP4 structure is truncated")
+
+
+def _mp4_facts_inner(raw):
+    assert raw[4:8] == b"ftyp", "not an MP4 file"
+
+    def boxes(start, end):
+        pos = start
+        while pos + 8 <= end:
+            size = int.from_bytes(raw[pos:pos + 4], "big")
+            kind = raw[pos + 4:pos + 8]
+            header = 8
+            if size == 1:
+                size = int.from_bytes(
+                    raw[pos + 8:pos + 16], "big"
+                )
+                header = 16
+            elif size == 0:
+                size = end - pos
+            assert size >= header, "a box shorter than its header"
+            assert pos + size <= end, (
+                "a box ends past the bytes under it"
+            )
+            yield kind, pos + header, pos + size
+            pos += size
+
+    def find(start, end, kind):
+        for found, body, stop in boxes(start, end):
+            if found == kind:
+                return body, stop
+        raise AssertionError("no %s box in the MP4" % kind)
+
+    # The walk above never steps into the media data box,
+    # so this pass drives the top level walk to completion
+    # over it. The point of the pass is the driving, because
+    # a media box that ends past the file is a cut the
+    # header facts alone would never show. The pass also
+    # keeps the span of every media box, because the sample
+    # placement check below reads them.
+    media_spans = []
+    for _kind, _body, stop in boxes(0, len(raw)):
+        assert stop <= len(raw), "a top level box ends past the file"
+        if _kind == b"mdat":
+            media_spans.append((_body, stop))
+
+    moov_body, moov_end = find(0, len(raw), b"moov")
+    mvhd_body, _ = find(moov_body, moov_end, b"mvhd")
+    version = raw[mvhd_body]
+    if version == 1:
+        timescale = int.from_bytes(
+            raw[mvhd_body + 20:mvhd_body + 24], "big"
+        )
+        duration = int.from_bytes(
+            raw[mvhd_body + 24:mvhd_body + 32], "big"
+        )
+    else:
+        timescale = int.from_bytes(
+            raw[mvhd_body + 12:mvhd_body + 16], "big"
+        )
+        duration = int.from_bytes(
+            raw[mvhd_body + 16:mvhd_body + 20], "big"
+        )
+    assert timescale > 0, "the MP4 movie header names no timescale"
+    width = height = None
+    samples = 0
+    config = False
+    payload = 0
+    placed = 0
+    nal_size = 4
+    for kind, body, stop in boxes(moov_body, moov_end):
+        if kind != b"trak":
+            continue
+        try:
+            mdia_body, mdia_end = find(body, stop, b"mdia")
+            minf_body, minf_end = find(mdia_body, mdia_end, b"minf")
+            stbl_body, stbl_end = find(minf_body, minf_end, b"stbl")
+            stsd_body, _ = find(stbl_body, stbl_end, b"stsd")
+        except AssertionError:
+            continue
+        entry = stsd_body + 8
+        if raw[entry + 4:entry + 8] not in (b"avc1", b"avc3"):
+            continue
+        width = int.from_bytes(raw[entry + 32:entry + 34], "big")
+        height = int.from_bytes(raw[entry + 34:entry + 36], "big")
+        size_field = int.from_bytes(raw[entry:entry + 4], "big")
+        record = raw[entry + 8 + 78:entry + size_field]
+        assert record[4:8] == b"avcC", (
+            "the video sample entry carries no codec record"
+        )
+        rec_size = int.from_bytes(record[0:4], "big")
+        assert 8 < rec_size <= len(record), (
+            "the codec record is cut inside the sample entry"
+        )
+        avcc = record[8:rec_size]
+        assert avcc[0] == 1, "the codec record names no version"
+        sps_count = avcc[5] & 0x1F
+        assert sps_count >= 1, (
+            "the codec record names no sequence parameter set"
+        )
+        at = 6
+        for _ in range(sps_count):
+            assert at + 2 <= len(avcc), (
+                "the codec record sequence parameter set is cut"
+            )
+            sps_len = int.from_bytes(avcc[at:at + 2], "big")
+            at += 2
+            assert 1 <= sps_len and at + sps_len <= len(avcc), (
+                "the codec record sequence parameter set is cut"
+            )
+            at += sps_len
+        assert at < len(avcc), (
+            "the codec record names no picture parameter set"
+        )
+        pps_count = avcc[at]
+        assert pps_count >= 1, (
+            "the codec record names no picture parameter set"
+        )
+        at += 1
+        for _ in range(pps_count):
+            assert at + 2 <= len(avcc), (
+                "the codec record picture parameter set is cut"
+            )
+            pps_len = int.from_bytes(avcc[at:at + 2], "big")
+            at += 2
+            assert 1 <= pps_len and at + pps_len <= len(avcc), (
+                "the codec record picture parameter set is cut"
+            )
+            at += pps_len
+        nal_size = (avcc[4] & 0x03) + 1
+        config = True
+        sizes = []
+        runs = []
+        offsets = []
+        try:
+            stts_body, _ = find(stbl_body, stbl_end, b"stts")
+            count = int.from_bytes(
+                raw[stts_body + 4:stts_body + 8], "big"
+            )
+            for i in range(count):
+                samples += int.from_bytes(
+                    raw[stts_body + 8 + i * 8:
+                        stts_body + 12 + i * 8], "big"
+                )
+            stsz_body, _ = find(stbl_body, stbl_end, b"stsz")
+            unit = int.from_bytes(
+                raw[stsz_body + 4:stsz_body + 8], "big"
+            )
+            total = int.from_bytes(
+                raw[stsz_body + 8:stsz_body + 12], "big"
+            )
+            if unit:
+                payload = unit * total
+                sizes = [unit] * total
+            else:
+                sizes = [
+                    int.from_bytes(
+                        raw[stsz_body + 12 + i * 4:
+                            stsz_body + 16 + i * 4], "big"
+                    )
+                    for i in range(total)
+                ]
+                payload = sum(sizes)
+        except AssertionError:
+            samples = 0
+            payload = 0
+        try:
+            stsc_body, _ = find(stbl_body, stbl_end, b"stsc")
+            run_total = int.from_bytes(
+                raw[stsc_body + 4:stsc_body + 8], "big"
+            )
+            for i in range(run_total):
+                at = stsc_body + 8 + i * 12
+                runs.append((
+                    int.from_bytes(raw[at:at + 4], "big"),
+                    int.from_bytes(raw[at + 4:at + 8], "big"),
+                ))
+            for name, wide in ((b"stco", 4), (b"co64", 8)):
+                try:
+                    off_body, _ = find(stbl_body, stbl_end, name)
+                except AssertionError:
+                    continue
+                off_total = int.from_bytes(
+                    raw[off_body + 4:off_body + 8], "big"
+                )
+                offsets = [
+                    int.from_bytes(
+                        raw[off_body + 8 + i * wide:
+                            off_body + 8 + (i + 1) * wide], "big"
+                    )
+                    for i in range(off_total)
+                ]
+                break
+        except AssertionError:
+            pass
+        if samples > 0:
+            assert len(sizes) == samples, (
+                "the size table names a sample count the "
+                "timing table does not"
+            )
+            assert runs and offsets, (
+                "the MP4 video samples name no chunk tables"
+            )
+            run_at = 0
+            at_size = 0
+            for chunk_at, chunk_off in enumerate(offsets, 1):
+                while (
+                    run_at + 1 < len(runs)
+                    and runs[run_at + 1][0] <= chunk_at
+                ):
+                    run_at += 1
+                pos = chunk_off
+                for _ in range(runs[run_at][1]):
+                    end = pos + sizes[at_size]
+                    assert any(
+                        start <= pos and end <= stop
+                        for start, stop in media_spans
+                    ), "a video sample stands outside the media data"
+                    head = raw[pos:pos + nal_size]
+                    assert len(head) == nal_size, (
+                        "a video sample is cut at its head"
+                    )
+                    first_len = int.from_bytes(head, "big")
+                    assert 1 <= first_len <= (
+                        sizes[at_size] - nal_size
+                    ), "a video sample opens on a unit past its end"
+                    header = raw[pos + nal_size]
+                    assert header >> 7 == 0 and (
+                        header & 0x1F
+                    ) in (
+                        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+                    ), "a video sample opens on no coded unit"
+                    if at_size == 0:
+                        types = []
+                        cursor = pos
+                        while cursor < end:
+                            step = int.from_bytes(
+                                raw[cursor:cursor + nal_size],
+                                "big",
+                            )
+                            assert 1 <= step <= (
+                                end - cursor - nal_size
+                            ), (
+                                "the first sample does not "
+                                "tile into units"
+                            )
+                            types.append(
+                                raw[cursor + nal_size] & 0x1F
+                            )
+                            cursor += nal_size + step
+                        assert 1 in types or 5 in types, (
+                            "the first sample holds "
+                            "no picture unit"
+                        )
+                    pos = end
+                    at_size += 1
+                    placed += 1
+            assert placed == samples, (
+                "the chunk tables place fewer samples than "
+                "the timing table names"
+            )
+        break
+    assert width and height, "no video track sample entry in the MP4"
+    assert samples > 0, "the MP4 video track names no samples"
+    assert payload > 0, "the MP4 video samples name no bytes"
+    assert placed == samples, (
+        "the MP4 video samples do not stand inside the media data"
+    )
+    return width, height, duration / timescale, samples, payload
+
+
+def _mp4_shell():
+    """Build a header only MP4 shell with planted facts.
+
+    The plant for the video gate. The shell carries an
+    ftyp box, a movie header claiming a duration of 171.7
+    seconds at a timescale of 1000, and one video track
+    whose sample entry claims 1584 by 1216 over one media
+    box of zero padding. It holds no codec record, no
+    sample timing table, and no sample sizes, so a probe
+    that reads frame evidence refuses it while a probe
+    that reads only header claims passes it.
+    """
+    def box(kind, body):
+        return (
+            (len(body) + 8).to_bytes(4, "big") + kind + body
+        )
+
+    mvhd = (
+        b"\x00\x00\x00\x00" + b"\x00" * 8
+        + (1000).to_bytes(4, "big") + (171700).to_bytes(4, "big")
+        + b"\x00" * 80
+    )
+    entry = (
+        (86).to_bytes(4, "big") + b"avc1" + b"\x00" * 24
+        + (1584).to_bytes(2, "big") + (1216).to_bytes(2, "big")
+        + b"\x00" * 48
+    )
+    stsd = b"\x00" * 4 + (1).to_bytes(4, "big") + entry
+    stbl = box(b"stbl", box(b"stsd", stsd))
+    minf = box(b"minf", stbl)
+    mdia = box(b"mdia", minf)
+    trak = box(b"trak", mdia)
+    moov = box(b"moov", box(b"mvhd", mvhd) + trak)
+    ftyp = box(b"ftyp", b"isom" + b"\x00" * 12)
+    mdat = box(b"mdat", b"\x00" * 105000)
+    return ftyp + moov + mdat
+
+
+def _mp4_table_shell(valid_record):
+    """Build an MP4 whose tables claim frames it lacks.
+
+    The second plant family for the video gate. The shell
+    carries the planted movie header and sample entry of
+    the header shell and adds a timing table claiming
+    1717 samples and a size table claiming bytes for
+    every one of them over the same media box of zero
+    padding, and it names no chunk tables at all, so the
+    claimed samples stand nowhere in the file. In the
+    letters form the sample entry record holds the bare
+    letters of a codec record at no box boundary. In the
+    valid form the record parses in full, so only the
+    sample placement check can refuse the shell.
+    """
+    def box(kind, body):
+        return (
+            (len(body) + 8).to_bytes(4, "big") + kind + body
+        )
+
+    mvhd = (
+        b"\x00\x00\x00\x00" + b"\x00" * 8
+        + (1000).to_bytes(4, "big") + (171700).to_bytes(4, "big")
+        + b"\x00" * 80
+    )
+    if valid_record:
+        avcc = (
+            b"\x01\x64\x00\x28\xff\xe1"
+            + (4).to_bytes(2, "big") + b"\x67\x64\x00\x28"
+            + b"\x01" + (2).to_bytes(2, "big") + b"\x68\xee"
+        )
+        record = (
+            (len(avcc) + 8).to_bytes(4, "big") + b"avcC" + avcc
+        )
+    else:
+        record = b"\x00" * 14 + b"avcC" + b"\x00" * 8
+    entry = (
+        (86 + len(record)).to_bytes(4, "big") + b"avc1"
+        + b"\x00" * 24
+        + (1584).to_bytes(2, "big") + (1216).to_bytes(2, "big")
+        + b"\x00" * 50
+        + record
+    )
+    stsd = b"\x00" * 4 + (1).to_bytes(4, "big") + entry
+    stts = (
+        b"\x00" * 4 + (1).to_bytes(4, "big")
+        + (1717).to_bytes(4, "big") + (1001).to_bytes(4, "big")
+    )
+    stsz = (
+        b"\x00" * 4 + (5100).to_bytes(4, "big")
+        + (1717).to_bytes(4, "big")
+    )
+    stbl = box(
+        b"stbl",
+        box(b"stsd", stsd) + box(b"stts", stts)
+        + box(b"stsz", stsz),
+    )
+    minf = box(b"minf", stbl)
+    mdia = box(b"mdia", minf)
+    trak = box(b"trak", mdia)
+    moov = box(b"moov", box(b"mvhd", mvhd) + trak)
+    ftyp = box(b"ftyp", b"isom" + b"\x00" * 12)
+    mdat = box(b"mdat", b"\x00" * 105000)
+    return ftyp + moov + mdat
+
+
+def _mp4_stream_shell(valid_record=True):
+    """Build an MP4 whose placed samples hold no units.
+
+    The third plant family for the video gate. The shell
+    carries the codec record and adds the chunk tables
+    the table shell lacks, with one chunk standing
+    inside a media box of zero bytes sized to the size
+    table claims, so the sample placement check stands
+    satisfied and only the coded unit check on the
+    sample bytes themselves can refuse it. In the
+    letters form the record holds the bare letters of a
+    codec record at no box boundary while every check
+    before the record stands satisfied, so only the
+    structural record parse can refuse that form, and
+    the plant test reads its refusal message to prove
+    the parse is the check that fired.
+    """
+    def box(kind, body):
+        return (
+            (len(body) + 8).to_bytes(4, "big") + kind + body
+        )
+
+    mvhd = (
+        b"\x00\x00\x00\x00" + b"\x00" * 8
+        + (1000).to_bytes(4, "big") + (171700).to_bytes(4, "big")
+        + b"\x00" * 80
+    )
+    if valid_record:
+        avcc = (
+            b"\x01\x64\x00\x28\xff\xe1"
+            + (4).to_bytes(2, "big") + b"\x67\x64\x00\x28"
+            + b"\x01" + (2).to_bytes(2, "big") + b"\x68\xee"
+        )
+        record = (
+            (len(avcc) + 8).to_bytes(4, "big") + b"avcC" + avcc
+        )
+    else:
+        record = b"\x00" * 14 + b"avcC" + b"\x00" * 8
+    entry = (
+        (86 + len(record)).to_bytes(4, "big") + b"avc1"
+        + b"\x00" * 24
+        + (1584).to_bytes(2, "big") + (1216).to_bytes(2, "big")
+        + b"\x00" * 50
+        + record
+    )
+    stsd = b"\x00" * 4 + (1).to_bytes(4, "big") + entry
+    stts = (
+        b"\x00" * 4 + (1).to_bytes(4, "big")
+        + (1717).to_bytes(4, "big") + (1001).to_bytes(4, "big")
+    )
+    stsz = (
+        b"\x00" * 4 + (5100).to_bytes(4, "big")
+        + (1717).to_bytes(4, "big")
+    )
+    stsc = (
+        b"\x00" * 4 + (1).to_bytes(4, "big")
+        + (1).to_bytes(4, "big") + (1717).to_bytes(4, "big")
+        + (1).to_bytes(4, "big")
+    )
+
+    def build(offset):
+        stco = (
+            b"\x00" * 4 + (1).to_bytes(4, "big")
+            + offset.to_bytes(4, "big")
+        )
+        stbl = box(
+            b"stbl",
+            box(b"stsd", stsd) + box(b"stts", stts)
+            + box(b"stsz", stsz) + box(b"stsc", stsc)
+            + box(b"stco", stco),
+        )
+        minf = box(b"minf", stbl)
+        mdia = box(b"mdia", minf)
+        trak = box(b"trak", mdia)
+        return box(b"moov", box(b"mvhd", mvhd) + trak)
+
+    ftyp = box(b"ftyp", b"isom" + b"\x00" * 12)
+    moov = build(0)
+    moov = build(len(ftyp) + len(moov) + 8)
+    mdat = box(b"mdat", b"\x00" * (5100 * 1717))
+    return ftyp + moov + mdat
+
+
+def _webm_shell():
+    """Build a header only WebM shell with planted facts.
+
+    The plant for the video gate. The shell carries an
+    EBML header naming webm, an Info element claiming a
+    16.9 second duration, and one video track claiming
+    VP8 at 1584 by 1140, over one Void element of zero
+    padding. It holds no cluster and no frame block, so a
+    probe that reads frame evidence refuses it while a
+    probe that reads only header claims passes it.
+    """
+    def size(value):
+        if value < 127:
+            return bytes([0x80 | value])
+        if value < 16383:
+            return bytes([0x40 | (value >> 8), value & 0xFF])
+        if value < 2097151:
+            return bytes([
+                0x20 | (value >> 16),
+                (value >> 8) & 0xFF,
+                value & 0xFF,
+            ])
+        return bytes([
+            0x10 | (value >> 24),
+            (value >> 16) & 0xFF,
+            (value >> 8) & 0xFF,
+            value & 0xFF,
+        ])
+
+    def element(kind, body):
+        return kind + size(len(body)) + body
+
+    header = element(
+        b"\x1a\x45\xdf\xa3",
+        element(b"\x42\x86", b"\x01")
+        + element(b"\x42\x82", b"webm"),
+    )
+    info = element(
+        b"\x15\x49\xa9\x66",
+        element(b"\x2a\xd7\xb1", (1000000).to_bytes(3, "big"))
+        + element(
+            b"\x44\x89", struct.pack(">d", 16900.0)
+        ),
+    )
+    video = element(
+        b"\xe0",
+        element(b"\xb0", (1584).to_bytes(2, "big"))
+        + element(b"\xba", (1140).to_bytes(2, "big")),
+    )
+    track = element(
+        b"\xae",
+        element(b"\xd7", b"\x01")
+        + element(b"\x83", b"\x01")
+        + element(b"\x86", b"V_VP8")
+        + video,
+    )
+    tracks = element(b"\x16\x54\xae\x6b", track)
+    void = element(b"\xec", b"\x00" * 100500)
+    segment = element(
+        b"\x18\x53\x80\x67", info + tracks + void
+    )
+    return header + segment
+
+
+def _webm_block_shell():
+    """Build a WebM whose frame blocks hold no frame.
+
+    The second plant family for the video gate. The shell
+    carries the planted Info and track elements of the
+    header shell and adds one cluster holding three frame
+    blocks whose payloads are single zero bytes under
+    timecodes that reach the planted duration, so every
+    header and table claim stands satisfied and only a
+    probe that reads the frame bytes themselves can
+    refuse it.
+    """
+    def size(value):
+        if value < 127:
+            return bytes([0x80 | value])
+        if value < 16383:
+            return bytes([0x40 | (value >> 8), value & 0xFF])
+        if value < 2097151:
+            return bytes([
+                0x20 | (value >> 16),
+                (value >> 8) & 0xFF,
+                value & 0xFF,
+            ])
+        return bytes([
+            0x10 | (value >> 24),
+            (value >> 16) & 0xFF,
+            (value >> 8) & 0xFF,
+            value & 0xFF,
+        ])
+
+    def element(kind, body):
+        return kind + size(len(body)) + body
+
+    header = element(
+        b"\x1a\x45\xdf\xa3",
+        element(b"\x42\x86", b"\x01")
+        + element(b"\x42\x82", b"webm"),
+    )
+    info = element(
+        b"\x15\x49\xa9\x66",
+        element(b"\x2a\xd7\xb1", (1000000).to_bytes(3, "big"))
+        + element(
+            b"\x44\x89", struct.pack(">d", 200.0)
+        ),
+    )
+    video = element(
+        b"\xe0",
+        element(b"\xb0", (1584).to_bytes(2, "big"))
+        + element(b"\xba", (1140).to_bytes(2, "big")),
+    )
+    track = element(
+        b"\xae",
+        element(b"\xd7", b"\x01")
+        + element(b"\x83", b"\x01")
+        + element(b"\x86", b"V_VP8")
+        + video,
+    )
+    tracks = element(b"\x16\x54\xae\x6b", track)
+
+    def block(delta):
+        return element(
+            b"\xa3",
+            b"\x81"
+            + delta.to_bytes(2, "big", signed=True)
+            + b"\x00" + b"\x00",
+        )
+
+    cluster = element(
+        b"\x1f\x43\xb6\x75",
+        element(b"\xe7", b"\x00")
+        + block(0) + block(100) + block(200),
+    )
+    segment = element(
+        b"\x18\x53\x80\x67", info + tracks + cluster
+    )
+    return header + segment
+
+
+def _webm_facts(path):
+    """Return video facts for one WebM file.
+
+    The probe reads the EBML structure with the standard
+    library only and returns width and height and duration
+    in seconds and the frame block count. It confirms the
+    DocType names webm, walks the Segment children to the
+    Info element for the TimestampScale and Duration and
+    to the first video track for its codec and its
+    PixelWidth and PixelHeight, and then reads the frame
+    blocks standing in the clusters, whose latest timecode
+    must stand at the stated duration rather than far
+    short of it, so a header shell with no frames cannot
+    pass. The probe then reads the frame tag at the head
+    of every block payload and holds each first partition
+    inside its own block, and every keyframe must carry
+    the VP8 signature and name the frame size the track
+    names, so blocks holding no decodable frame cannot
+    pass either. A file that does not carry this structure is not
+    a WebM the gate can certify, and the probe fails here
+    rather than passing it unexamined. Malformed input
+    fails as an AssertionError, because the probe's verdict
+    is the only thing its callers read.
+    """
+    raw = path.read_bytes()
+    try:
+        return _webm_facts_inner(raw)
+    except (IndexError, KeyError, struct.error):
+        raise AssertionError("the WebM structure is malformed")
+
+
+def _webm_facts_inner(raw):
+    assert raw[:4] == b"\x1a\x45\xdf\xa3", "not an EBML file"
+
+    def read_id(pos):
+        first = raw[pos]
+        assert first != 0, "an element id with no marker bit"
+        length = 1
+        mask = 0x80
+        while not first & mask:
+            mask >>= 1
+            length += 1
+        return raw[pos:pos + length], pos + length
+
+    def read_size(pos):
+        first = raw[pos]
+        assert first != 0, "a size with no marker bit"
+        length = 1
+        mask = 0x80
+        while not first & mask:
+            mask >>= 1
+            length += 1
+        value = first & (mask - 1)
+        for i in range(1, length):
+            value = (value << 8) | raw[pos + i]
+        unknown = value == (1 << (7 * length)) - 1
+        return (None if unknown else value), pos + length
+
+    def children(start, end):
+        pos = start
+        while pos < end:
+            kind, after = read_id(pos)
+            size, after = read_size(after)
+            stop = end if size is None else after + size
+            assert stop <= end, (
+                "an element ends past the bytes under it"
+            )
+            yield kind, after, stop
+            pos = stop
+
+    segment = None
+    for kind, body, stop in children(0, len(raw)):
+        if kind == b"\x1a\x45\xdf\xa3":
+            for sub, sub_body, sub_stop in children(body, stop):
+                if sub == b"\x42\x82":
+                    assert raw[sub_body:sub_stop] == b"webm", (
+                        "the EBML DocType does not name webm"
+                    )
+        elif kind == b"\x18\x53\x80\x67":
+            segment = (body, stop)
+            break
+    assert segment is not None, "no Segment in the WebM"
+    seg_body, seg_end = segment
+    # The muxer writes a SeekHead ahead of the Info and
+    # Tracks elements. The walk steps over it by its size,
+    # like every other child, so the ids inside its entries
+    # are never mistaken for the elements themselves.
+    scale = 1000000
+    duration_units = None
+    width = height = None
+    codec = None
+    video_track = None
+    found_frames = []
+    blocks = 0
+    max_timecode = None
+    base = 0
+    for kind, body, stop in children(seg_body, seg_end):
+        if kind == b"\x15\x49\xa9\x66":
+            for sub, sub_body, sub_stop in children(body, stop):
+                if sub == b"\x2a\xd7\xb1":
+                    scale = int.from_bytes(
+                        raw[sub_body:sub_stop], "big"
+                    )
+                elif sub == b"\x44\x89":
+                    duration_units = struct.unpack(
+                        ">f" if sub_stop - sub_body == 4 else ">d",
+                        raw[sub_body:sub_stop],
+                    )[0]
+        elif kind == b"\x1f\x43\xb6\x75":
+            for sub, sub_body, sub_stop in children(body, stop):
+                if sub == b"\xe7":
+                    base = int.from_bytes(
+                        raw[sub_body:sub_stop], "big"
+                    )
+                elif sub == b"\xa3":
+                    blocks += 1
+                    first = raw[sub_body]
+                    marker = 0x80
+                    tlen = 1
+                    while not first & marker:
+                        marker >>= 1
+                        tlen += 1
+                    track_no = first & (marker - 1)
+                    for i in range(1, tlen):
+                        track_no = (track_no << 8) | raw[
+                            sub_body + i
+                        ]
+                    head = sub_body + tlen
+                    delta = int.from_bytes(
+                        raw[head:head + 2], "big",
+                        signed=True,
+                    )
+                    stamp = base + delta
+                    if max_timecode is None or stamp > max_timecode:
+                        max_timecode = stamp
+                    found_frames.append(
+                        (track_no, raw[head + 2],
+                         head + 3, sub_stop)
+                    )
+        elif kind == b"\x16\x54\xae\x6b":
+            for track, t_body, t_stop in children(body, stop):
+                if track != b"\xae":
+                    continue
+                fields = {}
+                for sub, sub_body, sub_stop in children(
+                    t_body, t_stop
+                ):
+                    fields[sub] = (sub_body, sub_stop)
+                if b"\x83" not in fields:
+                    continue
+                s, e = fields[b"\x83"]
+                if raw[s:e] != b"\x01":
+                    continue
+                if b"\xd7" in fields:
+                    ns, ne = fields[b"\xd7"]
+                    video_track = int.from_bytes(raw[ns:ne], "big")
+                s, e = fields[b"\xe0"]
+                if b"\x86" in fields:
+                    cs, ce = fields[b"\x86"]
+                    codec = raw[cs:ce]
+                for sub, sub_body, sub_stop in children(s, e):
+                    if sub == b"\xb0":
+                        width = int.from_bytes(
+                            raw[sub_body:sub_stop], "big"
+                        )
+                    elif sub == b"\xba":
+                        height = int.from_bytes(
+                            raw[sub_body:sub_stop], "big"
+                        )
+    assert codec == b"V_VP8", "the WebM video track is not VP8"
+    assert width and height, "no video track in the WebM"
+    assert duration_units, "no duration in the WebM Info element"
+    seconds = duration_units * scale / 1e9
+    assert blocks > 0, "the WebM segment holds no frame blocks"
+    assert max_timecode is not None, (
+        "the WebM clusters name no frame timecodes"
+    )
+    tail = seconds - max_timecode * scale / 1e9
+    assert -0.5 <= tail <= 5.0, (
+        "the last frame timecode stands off the stated duration"
+    )
+    frames = [
+        frame for frame in found_frames
+        if video_track is None or frame[0] == video_track
+    ]
+    assert len(frames) == blocks, (
+        "a frame block stands on a track the gate does not read"
+    )
+    keyframes = 0
+    for _track, flags, start, stop in frames:
+        assert flags & 0x06 == 0, "a frame block is laced"
+        payload = raw[start:stop]
+        assert len(payload) >= 3, (
+            "a frame block is too small to hold a frame"
+        )
+        tag = payload[0] | (payload[1] << 8) | (payload[2] << 16)
+        part0 = tag >> 5
+        if tag & 1:
+            assert 1 <= part0 <= len(payload) - 3, (
+                "a frame block names a first partition "
+                "past its own bytes"
+            )
+        else:
+            keyframes += 1
+            assert len(payload) >= 10, (
+                "a keyframe block is too small to hold "
+                "its header"
+            )
+            assert payload[3:6] == b"\x9d\x01\x2a", (
+                "a keyframe block carries no VP8 signature"
+            )
+            assert part0 <= len(payload) - 10, (
+                "a keyframe block names a first partition "
+                "past its own bytes"
+            )
+            frame_width = (
+                int.from_bytes(payload[6:8], "little") & 0x3FFF
+            )
+            frame_height = (
+                int.from_bytes(payload[8:10], "little") & 0x3FFF
+            )
+            assert (frame_width, frame_height) == (width, height), (
+                "a keyframe names a frame size the track "
+                "does not"
+            )
+    assert keyframes > 0, "the WebM holds no keyframe"
+    return width, height, seconds, blocks
+
+
+class TestVideoForms(unittest.TestCase):
+    """The money shot video standard gate.
+
+    The video standard programme gave every money shot a
+    full video form beside its preview and its stills. Each
+    hero session and each proof strip moment stands in the
+    tree as an MP4 and a WebM rendered from the recorded
+    cast of its own session, and the capture record names
+    every file with its geometry and duration and play
+    length. The pins below hold the recorded facts, read
+    through the suite's own stdlib probes, so a money shot
+    whose video form is removed, truncated, or replaced by
+    a dummy file fails this gate by name. The gate certifies each video by its container structure, its sample placement, its coded unit framing, its frame tags, and its exact recorded size. It does not decode the encoded picture data, so a file fabricated to the recorded shape at the recorded size with framed but undecodable picture data is not refused by the gate. The provenance of the shipped films rests on the frame checks recorded in this section. The video files
+    stand outside the weighed page set under the ruling
+    pinned in TestBrandAssets, because a linked video is
+    click to play and no page load pulls it.
+    """
+
+    IMAGES = ROOT / "docs" / "images"
+    # The recorded play length of each film and clip in
+    # seconds. The duration a probe may read stands
+    # within 1.5 seconds of the figure named here. The
+    # third element of each row holds the frame evidence
+    # for the MP4 form, its sample count and its total
+    # sample bytes, and the WebM frame block counts stand
+    # in their own table below.
+    VIDEOS = {
+        "recognitio-claude-code-demo": (
+            (1584, 1216), 171.7, (1717, 8751129),
+        ),
+        "recognitio-cursor-agent-demo": (
+            (1584, 1216), 150.5, (1505, 3218173),
+        ),
+        "recognitio-session-claude-code-denial-video": (
+            (1584, 1140), 30.0, (300, 938817),
+        ),
+        "recognitio-session-codex-verified-video": (
+            (1584, 1456), 39.8, (398, 2180392),
+        ),
+        "recognitio-session-cursor-packet-check-video": (
+            (1584, 1140), 36.0, (360, 718566),
+        ),
+        "recognitio-session-qwen-summary-video": (
+            (1584, 1140), 16.9, (169, 2448593),
+        ),
+    }
+    WEBM_BLOCKS = {
+        "recognitio-claude-code-demo": 1717,
+        "recognitio-cursor-agent-demo": 1505,
+        "recognitio-session-claude-code-denial-video": 300,
+        "recognitio-session-codex-verified-video": 398,
+        "recognitio-session-cursor-packet-check-video": 360,
+        "recognitio-session-qwen-summary-video": 169,
+    }
+    # The byte size the capture record states for each
+    # video file, held here so the record test below can
+    # hold the record to its own figures and the forms
+    # test can hold each shipped file to its exact
+    # recorded size, so a dummy built to the recorded
+    # shape at the wrong size fails on the figure as
+    # well as on the probes that read its frames.
+    SIZES = {
+        "recognitio-claude-code-demo.mp4": 8772651,
+        "recognitio-claude-code-demo.webm": 24222065,
+        "recognitio-cursor-agent-demo.mp4": 3237111,
+        "recognitio-cursor-agent-demo.webm": 15813785,
+        "recognitio-session-claude-code-denial-video.mp4": 943256,
+        "recognitio-session-claude-code-denial-video.webm": 3103914,
+        "recognitio-session-codex-verified-video.mp4": 2186026,
+        "recognitio-session-codex-verified-video.webm": 4586737,
+        "recognitio-session-cursor-packet-check-video.mp4": 723749,
+        "recognitio-session-cursor-packet-check-video.webm": 2560181,
+        "recognitio-session-qwen-summary-video.mp4": 2451448,
+        "recognitio-session-qwen-summary-video.webm": 3353603,
+    }
+
+    def test_every_money_shot_carries_both_video_forms(self):
+        for stem, (geometry, seconds, evidence) in (
+            self.VIDEOS.items()
+        ):
+            samples, payload = evidence
+            path = self.IMAGES / (stem + ".mp4")
+            self.assertTrue(path.is_file(), stem + ".mp4")
+            width, height, duration, found, named = _mp4_facts(path)
+            self.assertEqual(
+                (width, height), geometry, stem + ".mp4"
+            )
+            self.assertAlmostEqual(
+                duration, seconds, delta=1.5, msg=stem + ".mp4"
+            )
+            self.assertEqual(found, samples, stem + ".mp4")
+            self.assertEqual(named, payload, stem + ".mp4")
+            self.assertEqual(
+                path.stat().st_size,
+                self.SIZES[stem + ".mp4"],
+                stem + ".mp4",
+            )
+            path = self.IMAGES / (stem + ".webm")
+            self.assertTrue(path.is_file(), stem + ".webm")
+            width, height, duration, blocks = _webm_facts(path)
+            self.assertEqual(
+                (width, height), geometry, stem + ".webm"
+            )
+            self.assertAlmostEqual(
+                duration, seconds, delta=1.5, msg=stem + ".webm"
+            )
+            self.assertEqual(
+                blocks, self.WEBM_BLOCKS[stem], stem + ".webm"
+            )
+            self.assertEqual(
+                path.stat().st_size,
+                self.SIZES[stem + ".webm"],
+                stem + ".webm",
+            )
+
+    def test_the_capture_record_names_every_video(self):
+        record = (
+            self.IMAGES / "capture-record.md"
+        ).read_text(encoding="utf-8")
+        section = record.split("## The video forms", 1)[1]
+        for stem in self.VIDEOS:
+            self.assertIn(stem + ".mp4", section, stem)
+            self.assertIn(stem + ".webm", section, stem)
+        for name, size in self.SIZES.items():
+            stated = (
+                "%s, %d bytes" % (name, size) in section
+                or "%s at %d bytes" % (name, size) in section
+            )
+            self.assertTrue(stated, name)
+        # The record also states each play length in the
+        # entry that names the film or clip, and the test
+        # holds that figure to the recorded duration, so a
+        # restated record cannot drift from the gate table.
+        lines = section.splitlines()
+        for stem, (_geometry, seconds, _evidence) in (
+            self.VIDEOS.items()
+        ):
+            entries = [
+                line for line in lines if stem + ".mp4" in line
+            ]
+            self.assertTrue(entries, stem)
+            self.assertTrue(
+                any(
+                    "play %.1f seconds" % seconds in line
+                    for line in entries
+                ),
+                stem,
+            )
+
+    def test_the_readme_links_the_films_and_clips(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        hero = readme.split("**Four harnesses, one range**", 1)[0]
+        self.assertIn(
+            '<a href="docs/images/'
+            'recognitio-claude-code-demo.mp4">',
+            hero,
+        )
+        strip = readme.split(
+            "**Four harnesses, one range**", 1
+        )[1].split("eval-chart.svg", 1)[0]
+        for stem in (
+            "recognitio-session-claude-code-denial-video",
+            "recognitio-session-codex-verified-video",
+            "recognitio-session-cursor-packet-check-video",
+            "recognitio-session-qwen-summary-video",
+        ):
+            self.assertIn(
+                '<a href="docs/images/%s.mp4">' % stem, strip, stem
+            )
+
+    def test_a_removed_or_truncated_video_fails_the_probe(self):
+        # The regression plant for the gate itself. A video
+        # file replaced by a short dummy or cut in half must
+        # fail the probe by assertion, never pass as a video.
+        source = (
+            self.IMAGES / "recognitio-claude-code-demo.mp4"
+        ).read_bytes()
+        with RetryingTemporaryDirectory() as tmp:
+            dummy = Path(tmp) / "dummy.mp4"
+            dummy.write_bytes(source[:64])
+            with self.assertRaises(AssertionError):
+                _mp4_facts(dummy)
+            halved = Path(tmp) / "halved.mp4"
+            halved.write_bytes(source[: len(source) // 2])
+            with self.assertRaises(AssertionError):
+                _mp4_facts(halved)
+            webm = (
+                self.IMAGES
+                / "recognitio-session-qwen-summary-video.webm"
+            ).read_bytes()
+            dummy = Path(tmp) / "dummy.webm"
+            dummy.write_bytes(webm[:64])
+            with self.assertRaises(AssertionError):
+                _webm_facts(dummy)
+            halved = Path(tmp) / "halved.webm"
+            halved.write_bytes(webm[: len(webm) // 2])
+            with self.assertRaises(AssertionError):
+                _webm_facts(halved)
+            # A forged WebM whose Info element carries a
+            # duration but whose Tracks element holds no
+            # video track must also fail, because the probe
+            # reads the track rather than trusting the
+            # container. The forgery is the Qwen file cut
+            # just past its Info element with a fresh empty
+            # Tracks element appended.
+            raw = webm
+            tracks_at = raw.find(b"\x16\x54\xae\x6b")
+            forged = Path(tmp) / "forged.webm"
+            forged.write_bytes(
+                raw[:tracks_at] + b"\x16\x54\xae\x6b\x80"
+            )
+            with self.assertRaises(AssertionError):
+                _webm_facts(forged)
+            # Hand built shells with planted header facts
+            # and no frames must also fail, because the
+            # probes read frame evidence and not only the
+            # values a header can claim. The MP4 shell
+            # carries a planted movie header and sample
+            # entry over one media box of zero padding. The
+            # WebM shell carries a planted duration and
+            # track over one Void of zero padding.
+            shell = Path(tmp) / "shell.mp4"
+            shell.write_bytes(_mp4_shell())
+            with self.assertRaises(AssertionError):
+                _mp4_facts(shell)
+            shellw = Path(tmp) / "shell.webm"
+            shellw.write_bytes(_webm_shell())
+            with self.assertRaises(AssertionError):
+                _webm_facts(shellw)
+            # The upgraded plants from the red team delta
+            # audit. An MP4 whose tables claim samples its
+            # chunk tables never place, in the bare letters
+            # record form and in a record form that parses
+            # in full, and a WebM whose frame blocks hold
+            # single zero bytes under honest timecodes must
+            # also fail, because the probes now read the
+            # frame data the tables describe.
+            for form in (False, True):
+                forged_mp4 = Path(tmp) / "table.mp4"
+                forged_mp4.write_bytes(_mp4_table_shell(form))
+                with self.assertRaises(AssertionError):
+                    _mp4_facts(forged_mp4)
+            forged_webm = Path(tmp) / "blocks.webm"
+            forged_webm.write_bytes(_webm_block_shell())
+            with self.assertRaises(AssertionError):
+                _webm_facts(forged_webm)
+            # The stream plant from the second red team
+            # delta. Its chunk tables place every claimed
+            # sample inside its media box, so only the
+            # coded unit check on the sample bytes can
+            # refuse it, and the media box holds zero
+            # bytes throughout.
+            stream = Path(tmp) / "stream.mp4"
+            stream.write_bytes(_mp4_stream_shell())
+            with self.assertRaises(AssertionError):
+                _mp4_facts(stream)
+            # The letters form of the stream shell holds
+            # every other check satisfied as far as the
+            # record, so the refusal must name the codec
+            # record. Reading the message is what proves
+            # the structural parse fired, because a probe
+            # that degraded the parse to a substring
+            # search would pass this record and refuse
+            # the file later on its unit bytes instead.
+            letters = Path(tmp) / "letters.mp4"
+            letters.write_bytes(_mp4_stream_shell(False))
+            with self.assertRaises(AssertionError) as caught:
+                _mp4_facts(letters)
+            self.assertIn("codec record", str(caught.exception))
+
+    def test_a_removed_video_fails_the_gate(self):
+        # The removal half of the regression clause. The
+        # plant copies the shipped files into a scratch
+        # images folder, proves the gate method passes on
+        # the copy, then removes one file and one whole
+        # stem and pads two files past their recorded
+        # sizes and proves the same method fails each
+        # time.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            images = root / "docs" / "images"
+            images.mkdir(parents=True)
+            for name in self.SIZES:
+                shutil.copy(self.IMAGES / name, images / name)
+            case = TestVideoForms(
+                "test_every_money_shot_carries_both_video_forms"
+            )
+            real = TestVideoForms.IMAGES
+            TestVideoForms.IMAGES = images
+            try:
+                case.test_every_money_shot_carries_both_video_forms()
+                (images / "recognitio-claude-code-demo.webm").unlink()
+                with self.assertRaises(AssertionError):
+                    case.test_every_money_shot_carries_both_video_forms()
+                shutil.copy(
+                    real / "recognitio-claude-code-demo.webm",
+                    images / "recognitio-claude-code-demo.webm",
+                )
+                (images / "recognitio-cursor-agent-demo.mp4").unlink()
+                (images / "recognitio-cursor-agent-demo.webm").unlink()
+                with self.assertRaises(AssertionError):
+                    case.test_every_money_shot_carries_both_video_forms()
+                shutil.copy(
+                    real / "recognitio-cursor-agent-demo.mp4",
+                    images / "recognitio-cursor-agent-demo.mp4",
+                )
+                shutil.copy(
+                    real / "recognitio-cursor-agent-demo.webm",
+                    images / "recognitio-cursor-agent-demo.webm",
+                )
+                # A shipped file padded past its recorded
+                # size must fail on the figure even when
+                # its frames still read as a video, because
+                # the forms test holds every file to the
+                # exact size the capture record states.
+                qwen = images / (
+                    "recognitio-session-qwen-summary-video.webm"
+                )
+                qwen.write_bytes(
+                    qwen.read_bytes() + b"\x00" * 16
+                )
+                with self.assertRaises(AssertionError):
+                    case.test_every_money_shot_carries_both_video_forms()
+                shutil.copy(
+                    real
+                    / "recognitio-session-qwen-summary-video.webm",
+                    qwen,
+                )
+                hero = images / "recognitio-claude-code-demo.mp4"
+                hero.write_bytes(
+                    hero.read_bytes()
+                    + (8).to_bytes(4, "big") + b"free"
+                )
+                with self.assertRaises(AssertionError):
+                    case.test_every_money_shot_carries_both_video_forms()
+            finally:
+                TestVideoForms.IMAGES = real
+
+    def test_linked_videos_stand_outside_the_weighed_set(self):
+        # The page weight ruling, pinned in both directions.
+        # A linked video file is click to play, so the
+        # weighing never collects it, while the inline
+        # preview the page does pull keeps its weight.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            film = root / "docs" / "images" / "film.mp4"
+            film.write_bytes(b"x" * 5000)
+            still = root / "docs" / "images" / "still.png"
+            still.write_bytes(b"x" * 700)
+            readme = "\n".join([
+                '<a href="docs/images/film.mp4">',
+                '<img src="docs/images/still.png">',
+                "",
+                "[the film](docs/images/film.mp4)",
+            ])
+            self.assertEqual(
+                readme_page_weight(root, readme), 700
+            )
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/still.png", refs)
+            self.assertNotIn("docs/images/film.mp4", refs)
 
 
 class TestProofStrip(unittest.TestCase):
@@ -7716,25 +8960,25 @@ class TestTreeFigureCensus(unittest.TestCase):
     # tree the pack describes.
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
-        "The repo holds 255 files and a few megabytes in "
-        "total, as restated on 2026-11-08 against the tree "
+        "The repo holds 267 files and tens of megabytes in "
+        "total, as restated on 2026-11-10 against the tree "
         "that now holds that count."
     )
     CAP = (
-        "at 255 files against a cap of 512 files"
+        "at 267 files against a cap of 512 files"
     )
     LARGEST = (
         "Its largest file is the demo recording at "
-        "607,309 bytes"
+        "24,222,065 bytes"
     )
 
     def test_the_pack_tree_figures_match_the_measured_tree(self):
         mod = load_script("check_submissions")
         measured = mod.tree_measurements(ROOT)
         self.assertIsNotNone(measured)
-        self.assertEqual(measured["count"], 255)
-        self.assertEqual(measured["scan_files"], 255)
-        self.assertEqual(measured["largest_size"], 607309)
+        self.assertEqual(measured["count"], 267)
+        self.assertEqual(measured["scan_files"], 267)
+        self.assertEqual(measured["largest_size"], 24222065)
         self.assertEqual(
             measured["largest_plain_path"],
             "tests/test_gate_scripts.py",
@@ -7745,7 +8989,7 @@ class TestTreeFigureCensus(unittest.TestCase):
             self.assertEqual(flat.count(sentence), 1, sentence)
         plain = (
             "Its largest file that is not an image or a font "
-            "is tests/test_gate_scripts.py at %s bytes"
+            "or a video is tests/test_gate_scripts.py at %s bytes"
             % format(measured["largest_plain_size"], ",")
         )
         self.assertEqual(flat.count(plain), 1)

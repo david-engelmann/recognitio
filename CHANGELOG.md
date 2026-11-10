@@ -953,6 +953,17 @@ This unreleased work carries version 1.3.0.
   packet naming its renamed file in the repaired
   shape, with the eval checksum record refreshed over
   the moved artefacts and nothing else.
+- Full video forms of the money shot sessions. Each hero session
+  and each proof strip moment now also stands in the repo as a
+  real video, an MP4 in H.264 and a WebM in VP8, rendered from
+  the recorded terminal casts at twice the shipped scale in full
+  colour with continuous motion sampled from the cast timing.
+  The hero previews on the README link to the films, and each
+  proof frame links to its clip. The capture record names every
+  video file with its render windows and its frame checks, and
+  the demo asset gate now fails a money shot that carries no
+  video form. The weighed page set is unchanged, because a
+  linked video is click to play and no page load pulls it.
 ### Fixed
 
 - The Build 8 brief now records the Agent Skills donation
