@@ -2654,8 +2654,12 @@ class TestCheckSubmissions(unittest.TestCase):
 
         self.assertEqual(
             int(stated(r"holds (\d+) files")), len(listed))
-        self.assertEqual(
-            int(stated(r"held 267 files")), 267)
+        # The held figure stands in the dated restatement
+        # sentence, which states the tree of its own date and
+        # is not a current figure, so it is read as the
+        # historical constant it names rather than against
+        # the measured tree.
+        self.assertIn("held 267 files", text)
         self.assertEqual(
             int(stated(r"at (\d+) files against a cap")),
             len(listed))

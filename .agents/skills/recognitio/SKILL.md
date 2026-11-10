@@ -27,8 +27,8 @@ Extraction always runs against the local clone. The hosted API diff is never tru
 
 1. Resolve the refs and confirm the base, the head and the merge base resolve in the local clone. Stop when a ref does not resolve.
 2. Choose the tiers and a budget sized to the change.
-3. Run the extractor script with the chosen mode, an output directory, and the tier and budget choices from step 2.
-4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet directory as the mechanical form of this step. In range and commit runs the packet is deterministic and the manifest stamp moves, while a pull request packet carries its fetch moment and can move.
+3. Run the extractor script with the chosen mode, an output directory, and the tier and budget choices.
+4. Read the manifest the script writes and check that its verified flag is true before anything else happens. Where the repo carries the packet check script, run it against the packet as the mechanical form of this step. In range and commit runs the packet is the deterministic surface and the manifest stamp moves, while a pull request packet carries its fetch moment and can move.
 5. Hand the packet to the review skill when verification passed. Stop and say exactly what is missing when verification failed.
 6. Record the three refs from the manifest wherever the review is recorded, so it can be reproduced.
 
@@ -60,7 +60,7 @@ When a call site shows a caller the packet gathered no context for, re-run with 
 
 ## Stamping the gate report
 
-A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet for a named commit therefore stamps in a checkout at that commit.
+A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit therefore stamps in a checkout standing at that commit.
 
 ## The tier model
 

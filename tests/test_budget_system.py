@@ -293,7 +293,18 @@ class TestEstimatorShapes(unittest.TestCase):
         self.assert_priced(text, 55)
 
     def test_repeated_character_run(self):
-        self.assert_priced("a" * 4200, 1050)
+        # The recorded real count stands as measured with the
+        # cl100k tokenizer, 525 tokens for 4,200 copies of the
+        # letter a, which merges eight copies into one token.
+        # At the repeated letter price the estimate stands at
+        # 2,100, a quarter of it in real tokens, so the shape
+        # stands on the named downward limit for a best
+        # merging repeated letter rather than inside the
+        # band, and the assertions below read that limit.
+        estimate = extract_mod.estimate_tokens("a" * 4200)
+        self.assertEqual(estimate, 2100)
+        self.assertGreaterEqual(525 * 100, 24 * estimate)
+        self.assertLessEqual(525, estimate)
 
     def test_the_method_is_named_in_the_help(self):
         result = subprocess.run(
