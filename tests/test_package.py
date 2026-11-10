@@ -1047,13 +1047,12 @@ class TestCheckPackage(unittest.TestCase):
                 for p in copy_mod.discover_manifest_files(root)
             ]
             self.assertIn("agent-plugins-package/plugin.json", found)
-            original = copy_mod.MANIFEST_FILES
-            copy_mod.MANIFEST_FILES = [path]
-            try:
-                with redirect_stderr(io.StringIO()):
-                    code = copy_mod.main()
-            finally:
-                copy_mod.MANIFEST_FILES = original
+            with redirect_stderr(io.StringIO()):
+                code = copy_mod.main(
+                    prose_files=[],
+                    comment_files=[],
+                    manifest_files=[path],
+                )
             self.assertEqual(code, 1)
 
 
