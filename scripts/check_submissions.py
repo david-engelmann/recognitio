@@ -99,12 +99,12 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 271 files",
+        "holds 273 files",
         "held 267 files",
-        "at 271 files against a cap of 512 files",
+        "at 273 files against a cap of 512 files",
         "demo recording at 24,222,065 bytes",
-        "tests/test_gate_scripts.py at 366,788 bytes",
-        "scan over all 271 files in the tree",
+        "tests/test_gate_scripts.py at 372,296 bytes",
+        "scan over all 273 files in the tree",
     ),
     PORTABLE_PACK: (
         "six month cycle",

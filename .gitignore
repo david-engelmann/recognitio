@@ -15,6 +15,7 @@ dist/
 .eggs/
 
 # Test and tool caches
+.gate-logs/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

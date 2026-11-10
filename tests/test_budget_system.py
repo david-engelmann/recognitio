@@ -1043,5 +1043,160 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
         self.assert_inside_the_estimator_band("b" * 20000, 5000)
 
 
+class TestRound14BothTierShedding(unittest.TestCase):
+    """Round 14. A budget that sheds both tiers is judged tier by tier.
+
+    The extractor sheds the history and companion tiers
+    together under a budget neither single restoration fits,
+    and the genuine packet stamps. The same packet
+    relabelled with a budget the smaller tier alone
+    restored fits inside, settled consistently across the
+    manifest account, the recorded command and the closing
+    receipt, is refused by the per tier necessity reading,
+    because the full restoration still stands over the
+    relabelled budget and every older reading passes it.
+    Reverting the per tier reading in the checker returns
+    the relabelled packet to a stamp.
+    """
+
+    def setUp(self):
+        self.tmp = RetryingTemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = make_fixture(self.tmp.name)
+        folder = Path(self.tmp.name) / "gh-one"
+        folder.mkdir()
+        script = folder / "gh"
+        script.write_text(
+            "#!/bin/sh\necho '[{\"number\": 7, \"title\": "
+            "\"Earlier work\", \"state\": \"OPEN\", \"files\": "
+            "[{\"path\": \"module.py\"}]}]'\n"
+        )
+        script.chmod(0o755)
+        self.env = env_with_path(
+            str(folder) + os.pathsep + os.environ["PATH"]
+        )
+
+    def build_both_shed_packet(self):
+        full = Path(self.tmp.name) / "full"
+        result = run_extract(
+            self.repo, full, "--range", "HEAD~1..HEAD", env=self.env
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = read_manifest(full)
+        tiers = manifest["tiers"]
+        spec = importlib.util.spec_from_file_location(
+            "extract_for_round14_budget", EXTRACT
+        )
+        extractor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(extractor)
+        net2 = tiers["T2"]["estimated_tokens"] - (
+            extractor.estimate_tokens(
+                extractor.tier_placeholder("T2", "dropped")
+            )
+        )
+        net3 = tiers["T3"]["estimated_tokens"] - (
+            extractor.estimate_tokens(
+                extractor.tier_placeholder("T3", "dropped")
+            )
+        )
+        # The extractor sheds to the best single drop first,
+        # so a budget that forces both drops stands below the
+        # settled figure of the better single drop. The
+        # placeholder arithmetic predicts that figure only
+        # roughly, because the packet around a placeholder
+        # prices differently in place, so the budget is found
+        # by a bounded search downward from just under the
+        # better single restoration until a run sheds both
+        # tiers, and the printed figures of that run are the
+        # ones the rest of the test builds on.
+        budget = (
+            manifest["budget"]["estimated_tokens"]
+            - max(net2, net3) - 1
+        )
+        shed = None
+        out = None
+        for attempt in range(12):
+            candidate = Path(self.tmp.name) / ("shed-%d" % attempt)
+            result = run_extract(
+                self.repo, candidate, "--range", "HEAD~1..HEAD",
+                "--budget", str(budget), env=self.env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            trial = read_manifest(candidate)
+            if (
+                trial["tiers"]["T3"]["state"] == "dropped"
+                and trial["tiers"]["T2"]["state"] == "dropped"
+            ):
+                shed = trial
+                out = candidate
+                break
+            budget -= 100
+        self.assertIsNotNone(
+            shed, "no budget in the searched band sheds both tiers"
+        )
+        return out, shed, net2, net3
+
+    def test_the_genuine_both_shed_packet_stamps(self):
+        out, shed, net2, net3 = self.build_both_shed_packet()
+        result = run_check(out, self.repo, env=self.env)
+        self.assertEqual(
+            result.returncode, 0, result.stdout + result.stderr
+        )
+        self.assertIn("is verified", result.stdout)
+
+    def test_a_both_shed_packet_relabelled_to_fit_one_tier_is_refused(self):
+        out, shed, net2, net3 = self.build_both_shed_packet()
+        forged = Path(self.tmp.name) / "forged"
+        shutil.copytree(out, forged)
+        manifest = read_manifest(forged)
+        genuine_budget = manifest["budget"]["budget_tokens"]
+        # The relabelled budget is the settled figure with
+        # the smaller net tier alone restored, so that one
+        # restoration fits exactly while the other single
+        # restoration and the full restoration stand over it.
+        # The nets are read from the shed manifest itself,
+        # settled tier size less placeholder size, which is
+        # the arithmetic the checker applies.
+        shed_nets = {
+            tier: shed["tiers"][tier]["estimated_tokens"]
+            - shed["tiers"][tier]["emitted_tokens"]
+            for tier in ("T2", "T3")
+        }
+        small_tier, small_net = min(
+            shed_nets.items(), key=lambda pair: pair[1]
+        )
+        raised = manifest["budget"]["estimated_tokens"] + small_net
+        manifest["budget"]["budget_tokens"] = raised
+        for entry in manifest["budget"]["dropped"]:
+            entry["reason"] = "budget of %d tokens" % raised
+        command = manifest["command"]
+        flag = command.index("--budget")
+        command[flag + 1] = str(raised)
+        (forged / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n"
+        )
+        packet = (forged / "packet.md").read_text()
+        packet = packet.replace(
+            "Budget in tokens: %d" % genuine_budget,
+            "Budget in tokens: %d" % raised,
+        )
+        for tier in ("T3", "T2"):
+            packet = packet.replace(
+                "Dropped %s because of the budget of %d tokens."
+                % (tier, genuine_budget),
+                "Dropped %s because of the budget of %d tokens."
+                % (tier, raised),
+            )
+        (forged / "packet.md").write_text(packet)
+        result = run_check(forged, self.repo, env=self.env)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(
+            "records %s as dropped under a budget of %d tokens, "
+            "but the packet with that tier alone restored"
+            % (small_tier, raised),
+            result.stdout + result.stderr,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

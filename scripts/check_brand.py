@@ -534,6 +534,34 @@ def master_problems(root=None):
                 problems.append(
                     "docs/brand/%s uses the colour %s and the palette "
                     "record names no such value" % (name, hit))
+        # The colour scan reads the functional notation as
+        # well as the hex spelling. A colour in a master is
+        # the same colour in rgb or rgba form, and the scan
+        # once matched only the six digit hex spelling, so
+        # the reserved green written as three decimal
+        # channels passed the gate while carrying the one
+        # colour no brand asset may carry. Each functional
+        # colour is converted to its hex value and judged by
+        # the same banned and allowed readings as a hex
+        # spelling, so an allowed palette colour in rgb form
+        # passes and only the value decides.
+        for match in re.finditer(
+            r"rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})"
+            r"(?:\s*,\s*[\d.]+%?)?\s*\)", raw
+        ):
+            value = "#%02X%02X%02X" % tuple(
+                int(match.group(index)) for index in (1, 2, 3)
+            )
+            if value in banned:
+                problems.append(
+                    "docs/brand/%s uses the reserved green %s "
+                    "written as %s and no brand asset may carry "
+                    "it" % (name, value, match.group(0)))
+            elif allowed and value not in allowed:
+                problems.append(
+                    "docs/brand/%s uses the colour %s written "
+                    "as %s and the palette record names no such "
+                    "value" % (name, value, match.group(0)))
     light = texts.get("wordmark-light.svg")
     dark = texts.get("wordmark-dark.svg")
     if light is not None and dark is not None:

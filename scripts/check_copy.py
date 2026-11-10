@@ -1055,7 +1055,37 @@ def link_target_problems(path):
     return problems
 
 
-def census_problems(root=None):
+def hidden_exclusion_census(root=None):
+    """The hidden directories the exclusion rule stands outside.
+
+    Discovery excludes a file standing under a hidden
+    directory whose name is not on the public list, and the
+    exclusion used to be silence, so a new authored surface
+    under a new hidden directory never joined the fence and
+    no output named the loss. This census counts the prose
+    candidates standing under each excluded hidden
+    directory, so the gate prints the excluded set as a
+    measured count on every run and a reader can see which
+    directories the fence does not read.
+    """
+    root = ROOT if root is None else root
+    counts = {}
+    candidates = []
+    for pattern in ("*.md", "*.mdc", "*.yml", "*.yaml"):
+        candidates.extend(root.rglob(pattern))
+    for path in sorted(set(candidates)):
+        try:
+            rel = path.relative_to(root)
+        except ValueError:
+            continue
+        for part in rel.parts[:-1]:
+            if part.startswith(".") and part not in _PUBLIC_DOT_DIRS:
+                counts[part] = counts.get(part, 0) + 1
+                break
+    return counts
+
+
+def census_problems(root=None, prose=None):
     """Problems with the prose census the fence stands on.
 
     The floor is read from a fresh discovery over the root
@@ -1066,7 +1096,8 @@ def census_problems(root=None):
     """
     root = ROOT if root is None else root
     problems = []
-    prose = discover_prose_files(root)
+    if prose is None:
+        prose = discover_prose_files(root)
     if not prose:
         problems.append(
             "the copy fence discovered no prose files, so "
@@ -1087,10 +1118,34 @@ def census_problems(root=None):
     return problems
 
 
-def main():
+def main(prose_files=None, comment_files=None, manifest_files=None):
+    """Run the fence over one discovery made at run start.
+
+    The surface lists used to be computed once at import
+    and scanned from those frozen lists, while the census
+    reading inside the same run re-discovered fresh from
+    the root, so in any process that changed the tree after
+    import the census could pass on the tree as it stood
+    while the scan ran on the tree as it was. The main path
+    now discovers once, here, and scans the discovery it
+    made, and the census reading judges that same
+    discovery. A caller may hand the three lists in
+    explicitly, which is the shape the gate tests use, and
+    no caller patches a module level list any longer.
+    """
+    injected = prose_files is not None
+    if prose_files is None:
+        prose_files = discover_prose_files()
+    if comment_files is None:
+        comment_files = discover_comment_files()
+    if manifest_files is None:
+        manifest_files = discover_manifest_files()
     violations = []
-    violations.extend(census_problems())
-    for path in PROSE_FILES:
+    if injected:
+        violations.extend(census_problems())
+    else:
+        violations.extend(census_problems(prose=prose_files))
+    for path in prose_files:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
@@ -1104,7 +1159,7 @@ def main():
             continue
         if path.suffix in (".md", ".mdc"):
             violations.extend(link_target_problems(path))
-    for path in COMMENT_FILES:
+    for path in comment_files:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
@@ -1115,7 +1170,7 @@ def main():
                 "%s cannot be read as UTF-8 text, %s"
                 % (display_name(path), exc)
             )
-    for path in MANIFEST_FILES:
+    for path in manifest_files:
         if not path.is_file():
             violations.append("%s is missing" % display_name(path))
             continue
@@ -1124,11 +1179,23 @@ def main():
         for violation in violations:
             print("check_copy: %s" % violation, file=sys.stderr)
         return 1
+    excluded = hidden_exclusion_census()
+    excluded_files = sum(excluded.values())
+    if excluded:
+        excluded_text = "%d files under the hidden directories %s" % (
+            excluded_files, ", ".join(sorted(excluded))
+        )
+    else:
+        excluded_text = "no files under an excluded hidden directory"
     print(
         "check_copy: copy bar holds on %d prose files, the "
         "description fields of %d plugin manifests and the "
-        "comment prose of %d config files"
-        % (len(PROSE_FILES), len(MANIFEST_FILES), len(COMMENT_FILES))
+        "comment prose of %d config files, with %s standing "
+        "outside the fence by the exclusion rule"
+        % (
+            len(prose_files), len(manifest_files),
+            len(comment_files), excluded_text,
+        )
     )
     return 0
 

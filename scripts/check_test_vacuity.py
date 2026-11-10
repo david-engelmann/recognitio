@@ -95,9 +95,25 @@ function on.
 
 Discovery matches the runners. Files are found with the
 test*.py pattern the unittest loader uses and with the
-*_test.py pattern pytest uses. Plain and asynchronous
+*_test.py pattern pytest uses, walking the tests folder
+recursively so the set is the set the loader walks,
+including a test module standing in a subdirectory of the
+tests folder. Plain and asynchronous
 methods whose names start with test are inspected, inside
 classes and at module level.
+
+The host side tests under the hooks folder are TypeScript
+and no limb of the syntax tree reading above can parse
+them, so they stand under a separate presence reading.
+Each test block there must carry an expect call, and the
+reading claims no more than that presence. It does not
+judge whether the expectation argues about a value, and
+it does not follow the block the way the Python reading
+follows a test body, so a host test whose expectations
+were all softened to constants would pass this guard and
+fall to the harness that runs it and to review. That
+boundary stands stated here so the guard name is never
+read as TypeScript wide cover it does not give.
 
 Discovery carries a floor, in the style of the sibling
 discovery gates. A tests directory that does not stand, a
@@ -228,6 +244,7 @@ can fail for a real reason this guard does not follow.
 
 import ast
 import builtins
+import re
 import sys
 from pathlib import Path
 
@@ -2437,8 +2454,8 @@ def vacuity_problems(root=None):
             "discovered no test methods to judge"
         )
         return problems
-    paths.update(tests_dir.glob("test*.py"))
-    paths.update(tests_dir.glob("*_test.py"))
+    paths.update(tests_dir.rglob("test*.py"))
+    paths.update(tests_dir.rglob("*_test.py"))
     if not paths:
         problems.append(
             "the tests directory holds no test files, so the "
@@ -2734,6 +2751,70 @@ def vacuity_problems(root=None):
             "the discovered test files hold no test methods, "
             "so the guard judged an empty suite"
         )
+    problems.extend(host_test_problems(root))
+    return problems
+
+
+def host_test_problems(root):
+    """Problems with the host side TypeScript tests.
+
+    The reading is presence only, and it claims no more.
+    Each test block in a hooks test file, opened by a test
+    call at the start of a line, must carry at least one
+    expect call inside its own block, so a host test that
+    was emptied to a name and a body with no expectation
+    draws a problem here. Whether an expectation can fail
+    for a real reason is not judged, because this guard
+    does not parse TypeScript, and that judgement stays
+    with the Python harness that runs the host tests and
+    with review. A hooks directory holding no test file at
+    all is a problem by name, so the reading cannot pass
+    over an absent population in silence.
+    """
+    problems = []
+    hooks_dir = root / "hooks"
+    if not hooks_dir.is_dir():
+        return problems
+    paths = sorted(hooks_dir.glob("*.test.ts"))
+    if not paths:
+        problems.append(
+            "the hooks directory holds no TypeScript test "
+            "file, so the guard judged no host side tests"
+        )
+        return problems
+    for path in paths:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(
+                "hooks/%s cannot be read as UTF-8 text, %s"
+                % (path.name, exc)
+            )
+            continue
+        starts = [
+            match for match in re.finditer(
+                r"(?m)^test\(\"([^\"]+)\"", text
+            )
+        ]
+        if not starts:
+            problems.append(
+                "hooks/%s holds no test blocks, so the guard "
+                "judged no host side tests in it" % path.name
+            )
+            continue
+        for index, match in enumerate(starts):
+            end = (
+                starts[index + 1].start()
+                if index + 1 < len(starts) else len(text)
+            )
+            block = text[match.start():end]
+            if "expect(" not in block:
+                problems.append(
+                    "hooks/%s test %s carries no expect call "
+                    "in its block, so it holds no assertion "
+                    "this guard can see"
+                    % (path.name, match.group(1))
+                )
     return problems
 
 

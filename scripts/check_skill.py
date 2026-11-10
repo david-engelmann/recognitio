@@ -118,10 +118,26 @@ def parse_frontmatter(text):
 
 
 def _tree_bytes(directory):
-    """Map every file under a directory to its bytes."""
+    """Map every file under a directory to its bytes.
+
+    A symlinked entry is recorded as a problem in its own
+    right rather than dropped from the map. The earlier
+    reading admitted a path only when it was a file and not
+    a symlink, so a file standing in either directory as a
+    symlink appeared in neither map and the comparison over
+    the two maps never named it, and an extra symlinked
+    file in a real directory copy passed in silence. The
+    map now carries the entry under a marker value that no
+    file bytes can equal, so the comparison names it on
+    whichever side it stands, beside the cache rule the
+    sibling tree maps in the package and Cursor gates
+    already carry for compiled files.
+    """
     found = {}
     for path in sorted(directory.rglob("*")):
-        if path.is_file() and not path.is_symlink():
+        if path.is_symlink():
+            found[str(path.relative_to(directory))] = None
+        elif path.is_file():
             found[str(path.relative_to(directory))] = path.read_bytes()
     return found
 
@@ -189,6 +205,18 @@ def layout_problems(canonical_dir, home_dir, root=ROOT):
     canonical_files = _tree_bytes(canonical_dir)
     home_files = _tree_bytes(home_dir)
     for name in sorted(set(canonical_files) | set(home_files)):
+        if canonical_files.get(name, b"") is None:
+            problems.append(
+                "canonical skill at %s carries %s as a symlink, "
+                "and a skill copy holds regular files only"
+                % (canonical_name, name)
+            )
+        if home_files.get(name, b"") is None:
+            problems.append(
+                "home platform skill at %s carries %s as a "
+                "symlink, and a skill copy holds regular "
+                "files only" % (home_name, name)
+            )
         if name not in canonical_files:
             problems.append(
                 "home platform skill at %s carries an extra file %s "

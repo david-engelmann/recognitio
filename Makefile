@@ -5,7 +5,7 @@
 
 PYTHON ?= python3
 
-.PHONY: check test
+.PHONY: check test gates
 
 check:
 	$(PYTHON) -m unittest discover -s tests
@@ -34,5 +34,8 @@ check:
 	$(PYTHON) scripts/check_submissions.py
 	$(PYTHON) scripts/check_test_vacuity.py
 	$(PYTHON) scripts/smoke_extract.py
+
+gates:
+	$(PYTHON) scripts/run_gates.py
 
 test: check

@@ -2227,7 +2227,18 @@ def budget_problems(manifest):
     settled sizes of the dropped tiers, still stands inside
     its recorded budget is a packet whose budget never
     required a drop, because the budget pass keeps the drop
-    set that drops nothing whenever that set fits.
+    set that drops nothing whenever that set fits. The
+    restored packet is settled the way the budget pass
+    itself assembles it, as the settled estimate with each
+    dropped placeholder swapped out and its settled tier
+    swapped in, so the figure is the true restored measure
+    and not that measure plus the placeholders. The same
+    reading restores one dropped tier at a time where more
+    than one stands dropped, because the budget pass keeps
+    the fitting drop set whose kept tiers carry the most,
+    so a drop set wider than the budget required is a false
+    account even where restoring every dropped tier at once
+    would break the budget.
     """
     problems = []
     budget = manifest["budget"]
@@ -2274,32 +2285,54 @@ def budget_problems(manifest):
             )
         if dropped:
             tiers = manifest.get("tiers") or {}
-            restored = budget["estimated_tokens"] + sum(
-                tiers[item["tier"]]["estimated_tokens"]
-                for item in dropped
-                if isinstance(tiers.get(item["tier"]), dict)
-                and isinstance(
-                    tiers[item["tier"]].get("estimated_tokens"), int
-                )
-            )
             settled_drops = [
                 item for item in dropped
                 if isinstance(tiers.get(item["tier"]), dict)
                 and isinstance(
                     tiers[item["tier"]].get("estimated_tokens"), int
                 )
-            ]
-            if len(settled_drops) == len(dropped) and \
-                    restored <= budget_tokens:
-                problems.append(
-                    "the manifest budget account records dropped "
-                    "tiers under a budget of %d tokens, but the "
-                    "packet with the dropped tiers restored "
-                    "measures about %d tokens, which does not "
-                    "exceed that budget, so the budget never "
-                    "required a drop"
-                    % (budget_tokens, restored)
+                and isinstance(
+                    tiers[item["tier"]].get("emitted_tokens"), int
                 )
+            ]
+            if len(settled_drops) == len(dropped):
+                nets = {
+                    item["tier"]:
+                        tiers[item["tier"]]["estimated_tokens"]
+                        - tiers[item["tier"]]["emitted_tokens"]
+                    for item in dropped
+                }
+                restored = budget["estimated_tokens"] + sum(
+                    nets.values()
+                )
+                if restored <= budget_tokens:
+                    problems.append(
+                        "the manifest budget account records "
+                        "dropped tiers under a budget of %d "
+                        "tokens, but the packet with the dropped "
+                        "tiers restored measures about %d "
+                        "tokens, which does not exceed that "
+                        "budget, so the budget never required "
+                        "a drop"
+                        % (budget_tokens, restored)
+                    )
+                if len(dropped) > 1:
+                    for item in dropped:
+                        single = budget["estimated_tokens"] \
+                            + nets[item["tier"]]
+                        if single <= budget_tokens:
+                            problems.append(
+                                "the manifest budget account "
+                                "records %s as dropped under a "
+                                "budget of %d tokens, but the "
+                                "packet with that tier alone "
+                                "restored measures about %d "
+                                "tokens, which does not exceed "
+                                "that budget, so the budget "
+                                "never required that drop either"
+                                % (item["tier"], budget_tokens,
+                                   single)
+                            )
     return problems
 
 
@@ -2913,6 +2946,98 @@ def identity_problems(manifest, extractor, repo=None, packet_text=None):
 PRIOR_PRS_HEADING = "### Prior pull requests touching these files"
 
 
+PASSAGE_SNAPSHOT_LINE = (
+    "The states in this list are a snapshot from the fetch "
+    "that built this packet. They are not refreshed after "
+    "that fetch and they are not a live claim about any "
+    "pull request."
+)
+
+PASSAGE_UNAVAILABLE_LINE = (
+    "Prior pull requests are unavailable in this environment, "
+    "so no pull request history was gathered."
+)
+
+PASSAGE_NO_MATCHES_LINE = (
+    "No earlier pull requests in the recent list touch these files."
+)
+
+PASSAGE_ENTRY_LINE = re.compile(
+    r"^- #(\d+) (.*) \((open|closed|merged)\)$"
+)
+
+PASSAGE_SHOWING_LINE = re.compile(
+    r"^Showing (\d+) of (\d+) matching pull requests\.$"
+)
+
+
+def recorded_passage_shape_problems(passage, extractor):
+    """Check a recorded passage against the extractor construction.
+
+    The passage is the one part of a dropped history tier whose
+    size settles against a record the packet itself supplies,
+    so the record is held to the exact shape the extractor
+    writes. The heading, the scope line with its lookup limits
+    taken from the extractor itself, and the snapshot line
+    stand fixed, and the body is one of the two closing lines
+    the extractor writes or a run of entry lines no longer
+    than the shown cap, closed by a showing line whose counts
+    agree with the entries and the list limit where the
+    extractor writes one. A passage padded past that shape
+    inflates the settled size the budget reading trusts, so
+    a passage outside the shape draws a refusal here.
+    """
+    refusal = (
+        "the prior pull requests passage the manifest records "
+        "for the dropped history tier does not stand in the "
+        "shape the extractor writes, so the dropped tier size "
+        "that settles against that passage cannot be trusted"
+    )
+    if not isinstance(passage, str):
+        return [refusal]
+    lines = passage.rstrip("\n").split("\n")
+    scope = (
+        "Scope of the lookup: the %d most changed files, "
+        "checked against the %d most recent pull requests, "
+        "with at most %d matches shown. A pull request outside "
+        "that window is not reported here."
+        % (extractor.MAX_HISTORY_FILES,
+           extractor.MAX_PRIOR_PR_LIST,
+           extractor.MAX_PRIOR_PRS)
+    )
+    if len(lines) < 6 or \
+            lines[0] != extractor.PRIOR_PRS_HEADING or \
+            lines[1] != "" or lines[2] != scope or \
+            lines[3] != "" or lines[4] != PASSAGE_SNAPSHOT_LINE or \
+            lines[5] != "":
+        return [refusal]
+    rest = lines[6:]
+    if rest and rest[-1] == "":
+        rest = rest[:-1]
+    if rest in ([PASSAGE_UNAVAILABLE_LINE],
+                [PASSAGE_NO_MATCHES_LINE]):
+        return []
+    entries = 0
+    index = 0
+    while index < len(rest) and PASSAGE_ENTRY_LINE.match(rest[index]):
+        entries += 1
+        index += 1
+    if entries == 0 or entries > extractor.MAX_PRIOR_PRS:
+        return [refusal]
+    if index < len(rest):
+        match = PASSAGE_SHOWING_LINE.match(rest[index])
+        if not match:
+            return [refusal]
+        shown, total = int(match.group(1)), int(match.group(2))
+        if shown != entries or total <= shown or \
+                total > extractor.MAX_PRIOR_PR_LIST:
+            return [refusal]
+        index += 1
+    if index != len(rest):
+        return [refusal]
+    return []
+
+
 def mask_prior_prs(text):
     """Mask the one tier passage a rebuild cannot reproduce.
 
@@ -2948,7 +3073,8 @@ def passage_problems(packet_text, manifest, extractor):
     stamp refuses. A dropped history tier carries no passage in
     the packet by its shape, and its recorded passage is the
     record the dropped tier size is settled against, so that
-    shape stands on the settling reading and not on this one.
+    shape stands on the shape reading above and not on this
+    one.
     """
     if extractor is None:
         return []
@@ -2959,7 +3085,10 @@ def passage_problems(packet_text, manifest, extractor):
     if not isinstance(tier, dict):
         return []
     if tier.get("state") == "dropped":
-        return []
+        recorded = manifest.get("prior_pull_requests_passage")
+        if recorded is None:
+            return []
+        return recorded_passage_shape_problems(recorded, extractor)
     span = span_text(packet_text, "## T3 History")
     if span is None:
         packet_passage = None

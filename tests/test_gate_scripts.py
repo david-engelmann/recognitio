@@ -125,23 +125,22 @@ class TestCheckCopy(unittest.TestCase):
         # The error stream is kept on self.last_stderr rather
         # than discarded, so a test that plants a defect can
         # assert the failure names the planted surface instead
-        # of holding only the exit code. The manifest list is
-        # patchable for the same reason.
-        original = self.mod.PROSE_FILES
-        original_comments = self.mod.COMMENT_FILES
-        original_manifests = self.mod.MANIFEST_FILES
-        self.mod.PROSE_FILES = files
-        self.mod.COMMENT_FILES = list(comment_files)
-        if manifest_files is not None:
-            self.mod.MANIFEST_FILES = list(manifest_files)
+        # of holding only the exit code. The three surface
+        # lists are handed to the gate main explicitly, the
+        # injection shape the Round 14 repair gave it, and no
+        # module level list is patched. A caller that names
+        # no manifest list hands an empty one, because the
+        # shipped manifests are not the surface under test
+        # in the tests that use this helper.
+        if manifest_files is None:
+            manifest_files = []
         err = io.StringIO()
-        try:
-            with redirect_stderr(err):
-                code = self.mod.main()
-        finally:
-            self.mod.PROSE_FILES = original
-            self.mod.COMMENT_FILES = original_comments
-            self.mod.MANIFEST_FILES = original_manifests
+        with redirect_stderr(err):
+            code = self.mod.main(
+                prose_files=list(files),
+                comment_files=list(comment_files),
+                manifest_files=list(manifest_files),
+            )
         self.last_stderr = err.getvalue()
         return code
 
@@ -1967,7 +1966,11 @@ class TestCheckVersion(unittest.TestCase):
 
     def run_main_on_texts(self, plugin_text, marketplace_text,
                           changelog_text, readme_text=None,
-                          mod_text=None, antigravity_text="default"):
+                          mod_text=None, antigravity_text="default",
+                          package_text='{"version": "1.3.0"}',
+                          cursor_plugin_text='{"version": "1.3.0"}',
+                          cursor_market_text=None,
+                          zcode_text='{"version": "1.3.0"}'):
         if readme_text is None:
             readme_text = "# Recognitio\n"
         if mod_text is None:
@@ -1976,6 +1979,11 @@ class TestCheckVersion(unittest.TestCase):
             antigravity_text = (
                 '{"name": "recognitio", '
                 '"description": "A plugin."}'
+            )
+        if cursor_market_text is None:
+            cursor_market_text = (
+                '{"metadata": {"version": "1.3.0"}, "plugins": '
+                '[{"version": "1.3.0"}]}'
             )
         with RetryingTemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1990,6 +1998,18 @@ class TestCheckVersion(unittest.TestCase):
                 )
             market = root / "marketplace.json"
             market.write_text(marketplace_text, encoding="utf-8")
+            package = root / "package.json"
+            package.write_text(package_text, encoding="utf-8")
+            cursor_plugin = root / "cursor-plugin.json"
+            cursor_plugin.write_text(
+                cursor_plugin_text, encoding="utf-8"
+            )
+            cursor_market = root / "cursor-marketplace.json"
+            cursor_market.write_text(
+                cursor_market_text, encoding="utf-8"
+            )
+            zcode_plugin = root / "zcode-plugin.json"
+            zcode_plugin.write_text(zcode_text, encoding="utf-8")
             extract = root / "extract.py"
             extract.write_text(
                 'EXTRACTOR_VERSION = "1.3.0"\n', encoding="utf-8"
@@ -2003,12 +2023,19 @@ class TestCheckVersion(unittest.TestCase):
                 self.mod.MARKETPLACE_JSON,
                 self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
                 getattr(self.mod, "ANTIGRAVITY_PLUGIN_JSON", None),
+                self.mod.PACKAGE_JSON, self.mod.CURSOR_PLUGIN_JSON,
+                self.mod.CURSOR_MARKETPLACE_JSON,
+                self.mod.ZCODE_PLUGIN_JSON,
             )
             self.mod.PLUGIN_JSON = plugin
             self.mod.MOD_PLUGIN_JSON = mod_plugin
             self.mod.MARKETPLACE_JSON = market
             self.mod.EXTRACT_PY = extract
             self.mod.CHANGELOG_MD = log
+            self.mod.PACKAGE_JSON = package
+            self.mod.CURSOR_PLUGIN_JSON = cursor_plugin
+            self.mod.CURSOR_MARKETPLACE_JSON = cursor_market
+            self.mod.ZCODE_PLUGIN_JSON = zcode_plugin
             self.mod.ANTIGRAVITY_PLUGIN_JSON = antigravity_plugin
             try:
                 with redirect_stderr(io.StringIO()) as captured:
@@ -2019,6 +2046,10 @@ class TestCheckVersion(unittest.TestCase):
                     self.mod.MARKETPLACE_JSON,
                     self.mod.EXTRACT_PY, self.mod.CHANGELOG_MD,
                     self.mod.ANTIGRAVITY_PLUGIN_JSON,
+                    self.mod.PACKAGE_JSON,
+                    self.mod.CURSOR_PLUGIN_JSON,
+                    self.mod.CURSOR_MARKETPLACE_JSON,
+                    self.mod.ZCODE_PLUGIN_JSON,
                 ) = original
             return code, captured.getvalue()
 
@@ -2041,6 +2072,51 @@ class TestCheckVersion(unittest.TestCase):
         )
         self.assertEqual(code, 1, err)
         self.assertIn("recognitio-mod", err)
+
+    def test_a_drifted_portable_package_version_fails(self):
+        # Round 14. The portable package manifest carries the
+        # release version and the gate never read it, so a bump
+        # that left it behind passed. The drift plant fails
+        # here and names the surface.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}', self.GOOD_MARKET, self.GOOD_LOG,
+            package_text='{"version": "9.9.9"}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("portable package plugin.json", err)
+
+    def test_a_drifted_cursor_plugin_version_fails(self):
+        # Round 14. The Cursor plugin manifest is a version
+        # surface of the same kind.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}', self.GOOD_MARKET, self.GOOD_LOG,
+            cursor_plugin_text='{"version": "9.9.9"}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Cursor plugin.json", err)
+
+    def test_a_drifted_cursor_marketplace_version_fails(self):
+        # Round 14. The Cursor marketplace listing carries a
+        # version on its metadata and on each entry.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}', self.GOOD_MARKET, self.GOOD_LOG,
+            cursor_market_text=(
+                '{"metadata": {"version": "1.3.0"}, "plugins": '
+                '[{"version": "9.9.9"}]}'
+            ),
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("Cursor marketplace.json entry 2", err)
+
+    def test_a_drifted_zcode_plugin_version_fails(self):
+        # Round 14. The ZCode plugin manifest is a version
+        # surface of the same kind.
+        code, err = self.run_main_on_texts(
+            '{"version": "1.3.0"}', self.GOOD_MARKET, self.GOOD_LOG,
+            zcode_text='{"version": "9.9.9"}',
+        )
+        self.assertEqual(code, 1, err)
+        self.assertIn("ZCode plugin.json", err)
 
     GOOD_LOG = (
         "# Changelog\n\n## [Unreleased]\n\n"
@@ -6506,6 +6582,55 @@ class TestCanonicalSkillLayout(unittest.TestCase):
                 any("missing" in p for p in problems), problems
             )
 
+    def test_a_symlinked_entry_inside_the_home_copy_fails(self):
+        # Round 14. The tree map once admitted a path only
+        # when it was a regular file and not a symlink, so an
+        # extra symlinked file inside a real directory copy
+        # appeared in neither map and the layout comparison
+        # passed over it in silence.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            link = (
+                root / ".claude" / "skills" / "recognitio"
+                / "references" / "linked-note.md"
+            )
+            link.symlink_to(Path("../SKILL.md"))
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any(
+                    "linked-note.md" in p and "as a symlink" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_symlinked_entry_inside_the_canonical_fails(self):
+        # Round 14. The same silent spot on the canonical
+        # side, where a file replaced by a symlink to another
+        # skill file read as no file at all in both maps.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_layout(tmp, home_shape="copy")
+            entry = (
+                root / ".agents" / "skills" / "recognitio"
+                / "references" / "budget-system.md"
+            )
+            target_bytes = entry.read_bytes()
+            entry.unlink()
+            entry.symlink_to(Path("../SKILL.md"))
+            home_entry = (
+                root / ".claude" / "skills" / "recognitio"
+                / "references" / "budget-system.md"
+            )
+            home_entry.write_bytes(target_bytes)
+            problems = self.layout_problems(root)
+            self.assertTrue(
+                any(
+                    "budget-system.md" in p and "as a symlink" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_drift_in_the_home_copy_fails_the_full_skill_gate(self):
         # T1 against the real gate entry point, not just the
         # layout function.
@@ -8960,12 +9085,12 @@ class TestTreeFigureCensus(unittest.TestCase):
     # tree the pack describes.
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
-        "The repo holds 271 files and tens of megabytes in "
+        "The repo holds 273 files and tens of megabytes in "
         "total, as restated on 2026-11-10 against the tree "
         "that now holds that count."
     )
     CAP = (
-        "at 271 files against a cap of 512 files"
+        "at 273 files against a cap of 512 files"
     )
     LARGEST = (
         "Its largest file is the demo recording at "
@@ -8976,8 +9101,8 @@ class TestTreeFigureCensus(unittest.TestCase):
         mod = load_script("check_submissions")
         measured = mod.tree_measurements(ROOT)
         self.assertIsNotNone(measured)
-        self.assertEqual(measured["count"], 271)
-        self.assertEqual(measured["scan_files"], 271)
+        self.assertEqual(measured["count"], 273)
+        self.assertEqual(measured["scan_files"], 273)
         self.assertEqual(measured["largest_size"], 24222065)
         self.assertEqual(
             measured["largest_plain_path"],

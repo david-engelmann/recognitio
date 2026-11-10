@@ -1070,6 +1070,57 @@ class ModContractTestCase(unittest.TestCase):
             module.write_text(text, encoding="utf-8")
             return self.mod.module_problems(module)
 
+    def test_the_shipped_verified_comparison_passes_the_operator_pin(self):
+        # Round 14 control. The shipped module compares the
+        # verified flag against true with the strict operator.
+        text = MODULE.read_text(encoding="utf-8")
+        problems = self.problems_for(text)
+        self.assertFalse(
+            any("loose" in p or "strict" in p for p in problems),
+            problems,
+        )
+
+    def test_a_loose_verified_comparison_fails_the_operator_pin(self):
+        # Round 14. The one comparison the spawn gate turns
+        # on, respelled with the loose operator, widened the
+        # gate to any truthy value and passed every reading
+        # the gate then carried.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true", "manifest.verified == true"
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("loose operator" in p for p in problems), problems
+        )
+
+    def test_a_reversed_loose_comparison_fails_the_operator_pin(self):
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true", "true == manifest.verified"
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("loose operator" in p for p in problems), problems
+        )
+
+    def test_an_aliased_verified_flag_fails_the_operator_pin(self):
+        # The flag carried into a local name before the
+        # comparison leaves the shipped strict form, so the
+        # pin refuses it the same way.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true", "flag === true"
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
     def test_a_spaced_env_call_with_a_variable_fails_the_pin(self):
         # The red team regression. A space before the parenthesis
         # took the call outside the first pin's pattern entirely,

@@ -7535,6 +7535,55 @@ def export_problems(code):
     return problems
 
 
+def verified_equality_problems(code):
+    """Problems with the equality the verified check stands on.
+
+    The one comparison the whole spawn gate turns on is the
+    manifest verified flag against true, and the shipped
+    module spells it with the strict equality operator, so
+    a value that is merely truthy never passes. The loose
+    spelling reads almost the same and widens the gate to
+    any truthy value the manifest carries, and the
+    structural census tolerates either operator, so the
+    loose form once passed every reading in this gate. The
+    pin is two sided. No loose equality or loose inequality
+    operator stands anywhere in the module outside a
+    literal, in either operand order and under any alias,
+    because the module needs no loose comparison for any
+    of its checks. And the verified comparison itself must
+    stand in its shipped strict form, a member read of the
+    verified flag compared strictly against true, so an
+    alias that carries the flag away from the comparison
+    draws the same refusal as the loose operator does.
+    """
+    problems = []
+    spans = literal_spans(code)
+    for match in re.finditer(r"==|!=", code):
+        if match.group(0) == "==" and code[match.end():match.end() + 1] == "=":
+            continue
+        if match.group(0) == "!=" and code[match.end():match.end() + 1] == "=":
+            continue
+        if any(start <= match.start() <= end for start, end in spans):
+            continue
+        problems.append(
+            "the hooks module compares with the loose "
+            "operator %s, and every comparison in the module "
+            "stands in its strict form so a truthy value can "
+            "never stand in for the verified flag"
+            % match.group(0)
+        )
+        break
+    if not re.search(r"\.verified\s*===\s*true\b", code):
+        problems.append(
+            "the hooks module does not compare the manifest "
+            "verified flag against true with the strict "
+            "equality operator in its shipped form, so the "
+            "one comparison the spawn gate turns on does "
+            "not stand pinned"
+        )
+    return problems
+
+
 def module_problems(path):
     """Problems with the hooks module source."""
     problems = []
@@ -7563,6 +7612,7 @@ def module_problems(path):
             "the hooks module touches disable-model-invocation, which "
             "stays at its default false"
         )
+    problems.extend(verified_equality_problems(decoded))
     code = normalise_member_spellings(decoded)
     ranges = function_ranges(code)
     problems.extend(dollar_value_problems(code, ranges, decoded))

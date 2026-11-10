@@ -20,6 +20,18 @@ gate fails when one stands there. A path that is not a regular
 file draws a named problem and is never read, and an absent
 manifest draws a named problem rather than passing in silence.
 
+Four further manifests carry a version and stand in this
+reading on the same terms, being the portable package
+manifest, the Cursor plugin manifest, the Cursor
+marketplace metadata and entry versions, and the ZCode
+plugin manifest. Their coherence was once borrowed from
+sibling gates that each compared one of them against a
+surface this gate reads, and a reader of this gate's green
+line took it as the whole coherence proof while its own
+reading covered five of the nine surfaces. The reading
+now covers all nine directly, and a drift on any one of
+the four names that surface in its own problem line.
+
 The README carries no version badge. The badge retired in the
 visual round 2 storefront rebuild because a static badge states a
 version no surface updates, and the repo carries no release or
@@ -43,6 +55,10 @@ MOD_PLUGIN_JSON = (
 )
 ANTIGRAVITY_PLUGIN_JSON = ROOT / ".antigravity" / "plugin.json"
 MARKETPLACE_JSON = ROOT / ".claude-plugin" / "marketplace.json"
+PACKAGE_JSON = ROOT / "agent-plugins-package" / "plugin.json"
+CURSOR_PLUGIN_JSON = ROOT / ".cursor-plugin" / "plugin.json"
+CURSOR_MARKETPLACE_JSON = ROOT / ".cursor-plugin" / "marketplace.json"
+ZCODE_PLUGIN_JSON = ROOT / ".zcode-plugin" / "plugin.json"
 EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
 
@@ -466,6 +482,70 @@ def main():
             for index, version in enumerate(found):
                 versions["marketplace.json entry %d" % (index + 1)] = version
 
+    text = read(PACKAGE_JSON)
+    if text is None:
+        problems.append(
+            "missing portable package manifest at "
+            "agent-plugins-package/plugin.json"
+        )
+        versions["portable package plugin.json"] = None
+    else:
+        try:
+            versions["portable package plugin.json"] = plugin_version(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append(
+                "portable package plugin.json does not parse: %s" % exc
+            )
+            versions["portable package plugin.json"] = None
+
+    text = read(CURSOR_PLUGIN_JSON)
+    if text is None:
+        problems.append(
+            "missing Cursor plugin manifest at .cursor-plugin/plugin.json"
+        )
+        versions["Cursor plugin.json"] = None
+    else:
+        try:
+            versions["Cursor plugin.json"] = plugin_version(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append("Cursor plugin.json does not parse: %s" % exc)
+            versions["Cursor plugin.json"] = None
+
+    text = read(CURSOR_MARKETPLACE_JSON)
+    if text is None:
+        problems.append(
+            "missing Cursor marketplace listing at "
+            ".cursor-plugin/marketplace.json"
+        )
+    else:
+        try:
+            found = marketplace_versions(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append("Cursor marketplace.json problem: %s" % exc)
+            found = None
+        if found is not None:
+            if not found:
+                problems.append(
+                    "Cursor marketplace.json carries no version"
+                )
+            for index, version in enumerate(found):
+                versions[
+                    "Cursor marketplace.json entry %d" % (index + 1)
+                ] = version
+
+    text = read(ZCODE_PLUGIN_JSON)
+    if text is None:
+        problems.append(
+            "missing ZCode plugin manifest at .zcode-plugin/plugin.json"
+        )
+        versions["ZCode plugin.json"] = None
+    else:
+        try:
+            versions["ZCode plugin.json"] = plugin_version(text)
+        except (json.JSONDecodeError, ValueError, TypeError, AttributeError) as exc:
+            problems.append("ZCode plugin.json does not parse: %s" % exc)
+            versions["ZCode plugin.json"] = None
+
     text = read(EXTRACT_PY)
     versions["EXTRACTOR_VERSION"] = (
         extractor_version(text) if text is not None else None
@@ -484,8 +564,8 @@ def main():
         return 1
     print(
         "check_version: version %s agrees across the plugin "
-        "manifests, the marketplace listing, the extractor and "
-        "the changelog"
+        "manifests, the marketplace listings, the portable "
+        "package, the extractor and the changelog"
         % versions["EXTRACTOR_VERSION"]
     )
     return 0

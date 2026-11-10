@@ -331,6 +331,71 @@ class TestCheckBrand(unittest.TestCase):
             self.write_json(root, "agent-plugins-package/plugin.json", data)
             self.assertEqual(self.problems(root), [])
 
+    def plant_fill(self, root, fill, both=False):
+        names = ["wordmark-light.svg"]
+        if both:
+            names.append("wordmark-dark.svg")
+        for name in names:
+            path = root / "docs" / "brand" / name
+            text = path.read_text(encoding="utf-8")
+            path.write_text(
+                text.replace(
+                    "</svg>",
+                    '<rect width="4" height="4" fill="%s"/></svg>'
+                    % fill,
+                ),
+                encoding="utf-8",
+            )
+
+    def test_p17_the_reserved_green_in_rgb_form_fails(self):
+        # Round 14. The colour scan matched only the six
+        # digit hex spelling, so the reserved green written
+        # as three decimal channels carried the one colour
+        # no brand asset may carry past every reading.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.plant_fill(root, "rgb(74,199,106)")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "reserved green" in p and "rgb(74,199,106)" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_p17_the_reserved_green_in_rgba_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.plant_fill(root, "rgba(74, 199, 106, 0.5)")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("reserved green" in p for p in problems),
+                problems,
+            )
+
+    def test_p17_an_unrecorded_colour_in_rgb_form_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.plant_fill(root, "rgb(1,2,3)")
+            problems = self.problems(root)
+            self.assertTrue(
+                any(
+                    "#010203" in p and "names no such value" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_p17_an_allowed_colour_in_rgb_form_holds(self):
+        # The control. The accent colour of the palette in
+        # rgb form is the same colour the hex spelling
+        # carries, and only the value decides.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            self.plant_fill(root, "rgb(217,119,87)", both=True)
+            self.assertEqual(self.problems(root), [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -387,6 +387,69 @@ def persona_problems(root):
         "agent file: %s" % problem
         for problem in frontmatter_problems(text)
     )
+    problems.extend(
+        "agent file: %s" % problem
+        for problem in body_problems(text)
+    )
+    return problems
+
+
+# The one sentence in the reviewer body that states the
+# persona discipline, pinned whole. The body reading below
+# stands on it, and the sentence is named here so a rewrite
+# of the discipline itself draws a problem rather than
+# silently moving the boundary the reading enforces.
+DISCIPLINE_SENTENCE = (
+    "It does not approve, reject, rank, or comment on the code."
+)
+
+
+def body_problems(text):
+    """Problems with the body of the reviewer agent file.
+
+    The persona gate pinned the frontmatter field by field
+    and never read the body, so an instruction appended to
+    the body of the shipped reviewer file, one telling the
+    session to approve on a condition the discipline
+    forbids, passed the gate while standing in the file the
+    host loads as the session agent. The body reading is
+    narrow by design. The discipline sentence must stand
+    in the body whole, and no other sentence in the body
+    may carry the verb approve in any of its forms, because
+    the discipline the sentence states is that this persona
+    does not approve at all. The noun approval in a
+    descriptive sentence is not the verb and does not draw
+    a problem, and verbs of judgement other than approve
+    stay outside this reading, which claims the approval
+    instruction family and no more.
+    """
+    problems = []
+    parts = text.split("---", 2)
+    body = parts[2] if len(parts) == 3 else text
+    if DISCIPLINE_SENTENCE not in body:
+        problems.append(
+            "the reviewer body does not carry its discipline "
+            "sentence whole, the sentence that states the "
+            "persona does not approve, reject, rank, or "
+            "comment on the code"
+        )
+    flat = re.sub(r"\s+", " ", body)
+    sentences = [
+        piece.strip()
+        for piece in re.split(r"(?<=[.!?])\s+", flat)
+        if piece.strip()
+    ]
+    for sentence in sentences:
+        if sentence == DISCIPLINE_SENTENCE:
+            continue
+        if re.search(r"\bapprove[sd]?\b", sentence, re.IGNORECASE):
+            problems.append(
+                "the reviewer body carries the sentence %r, "
+                "and no sentence outside the discipline "
+                "sentence may direct or describe this persona "
+                "approving, because the persona does not "
+                "approve" % sentence
+            )
     return problems
 
 

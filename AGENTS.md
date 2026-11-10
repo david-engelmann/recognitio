@@ -135,6 +135,21 @@ trailer on pull request commits, and a green local run says nothing
 about it. Green local gates first, then push. CI is a backstop,
 not a gate.
 
+The gate runner at `scripts/run_gates.py` stands under its own
+Makefile target named `gates` beside the check target and is not
+part of the wiring above. It runs the same steps the check target
+names in the same order and writes each step output to a log
+folder under the tree by default, or to a folder the caller names,
+with a meta record keyed to the git tree hash of the tree under
+test, and it refuses a working state that differs from its head
+unless the caller names its local mode, counting only untracked
+entries under its own log folder as its own output and every other
+entry as a difference, and it holds the discover count against a
+pinned floor that moves only with the census, and it records the
+step frontier of a stopped run. A verdict that cannot name its
+tree certifies nothing, and the runner is the shipped form of
+that rule.
+
 ## Layout map
 
 - `.agents/skills/recognitio/SKILL.md` holds the skill text an agent reads

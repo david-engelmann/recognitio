@@ -4059,3 +4059,34 @@ This unreleased work carries version 1.3.0.
   stands once in the manifest list of a packet
   whose capped ranges spread over more than one
   of the most changed files.
+- The gate runner now stands beside the gate wiring
+  as its own target. It runs the gate steps and
+  writes each step output to a log folder under
+  the tree by default, or to a folder the caller
+  names, and a meta record keyed to the git tree
+  hash with the step name and its exit code and
+  its count line, and it refuses a dirty tree
+  outside its named local mode, counting only
+  untracked entries under its own log folder as
+  its own output, and asserts the discover count
+  against a pinned floor that moves only with the
+  census, and it records the step frontier on a
+  stopped run. The packet check now
+  refuses a drop whose own restoration fits the
+  recorded budget beside the full restoration
+  reading it already held, and the budget reference
+  states that per tier invariant in all four of its
+  copies. The version gate now reads the portable
+  package manifest and the Cursor plugin manifest
+  and the Cursor marketplace listing and the ZCode
+  plugin manifest directly beside the five surfaces
+  it already read. The brief gates now close their
+  prose outside the numbered rules, and the mod
+  gate refuses a loose equality on the verified
+  check, and the brand gate reads the reserved
+  colours in rgb notation beside the hexadecimal
+  spelling, and the persona gate reads the reviewer
+  body it certifies, and the skill gate records a
+  symlinked entry as a problem, and the vacuity
+  guard reads the hooks TypeScript tests for
+  assertion presence under its stated boundary.

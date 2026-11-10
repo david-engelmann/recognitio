@@ -4067,5 +4067,522 @@ class TestRound13GitFailureKinds(unittest.TestCase):
         )
 
 
+class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
+    """Round 14. A drop is forced only when no single restoration fits.
+
+    The budget reading once compared the recorded budget
+    against the packet with every dropped tier restored at
+    its settled estimate added whole, placeholder and all,
+    so a manifest that dropped both companion and history
+    tiers under a budget either single restoration fit
+    inside passed as budget forced, and a single drop passed
+    inside the window between the netted and unnetted
+    restoration figures. The plants stand on the shipped
+    example packet, whose settled figures are a packet
+    estimate of 6031 tokens with the history tier settled at
+    1853 and the companion tier settled at 323, and the
+    settled dropped packet measures 3900, so restoring the
+    companion tier alone measures 4200, restoring the
+    history tier alone measures 5731, and restoring both
+    measures the genuine 6031. Reverting the per tier
+    reading or the placeholder netting in the checker
+    returns each refusal plant below to a pass. The
+    naming pin at the foot of this class covers the
+    manifest over reading sentence beside them.
+    """
+
+    EXAMPLE = ROOT / "examples" / "example-packet-991ac6a"
+
+    def example_manifest(self):
+        return json.loads(
+            (self.EXAMPLE / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def dropped_example(self, budget, tiers):
+        manifest = self.example_manifest()
+        text = (self.EXAMPLE / "packet.md").read_text(encoding="utf-8")
+        settled = extract_mod.estimate_tokens(text)
+        headings = {"T3": "## T3 History", "T2": "## T2 Companions"}
+        for tier in tiers:
+            span = check_mod.section_span(text, headings[tier])
+            body = span[:-1] if span.endswith("\n") else span
+            settled = settled - extract_mod.estimate_tokens(body) \
+                + extract_mod.estimate_tokens(
+                    extract_mod.tier_placeholder(tier, "dropped")
+                )
+            manifest["tiers"][tier]["state"] = "dropped"
+            manifest["tiers"][tier]["included"] = False
+            manifest["tiers"][tier]["emitted_tokens"] = \
+                extract_mod.estimate_tokens(
+                    extract_mod.tier_placeholder(tier, "dropped")
+                )
+        manifest["budget"]["budget_tokens"] = budget
+        manifest["budget"]["estimated_tokens"] = settled
+        manifest["budget"]["dropped"] = [
+            {"tier": tier, "reason": "budget of %d tokens" % budget}
+            for tier in tiers
+        ]
+        manifest["command"] = manifest["command"] + [
+            "--budget", str(budget)
+        ]
+        return manifest
+
+    def test_both_drops_under_a_budget_no_restoration_fits_passes(self):
+        # The control. At a recorded budget of 4199 the
+        # settled dropped packet fits, and restoring the
+        # companion tier alone measures 4200, the history
+        # tier alone 5731 and both 6031, so every drop the
+        # account records was forced and no problem stands.
+        manifest = self.dropped_example(4199, ("T3", "T2"))
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 3900)
+        self.assertEqual(check_mod.budget_problems(manifest), [])
+
+    def test_both_drops_refused_when_the_companion_restoration_fits(self):
+        # At 4200 the companion tier alone restored measures
+        # exactly the recorded budget, so its drop was never
+        # required even though the full restoration at 6031
+        # stands over the budget and the older reading
+        # passed this account.
+        manifest = self.dropped_example(4200, ("T3", "T2"))
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "records T2 as dropped under a budget of 4200 "
+                "tokens, but the packet with that tier alone "
+                "restored measures about 4200 tokens" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_both_drops_refused_when_the_history_restoration_fits(self):
+        # At 5731 the history tier alone restored fits, so
+        # the refusal names the history tier.
+        manifest = self.dropped_example(5731, ("T3", "T2"))
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "records T3 as dropped under a budget of 5731 "
+                "tokens, but the packet with that tier alone "
+                "restored measures about 5731 tokens" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_both_drops_at_6030_refuse_on_the_per_tier_reading_alone(self):
+        # At 6030 the full netted restoration measures 6031
+        # and stands over the budget, so the full restoration
+        # reading states no problem and the refusal rests on
+        # the per tier reading alone.
+        manifest = self.dropped_example(6030, ("T3", "T2"))
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(problems)
+        self.assertTrue(
+            all(
+                "with that tier alone restored" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_single_drop_inside_the_placeholder_window_is_refused(self):
+        # The netting plant. The history tier alone dropped
+        # settles the packet at 4200, its placeholder stands
+        # at 22 emitted tokens against a settled estimate of
+        # 1853, and at a recorded budget of 6040 the netted
+        # restoration measures the genuine 6031 and fits,
+        # while the unnetted figure of 6053 stands over the
+        # budget, so the pre repair reading passed and the
+        # netted reading refuses.
+        manifest = self.dropped_example(6040, ("T3",))
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 4200)
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "does not exceed that budget, so the budget "
+                "never required a drop" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_over_budget_refusal_names_the_budget_it_judges(self):
+        # The naming pin for the manifest half of the budget
+        # necessity family. A manifest whose recorded budget
+        # stands under its own recorded estimate is refused
+        # by the over reading, and the refusal sentence must
+        # carry both figures it judges, the estimate and the
+        # budget, so a reader of the stamp can check the
+        # account without the manifest in hand. Reverting
+        # the sentence to a form naming only one figure
+        # returns this test to a failure.
+        manifest = self.dropped_example(5900, ())
+        self.assertEqual(
+            manifest["budget"]["estimated_tokens"], 6031
+        )
+        problems = check_mod.budget_problems(manifest)
+        self.assertTrue(
+            any(
+                "estimate of 6031 tokens exceeds the budget "
+                "of 5900 tokens" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+
+class _RaisingExtractor:
+    """An extractor stand in whose every reading raises."""
+
+    def __getattr__(self, name):
+        def boom(*args, **kwargs):
+            raise RuntimeError("stub extractor refusal")
+        return boom
+
+
+class _VerifyRaisingExtractor:
+    """An extractor whose recount stands and whose verify raises."""
+
+    def fetch_change(self, repo, base, head):
+        return {"files": []}
+
+    def enrich_files(self, repo, base, head, change):
+        return []
+
+    def manifest_file_records(self, files):
+        return []
+
+    def verify_counts(self, repo, base, head, recorded):
+        raise RuntimeError("stub verify refusal")
+
+
+class _RereviewRaisingExtractor:
+    """An extractor whose re-review rebuild raises."""
+
+    def parse_findings(self, text):
+        return []
+
+    def findings_header_problems(self, text, head, since):
+        return []
+
+    def build_rereview(self, *args, **kwargs):
+        raise RuntimeError("stub rebuild refusal")
+
+
+class TestRound14RemedyClausePins(unittest.TestCase):
+    """Round 14. The remedy clauses the failure wordings carry stand pinned.
+
+    Round 13 added a remedy clause to the refusal families
+    of the checker, naming the act that repairs the state
+    each refusal reports, and no test read the added words,
+    so cutting a clause left the verifier suite fully
+    green. Each test below drives one refusal to its
+    wording and asserts the clause itself, so cutting any
+    pinned clause fails the test that names it.
+    """
+
+    EXAMPLE = ROOT / "examples" / "example-packet-991ac6a"
+
+    def example_manifest(self):
+        return json.loads(
+            (self.EXAMPLE / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def with_fake_run(self, run, call):
+        original = check_mod.subprocess
+        check_mod.subprocess = SimpleNamespace(
+            run=run, TimeoutExpired=subprocess.TimeoutExpired
+        )
+        try:
+            return call()
+        finally:
+            check_mod.subprocess = original
+
+    @staticmethod
+    def refusing_run(*args, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+    def test_a_head_that_is_not_a_commit_carries_its_remedy(self):
+        manifest = {
+            "base": None, "head": "a" * 40, "merge_base": None,
+            "mode": "commit", "since": None,
+        }
+        problems = self.with_fake_run(
+            self.refusing_run,
+            lambda: check_mod.ref_problems("/repo", manifest, None, None),
+        )
+        self.assertTrue(
+            any(
+                "Check the packet against the repository the "
+                "run read, or rebuild the packet from that "
+                "repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_base_that_is_not_a_commit_carries_its_remedy(self):
+        def run(*args, **kwargs):
+            joined = " ".join(str(arg) for arg in args)
+            if ("b" * 40) in joined:
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="commit\n", stderr="")
+        manifest = {
+            "base": "b" * 40, "head": "a" * 40,
+            "merge_base": None, "mode": "range", "since": None,
+        }
+        problems = self.with_fake_run(
+            run,
+            lambda: check_mod.ref_problems("/repo", manifest, None, None),
+        )
+        self.assertTrue(
+            any(
+                "Check the packet against the repository the "
+                "run read, or rebuild the packet from that "
+                "repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_a_since_that_is_not_a_commit_carries_its_remedy(self):
+        def run(*args, **kwargs):
+            joined = " ".join(str(arg) for arg in args)
+            if ("c" * 40) in joined:
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr="")
+            if "rev-parse" in joined:
+                return SimpleNamespace(
+                    returncode=0, stdout="a" * 40 + "\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="commit\n", stderr="")
+        manifest = {
+            "base": None, "head": "a" * 40, "merge_base": None,
+            "mode": "commit", "since": "c" * 40,
+        }
+        problems = self.with_fake_run(
+            run,
+            lambda: check_mod.ref_problems("/repo", manifest, None, None),
+        )
+        self.assertTrue(
+            any(
+                "Check the packet against the repository the "
+                "run read, or rebuild the packet from that "
+                "repository" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_no_merge_base_carries_its_remedy(self):
+        def run(*args, **kwargs):
+            joined = " ".join(str(arg) for arg in args)
+            if "merge-base" in joined:
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="commit\n", stderr="")
+        manifest = {
+            "base": "b" * 40, "head": "a" * 40,
+            "merge_base": None, "mode": "range", "since": None,
+        }
+        problems = self.with_fake_run(
+            run,
+            lambda: check_mod.ref_problems("/repo", manifest, None, None),
+        )
+        self.assertTrue(
+            any(
+                "Fetch the full history of both into this "
+                "repository, or rebuild the packet from a "
+                "repository that holds their shared history"
+                in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def run_main_on(self, packet_dir, repo):
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            code = check_mod.main(
+                [str(packet_dir), "--repo", str(repo)]
+            )
+        return code, stream.getvalue()
+
+    def empty_repo(self, tmp):
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        subprocess.run(
+            ["git", "init", "-q", str(repo)], check=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return repo
+
+    def test_a_missing_packet_carries_its_remedy(self):
+        with RetryingTemporaryDirectory() as tmp:
+            packet_dir = Path(tmp) / "packet"
+            packet_dir.mkdir()
+            shutil.copy(
+                self.EXAMPLE / "manifest.json",
+                packet_dir / "manifest.json",
+            )
+            repo = self.empty_repo(tmp)
+            code, stderr = self.run_main_on(packet_dir, repo)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "Name the directory the run wrote the packet into",
+            stderr,
+        )
+
+    def test_a_missing_manifest_carries_its_remedy(self):
+        with RetryingTemporaryDirectory() as tmp:
+            packet_dir = Path(tmp) / "packet"
+            packet_dir.mkdir()
+            shutil.copy(
+                self.EXAMPLE / "packet.md",
+                packet_dir / "packet.md",
+            )
+            repo = self.empty_repo(tmp)
+            code, stderr = self.run_main_on(packet_dir, repo)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "Name the directory the run wrote the manifest into",
+            stderr,
+        )
+
+    def test_no_readable_head_commit_carries_its_remedy(self):
+        with RetryingTemporaryDirectory() as tmp:
+            packet_dir = Path(tmp) / "packet"
+            shutil.copytree(self.EXAMPLE, packet_dir)
+            repo = self.empty_repo(tmp)
+            code, stderr = self.run_main_on(packet_dir, repo)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "Open the repository at a commit, then run the "
+            "check again",
+            stderr,
+        )
+
+    def test_the_recount_door_carries_its_remedy(self):
+        manifest = self.example_manifest()
+        problems, change = check_mod.recount_problems(
+            "/repo", manifest, _RaisingExtractor()
+        )
+        self.assertIsNone(change)
+        self.assertTrue(
+            any(
+                "so that reading cannot be checked. Run the "
+                "check again once the cause it names is "
+                "repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_verification_recount_door_carries_its_remedy(self):
+        manifest = self.example_manifest()
+        manifest["files"] = []
+        manifest["exclusions"] = []
+        problems, change = check_mod.recount_problems(
+            "/repo", manifest, _VerifyRaisingExtractor()
+        )
+        self.assertTrue(
+            any(
+                "the verification recount could not run" in problem
+                and "so that reading cannot be checked. Run "
+                "the check again once the cause it names is "
+                "repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_tier_rebuild_door_carries_its_remedy(self):
+        manifest = self.example_manifest()
+        problems = check_mod.rebuild_problems(
+            "packet", manifest, "/repo",
+            {"files": [], "chunks": []}, _RaisingExtractor(),
+        )
+        self.assertTrue(
+            any(
+                "the tier rebuild could not run" in problem
+                and "Run the check again once the cause it "
+                "names is repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_framing_rebuild_door_carries_its_remedy(self):
+        manifest = self.example_manifest()
+        problems = check_mod.whole_section_problems(
+            "packet", manifest, _RaisingExtractor()
+        )
+        self.assertTrue(
+            any(
+                "the framing section rebuild could not run"
+                in problem
+                and "Run the check again once the cause it "
+                "names is repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_rereview_file_door_carries_its_remedy(self):
+        with RetryingTemporaryDirectory() as tmp:
+            findings = Path(tmp) / "findings.md"
+            findings.write_text("findings\n", encoding="utf-8")
+            digest = hashlib.sha256(
+                findings.read_bytes()).hexdigest()
+            manifest = self.example_manifest()
+            manifest["command"] = manifest["command"] + [
+                "--findings", str(findings)
+            ]
+            manifest["findings_sha256"] = digest
+            packet_text = (
+                "## Re-review\n\n### Prior findings accounting\n\n"
+                + check_mod.NO_FINDINGS_LINE + "\n"
+            )
+            problems = check_mod.rereview_problems(
+                packet_text, manifest, "/repo",
+                _RereviewRaisingExtractor(),
+                packet_dir=Path(tmp),
+            )
+        self.assertTrue(
+            any(
+                "the re-review rebuild could not run" in problem
+                and "Run the check again once the cause it "
+                "names is repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+    def test_the_rereview_packet_door_carries_its_remedy(self):
+        manifest = self.example_manifest()
+        manifest["findings_sha256"] = None
+        packet_text = (
+            "## Re-review\n\n### Prior findings accounting\n\n"
+            + check_mod.NO_FINDINGS_LINE + "\n"
+        )
+        problems = check_mod.rereview_problems(
+            packet_text, manifest, "/repo",
+            _RereviewRaisingExtractor(),
+        )
+        self.assertTrue(
+            any(
+                "the re-review rebuild could not run" in problem
+                and "Run the check again once the cause it "
+                "names is repaired" in problem
+                for problem in problems
+            ),
+            problems,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
