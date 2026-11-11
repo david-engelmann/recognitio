@@ -936,6 +936,48 @@ def brief_problems(root, problems):
                     "re-derived difference of %s bytes"
                     % (stated, format(lost, ","))
                 )
+        # Round 16. The README states the same worked sum
+        # in its Codex section, and the reading above
+        # covered the brief alone, so a restated figure
+        # in the README passed this gate while the suite
+        # alone refused it. The README home now stands
+        # in the same reading, in the sentence forms the
+        # README carries.
+        readme_path = root / "README.md"
+        if readme_path.is_file():
+            readme_text = re.sub(
+                r"\s+", " ",
+                readme_path.read_text(encoding="utf-8"))
+            for stated in re.findall(
+                    r"embeds at most ([\d,]+) bytes",
+                    readme_text):
+                if int(stated.replace(",", "")) != cap:
+                    problems.append(
+                        "README.md states the AGENTS byte "
+                        "cap as %s, which differs from the "
+                        "re-derived cap of 32,768 bytes"
+                        % stated
+                    )
+            for stated in re.findall(
+                    r"this repo file stands at ([\d,]+) bytes",
+                    readme_text):
+                if int(stated.replace(",", "")) != file_bytes:
+                    problems.append(
+                        "README.md states the AGENTS file "
+                        "at %s bytes, which differs from "
+                        "the measured %s bytes"
+                        % (stated, format(file_bytes, ","))
+                    )
+            for stated in re.findall(
+                    r"its last ([\d,]+) bytes never reach",
+                    readme_text):
+                if int(stated.replace(",", "")) != lost:
+                    problems.append(
+                        "README.md states the lost bytes "
+                        "as %s, which differs from the "
+                        "re-derived difference of %s bytes"
+                        % (stated, format(lost, ","))
+                    )
     section = rules_section(raw)
     if section is None:
         problems.append(

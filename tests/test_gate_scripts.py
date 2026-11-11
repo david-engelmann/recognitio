@@ -3237,8 +3237,8 @@ class TestReadmeRound9(unittest.TestCase):
     languages the definition patterns cover, the demo lead in
     carries its receipt, the pericope is glossed at first use,
     the eval paragraph states the tied result beside the
-    constructed one, the hosted diff claim carries the research
-    attribution, and the worked example states the true
+    constructed one, the hosted diff claim names the evidence
+    record, and the worked example states the true
     relationship of its two function names.
     """
 
@@ -3369,12 +3369,17 @@ class TestReadmeRound9(unittest.TestCase):
             self.flat,
         )
 
-    def test_the_hosted_claim_carries_the_research_attribution(self):
+    def test_the_hosted_claim_names_the_evidence_record(self):
         self.assertIn(
-            "The research this project grew out of found hosted "
+            "The evidence recorded in "
+            "docs/hosted-diff-evidence.md shows hosted "
             "diffs capping the file counts they return and "
             "dropping oversized patches entirely, with no flag "
             "on either",
+            self.flat,
+        )
+        self.assertNotIn(
+            "The research this project grew out of found hosted ",
             self.flat,
         )
         self.assertNotIn(
@@ -3919,6 +3924,7 @@ class TestDocsIndex(unittest.TestCase):
         "decisions.md",
         "devin-playbook-brief.md",
         "headless-review.md",
+        "hosted-diff-evidence.md",
         "kimi-plugin-brief.md",
         "mod-build7.md",
         "principles.md",
@@ -9085,12 +9091,12 @@ class TestTreeFigureCensus(unittest.TestCase):
     # tree the pack describes.
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
-        "The repo holds 273 files and tens of megabytes in "
+        "The repo holds 274 files and tens of megabytes in "
         "total, as restated on 2026-11-10 against the tree "
         "that now holds that count."
     )
     CAP = (
-        "at 273 files against a cap of 512 files"
+        "at 274 files against a cap of 512 files"
     )
     LARGEST = (
         "Its largest file is the demo recording at "
@@ -9101,8 +9107,8 @@ class TestTreeFigureCensus(unittest.TestCase):
         mod = load_script("check_submissions")
         measured = mod.tree_measurements(ROOT)
         self.assertIsNotNone(measured)
-        self.assertEqual(measured["count"], 273)
-        self.assertEqual(measured["scan_files"], 273)
+        self.assertEqual(measured["count"], 274)
+        self.assertEqual(measured["scan_files"], 274)
         self.assertEqual(measured["largest_size"], 24222065)
         self.assertEqual(
             measured["largest_plain_path"],
@@ -9170,3 +9176,54 @@ class TestRound15SkillMainRoot(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound16ReadmeVersionForm(unittest.TestCase):
+    """Round 16. The version gate reads the README version form.
+
+    The README carried no version as data and the gate read
+    it not at all, so a fresh sentence stating the release
+    line at a new version passed every gate. A figure in
+    the version form now stands read against the shipped
+    version.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_version")
+
+    def test_a_fresh_release_sentence_fails(self):
+        problems = self.mod.readme_version_problems(
+            "The current release line stands at version 1.3.1.",
+            "1.3.0",
+        )
+        self.assertTrue(
+            any(
+                "README.md states a version as 1.3.1" in p
+                for p in problems
+            ),
+            problems,
+        )
+
+    def test_a_four_component_figure_fails(self):
+        problems = self.mod.readme_version_problems(
+            "The current release line stands at version "
+            "1.3.0.1.",
+            "1.3.0",
+        )
+        self.assertTrue(problems)
+
+    def test_the_shipped_version_form_holds(self):
+        self.assertEqual(
+            self.mod.readme_version_problems(
+                "The current release line stands at version "
+                "1.3.0.",
+                "1.3.0",
+            ),
+            [],
+        )
+
+    def test_the_shipped_readme_draws_no_problem(self):
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            self.mod.readme_version_problems(text, "1.3.0"), []
+        )

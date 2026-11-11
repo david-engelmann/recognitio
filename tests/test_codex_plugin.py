@@ -961,3 +961,75 @@ class TestRound15CodexPluginClosure(unittest.TestCase):
             ),
             [],
         )
+
+
+class TestRound16CodexReadmeFigures(unittest.TestCase):
+    """Round 16. The README home stands in the byte reading.
+
+    The gate re-derived the AGENTS byte sum over the brief
+    alone, so the same sum restated in the README passed
+    the gate while a suite pin alone refused it. The README
+    home now stands in the gate's own reading, in the
+    sentence forms the README carries.
+    """
+
+    def setUp(self):
+        self.base = TestCheckCodexPlugin()
+        self.base.setUp()
+
+    def test_a_restated_readme_size_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            match = re.search(
+                r"this repo file stands at ([\d,]+) bytes", text)
+            self.assertIsNotNone(match)
+            stated = int(match.group(1).replace(",", ""))
+            planted = text.replace(
+                "stands at %s bytes" % match.group(1),
+                "stands at %s bytes" % format(stated + 1, ","),
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "README.md states the AGENTS file" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_restated_readme_lost_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            match = re.search(
+                r"its last ([\d,]+) bytes never reach", text)
+            self.assertIsNotNone(match)
+            stated = int(match.group(1).replace(",", ""))
+            planted = text.replace(
+                "its last %s bytes" % match.group(1),
+                "its last %s bytes" % format(stated + 1, ","),
+                1,
+            )
+            self.assertNotEqual(planted, text)
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "README.md states the lost bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_shipped_readme_draws_no_figure_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any("README.md states" in p for p in problems),
+                problems,
+            )

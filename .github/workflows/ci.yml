@@ -22,7 +22,7 @@ jobs:
     # The timeout holds the whole gate with room to spare. The test
     # discover alone took 380 seconds on the runner at 2,344 tests
     # in run 302, and that measurement stands as history. The
-    # suite now stands at 3,012 tests by the loader count on this tree,
+    # suite now stands at 3,039 tests by the loader count on this tree,
     # and 24 gate scripts plus the smoke script run behind the
     # discover, so the old ten minutes cancelled the job inside
     # the gate step before any verdict could stand. On hosted run

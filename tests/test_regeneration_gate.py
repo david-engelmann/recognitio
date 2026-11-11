@@ -2158,3 +2158,53 @@ class ChangelogReachTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound16RegenerationCount(unittest.TestCase):
+    """Round 16. The success line derives its task count.
+
+    The line hardcoded the six eval task packets while the
+    gate discovers them by iteration, so a seventh task
+    would have left the green line stating a count the
+    gate never counted. The count now derives from the
+    tasks folder the reading itself discovers.
+    """
+
+    def run_main(self, root):
+        import io
+        from contextlib import redirect_stdout
+
+        original_root = GATE.ROOT
+        original = GATE.all_problems
+        GATE.ROOT = root
+        GATE.all_problems = lambda ignored: []
+        try:
+            with redirect_stdout(io.StringIO()) as captured:
+                code = GATE.main()
+        finally:
+            GATE.ROOT = original_root
+            GATE.all_problems = original
+        return code, captured.getvalue()
+
+    def test_the_success_line_counts_the_tasks_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tasks = root / "evals" / "tasks"
+            for name in ("task-01", "task-02", "task-03"):
+                (tasks / name).mkdir(parents=True)
+            code, out = self.run_main(root)
+            self.assertEqual(code, 0)
+            self.assertIn("the 3 eval task packets", out)
+
+    def test_the_success_line_counts_the_shipped_tasks(self):
+        code, out = self.run_main(ROOT)
+        self.assertEqual(code, 0)
+        shipped = len(
+            [
+                entry
+                for entry in (ROOT / "evals" / "tasks").iterdir()
+                if entry.is_dir()
+            ]
+        )
+        self.assertIn(
+            "the %d eval task packets" % shipped, out)

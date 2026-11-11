@@ -9,7 +9,7 @@ background: false
 
 ## Purpose
 
-Recognitio assembles what a reviewer reads. It takes a pull request, a commit range, or a single commit and builds one packet that holds the change together with the context a careful human reviewer would go and find. It makes no judgement about the code. Judgement belongs to the review skill that reads the packet.
+Recognitio assembles what a reviewer reads. It takes a pull request, a commit range, or a single commit and builds one packet that holds the change together with the context a careful human reviewer would go and find. It makes no judgement about the code. Judgement belongs to the review skill reading the packet.
 
 A reviewer reads the change inside its enclosing function, follows the changed names to their call sites, checks the tests that touch the changed module, and looks at who shaped these lines before. Recognitio gathers all of that ahead of time, counts it, and proves that nothing is missing.
 
@@ -21,7 +21,7 @@ A since ref can ride with any mode for re-review.
 - Range mode takes two refs, A..B or A...B, and extracts what the second proposes against their merge base. It certifies the branch against that merge base, not a later one.
 - Commit mode takes one commit and extracts it against its parent. A root commit extracts against the empty tree and its manifest records no merge base.
 
-Extraction always runs against the local clone. The hosted API diff is never trusted, because hosted diffs cap out and drop files without saying so. Local git has no file count cap and holds the full history. A shallow clone is refused outright, because truncated history would let the packet describe a boundary commit as the whole tree.
+Extraction runs against the local clone. A hosted diff is never trusted, because it caps out and drops files in silence, as docs/hosted-diff-evidence.md records. Local git has no file count cap and holds full history. A shallow clone is refused outright, because truncated history would let the packet describe a boundary commit as the whole tree.
 
 ## Workflow
 
@@ -41,7 +41,7 @@ python3 .agents/skills/recognitio/scripts/extract.py --commit HEAD --out packet 
 python3 .agents/skills/recognitio/scripts/extract.py --range main...feature --since OLDHEAD --findings findings.txt --budget 60000 --out packet --repo .
 ```
 
-In a forked subagent, the return carries only the packet directory, the verified flag, and the three refs, and the reviewer opens the packet itself.
+In a forked subagent, the return carries only the packet directory, the verified flag, and the three refs, and the reviewer opens the packet.
 
 ## Choosing tiers
 
@@ -60,7 +60,7 @@ When a call site shows a caller the packet gathered no context for, re-run with 
 
 ## Stamping the gate report
 
-A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit therefore stamps in a checkout standing at that commit.
+A review is stamped only on a verified packet. The gate report records base, head and merge base from the manifest, the exact extractor command and the reviewed head. It validates the manifest against the schema, recounts the change, reads the packet against the manifest and the recount, and applies the readings in references/verifier-completeness.md. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition and not any decay in the packet. A packet built for a named commit therefore stamps in a checkout standing at that commit.
 
 ## The tier model
 

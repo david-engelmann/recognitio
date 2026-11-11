@@ -99,12 +99,13 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 273 files",
+        "holds 274 files",
         "held 267 files",
-        "at 273 files against a cap of 512 files",
+        "held 274 files",
+        "at 274 files against a cap of 512 files",
         "demo recording at 24,222,065 bytes",
-        "tests/test_gate_scripts.py at 374,058 bytes",
-        "scan over all 273 files in the tree",
+        "tests/test_gate_scripts.py at 375,816 bytes",
+        "scan over all 274 files in the tree",
     ),
     PORTABLE_PACK: (
         "six month cycle",
@@ -3045,6 +3046,42 @@ def portable_problems(root, problems):
             "fixed location")
 
 
+def cursor_pack_figure_problems(root, problems):
+    """Check the Cursor pack tree figures against the tree.
+
+    Round 16. The figure family read the Claude pack
+    alone, so a tree figure stated in the Cursor pack
+    stood unjudged and a stale count planted in its
+    summary passed the gate. The Cursor pack states
+    no tree figure today. Any file count statement it
+    carries in the holds form the family prices, a
+    repo, repository or tree holds form, is judged
+    against the measured tree, so such a statement
+    refuses by name when its figure drifts.
+    """
+    path = root / CURSOR_PACK
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    measured = tree_measurements(root)
+    if measured is None:
+        return
+    text = re.sub(r"\s+", " ", raw)
+    number = r"([0-9][0-9,]*)"
+    for holds in re.finditer(
+        r"\b(?:the )?(?:repo|repository|tree) holds %s files"
+        % number, text, re.IGNORECASE
+    ):
+        claimed = int(holds.group(1).replace(",", ""))
+        if claimed != measured["count"]:
+            problems.append(
+                "%s states the tree holds %s files and the "
+                "tree holds %d"
+                % (CURSOR_PACK, holds.group(1),
+                   measured["count"]))
+
+
 def submissions_problems(root=None):
     """Problems with the submission packs or their facts."""
     root = ROOT if root is None else root
@@ -3054,6 +3091,7 @@ def submissions_problems(root=None):
     portable_problems(root, problems)
     pack_problems(root, version, problems)
     figure_problems(root, problems)
+    cursor_pack_figure_problems(root, problems)
     return problems
 
 
@@ -3064,9 +3102,11 @@ def main():
             print("check_submissions: %s" % problem, file=sys.stderr)
         return 1
     print(
-        "check_submissions: the three submission packs stand "
-        "unsubmitted at the shipped version, and every manifest "
-        "fact their evidence checks rest on holds in the tree"
+        "check_submissions: the three submission packs state "
+        "in their own text that nothing in them has been "
+        "submitted and state the shipped version, and every "
+        "manifest fact their evidence checks rest on holds "
+        "in the tree"
     )
     return 0
 

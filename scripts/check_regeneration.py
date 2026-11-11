@@ -1936,12 +1936,18 @@ def main():
         for problem in problems:
             print("check_regeneration: %s" % problem, file=sys.stderr)
         return 1
+    tasks = ROOT / "evals" / "tasks"
+    task_count = 0
+    if tasks.is_dir():
+        task_count = len(
+            [entry for entry in tasks.iterdir() if entry.is_dir()]
+        )
     print(
-        "check_regeneration: the example packet and the six "
+        "check_regeneration: the example packet and the %d "
         "eval task packets and the proof run packet regenerate "
         "from their stated provenance and every builder under "
         "the docs tree writes only the outputs the tree ships "
-        "and writes them byte for byte"
+        "and writes them byte for byte" % task_count
     )
     return 0
 

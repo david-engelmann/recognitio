@@ -29,6 +29,7 @@ FILES = (
     ".zcode-plugin/plugin.json",
     ".antigravity/plugin.json",
     "README.md",
+    "DESIGN.md",
 )
 BRAND_FILES = (
     "wordmark-light.svg",
@@ -399,3 +400,60 @@ class TestCheckBrand(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound16DesignFile(unittest.TestCase):
+    """Round 16. The brand gate opens the design file.
+
+    The design file token extraction claim and its waived
+    pairing figure rested on no reading in the tree, so
+    either could drift in silence. The gate now reads the
+    accent token against the palette record and recomputes
+    the pairing from the file's own tokens.
+    """
+
+    def setUp(self):
+        self.base = TestCheckBrand()
+        self.base.setUp()
+
+    def test_a_drifted_accent_token_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "DESIGN.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                'accent: "#D97757"', 'accent: "#D97758"', 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "DESIGN.md states its accent" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_restated_waiver_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "DESIGN.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                "at 3.12 to 1", "at 3.13 to 1", 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("waived pairing" in p for p in problems),
+                problems,
+            )
+
+    def test_the_shipped_design_file_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any("DESIGN.md" in p for p in problems),
+                problems,
+            )

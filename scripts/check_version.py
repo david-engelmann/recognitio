@@ -39,6 +39,16 @@ registry entry that backs it as a shipped version. Version
 coherence is proven here against the manifests and the changelog,
 which are the surfaces that carry the version as data.
 
+The README carries one version surface in prose. A sentence
+in the README that states a figure in the version form, the
+word version standing before its figure, is read against the
+shipped version, because the README states the versions of
+the tools it names in the name and figure form instead and
+names no other product in the version form. A figure in
+that form that differs from the shipped version is a
+release claim no surface backs, and this gate refuses it
+by name.
+
 Exits nonzero with one line per problem when anything disagrees.
 """
 
@@ -61,6 +71,7 @@ CURSOR_MARKETPLACE_JSON = ROOT / ".cursor-plugin" / "marketplace.json"
 ZCODE_PLUGIN_JSON = ROOT / ".zcode-plugin" / "plugin.json"
 EXTRACT_PY = ROOT / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
 CHANGELOG_MD = ROOT / "CHANGELOG.md"
+README_MD = ROOT / "README.md"
 
 
 class DuplicateKeyError(ValueError):
@@ -301,6 +312,33 @@ def coherence_problems(versions):
 
 
 UTF8_UNREADABLE = []
+
+
+def readme_version_problems(text, shipped):
+    """Problems with a version figure stated in the README.
+
+    Round 16. The README carries no version as data, and
+    the version gate read it not at all, so a fresh
+    sentence stating the release line at a new version
+    passed every gate. A figure stated in the version
+    form, the word version standing before its figure,
+    is a claim about this product version, because the
+    README names no other product in that form. Every
+    such figure is read against the shipped version.
+    """
+    problems = []
+    if shipped is None:
+        return problems
+    for token in re.findall(r"version (\d+(?:\.\d+)+)", text):
+        if token != shipped:
+            problems.append(
+                "README.md states a version as %s in the "
+                "version form, which differs from the "
+                "shipped version %s the manifests, the "
+                "extractor and the changelog carry"
+                % (token, shipped)
+            )
+    return problems
 
 
 def read(path):
@@ -556,6 +594,16 @@ def main():
         changelog_version(text) if text is not None else None
     )
 
+    text = read(README_MD)
+    if text is None:
+        problems.append("missing README at README.md")
+    else:
+        problems.extend(
+            readme_version_problems(
+                text, versions["EXTRACTOR_VERSION"]
+            )
+        )
+
     problems.extend(coherence_problems(versions))
     problems = repair_utf8_problems(problems)
     if problems:
@@ -565,7 +613,8 @@ def main():
     print(
         "check_version: version %s agrees across the plugin "
         "manifests, the marketplace listings, the portable "
-        "package, the extractor and the changelog"
+        "package, the extractor, the changelog and the "
+        "README version form"
         % versions["EXTRACTOR_VERSION"]
     )
     return 0

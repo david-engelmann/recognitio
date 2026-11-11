@@ -1749,7 +1749,16 @@ def qwen_problems(root=None):
     # silence. The census counts the occurrences and
     # refuses any count but the two the brief carries.
     version_sentence = "The repo version stays 1.3.0"
-    found = flat.count(version_sentence)
+    # Round 16. The census counts the sentence only where
+    # its figure ends the number as written, so an
+    # occurrence whose figure runs on past the pinned
+    # form, as a four component figure does, is not
+    # counted as the pinned sentence standing. A full
+    # stop that ends the sentence still counts, because
+    # the figure there is complete before the stop.
+    found = len(re.findall(
+        r"The repo version stays 1\.3\.0(?!\d|\.\d)", flat
+    ))
     if found != 2:
         problems.append(
             "the Qwen brief at docs/qwen-code-brief.md "
@@ -1765,8 +1774,12 @@ def qwen_problems(root=None):
     # Every sentence of the shape is therefore read for
     # its figure, and a figure that differs from the repo
     # version refuses by name.
+    # Round 16. The figure is captured whole as written,
+    # so a figure carrying a fourth component is read as
+    # the figure it is and refused, not read as its
+    # pinned prefix and passed.
     for token in re.findall(
-        r"The repo version stays (\d+\.\d+\.\d+)", flat
+        r"The repo version stays (\d+(?:\.\d+)+)", flat
     ):
         if token != "1.3.0":
             problems.append(
@@ -1799,6 +1812,57 @@ def qwen_problems(root=None):
                 "states the second live session date as " + stated
                 + ", which differs from the recorded live "
                 "session date 2026-11-03"
+            )
+    # Round 16. A version figure standing in the brief
+    # in the plain version form, the word version before
+    # its figure, is read against the one figure the
+    # brief carries in that form, the bundled command
+    # line figure from the releases listing, so a fresh
+    # sentence stating a version in that form refuses by
+    # name whatever figure it states and however many
+    # components the figure carries.
+    for token in re.findall(r"version (\d+(?:\.\d+)+)", flat):
+        if token != "0.26.0":
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states a version as %s in the plain version "
+                "form, which differs from the bundled command "
+                "line figure 0.26.0 the brief carries in that "
+                "form" % token
+            )
+    # Round 16. The conversion figures the brief states,
+    # the installed file size against the canonical file
+    # and the installer mirror size against its input,
+    # stand pinned as the recorded constants of the
+    # round 37 conversion record, because the converted
+    # bundle does not ship in this tree to be remeasured.
+    # A restated figure refuses by name.
+    for stated, against in re.findall(
+        r"the installed file runs ([\d,]+) bytes against "
+        r"([\d,]+) for the canonical file", flat
+    ):
+        if (int(stated.replace(",", "")),
+                int(against.replace(",", ""))) != (15231, 15233):
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states the installed file at %s bytes "
+                "against %s for the canonical file, which "
+                "differs from the recorded conversion "
+                "figures of 15,231 against 15,233"
+                % (stated, against)
+            )
+    for stated, against in re.findall(
+        r"at ([\d,]+) bytes against ([\d,]+) for the input",
+        flat
+    ):
+        if (int(stated.replace(",", "")),
+                int(against.replace(",", ""))) != (355, 356):
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states the installer mirror at %s bytes "
+                "against %s for the input, which differs "
+                "from the recorded conversion figures of "
+                "355 against 356" % (stated, against)
             )
     problems.extend(derivation_problems(brief))
     qwen_section = rules_section(brief)

@@ -406,7 +406,8 @@ that rule.
 
 1. Extraction comes from local git only. Never build a packet from
    a hosted API diff, because hosted diffs cap their file counts and
-   drop oversized patches without a flag.
+   drop oversized patches without a flag, as the evidence recorded
+   in docs/hosted-diff-evidence.md shows.
 2. The manifest fails closed. A packet whose verified flag is false
    is not a packet, and nobody reviews it as if it were whole.
 3. Stdlib only in their own code. The extractor and the gate
@@ -485,7 +486,7 @@ this map instead.
 
 ## Current state
 
-Written on 2026-10-15 and updated on 2026-10-24. The first version
+Written on 2026-10-15 and updated on 2026-10-30. The first version
 of the skill is built and landed on `main`, with the extractor, the
 four tier model and the fail closed manifest in place. The first
 perfection cycle hardened the extractor against ambient git

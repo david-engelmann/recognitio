@@ -2604,9 +2604,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 273 files", "holds 236 files"))
+                "holds 274 files", "holds 236 files"))
         self.assertTrue(
-            any("273 files" in p for p in problems), problems)
+            any("274 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the
@@ -2885,3 +2885,60 @@ class TestPackPinWidth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound16CursorPackFigures(unittest.TestCase):
+    """Round 16. The figure family reads the Cursor pack.
+
+    The family read the Claude pack alone, so a stale tree
+    count planted in the Cursor pack summary passed the
+    gate. A file count statement in the holds form now
+    stands judged against the measured tree in that pack
+    too.
+    """
+
+    def setUp(self):
+        self.base = TestCheckSubmissions()
+        self.base.setUp()
+
+    def test_a_stale_cursor_pack_count_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            measured = self.base.mod.tree_measurements(root)
+            self.assertIsNotNone(measured)
+            pack = root / CURSOR_PACK
+            text = pack.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe tree holds %d files.\n"
+                % (measured["count"] + 1)
+            )
+            pack.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the tree holds" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_true_cursor_pack_count_holds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            measured = self.base.mod.tree_measurements(root)
+            self.assertIsNotNone(measured)
+            pack = root / CURSOR_PACK
+            text = pack.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe tree holds %d files.\n"
+                % measured["count"]
+            )
+            pack.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any(
+                    "states the tree holds" in p for p in problems
+                ),
+                problems,
+            )

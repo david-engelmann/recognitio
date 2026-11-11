@@ -597,12 +597,76 @@ def master_problems(root=None):
     return problems
 
 
+def design_problems(root=None):
+    """Problems with the design file's own claims.
+
+    Round 16. The brand gate now opens the adopted
+    design file at the repo root. Its accent token is
+    read against the palette record, and the one
+    waived pairing the file records, the ground text
+    colour on the accent background, is recomputed
+    from the file's own tokens and read against the
+    figure the file states, so the waiver stands on a
+    recomputation rather than on the prose that
+    states it. The reading certifies those two claims
+    of the file and no other sentence in it.
+    """
+    root = ROOT if root is None else root
+    problems = []
+    path = root / "DESIGN.md"
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        problems.append("missing design file at DESIGN.md")
+        return problems
+    palette = load_palette(root, [])
+
+    def token(name):
+        match = re.search(
+            r"^  %s: \"(#[0-9A-Fa-f]{6})\"" % name,
+            raw, re.MULTILINE)
+        return match.group(1) if match else None
+
+    accent = token("accent")
+    ground = token("ground")
+    if accent is None:
+        problems.append(
+            "DESIGN.md carries no accent token the gate "
+            "can read")
+    if ground is None:
+        problems.append(
+            "DESIGN.md carries no ground token the gate "
+            "can read")
+    if palette is not None and accent is not None:
+        if accent.lower() != str(palette.get("accent")).lower():
+            problems.append(
+                "DESIGN.md states its accent as %s and "
+                "the palette record holds %s"
+                % (accent, palette.get("accent")))
+    stated = re.search(
+        r"pairs the ground text color on the accent "
+        r"background at ([\d.]+) to 1", raw)
+    if stated is None:
+        problems.append(
+            "DESIGN.md states no waived pairing figure "
+            "the gate can recompute")
+    elif accent is not None and ground is not None:
+        measured = format(contrast(ground, accent), ".2f")
+        if measured != stated.group(1):
+            problems.append(
+                "DESIGN.md states the waived pairing at "
+                "%s to 1 and its own tokens measure %s "
+                "to 1" % (stated.group(1), measured))
+    return problems
+
+
 def brand_problems(root=None):
     """Every brand asset problem this script pins."""
     UTF8_UNREADABLE.clear()
     problems = []
     problems.extend(manifest_problems(root))
     problems.extend(palette_problems(root))
+    problems.extend(design_problems(root))
     problems.extend(master_problems(root))
     return repair_utf8_problems(problems)
 

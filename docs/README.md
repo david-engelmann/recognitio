@@ -96,6 +96,11 @@ capture record, so no document in this set stands unlisted.
   design decisions that depart from the research sketch this
   project grew from, with the reason for each one and dated
   notes where later rounds amended an entry.
+- [The hosted diff evidence](hosted-diff-evidence.md) (record) records
+  the documented caps on hosted diffs and the comparison
+  measured on this repo through the host API, the evidence
+  the hosted diff claim in the principles and the README
+  rests on.
 
 ## The filed records
 

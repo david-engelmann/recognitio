@@ -617,3 +617,76 @@ class TestSkillLimitSentences(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for fragment in self.FRAGMENTS:
             self.assertIn(fragment, skill, fragment[:48])
+
+
+class TestRound16CopyClaims(unittest.TestCase):
+    """Round 16 copy claims that no gate read, now held by name.
+
+    Each test answers one audit or red team item from the
+    round. The plants behind them passed every gate on the
+    tree they were planted on, so each pin here is the
+    repair and each fails when its sentence moves.
+    """
+
+    def normalized(self, path):
+        return " ".join(
+            (ROOT / path).read_text(encoding="utf-8").split()
+        )
+
+    def test_the_companion_sentence_stands_at_both_occurrences(self):
+        # Red team Major 2. The pin held the first occurrence
+        # of the companion sentence and the plant moved the
+        # second, in the objections answer. Both occurrences
+        # now stand pinned in their own forms.
+        readme = self.normalized("README.md")
+        self.assertIn(
+            "The definition patterns the companion search uses "
+            "cover five languages",
+            readme,
+        )
+        self.assertIn(
+            "whose companion search covers five languages",
+            readme,
+        )
+        self.assertEqual(readme.count("covers five languages"), 1)
+
+    def test_the_verified_bullet_keeps_its_only(self):
+        # Red team Minor. The word only dropped out of the
+        # verified bullet left the sentence claiming the
+        # packet earns the word on less than the recount
+        # proves.
+        readme = self.normalized("README.md")
+        self.assertIn(
+            "calls the packet verified only when both counts "
+            "agree",
+            readme,
+        )
+
+    def test_the_principles_local_clone_sentence_stands(self):
+        # The R5 shape carried to the principles page, whose
+        # local clone sentence the same plant family could
+        # soften in silence.
+        principles = self.normalized("docs/principles.md")
+        self.assertIn(
+            "The local clone holds the whole change.",
+            principles,
+        )
+
+    def test_the_agents_date_line_names_the_latest_chronicle_date(self):
+        # Standards Minor 1. The date line named a date behind
+        # the latest date its own chronicle carries, and no
+        # gate or test read the line. The line now stands
+        # held to the maximum date in its section.
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        section = agents.split("## Current state", 1)[1]
+        line = re.search(
+            r"Written on (\d{4}-\d{2}-\d{2}) and updated on "
+            r"(\d{4}-\d{2}-\d{2})\.",
+            section,
+        )
+        self.assertIsNotNone(line)
+        body = section.replace(line.group(0), "")
+        dates = re.findall(r"\d{4}-\d{2}-\d{2}", body)
+        self.assertTrue(dates)
+        self.assertEqual(line.group(2), max(dates))
+

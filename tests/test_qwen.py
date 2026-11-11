@@ -1752,3 +1752,130 @@ class TestRound15QwenVersionCensus(unittest.TestCase):
             self.assertNotEqual(planted, text)
             path.write_text(planted, encoding="utf-8")
             self.assertTrue(self.base.problems(root))
+
+
+class TestRound16QwenFigures(unittest.TestCase):
+    """Round 16. The version figure is read whole as written.
+
+    The Round 15 census counted the pinned sentence by its
+    prefix, so an occurrence whose figure ran on to a fourth
+    component still counted, and the figure reading read the
+    same prefix and passed it. The census now counts the
+    sentence only where its figure ends the number, the
+    figure reading captures the figure whole, a version
+    stated in the plain version form is read against the one
+    figure the brief carries in that form, and the conversion
+    figures stand pinned as recorded constants.
+    """
+
+    def setUp(self):
+        self.base = TestCheckQwen()
+        self.base.setUp()
+
+    def test_a_four_component_moved_occurrence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                "stays 1.3.0", "stays 1.3.0.1", 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "repo version as 1.3.0.1" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_appended_four_component_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe repo version stays 1.3.0.1.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "repo version as 1.3.0.1" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_plain_version_form_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe extension format stands at version "
+                "1.3.0.1.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "in the plain version form" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_restated_installed_file_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                "runs 15231 bytes", "runs 15232 bytes", 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "recorded conversion figures of 15,231" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_restated_mirror_figure_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                "at 355 bytes", "at 354 bytes", 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "recorded conversion figures of" in p
+                    and "355 against 356" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_shipped_brief_draws_no_round16_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any(
+                    "plain version form" in p
+                    or "recorded conversion figures" in p
+                    or "1.3.0.1" in p
+                    for p in problems
+                ),
+                problems,
+            )

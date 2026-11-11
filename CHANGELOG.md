@@ -4127,3 +4127,33 @@ This unreleased work carries version 1.3.0.
   manifest link the repaired extension reading now
   refuses, while the version reading still reads the
   genuine content through the link.
+- The capstone round 16 pass closes the public claims
+  findings. The hosted diff claim in the README, the
+  principles and the skill now names the evidence page
+  that records the documented caps and a comparison
+  measured on this repo, and the page joins the docs
+  index. The Qwen gate reads a version figure whole as
+  written, so a four component figure refuses, counts
+  its version sentence only where the figure ends the
+  number, reads a version stated in the plain version
+  form against the one figure the brief carries in that
+  form, and pins the conversion figures as recorded
+  constants. The Comate gate reads the plain version
+  form the same way. The version gate reads a version
+  figure stated in the README against the shipped
+  version. The Codex plugin gate reads the AGENTS byte
+  sum in the README beside the brief, and both homes
+  restate the sum against the measured file. The
+  submissions figure family now reads the Cursor pack,
+  the Claude pack glance restates its file count from
+  measurement, and the submissions and regeneration
+  success lines state only what their gates read, the
+  regeneration count derived from the tasks folder. The
+  brand gate opens the design file, reads its accent
+  against the palette record and recomputes the waived
+  pairing from its own tokens. The AGENTS date line
+  restates to the latest date its chronicle carries and
+  a suite pin holds it there, and suite pins hold the
+  README companion sentence at both its occurrences,
+  the verified bullet and the principles local clone
+  sentence.

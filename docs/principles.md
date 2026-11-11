@@ -19,9 +19,10 @@ page and on a dark one.
 ## Build from the local clone, never from a hosted diff
 
 A hosted diff is a summary written by a service with limits of its own.
-The research this project grew out of found hosted diffs capping the
-file counts they return and dropping oversized patches entirely, with no
-flag on either and a success response over the top. A packet built from
+The evidence recorded in docs/hosted-diff-evidence.md shows hosted
+diffs capping the file counts they return and dropping oversized
+patches entirely, with no flag on either and a success response
+over the top. A packet built from
 that summary inherits each silence in it, and no check downstream can
 restore a file the source never mentioned.
 

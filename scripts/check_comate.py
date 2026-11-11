@@ -1360,6 +1360,25 @@ def brief_problems(root, problems):
                 "over %s tools, which differs from the pinned "
                 "figure of over 20 tools" % stated
             )
+    # Round 16. The whole brief side of the reading now
+    # also covers the plain version form, the word
+    # version before its figure, read over the whole
+    # brief. The brief carries exactly one figure in
+    # that form, the client version, so a fresh sentence
+    # stating a version in that form refuses by name
+    # whatever figure it states and however many
+    # components the figure carries. The repair pass
+    # five bound, that a version token standing in no
+    # shipped statement form states no client version
+    # in this reading, no longer stands for this form.
+    for stated in re.findall(r"version (\d+(?:\.\d+)+)", text):
+        if stated != "3.11.5":
+            problems.append(
+                "docs/comate-brief.md states a version as "
+                "%s in the plain version form, which "
+                "differs from the pinned version 3.11.5"
+                % stated
+            )
     for label, sentence in BRIEF_SENTENCES:
         if sentence not in text:
             problems.append(

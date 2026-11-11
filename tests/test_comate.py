@@ -1940,3 +1940,70 @@ class TestRound15ComateClosure(unittest.TestCase):
             ),
             [],
         )
+
+
+class TestRound16ComateVersionForm(unittest.TestCase):
+    """Round 16. The plain version form stands in the reading.
+
+    The whole brief readings covered the shipped statement
+    forms of the client version, so a fresh sentence stating
+    a version in the plain version form, the word version
+    before its figure, stated no client version in the
+    reading and passed. The form now stands read over the
+    whole brief against the one figure the brief carries
+    in it.
+    """
+
+    def setUp(self):
+        self.base = TestCheckComate()
+        self.base.setUp()
+
+    def test_an_appended_plain_version_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "comate-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe skill format stands at version 2.0.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "in the plain version form" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_appended_four_component_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "comate-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe client roadmap stands at version "
+                "3.11.5.1.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "in the plain version form" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_shipped_brief_draws_no_plain_form_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any(
+                    "plain version form" in p for p in problems
+                ),
+                problems,
+            )
