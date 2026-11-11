@@ -140,6 +140,18 @@ class TestCheckSubmissions(unittest.TestCase):
         names and its pack figures are rewritten to the figures
         the gate itself measures on that layout. What remains
         under test is the comparison, which is the gate.
+
+        The layout also gains the gate scripts suite at its
+        shipped size, the tree's largest plain file. The shape
+        tests append sentences to the pack, and the pack is
+        itself a plain file in the layout, so a layout whose
+        largest plain file stands within one sentence of the
+        pack's own size lets an append alone make the pack the
+        largest plain file and falsify the restated figure
+        before the appended sentence is judged at all. With
+        the suite file standing in the layout, the restated
+        largest plain figure names the file the shipped pack
+        names, and no appended sentence can cross it.
         """
         root = self.make_layout(tmp)
         target = root / "docs" / "images"
@@ -148,6 +160,11 @@ class TestCheckSubmissions(unittest.TestCase):
             ROOT / "docs" / "images"
             / "recognitio-cursor-agent-demo.gif",
             target / "recognitio-cursor-agent-demo.gif")
+        suite_target = root / "tests"
+        suite_target.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            ROOT / "tests" / "test_gate_scripts.py",
+            suite_target / "test_gate_scripts.py")
         measured = self.mod.tree_measurements(root)
         self.assertIsNotNone(measured)
         pack = root / CLAUDE_PACK
@@ -927,7 +944,9 @@ class TestCheckSubmissions(unittest.TestCase):
             pass_shapes = (
                 "The largest file is 100 bytes or more.",
                 "The largest file is 999,999 bytes or fewer.",
-                "%s is between 1 and 99,999 bytes." % plain,
+                "%s is between 1 and %s bytes."
+                % (plain, format(
+                    measured["largest_plain_size"] + 1, ",")),
                 "The repo holds a trillion files.",
                 "The repo holds a myriad of files.",
                 "The repo holds countless files.",
