@@ -231,8 +231,8 @@ project holding the skill at both evidenced project paths
 stood prepared beside the run, and the folder argument
 did not survive the client's relaunch past the welcome
 flow, so the project never stood open as a workspace, and
-discovery inside a project is part of what the owed
-session must show. The welcome flow was skipped and the
+discovery inside a project stands unverified beside
+it. The welcome flow was skipped and the
 new task surface shows the agent start page. The agent
 surface presents a log in button and no task surface
 before a sign in, and a license quick login line and a

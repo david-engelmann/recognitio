@@ -1683,3 +1683,72 @@ class TestRepairPassFiveQwen(unittest.TestCase):
         )
         self.assert_plant_kind(
             problems, "internal verify exit")
+
+
+class TestRound15QwenVersionCensus(unittest.TestCase):
+    """Round 15. The gate counts the version sentence."""
+
+    def setUp(self):
+        self.base = TestCheckQwen()
+        self.base.setUp()
+
+    def test_a_single_moved_occurrence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace("stays 1.3.0", "stays 1.3.1", 1)
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("1 times" in p for p in problems), problems
+            )
+
+    def test_an_appended_contradictory_version_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = (
+                text.rstrip("\n")
+                + "\n\nThe repo version stays 1.3.1.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "repo version as 1.3.1" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_moved_occurrence_behind_a_fresh_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace("stays 1.3.0", "stays 1.3.1", 1)
+            self.assertNotEqual(planted, text)
+            planted = (
+                planted.rstrip("\n")
+                + "\n\nThe repo version stays 1.3.0.\n"
+            )
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "repo version as 1.3.1" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_both_occurrences_moved_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / "docs" / "qwen-code-brief.md"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace("stays 1.3.0", "stays 1.3.1")
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            self.assertTrue(self.base.problems(root))

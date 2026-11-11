@@ -4090,3 +4090,40 @@ This unreleased work carries version 1.3.0.
   symlinked entry as a problem, and the vacuity
   guard reads the hooks TypeScript tests for
   assertion presence under its stated boundary.
+- The capstone round 15 pass closes the provider
+  findings of its three seats with no new build. The
+  brief prose closure reading now stands in the Codex
+  plugin gate and the Comate gate beside the nine gates
+  that already carried it, in one byte identical block
+  restated for the eleven rules briefs, and the reading
+  also judges the skeleton of each disciplined section,
+  the text before its first numbered rule, so a stray
+  operative paragraph standing in the preamble of the
+  rules refuses on the same terms as one appended after
+  them. The Comate
+  brief client run sentence the reading flagged stands
+  reworded to the recorded state it describes. The
+  package gate now pins the declared extension values
+  the brief enumerates, the shape keys and their path
+  lists and both native pointer values, and resolves
+  every declared path against the repo root, refusing
+  a directory, a path that climbs out of the root, and
+  a symlink standing on the path. The copy scan now
+  collects the author and owner names and emails of
+  the plugin manifests beside the description fields,
+  and its manifest scan and the ZCode manifest reading
+  load through the strict reader that refuses a
+  repeated key. The Qwen gate now counts the
+  occurrences of its version sentence, so a single
+  moved occurrence refuses, and it reads every version
+  sentence for its figure, so a contradictory sentence
+  standing beside the counted pair refuses by name. The Cursor and package
+  tree maps now record a symlinked entry under the
+  marker the skill gate carries, the skill gate main
+  entry derives its paths from a root it is handed,
+  and the gate runner count parser takes the last
+  count line in a step output. One shipped package
+  test stands restated, because it pinned a native
+  manifest link the repaired extension reading now
+  refuses, while the version reading still reads the
+  genuine content through the link.

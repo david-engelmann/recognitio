@@ -40,6 +40,12 @@ HOME_SKILL_DIR = ROOT / ".claude" / "skills" / "recognitio"
 SKILL_DIR = CANONICAL_SKILL_DIR
 SKILL_MD = SKILL_DIR / "SKILL.md"
 EXTRACT = SKILL_DIR / "scripts" / "extract.py"
+# The layout under any one root, captured here at import
+# before the gate tests override the joined names above,
+# so the main entry derives a handed root its paths from
+# the layout itself and never from the overrides.
+SKILL_DIR_UNDER_ROOT = SKILL_DIR.relative_to(ROOT)
+HOME_SKILL_DIR_UNDER_ROOT = HOME_SKILL_DIR.relative_to(ROOT)
 DESCRIPTION_LIMIT = 1024
 NAME_LIMIT = 64
 # The host reattaches each skill after a compaction cut at 20000
@@ -328,11 +334,28 @@ def _same_file(first, second):
 
 
 def main(root=None):
-    root = ROOT if root is None else root
+    # Round 15. A handed root derives every path from that
+    # root, the form the sibling gate entries use, so a
+    # fixture root is judged on its own paths. Called with
+    # no root, the entry keeps reading the module globals
+    # above, which the gate tests override against scratch
+    # fixtures, as the comment at those names records.
+    if root is None:
+        root = ROOT
+        skill_dir = SKILL_DIR
+        home_dir = HOME_SKILL_DIR
+        skill_md = SKILL_MD
+        extract = EXTRACT
+    else:
+        root = Path(root)
+        skill_dir = root / SKILL_DIR_UNDER_ROOT
+        home_dir = root / HOME_SKILL_DIR_UNDER_ROOT
+        skill_md = skill_dir / "SKILL.md"
+        extract = skill_dir / "scripts" / "extract.py"
     problems = []
-    problems.extend(layout_problems(SKILL_DIR, HOME_SKILL_DIR, root))
-    problems.extend(content_problems(SKILL_DIR, SKILL_MD, EXTRACT, ""))
-    home_md = HOME_SKILL_DIR / "SKILL.md"
+    problems.extend(layout_problems(skill_dir, home_dir, root))
+    problems.extend(content_problems(skill_dir, skill_md, extract, ""))
+    home_md = home_dir / "SKILL.md"
     # When the home spelling is a symlink to the canonical, its
     # SKILL.md is the same file the canonical check just read,
     # so a second content pass would only repeat its messages.
@@ -340,13 +363,13 @@ def main(root=None):
     # is byte identical, but its messages still name the
     # spelling, because a byte identical copy can still be
     # pointed at a broken file on a fixture.
-    if home_md.is_file() and not _same_file(home_md, SKILL_MD):
+    if home_md.is_file() and not _same_file(home_md, skill_md):
         problems.extend(
             content_problems(
-                HOME_SKILL_DIR,
+                home_dir,
                 home_md,
-                HOME_SKILL_DIR / "scripts" / "extract.py",
-                "%s: " % describe(HOME_SKILL_DIR, root),
+                home_dir / "scripts" / "extract.py",
+                "%s: " % describe(home_dir, root),
             )
         )
 

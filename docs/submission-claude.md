@@ -162,7 +162,7 @@ limit, so that limit stands unmet. The file count also holds
 under the cap the checklist holds for a reviewer, at 273
 files against a cap of 512 files. Its largest file that is
 not an image or a font or a video is
-tests/test_gate_scripts.py at 372,296 bytes, over
+tests/test_gate_scripts.py at 374,058 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files, so two limits in this item stand unmet while
 the remaining limit in it holds. Its tracked extensions run

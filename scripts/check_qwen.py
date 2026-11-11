@@ -1634,21 +1634,36 @@ def operative_prose_problems(raw, section, label):
     no rule carries and no derivation note names. This
     reading closes the brief as a whole. The disciplined
     section is removed and every remaining sentence is
-    judged, and a sentence is operative when it speaks to
-    or about the reviewing session, naming the reviewer or
+    judged, and the skeleton of the section is judged
+    beside it, the skeleton being the text of the section
+    before its first numbered rule, so a stray paragraph
+    standing in the preamble of the rules is judged on the
+    same terms as one standing anywhere outside the
+    section. The numbered rule blocks themselves stand
+    exempt, because a rule states its instruction as a
+    numbered rule carrying its derivation note, which is
+    the one form this brief allows. A sentence is
+    operative when it speaks to or about the reviewing
+    session, naming the reviewer or
     the session or addressing the reader as you, and it
     either carries a duty modal or opens with an imperative
     verb of the instruction family. A descriptive sentence
     about the session states no instruction and passes, and
     an instruction with no session subject stands outside
     this family and is left to its own pins. The identical
-    reading stands in each of the nine brief gates, because
-    the nine briefs share the one discipline and a closure
-    that covered fewer than all nine would leave the same
-    door open at the next brief.
+    reading stands in each of the eleven brief gates,
+    because the eleven rules briefs share the one discipline
+    and a closure that covered fewer than all eleven would
+    leave the same door open at the next brief.
     """
     outside = raw.replace(section, " ", 1) if section else raw
-    flat = re.sub(r"\s+", " ", outside)
+    skeleton = ""
+    if section:
+        skeleton = re.split(
+            r"(?m)^### [A-Z]+\d+\.", section, maxsplit=1
+        )[0]
+    judged = outside + " " + skeleton if skeleton else outside
+    flat = re.sub(r"\s+", " ", judged)
     problems = []
     reported = set()
 
@@ -1681,7 +1696,7 @@ def operative_prose_problems(raw, section, label):
     # marks as well, with the markdown furniture stripped,
     # so the same instruction is refused in that folded
     # form too.
-    for line in outside.splitlines():
+    for line in judged.splitlines():
         fragment = re.sub(r"^[#>*\-\d.\s`]+", "", line)
         judge(fragment, fragment.strip())
     return problems
@@ -1726,6 +1741,39 @@ def qwen_problems(root=None):
                 "the Qwen brief at docs/qwen-code-brief.md "
                 "carries a dropped pin, namely " + name + ", "
                 "which the brief must state in its pinned form"
+            )
+    # Round 15. The version sentence stands twice in the
+    # brief, and the presence pin above reads only that it
+    # stands somewhere, so moving a single occurrence to a
+    # new version left the brief contradicting itself in
+    # silence. The census counts the occurrences and
+    # refuses any count but the two the brief carries.
+    version_sentence = "The repo version stays 1.3.0"
+    found = flat.count(version_sentence)
+    if found != 2:
+        problems.append(
+            "the Qwen brief at docs/qwen-code-brief.md "
+            "states the version sentence %r %d times, not "
+            "the two occurrences the brief carries"
+            % (version_sentence, found)
+        )
+    # Round 15 delta. The census above counts the correct
+    # sentence and nothing else, so a contradictory sentence
+    # of the same shape could stand beside the two counted
+    # ones, and a moved occurrence could hide behind a
+    # fresh correct sentence that restores the count.
+    # Every sentence of the shape is therefore read for
+    # its figure, and a figure that differs from the repo
+    # version refuses by name.
+    for token in re.findall(
+        r"The repo version stays (\d+\.\d+\.\d+)", flat
+    ):
+        if token != "1.3.0":
+            problems.append(
+                "the Qwen brief at docs/qwen-code-brief.md "
+                "states the repo version as %s beside the "
+                "pinned 1.3.0, so the brief contradicts "
+                "itself on the version it states" % token
             )
     if "Runtime invocation stays UNVERIFIED" in flat:
         problems.append(

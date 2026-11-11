@@ -69,7 +69,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PINNED_TEST_FLOOR = 2980
+PINNED_TEST_FLOOR = 3012
 
 RAN_RE = re.compile(r"^Ran (\d+) tests", re.M)
 
@@ -200,10 +200,15 @@ def count_line(output):
 
     Only the discover step prints a count in a stable form,
     so the reading names that form and returns no count
-    anywhere else rather than inventing one.
+    anywhere else rather than inventing one. The last match
+    in the output is the count, because a stray earlier line
+    in the combined output can claim a count the step never
+    printed as its verdict, and the first match reading let
+    such a line overstate the count the floor arm reads.
     """
-    match = RAN_RE.search(output)
-    if match:
+    matches = list(RAN_RE.finditer(output))
+    if matches:
+        match = matches[-1]
         return int(match.group(1)), match.group(0)
     return None, None
 

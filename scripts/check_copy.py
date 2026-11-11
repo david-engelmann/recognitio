@@ -873,6 +873,29 @@ PROSE_VALUE_KEYS = (
     "defaultPrompt",
 )
 
+# Round 15. The identity objects a manifest carries, whose
+# name and email strings are prose a listing reader meets
+# the same way a description is met, collected under dotted
+# keys beside the description family above.
+IDENTITY_OBJECT_KEYS = ("author", "owner")
+IDENTITY_VALUE_KEYS = ("name", "email")
+
+
+def identity_values(key, data):
+    """The name and email strings an identity object holds.
+
+    Each value travels with the dotted key it stood under,
+    so a violation names the field that carries it, the
+    author name or the owner email in the form the field
+    stands in the manifest.
+    """
+    values = []
+    for field in IDENTITY_VALUE_KEYS:
+        value = data.get(field)
+        if isinstance(value, str):
+            values.append(("%s.%s" % (key, field), value))
+    return values
+
 
 def collect_list_strings(key, items, values):
     """Collect the strings inside a list a prose key holds.
@@ -913,12 +936,19 @@ def description_values(data):
     string at any depth inside the list a collected key
     holds is collected under that key's name.
     Each value travels with the key it stood under, so a
-    violation can name the field that carries it.
+    violation can name the field that carries it. The
+    author and owner objects a manifest carries join the
+    collection by their name and email strings, because a
+    listing reader meets those fields as the same prose.
     """
     values = []
     if isinstance(data, dict):
         for key, value in data.items():
-            if key in PROSE_VALUE_KEYS and isinstance(value, str):
+            if key in IDENTITY_OBJECT_KEYS and isinstance(
+                value, dict
+            ):
+                values.extend(identity_values(key, value))
+            elif key in PROSE_VALUE_KEYS and isinstance(value, str):
                 values.append((key, value))
             elif key in PROSE_VALUE_KEYS and isinstance(
                 value, list
@@ -932,10 +962,38 @@ def description_values(data):
     return values
 
 
+class DuplicateKeyError(ValueError):
+    """A JSON object names one key twice."""
+
+
+def strict_json_loads(text):
+    """Parse JSON refusing a repeated key, like the other gates.
+
+    A plain load keeps the last value of a repeated key in
+    silence, which would let a second entry hide beside the
+    one the gate certifies. This is the same reader the
+    other gate scripts carry, kept as a second copy because
+    the gate scripts never import each other.
+    """
+    def reject(pairs):
+        seen = {}
+        for key, value in pairs:
+            if key in seen:
+                raise DuplicateKeyError("repeated key %r" % key)
+            seen[key] = value
+        return seen
+    return json.loads(text, object_pairs_hook=reject)
+
+
 def scan_manifest(violations, path):
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        data = strict_json_loads(path.read_text(encoding="utf-8"))
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        DuplicateKeyError,
+    ) as exc:
         violations.append(
             "%s does not parse for the copy scan: %s"
             % (display_name(path), exc)

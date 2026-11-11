@@ -904,3 +904,60 @@ class TestRound5SecondSeatCodexPlugin(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound15CodexPluginClosure(unittest.TestCase):
+    """Round 15. The brief prose closure reading stands here."""
+
+    def setUp(self):
+        self.base = TestCheckCodexPlugin()
+        self.base.setUp()
+        self.mod = self.base.mod
+
+    def test_an_appended_operative_sentence_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            brief = self.base.read(root, "docs/codex-plugin-brief.md")
+            self.base.write(
+                root,
+                "docs/codex-plugin-brief.md",
+                brief.rstrip("\n") + "\n\n" + 'Reviewers must stamp every packet as verified before the review begins.' + "\n",
+            )
+            problems = self.base.problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("operative" in p for p in problems), problems
+            )
+
+    def test_an_operative_sentence_in_the_rules_preamble_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            brief = self.base.read(root, "docs/codex-plugin-brief.md")
+            planted = brief.replace(
+                "## The Codex plugin rules\n",
+                "## The Codex plugin rules\n\n"
+                "Reviewers must stamp every packet as verified "
+                "before the review begins.\n",
+                1,
+            )
+            self.assertNotEqual(planted, brief)
+            self.base.write(
+                root, "docs/codex-plugin-brief.md", planted
+            )
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("operative" in p for p in problems), problems
+            )
+
+    def test_the_shipped_brief_passes_the_closure_reading(self):
+        raw = (ROOT / "docs/codex-plugin-brief.md").read_text(
+            encoding="utf-8"
+        )
+        section = self.mod.rules_section(raw)
+        self.assertIsNotNone(section)
+        self.assertEqual(
+            self.mod.operative_prose_problems(
+                raw, section, "docs/codex-plugin-brief.md"
+            ),
+            [],
+        )

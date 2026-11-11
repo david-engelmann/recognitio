@@ -1192,6 +1192,86 @@ def comate_subsection_stands(readme):
     )
 
 
+def operative_prose_problems(raw, section, label):
+    """Problems with operative prose outside the section.
+
+    The derivation discipline of this gate binds the
+    numbered rules inside the disciplined section, and the
+    rest of the brief stood outside every reading, so one
+    plain prose sentence appended after the section, in
+    the form of an instruction to the reviewing session,
+    passed the gate while carrying an operative direction
+    no rule carries and no derivation note names. This
+    reading closes the brief as a whole. The disciplined
+    section is removed and every remaining sentence is
+    judged, and the skeleton of the section is judged
+    beside it, the skeleton being the text of the section
+    before its first numbered rule, so a stray paragraph
+    standing in the preamble of the rules is judged on the
+    same terms as one standing anywhere outside the
+    section. The numbered rule blocks themselves stand
+    exempt, because a rule states its instruction as a
+    numbered rule carrying its derivation note, which is
+    the one form this brief allows. A sentence is
+    operative when it speaks to or about the reviewing
+    session, naming the reviewer or
+    the session or addressing the reader as you, and it
+    either carries a duty modal or opens with an imperative
+    verb of the instruction family. A descriptive sentence
+    about the session states no instruction and passes, and
+    an instruction with no session subject stands outside
+    this family and is left to its own pins. The identical
+    reading stands in each of the eleven brief gates,
+    because the eleven rules briefs share the one discipline
+    and a closure that covered fewer than all eleven would
+    leave the same door open at the next brief.
+    """
+    outside = raw.replace(section, " ", 1) if section else raw
+    skeleton = ""
+    if section:
+        skeleton = re.split(
+            r"(?m)^### [A-Z]+\d+\.", section, maxsplit=1
+        )[0]
+    judged = outside + " " + skeleton if skeleton else outside
+    flat = re.sub(r"\s+", " ", judged)
+    problems = []
+    reported = set()
+
+    def judge(fragment, shown):
+        low = fragment.lower()
+        if not re.search(r"\b(reviewers?|sessions?|you)\b", low):
+            return
+        deontic = re.search(
+            r"\b(must|shall|should|needs? to|has to|have to|"
+            r"is required to|are required to)\b", low)
+        imperative = re.match(
+            r"\s*(always|never|print|begin|open|start|approve|"
+            r"reject|show|display)\b", low)
+        if (deontic or imperative) and shown not in reported:
+            reported.add(shown)
+            problems.append(
+                "%s carries the operative sentence %r outside "
+                "its disciplined section, and an instruction "
+                "to the reviewing session stands in this brief "
+                "only as a numbered rule carrying its "
+                "derivation note" % (label, shown))
+
+    for sentence in re.split(r"(?<=[.!?])\s+", flat):
+        judge(sentence, sentence.strip())
+    # An appended instruction stands on its own line at the
+    # end of a brief whose last sentence carries no closing
+    # mark, so the sentence split can fold it into the
+    # trailing genuine sentence and hide its opening
+    # imperative. Each line is therefore judged on its own
+    # marks as well, with the markdown furniture stripped,
+    # so the same instruction is refused in that folded
+    # form too.
+    for line in judged.splitlines():
+        fragment = re.sub(r"^[#>*\-\d.\s`]+", "", line)
+        judge(fragment, fragment.strip())
+    return problems
+
+
 def brief_problems(root, problems):
     """Problems with the Build 20 brief and its records."""
     raw = read_text(
@@ -1209,6 +1289,10 @@ def brief_problems(root, problems):
         )
     else:
         problems.extend(derivation_problems(section))
+        problems.extend(
+            operative_prose_problems(
+                raw, section, "docs/comate-brief.md")
+        )
     problems.extend(
         contradiction_problems(text, "docs/comate-brief.md")
     )

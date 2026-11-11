@@ -858,3 +858,42 @@ class TestRound5SecondSeatZcode(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound15ZcodeStrictReader(unittest.TestCase):
+    """Round 15. Both manifest loads refuse a repeated key."""
+
+    def setUp(self):
+        self.base = TestCheckZcode()
+        self.base.setUp()
+        self.mod = self.base.mod
+
+    def test_a_repeated_key_in_the_native_manifest_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / ".zcode-plugin" / "plugin.json"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                '"description":', '"name": "planted", "description":', 1
+            )
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("repeated key" in p for p in problems), problems
+            )
+
+    def test_a_repeated_version_key_in_the_home_manifest_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            path = root / ".claude-plugin" / "plugin.json"
+            text = path.read_text(encoding="utf-8")
+            planted = text.replace(
+                '"version":', '"version": "1.3.0", "version":', 1
+            )
+            self.assertNotEqual(planted, text)
+            path.write_text(planted, encoding="utf-8")
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("does not match" in p for p in problems), problems
+            )

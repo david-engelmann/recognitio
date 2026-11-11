@@ -9120,5 +9120,53 @@ class TestTreeFigureCensus(unittest.TestCase):
         self.assertEqual(flat.count(plain), 1)
 
 
+class TestRound15SkillMainRoot(unittest.TestCase):
+    """Round 15. The skill gate main entry judges a handed root."""
+
+    def setUp(self):
+        self.mod = load_script("check_skill")
+
+    def make_root(self, tmp):
+        root = Path(tmp) / "root"
+        shutil.copytree(
+            ROOT / ".agents" / "skills" / "recognitio",
+            root / ".agents" / "skills" / "recognitio",
+        )
+        home = root / ".claude" / "skills"
+        home.mkdir(parents=True)
+        (home / "recognitio").symlink_to(
+            root / ".agents" / "skills" / "recognitio"
+        )
+        return root
+
+    def run_main(self, root):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = self.mod.main(root=root)
+        return code, err.getvalue()
+
+    def test_a_clean_handed_root_passes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_root(tmp)
+            code, err = self.run_main(root)
+            self.assertEqual(code, 0, err)
+
+    def test_a_broken_handed_root_fails(self):
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.make_root(tmp)
+            md = root / ".agents" / "skills" / "recognitio" / "SKILL.md"
+            lines = md.read_text(encoding="utf-8").split("\n")
+            for i, line in enumerate(lines):
+                if line.startswith("description:"):
+                    lines[i] = line + " " + ("x" * 600) + " " + ("y" * 600)
+                    break
+            else:
+                self.fail("the skill file carries no description line")
+            md.write_text("\n".join(lines), encoding="utf-8")
+            code, err = self.run_main(root)
+            self.assertEqual(code, 1)
+            self.assertIn("over the 1024 limit", err)
+
+
 if __name__ == "__main__":
     unittest.main()

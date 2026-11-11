@@ -220,3 +220,29 @@ class TestRunnerAgainstTheShippedTree(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCountLineLastMatch(unittest.TestCase):
+    """Round 15. The count parser takes the last count line."""
+
+    def setUp(self):
+        self.mod = load_runner()
+
+    def test_the_last_count_is_the_count_taken(self):
+        output = (
+            "Ran 9999 tests in 0.001s\n"
+            "noise between the claims\n"
+            "Ran 2 tests in 0.002s\n"
+        )
+        self.assertEqual(
+            self.mod.count_line(output), (2, "Ran 2 tests")
+        )
+
+    def test_a_single_count_still_reads(self):
+        self.assertEqual(
+            self.mod.count_line("Ran 7 tests in 1.0s\n"),
+            (7, "Ran 7 tests"),
+        )
+
+    def test_no_count_line_returns_no_count(self):
+        self.assertEqual(self.mod.count_line("no counts\n"), (None, None))

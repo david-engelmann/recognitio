@@ -453,11 +453,13 @@ class TestCheckPackage(unittest.TestCase):
                 problems,
             )
 
-    def test_a_native_manifest_linking_to_a_regular_file_holds(self):
-        # The regular file test follows links, so a native
-        # manifest standing as a link to a regular file with
-        # the genuine content still reads through and the
-        # scratch layout still holds.
+    def test_a_native_manifest_linking_outside_the_root_fails(self):
+        # Round 15. The version reading still follows the link
+        # and reads the genuine content through it, so no
+        # version problem stands. The extension declaration
+        # reading no longer follows it, because a declared
+        # native shape must resolve in the repo itself, and a
+        # symlink standing on its path is refused by name.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             path = root / ".claude-plugin" / "plugin.json"
@@ -465,7 +467,10 @@ class TestCheckPackage(unittest.TestCase):
             shutil.copyfile(path, target)
             path.unlink()
             path.symlink_to(target)
-            self.assertEqual(self.problems(root), [])
+            problems = self.problems(root)
+            self.assertEqual(len(problems), 1, problems)
+            self.assertIn(".claude-plugin/plugin.json", problems[0])
+            self.assertIn("symlink", problems[0])
 
     def test_a_portable_manifest_linking_to_a_regular_file_holds(self):
         # A portable manifest standing as a link to a regular
@@ -1349,3 +1354,197 @@ class TestCopyFenceSpanningScalars(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound15PackageExtensions(unittest.TestCase):
+    """Round 15. The declared extension values are pinned and
+    every declared path resolves in the sibling form."""
+
+    def setUp(self):
+        self.base = TestCheckPackage()
+        self.base.setUp()
+        self.mod = self.base.mod
+
+    def manifest(self, root):
+        return json.loads(
+            (root / "agent-plugins-package" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+    def write_manifest(self, root, data):
+        (root / "agent-plugins-package" / "plugin.json").write_text(
+            json.dumps(data, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+    def shapes(self, data):
+        return data["extensions"]["com.anthropic.claude-code"]["shapes"]
+
+    def test_a_directory_extension_value_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            data = self.manifest(root)
+            data["extensions"]["com.anthropic.claude-code"][
+                "nativeMarketplace"
+            ] = ".claude-plugin"
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "does not resolve" in p and "regular file" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_climbing_extension_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            (Path(tmp) / "outside.md").write_text(
+                "outside", encoding="utf-8"
+            )
+            data = self.manifest(root)
+            self.shapes(data)["outputStyle"] = ["../outside.md"]
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("outside the repo" in p for p in problems),
+                problems,
+            )
+
+    def test_an_escaping_symlink_extension_path_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            outside = Path(tmp) / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            (root / "escape.json").symlink_to(outside)
+            data = self.manifest(root)
+            self.shapes(data)["agentPersona"] = ["escape.json"]
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("symlink" in p for p in problems), problems
+            )
+
+    def test_a_renamed_shape_key_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            data = self.manifest(root)
+            shapes = self.shapes(data)
+            shapes["personaFile"] = shapes.pop("agentPersona")
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("personaFile" in p for p in problems), problems
+            )
+
+    def test_a_retargeted_pointer_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            data = self.manifest(root)
+            data["extensions"]["com.anthropic.claude-code"][
+                "nativeManifest"
+            ] = ".claude-plugin/marketplace.json"
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("nativeManifest" in p for p in problems), problems
+            )
+
+    def test_a_retargeted_shape_path_list_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            data = self.manifest(root)
+            self.shapes(data)["modHooks"] = ["hooks/hooks.json"]
+            self.write_manifest(root, data)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("modHooks" in p for p in problems), problems
+            )
+
+    def test_an_entry_level_symlink_in_the_package_skill_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            copy = (
+                root / "agent-plugins-package" / "skills" / "recognitio"
+            )
+            target = copy / "SKILL.md"
+            (copy / "planted-link.md").symlink_to(target)
+            problems = self.base.problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("planted-link" in p for p in problems), problems
+            )
+
+
+class TestRound15CopyIdentityAndStrictReader(unittest.TestCase):
+    """Round 15. The copy scan collects the identity fields
+    and loads manifests through the strict reader."""
+
+    def setUp(self):
+        self.mod = load_script("check_copy")
+
+    def scan(self, path):
+        violations = []
+        self.mod.scan_manifest(violations, path)
+        return violations
+
+    def plant(self, rel, dotted, field_path):
+        data = json.loads((ROOT / rel).read_text(encoding="utf-8"))
+        holder = data
+        for key in field_path[:-1]:
+            holder = holder[key]
+        holder[field_path[-1]] = holder[field_path[-1]] + "\u2014"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "plugin.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            violations = self.scan(path)
+        self.assertTrue(
+            any(dotted in v and "em dash" in v for v in violations),
+            (rel, violations),
+        )
+
+    def test_the_claude_author_name_refuses_a_banned_mark(self):
+        self.plant(
+            ".claude-plugin/plugin.json", "author.name", ("author", "name")
+        )
+
+    def test_the_marketplace_owner_name_refuses_a_banned_mark(self):
+        self.plant(
+            ".claude-plugin/marketplace.json",
+            "owner.name",
+            ("owner", "name"),
+        )
+
+    def test_the_marketplace_owner_email_refuses_a_banned_mark(self):
+        self.plant(
+            ".claude-plugin/marketplace.json",
+            "owner.email",
+            ("owner", "email"),
+        )
+
+    def test_the_mod_author_name_refuses_a_banned_mark(self):
+        self.plant(
+            "plugins/recognitio-mod/.claude-plugin/plugin.json",
+            "author.name",
+            ("author", "name"),
+        )
+
+    def test_the_package_author_name_refuses_a_banned_mark(self):
+        self.plant(
+            "agent-plugins-package/plugin.json",
+            "author.name",
+            ("author", "name"),
+        )
+
+    def test_a_repeated_description_key_fails_the_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "plugin.json"
+            path.write_text(
+                '{"description": "one", "description": "two"}',
+                encoding="utf-8",
+            )
+            violations = self.scan(path)
+        self.assertTrue(
+            any("repeated key" in v for v in violations), violations
+        )

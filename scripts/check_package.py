@@ -44,6 +44,14 @@ the recognitio marketplace entry to the one canonical
 sentence the listing standard sets for every face, and
 the never both instruction moved to the portable long
 description, where the standard puts usage guidance.
+
+Round 15 pins the declared extension values themselves
+against the brief enumeration and resolves every declared
+path against the repo root in the sibling form the Cursor
+gate carries, refusing a directory, an escaping target and
+a symlink standing on the path, so the delegated reading
+the Antigravity gate rests on this gate holds the same
+form.
 """
 
 import json
@@ -112,6 +120,37 @@ EXTENSION_KEYS = {
         "nativeManifest", "note", "shapes",
     },
     "com.openai": {"interface"},
+}
+
+# Round 15. The declared extension values themselves, pinned
+# against the enumeration at docs/agent-plugins-brief.md, the
+# shape keys and their path lists and both native pointer
+# values, so a retargeted pointer or a renamed shape key is
+# refused by name instead of resolving wherever it points.
+EXTENSION_DECLARATIONS = {
+    "com.anthropic.claude-code": {
+        "nativeManifest": ".claude-plugin/plugin.json",
+        "nativeMarketplace": ".claude-plugin/marketplace.json",
+        "shapes": {
+            "agentPersona": ["agents/reviewer.md"],
+            "fanOutWorkflow": [
+                "workflows/review-fanout.md",
+                "workflows/findings.schema.json",
+            ],
+            "headlessRunbook": [
+                "docs/headless-review.md",
+                "scripts/check_headless.py",
+            ],
+            "modHooks": ["hooks/hooks.json", "hooks/register.js"],
+            "outputStyle": ["output-styles/packet.md"],
+        },
+    },
+    "com.google.antigravity": {
+        "nativeManifest": ".antigravity/plugin.json",
+        "shapes": {
+            "hookWiring": [".antigravity/hooks.json"],
+        },
+    },
 }
 
 HONESTY_SENTENCE = (
@@ -307,6 +346,108 @@ def extension_paths(data):
     return paths
 
 
+def extension_path_problems(root, entry):
+    """Problems with one declared extension path in the repo.
+
+    The sibling form the Cursor gate carries for its own
+    manifest paths. The declared value is resolved against
+    the root it is read at, and a resolved target outside
+    that root refuses, a target that is not a regular file
+    refuses, and a symlink standing on the path refuses,
+    each by name. A target that does not stand in the repo
+    at all keeps the absent reading it has always carried,
+    so a dangling link still reads as absent, the way the
+    manifest load itself reads one.
+    """
+    target = root / entry
+    resolved = target.resolve()
+    if not resolved.exists():
+        return [
+            "the extension path %r does not resolve in the repo, "
+            "so the portable manifest names a native shape that "
+            "is not there" % entry
+        ]
+    current = root
+    prefix = []
+    for part in Path(entry).parts:
+        current = current / part
+        prefix.append(part)
+        if current.is_symlink():
+            return [
+                "the extension path %r does not resolve in the "
+                "repo, because it passes through the symlink %s"
+                % (entry, "/".join(prefix))
+            ]
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError:
+        return [
+            "the extension path %r does not resolve in the repo, "
+            "because its resolved target stands outside the repo"
+            % entry
+        ]
+    if not resolved.is_file():
+        return [
+            "the extension path %r does not resolve in the repo "
+            "as a regular file, so the portable manifest names "
+            "a native shape that is not a file" % entry
+        ]
+    return []
+
+
+def extension_declaration_problems(data):
+    """Problems with the declared extension values themselves.
+
+    Round 15. The brief enumerates the shapes and the native
+    pointers, so the declared values are pinned word for
+    word. A renamed shape key or a retargeted pointer is
+    refused by name here, before the resolution reading
+    judges wherever the value points.
+    """
+    problems = []
+    extensions = data.get("extensions")
+    if not isinstance(extensions, dict):
+        return problems
+    for namespace, pinned in EXTENSION_DECLARATIONS.items():
+        declared = extensions.get(namespace)
+        if not isinstance(declared, dict):
+            continue
+        for key in ("nativeManifest", "nativeMarketplace"):
+            if key in pinned and declared.get(key) != pinned[key]:
+                problems.append(
+                    "the %s extension declares %s as %r, not "
+                    "the pinned %r the brief enumerates"
+                    % (namespace, key, declared.get(key), pinned[key])
+                )
+        shapes = declared.get("shapes")
+        pinned_shapes = pinned["shapes"]
+        if not isinstance(shapes, dict):
+            problems.append(
+                "the %s extension carries no shapes object, so "
+                "its declared shapes stand nowhere" % namespace
+            )
+            continue
+        for key in sorted(set(shapes) - set(pinned_shapes)):
+            problems.append(
+                "the %s extension declares the shape key %r, "
+                "which the brief does not enumerate"
+                % (namespace, key)
+            )
+        for key in sorted(set(pinned_shapes) - set(shapes)):
+            problems.append(
+                "the %s extension declares no %r shape, which "
+                "the brief enumerates" % (namespace, key)
+            )
+        for key, pinned_paths in pinned_shapes.items():
+            if key in shapes and shapes[key] != pinned_paths:
+                problems.append(
+                    "the %s extension declares the %r shape as "
+                    "%r, not the pinned path list %r"
+                    % (namespace, key, shapes[key], pinned_paths)
+                )
+    return problems
+
+
 def manifest_problems(data, root):
     """Problems with the portable manifest itself."""
     problems = []
@@ -386,6 +527,7 @@ def manifest_problems(data, root):
                 "its declared key set requires"
                 % (ext_namespace, key)
             )
+    problems.extend(extension_declaration_problems(data))
     namespace = extensions.get(NAMESPACE)
     if not isinstance(namespace, dict):
         problems.append(
@@ -394,12 +536,7 @@ def manifest_problems(data, root):
         )
         return problems
     for entry in extension_paths(data):
-        if not (root / entry).exists():
-            problems.append(
-                "the extension path %r does not resolve in the repo, "
-                "so the portable manifest names a native shape that "
-                "is not there" % entry
-            )
+        problems.extend(extension_path_problems(root, entry))
     return problems
 
 
@@ -431,14 +568,20 @@ def tree_bytes(directory):
     put a cache on the canonical side only and fail the pin for
     no authored reason. The exclusion is keyed on the bytecode
     shape alone, so a file that merely wears a cache name is
-    read and compared like any other file.
+    read and compared like any other file. A symlinked entry
+    is recorded under a marker value no file bytes can equal,
+    the form the skill gate tree map carries, so a comparison
+    names it instead of passing it in silence.
     """
     found = {}
     for path in sorted(directory.rglob("*")):
         if is_bytecode_cache(path):
             continue
-        if path.is_file() and not path.is_symlink():
-            found[str(path.relative_to(directory))] = path.read_bytes()
+        rel = str(path.relative_to(directory))
+        if path.is_symlink():
+            found[rel] = None
+        elif path.is_file():
+            found[rel] = path.read_bytes()
     return found
 
 

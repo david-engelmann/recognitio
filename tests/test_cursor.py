@@ -2913,3 +2913,33 @@ class TestRound5SecondSeatCursor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound15CursorTreeMap(unittest.TestCase):
+    """Round 15. The tree map records a symlinked entry."""
+
+    def setUp(self):
+        self.base = TestCheckCursor()
+        self.base.setUp()
+        self.mod = self.base.mod
+
+    def test_an_entry_level_symlink_inside_a_real_copy_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            copy = root / ".cursor-plugin" / "skills" / "recognitio"
+            (copy / "planted-link.md").symlink_to(copy / "SKILL.md")
+            problems = self.base.problems(root)
+            self.assertTrue(problems)
+            self.assertTrue(
+                any("planted-link" in p for p in problems), problems
+            )
+
+    def test_tree_bytes_records_the_symlink_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "tree"
+            folder.mkdir()
+            (folder / "real.md").write_text("real", encoding="utf-8")
+            (folder / "link.md").symlink_to(folder / "real.md")
+            found = self.mod.tree_bytes(folder)
+            self.assertEqual(found["real.md"], b"real")
+            self.assertIsNone(found["link.md"])
