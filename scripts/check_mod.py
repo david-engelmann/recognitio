@@ -7555,6 +7555,15 @@ def verified_equality_problems(code):
     verified flag compared strictly against true, so an
     alias that carries the flag away from the comparison
     draws the same refusal as the loose operator does.
+    The strict form is read where the spawn gate turns on
+    it, at the returns of packetIsVerified that carry the
+    comparison, and the term carrying the comparison in
+    each such return must stand as the strict comparison
+    alone, so a disjunct standing beside it in any such
+    return, one restating the flag against another value
+    or any other term beside it, draws the same refusal,
+    and a strict spelling standing anywhere else in the
+    module settles nothing.
     """
     problems = []
     spans = literal_spans(code)
@@ -7573,7 +7582,17 @@ def verified_equality_problems(code):
             % match.group(0)
         )
         break
-    if not re.search(r"\.verified\s*===\s*true\b", code):
+    carrying_returns = []
+    for start, end, name, segments, pstart, pend in \
+            function_ranges(code):
+        if name != "packetIsVerified":
+            continue
+        body = code[start:end]
+        for match in re.finditer(r"\breturn\b", body):
+            expression, _ = expression_at(body, match.end())
+            if ".verified" in expression:
+                carrying_returns.append(expression)
+    if not carrying_returns:
         problems.append(
             "the hooks module does not compare the manifest "
             "verified flag against true with the strict "
@@ -7581,6 +7600,62 @@ def verified_equality_problems(code):
             "one comparison the spawn gate turns on does "
             "not stand pinned"
         )
+        return problems
+    for expression in carrying_returns:
+        text = expression.strip()
+        if text.startswith("(") and \
+                matching_close(text, 0) == len(text) - 1:
+            text = text[1:-1].strip()
+        spans = literal_spans(text)
+        disjunct = any(
+            not any(start <= match.start() <= end
+                    for start, end in spans)
+            for match in re.finditer(r"\|\|", text)
+        )
+        terms = []
+        depth = 0
+        start = 0
+        index = 0
+        quoted = None
+        while index < len(text):
+            char = text[index]
+            if quoted is not None:
+                if char == "\\":
+                    index += 1
+                elif char == quoted:
+                    quoted = None
+            elif char in "'\"`":
+                quoted = char
+            elif char in "([{":
+                depth += 1
+            elif char in ")]}":
+                depth -= 1
+            elif depth == 0 and text[index:index + 2] in ("&&", "||"):
+                terms.append(text[start:index])
+                index += 2
+                start = index
+                continue
+            index += 1
+        terms.append(text[start:])
+        carrying = [term for term in terms if ".verified" in term]
+        strict = (
+            not disjunct
+            and text.count(".verified") == 1
+            and len(carrying) == 1
+            and re.fullmatch(
+                r"[A-Za-z_$][\w$]*\.verified\s*===\s*true",
+                carrying[0].strip(),
+            )
+        )
+        if not strict:
+            problems.append(
+                "the hooks module does not compare the manifest "
+                "verified flag against true with the strict "
+                "equality operator in its shipped form, so the "
+                "one comparison the spawn gate turns on does "
+                "not stand pinned"
+            )
+            break
     return problems
 
 

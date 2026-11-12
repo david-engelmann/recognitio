@@ -411,6 +411,17 @@ thrown object it can read, and a catch clause feed
 produced by a call production stands among the feeds
 that tracing does not follow, failing closed at
 runtime where the read takes it.
+The operator pin refuses a loose equality or loose
+inequality operator standing anywhere in the module
+outside a literal, the operators `==` and `!=`, in
+either operand order and under any alias, because
+the module needs no loose comparison for any of its
+checks. The verified comparison itself must stand in
+its shipped strict form, a member read of the
+verified flag compared strictly against true,
+standing as `.verified === true`, so an alias that
+carries the flag away from the comparison draws the
+same refusal as the loose operator does.
 What the pins cannot hold is the runtime half of
 the contract, which stands on the live run and the
 host side tests alone.
@@ -424,11 +435,13 @@ than judge it. The family is the construct space the
 shipped module and the variants this programme has
 priced as legitimate exercise, and the census in the
 gate reads it as a list of constructs a module in the
-family never carries. A module carrying one is
-refused with the family problem for its kind, whatever
-the readings would have said of it, so the
-certification this brief describes is a certification
-of a family member and of nothing else.
+family never carries, and that census tolerates
+either operator, so the operator refusal stands apart
+from it. A module carrying one is refused with the
+family problem for its kind, whatever the readings
+would have said of it, so the certification this
+brief describes is a certification of a family member
+and of nothing else.
 
 A module in the family carries no labelled statement.
 Its loop conditions read state the module holds,

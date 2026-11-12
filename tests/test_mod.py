@@ -1121,6 +1121,90 @@ class ModContractTestCase(unittest.TestCase):
             problems,
         )
 
+    def test_a_numeric_disjunct_beside_the_verified_comparison_fails_the_operator_pin(self):
+        # Round 18. A numeric stamp standing beside the
+        # shipped comparison as a disjunct widens the gate
+        # to that stamp while the strict spelling still
+        # stands in the module, so the pin now reads the
+        # comparison in the return that carries it.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true",
+            "manifest.verified === true || manifest.verified === 1",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
+    def test_a_string_disjunct_beside_the_verified_comparison_fails_the_operator_pin(self):
+        # Round 18. The string true stamp standing beside
+        # the shipped comparison as a disjunct widens the
+        # gate the same way, and the pin refuses it on the
+        # same reading.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true",
+            "manifest.verified === true || manifest.verified === \"true\"",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
+    def test_a_widened_return_before_a_clean_return_fails_the_operator_pin(self):
+        # Round 18. A widened return carrying the
+        # comparison draws the refusal even when a clean
+        # return carrying it stands after it in the
+        # deciding function, because the pin judges every
+        # return that carries the comparison.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "  return (\n"
+            "    manifest !== null &&\n"
+            "    typeof manifest === \"object\" &&\n"
+            "    manifest.verified === true\n"
+            "  );",
+            "  if (manifest !== null && typeof manifest === \"object\") {\n"
+            "    return manifest.verified === true || manifest.verified === 1;\n"
+            "  }\n"
+            "  return manifest.verified === true;",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
+    def test_a_widened_return_after_a_clean_return_fails_the_operator_pin(self):
+        # Round 18. The mirrored order draws the refusal
+        # as well, a clean return carrying the comparison
+        # standing first and the widened return standing
+        # after it in the deciding function.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "  return (\n"
+            "    manifest !== null &&\n"
+            "    typeof manifest === \"object\" &&\n"
+            "    manifest.verified === true\n"
+            "  );",
+            "  if (manifest === null || typeof manifest !== \"object\") {\n"
+            "    return manifest.verified === true;\n"
+            "  }\n"
+            "  return manifest.verified === true || manifest.verified === 1;",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
     def test_a_spaced_env_call_with_a_variable_fails_the_pin(self):
         # The red team regression. A space before the parenthesis
         # took the call outside the first pin's pattern entirely,
