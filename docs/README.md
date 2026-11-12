@@ -24,6 +24,8 @@ capture record, so no document in this set stands unlisted.
 
 ## The platform builds
 
+A derivation noted rule is a rule that carries a note naming the skill section or primary source it restates.
+
 - [The Build 7 mod](mod-build7.md) (landed) gates the reviewer fan out
   at spawn time on the verified flag in the packet manifest.
 - [The Build 8 portable package](agent-plugins-brief.md) (landed)

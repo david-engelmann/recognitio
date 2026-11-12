@@ -20,8 +20,8 @@ page and on a dark one.
 
 A hosted diff is a summary written by a service with limits of its own.
 The evidence recorded in docs/hosted-diff-evidence.md shows hosted
-diffs capping the file counts they return and dropping oversized
-patches entirely, with no flag on either and a success response
+diffs capping the file counts they return and dropping patches entirely, with no flag
+on either and a success response
 over the top. A packet built from
 that summary inherits each silence in it, and no check downstream can
 restore a file the source never mentioned.
@@ -92,7 +92,8 @@ not show the function the change lives in, the call sites that depend on
 it, or the tests that name it, and a reviewer judging from the hunk
 alone is guessing at everything the hunk touches. The packet therefore
 carries the whole enclosing function for every change it shows as a
-diff, and the companions that belong with it.
+diff where the change lies inside a function, and an edit outside
+any function stands without that context.
 
 The paired eval recorded in this repo measured what judging from the
 diff alone costs. The packet pass found 8 of 8 planted defects across

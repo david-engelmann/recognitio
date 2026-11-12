@@ -17,8 +17,9 @@ This unreleased work carries version 1.3.0.
   them into a review packet across four tiers. Triage comes first,
   then the change itself with whole enclosing function context, then
   companion call sites and test files, then history. A manifest
-  records every changed file and hunk, and an independent recount
-  must agree with the manifest before the packet is called verified.
+  records every changed file and hunk, and a recount run again through the same
+extractor under separate git invocations
+must agree with the manifest before the packet is called verified.
 - The pull request title, body and spec references in the triage
   tier, and the changed file list beside the numstat summary.
 - Imports of the changed files and definitions of the changed names

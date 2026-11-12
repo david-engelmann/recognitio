@@ -36,16 +36,17 @@ evidence with Antigravity as the named path, which confirms the
 Antigravity first orientation the program already carried. It
 records the v0.65.0 stable pin with the docs lag caveat naming
 which page to trust. Decision 4 binds this build like every
-other build. The brief and the hook wiring document the
-contract and never enforce it. Enforcement stays on the shipped
-scripts.
+other build. The brief documents the contract, and the hook wiring enforces
+it through the shipped packet gate script.
 
 A correction recorded on 2026-10-31. The hook wiring now
 enforces the contract through the shipped packet gate script,
 which returns the deny and force_ask and auto_approve
-decisions the contract states. The sentence above stands as
-the position this brief recorded before that script landed,
-and this correction is the current reading.
+decisions the contract states. An earlier form of that sentence stands as the position
+this brief recorded before that script landed, stating that
+the brief and the hook wiring documented the contract and
+never enforced it, and this correction is the current
+reading.
 
 The packet gate script named in this brief is the Antigravity
 PreToolUse hook script of this build, and it is not the spawn

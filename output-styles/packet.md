@@ -32,10 +32,10 @@ The packet is built in four tiers and a closing recount receipt, and each tier i
 ```
 
 - T0 holds triage. It carries the pull request title, body, and spec references, capped at five, when the mode resolves them, the file list, the numstat summary, and the commit list for the range, so a reviewer sees why the change exists and what shape it has before its content.
-- T1 holds the change itself. It carries the per file diffs with whole enclosing function context, so every edited line is read inside the function it lives in.
+- T1 holds the change itself. It carries the per file diffs with whole enclosing function context where an edit lies inside a function, and an edit outside any function stands without that context.
 - T2 holds the companions. It carries call sites for the changed function names elsewhere in the repo, the imports of each changed file, definitions of the changed names outside the changed files, and the test files that mention the changed modules, all found by deterministic search and capped with the caps stated in the packet.
 - T3 holds history. It carries a blame summary for the changed ranges in the most changed files, the recent evolution of up to three changed functions, and prior pull requests touching the most changed files when the GitHub CLI can name them.
-- The Re-review section holds the commits since the previous review and the range diff against it, and it stands only on a run that carries a since ref.
+- The Re-review section holds the commits since the previous review and the range diff against it, and it stands only on a run that carries a since ref naming the head reviewed last time.
 - The packet closes with a verification recount that prints the manifest counts and the recount agreement, keeps the budget figures as facts, and ends on the limit sentence.
 
 The T2 and T3 headings stand in every packet. Cap notes stand under a Cap notes block in the tier they belong to.

@@ -1,6 +1,6 @@
 # The recognitio Cursor plugin
 
-Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.
+Pulls the relevant changes from a pull request, a commit range or a single commit, with the context a reviewer needs, into one verified review packet.
 
 ## What it ships
 

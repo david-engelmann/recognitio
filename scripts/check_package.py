@@ -678,19 +678,19 @@ def tree_problems(root):
 
 
 PORTABLE_DESCRIPTION = (
-    "Pulls the relevant changes from a pull request or a commit "
-    "range, with the context a reviewer needs, into one verified "
-    "review packet."
+    "Pulls the relevant changes from a pull request, a commit "
+    "range or a single commit, with the context a reviewer needs, "
+    "into one verified review packet."
 )
 NATIVE_DESCRIPTION = (
-    "Pulls the relevant changes from a pull request or a commit "
-    "range, with the context a reviewer needs, into one verified "
-    "review packet."
+    "Pulls the relevant changes from a pull request, a commit "
+    "range or a single commit, with the context a reviewer needs, "
+    "into one verified review packet."
 )
 MARKETPLACE_METADATA_DESCRIPTION = (
-    "Pulls the relevant changes from a pull request or a commit "
-    "range, with the context a reviewer needs, into one verified "
-    "review packet."
+    "Pulls the relevant changes from a pull request, a commit "
+    "range or a single commit, with the context a reviewer needs, "
+    "into one verified review packet."
 )
 MARKETPLACE_MOD_DESCRIPTION = (
     "Gates reviewer spawns in Claude Code on the verified review "

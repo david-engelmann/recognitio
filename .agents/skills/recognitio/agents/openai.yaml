@@ -1,6 +1,6 @@
 interface:
   display_name: "Recognitio"
-  short_description: "Builds one verified review packet from a pull request or a commit range in the local clone"
+  short_description: "Builds one verified review packet from a pull request, a commit range or a single commit in the local clone."
   brand_color: "#D97757"
   default_prompt: "Use recognitio to build a verified review packet for this change"
 policy:

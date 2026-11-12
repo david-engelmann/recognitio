@@ -594,9 +594,9 @@ class TestSkillLimitSentences(unittest.TestCase):
         "Never let a review begin on a packet whose verified "
         "flag is false.",
         "A credential bearing file is flagged in the triage "
-        "list and the manifest, its diff is withheld, and "
-        "credential shaped values are redacted in packet "
-        "text.",
+        "list and the manifest, its diff withheld, and "
+        "credential shaped values are redacted in the "
+        "packet.",
         "On a platform with no file locking that refusal "
         "does not stand, so runs at one directory there must "
         "be kept apart by hand.",

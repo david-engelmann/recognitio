@@ -66,6 +66,7 @@ components:
 ## Overview
 
 This file is the design system for storefront and landing pages, the Recognitio class of surface. It is a Persuade surface in Impeccable's mode terms, a page whose job is to explain a real product and earn a real install or purchase. Persuasion here never outruns evidence. The page sells only what the product does, shows only output the product produced, and claims only numbers the product's own records carry.
+The front matter version field versions this design record's own format and revision state, not the product version.
 
 This file stands adopted for the Recognitio repository page, and this adoption is its standing state. The token values in the front matter were extracted from the stylesheets the live page serves in the change that adopted the file, with the light theme carried as the canonical set, and they stand reconciled against the palette record under docs/brand in the repo. The spacing scale is the one part of the front matter that stands pre-filled as doctrine rather than extracted, carrying the house 4px scale the Layout section states. No placeholder values stand in this file. The instruction to replace placeholder values with extracted ones belongs to the unadopted template this file was adopted from, and it is spent.
 

@@ -5,8 +5,9 @@ single source of agent guidance here, and CLAUDE.md points at it.
 
 ## What this is
 
-Pulls the relevant changes from a pull request or a commit range,
-with the context a reviewer needs, into one verified review packet.
+Pulls the relevant changes from a pull request, a commit range or a
+single commit, with the context a reviewer needs, into one verified
+review packet.
 The packet is called the pericope. The canonical
 skill lives in `.agents/skills/recognitio/` and its extractor is
 the script at `.agents/skills/recognitio/scripts/extract.py`. A
@@ -406,7 +407,7 @@ that rule.
 
 1. Extraction comes from local git only. Never build a packet from
    a hosted API diff, because hosted diffs cap their file counts and
-   drop oversized patches without a flag, as the evidence recorded
+   drop patches without a flag, as the evidence recorded
    in docs/hosted-diff-evidence.md shows.
 2. The manifest fails closed. A packet whose verified flag is false
    is not a packet, and nobody reviews it as if it were whole.

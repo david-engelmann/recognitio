@@ -3588,10 +3588,10 @@ class TestSkillDeterminismScope(unittest.TestCase):
     )
 
     SCOPED = (
-        "In range and commit runs the packet is the "
+        "In range and commit runs the change tier is the "
         "deterministic surface and the manifest stamp moves, "
-        "while a pull request packet carries its fetch moment "
-        "and can move"
+        "while the history tier gathers live pull request "
+        "state in any mode and can move the packet"
     )
 
     def test_the_scoped_sentence_stands_in_every_copy(self):

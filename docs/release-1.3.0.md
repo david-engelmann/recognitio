@@ -28,8 +28,9 @@ release carries and the checklist that act follows.
   request, a commit range or a single commit from the local
   clone and assembles them into a review packet across four
   tiers, with a manifest that records every changed file and
-  hunk and an independent recount that must agree with the
-  manifest before the packet is called verified.
+  hunk and a recount run again through the same extractor
+under separate git invocations that must agree
+with the manifest before the packet is called verified.
 - A packet check script that validates a packet directory
   before a review is stamped on it, a findings file for
   re-review, named placeholders for binary and generated and

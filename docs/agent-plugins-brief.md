@@ -14,7 +14,8 @@ The package shape and the byte identical skill copy are pinned by the gate on ev
 
 **What is unverified**
 
-Live installs of the portable package in implementing hosts stand proven on two hosts. The Codex plugin probe installed the package on 2026-10-27 and again on 2026-10-29 and listed it installed and enabled, with the installed skill byte identical to the canonical skill. The Qwen Code run on 2026-10-29 installed the shipped package live and listed it enabled. The WP2 sessions on 2026-11-03 then installed the package from this tree again on both hosts and listed recognitio 1.3.0 installed and enabled on Codex and enabled for user and workspace on Qwen, with each installed skill tree byte identical to the canonical skill. Host behaviour beyond those installs stays unproven here.
+Live installs of the portable package in implementing hosts stand proven on two hosts. The Codex plugin probe installed the package on 2026-10-27 and again on 2026-10-29 and listed it installed and enabled, with the installed skill byte identical to the canonical skill. The Qwen Code run on 2026-10-29 installed the shipped package live and listed it enabled. The storefront programme sessions on 2026-11-03 then installed the package from this tree
+again on both hosts and listed recognitio 1.3.0 installed and enabled on Codex and enabled for user and workspace on Qwen, with each installed skill tree byte identical to the canonical skill. Host behaviour beyond those installs stays unproven here.
 
 ## Summary
 
@@ -49,7 +50,9 @@ field and must not assign semantics to unknown fields. The
 portable manifest carries the canonical `$schema` value
 `https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`.
 
-This is the inversion guard the round 19 spec lane named. The
+This closed set is what keeps the portable manifest from
+carrying the native keys that would drop its enforcement
+in silence. The
 repo native manifest at `.claude-plugin/plugin.json` carries the
 keys `agents`, `settings`, `outputStyles` and `skills`, and none
 of them is in the permitted set. A portable manifest that reused
@@ -140,8 +143,8 @@ standard, which the 1.0 specification references normatively as
 the source of truth for the `SKILL.md` format. Anthropic
 donated the standard to the foundation on 2026-10-22,
 announced at AGNTCon and MCPCon, and the transfer is now recorded
-as primary on both halves, read from the Linux Foundation
-release and Anthropic's own post in round 20. Governance for the
+as primary on both halves, read from the Linux Foundation release and
+Anthropic's own post. Governance for the
 Agent Plugins project itself is defined separately from the
 portable package format in its own Technical Charter, as the
 1.0 spec text states. The 70 plus platform integrations the

@@ -511,9 +511,9 @@ def manifest_problems(root=None):
         )
     if "description" in data:
         pinned_description = (
-            "Pulls the relevant changes from a pull request or "
-            "a commit range, with the context a reviewer needs, "
-            "into one verified review packet."
+            "Pulls the relevant changes from a pull request, a "
+            "commit range or a single commit, with the context a "
+            "reviewer needs, into one verified review packet."
         )
         if data["description"] != pinned_description:
             problems.append(

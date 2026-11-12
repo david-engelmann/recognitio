@@ -100,9 +100,9 @@ SHIPPED_LOGO = "docs/brand/recognitio-icon.svg"
 # entry and metadata descriptions the marketplace checks
 # compare against it cannot drift as one body with it.
 SHIPPED_DESCRIPTION = (
-    "Pulls the relevant changes from a pull request or a "
-    "commit range, with the context a reviewer needs, into "
-    "one verified review packet."
+    "Pulls the relevant changes from a pull request, a "
+    "commit range or a single commit, with the context a "
+    "reviewer needs, into one verified review packet."
 )
 
 # The shipped manifest author and marketplace name, pinned

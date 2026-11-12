@@ -1,1 +1,1 @@
-{"$schema":"https://antigravity.google/schemas/v1/plugin.json","description":"Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.","name":"recognitio"}
+{"$schema":"https://antigravity.google/schemas/v1/plugin.json","description":"Pulls the relevant changes from a pull request, a commit range or a single commit, with the context a reviewer needs, into one verified review packet.","name":"recognitio"}

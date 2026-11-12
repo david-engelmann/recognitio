@@ -2728,8 +2728,9 @@ class TestDescriptionPins(unittest.TestCase):
         "findings."
     )
     MANIFEST_DESCRIPTION = (
-        "Pulls the relevant changes from a pull request or a commit range, "
-        "with the context a reviewer needs, into one verified review packet."
+        "Pulls the relevant changes from a pull request, a commit range or a "
+        "single commit, with the context a reviewer needs, into one verified "
+        "review packet."
     )
     # The storefront repair round once let the two Claude
     # listing surfaces and the portable manifest carry one
@@ -2870,9 +2871,9 @@ class TestReadmeStorefront(unittest.TestCase):
     """
 
     CANONICAL = (
-        "Pulls the relevant changes from a pull request or a commit "
-        "range, with the context a reviewer needs, into one verified "
-        "review packet."
+        "Pulls the relevant changes from a pull request, a commit "
+        "range or a single commit, with the context a reviewer needs, "
+        "into one verified review packet."
     )
     HEADLINE = "**A review starts from evidence instead of a bare diff.**"
     BRIEF_LINKS = (
@@ -3372,10 +3373,9 @@ class TestReadmeRound9(unittest.TestCase):
     def test_the_hosted_claim_names_the_evidence_record(self):
         self.assertIn(
             "The evidence recorded in "
-            "docs/hosted-diff-evidence.md shows hosted "
-            "diffs capping the file counts they return and "
-            "dropping oversized patches entirely, with no flag "
-            "on either",
+            "docs/hosted-diff-evidence.md shows hosted diffs "
+            "capping the file counts they return and dropping "
+            "patches entirely, with no flag on either",
             self.flat,
         )
         self.assertNotIn(
@@ -3397,6 +3397,49 @@ class TestReadmeRound9(unittest.TestCase):
             self.flat,
         )
 
+
+    def test_the_tier_sentence_states_no_universal(self):
+        # Round 17, red team Plant 2. One word added to the
+        # tier sentence promised every call site, a completeness
+        # the five language sentence beside it denies on its
+        # face, and no reading refused the plant.
+        self.assertIn(
+            "T2 gathers call sites and definitions of the "
+            "changed names, the imports of each changed file, "
+            "and the test files that mention the changed modules.",
+            self.flat,
+        )
+        self.assertNotIn("T2 gathers all call sites", self.flat)
+
+    def test_the_worked_example_figures_stand_pinned(self):
+        # Round 17, red team Plant 3. The worked example figure
+        # stood in no reading, so a one line move in the
+        # enclosing function count passed every gate.
+        self.assertIn(
+            "which runs 163 lines at the base revision and "
+            "173 at the head",
+            self.flat,
+        )
+        self.assertNotIn(
+            "which runs 164 lines at the base revision", self.flat
+        )
+
+    def test_the_summary_bullets_state_their_bounds(self):
+        # Round 17, red team confirmation Plant F1. The history
+        # bullet bound repair R5 gave it stood in no reading,
+        # so its five could be restated as ten unrefused here.
+        self.assertIn(
+            "Adds the history of the three most changed files, "
+            "with blame and up to five earlier pull requests "
+            "matched against the thirty most recent, or a note "
+            "that the lookup stands unavailable",
+            self.flat,
+        )
+        self.assertNotIn(
+            "up to ten earlier pull requests matched against "
+            "the thirty most recent",
+            self.flat,
+        )
 
 class TestReadmeWp2(unittest.TestCase):
     """The WP2 proof and story landing is pinned.
@@ -9060,12 +9103,9 @@ class TestCapstoneSupersessionPin(unittest.TestCase):
     PACK = ROOT / "docs" / "submission-claude.md"
     SCOPING = (
         "The closing statements this pack rests on stand "
-        "scoped by the supersession lines recorded in "
-        "capstone Round 11 in the final certification of "
-        "the 300 round programme, in the burn down addendum "
-        "to that certification, and in the storefront "
-        "certification summary, each line scoping its own "
-        "closing figures to the head they were earned on."
+        "scoped to the heads they were earned on, and each "
+        "record that carries one scopes its own closing "
+        "figures to the head they were earned on."
     )
 
     def test_the_supersession_scoping_sentence_stands_pinned(self):
@@ -9092,7 +9132,7 @@ class TestTreeFigureCensus(unittest.TestCase):
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
         "The repo holds 274 files and tens of megabytes in "
-        "total, as restated on 2026-11-10 against the tree "
+        "total, as restated on 2026-11-11 against the tree "
         "that now holds that count."
     )
     CAP = (

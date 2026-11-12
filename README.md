@@ -5,7 +5,7 @@
 
 **A review starts from evidence instead of a bare diff.**
 
-Pulls the relevant changes from a pull request or a commit range, with the context a reviewer needs, into one verified review packet.
+Pulls the relevant changes from a pull request, a commit range or a single commit, with the context a reviewer needs, into one verified review packet.
 
 For reviewers and the agents who assist them, judging a pull request or a commit range they did not write and needing the whole change with its context in hand before they judge it.
 
@@ -114,8 +114,8 @@ That is the whole first pass. The single commit flag takes HEAD or any commit yo
 ## What it does
 
 - Pulls the change out of a pull request, a commit range or a single commit from the local clone
-- Gathers the call sites, imports, definitions and test files that belong with the change
-- Adds the history of the most changed files, with blame and earlier pull requests
+- Gathers the call sites, imports, definitions and test files that belong with the change, under the caps the packet itself prints
+- Adds the history of the three most changed files, with blame and up to five earlier pull requests matched against the thirty most recent, or a note that the lookup stands unavailable
 - Counts every file, hunk and line twice by separate git invocations and calls the packet verified only when both counts agree
 
 
@@ -205,7 +205,7 @@ The four tiers are T0 Triage, T1 The change, T2 Companions and T3 History. T2 ga
 A diff alone is not what a reviewer reads.
 
 - A reviewer reads the change inside its enclosing function, follows changed names to their call sites, opens the tests that touch the changed module, and checks who shaped these lines in the past.
-- The evidence recorded in docs/hosted-diff-evidence.md shows hosted diffs capping the file counts they return and dropping oversized patches entirely, with no flag on either, so a large pull request can be reviewed in part while everyone believes it was reviewed in whole.
+- The evidence recorded in docs/hosted-diff-evidence.md shows hosted diffs capping the file counts they return and dropping patches entirely, with no flag on either, so a large pull request can be reviewed in part while everyone believes it was reviewed in whole.
 - Recognitio runs against the local clone instead, where there is no file count cap and the full history is present, and a packet is called verified only when two separate counts of it agree.
 
 Recognitio serves the pull request review workflow. It is the step before the review, for a reviewer judging a change they did not write.
@@ -214,7 +214,7 @@ Recognitio serves the pull request review workflow. It is the step before the re
 
 ### Why not just run gh pr diff
 
-Because that output is a hosted diff, and the evidence recorded in docs/hosted-diff-evidence.md shows hosted diffs capping the file counts they return and dropping oversized patches entirely with no flag on either, so a large pull request can read as complete while part of it never reached the page. Recognitio builds from the local clone instead, where there is no file count cap, and recounts the change so the reader knows the packet holds all of it.
+Because that output is a hosted diff, and the evidence recorded in docs/hosted-diff-evidence.md shows hosted diffs capping the file counts they return and dropping patches entirely with no flag on either, so a large pull request can read as complete while part of it never reached the page. Recognitio builds from the local clone instead, where there is no file count cap, and recounts the change so the reader knows the packet holds all of it.
 
 ### Why does it run locally
 
@@ -283,7 +283,7 @@ recognitio
 
 ### Codex
 
-The Codex route offers the same skill through the Codex plugin host. Register this repo as a marketplace in Codex with the first command below, then install the plugin with the second, or install recognitio from that marketplace in the Plugins Directory of the ChatGPT desktop app, the surface the primary documentation names for installing and testing a local plugin. The marketplace file stands at `.agents/plugins/marketplace.json` and points at the portable package, whose manifest carries the OpenAI extension with the display fields and the brand icon under its interface. No universal plugin directory listing exists or has been submitted for it, so the repo marketplace route below is the route. The skill also works on its own, because the canonical skill stands at `.agents/skills/recognitio`, the location Codex scans in a repo, and the brief at [the Codex plugin brief](docs/codex-plugin-brief.md) states the full Codex contract. The plugin ships in this repo in plugin package form. One limit rides with that route. Codex embeds at most 32,768 bytes of AGENTS.md into a session, and this repo file stands at 60,405 bytes, so its last 27,637 bytes never reach a Codex session. The lost bytes are the greater part of the Current state chronicle, and the operative guidance stands inside the cap whole, as the brief states at its head.
+The Codex route offers the same skill through the Codex plugin host. Register this repo as a marketplace in Codex with the first command below, then install the plugin with the second, or install recognitio from that marketplace in the Plugins Directory of the ChatGPT desktop app, the surface the primary documentation names for installing and testing a local plugin. The marketplace file stands at `.agents/plugins/marketplace.json` and points at the portable package, whose manifest carries the OpenAI extension with the display fields and the brand icon under its interface. No universal plugin directory listing exists or has been submitted for it, so the repo marketplace route below is the route. The skill also works on its own, because the canonical skill stands at `.agents/skills/recognitio`, the location Codex scans in a repo, and the brief at [the Codex plugin brief](docs/codex-plugin-brief.md) states the full Codex contract. The plugin ships in this repo in plugin package form. One limit rides with that route. Codex embeds at most 32,768 bytes of AGENTS.md into a session, and this repo file stands at 60,412 bytes, so its last 27,644 bytes never reach a Codex session. The lost bytes are the greater part of the Current state chronicle, and the operative guidance stands inside the cap whole, as the brief states at its head.
 
 ```bash
 codex plugin marketplace add \
@@ -391,7 +391,8 @@ The plugin ships a reviewer persona as a plugin agent. The agent file lives at `
 
 ## Platform adaptations
 
-Each adaptation restates the packet discipline in the surface its platform reads, with guidance advising and enforcement staying on the shipped scripts. Each row below sums up what ships for one platform, and the brief it links states what stands proven and what stands unverified for that platform, because several of these surfaces have no live run behind them yet.
+Each adaptation restates the packet discipline in the surface its platform reads, with guidance advising and enforcement staying on the shipped scripts.
+A derivation noted rule is a rule that carries a note naming the skill section or primary source it restates. Each row below sums up what ships for one platform, and the brief it links states what stands proven and what stands unverified for that platform, because several of these surfaces have no live run behind them yet.
 
 | Platform | What ships |
 | --- | --- |

@@ -22,8 +22,9 @@ files inside, and the manifest, the marketplace, and the
 skill folder file are pinned by the gate in this repo.
 The companion Codex review rules then changed a live
 review in the paired run of 2026-10-29 that the Codex
-review brief records. The WP2 session on 2026-11-03
-installed the plugin from this tree and listed it
+review brief records. The storefront programme session on
+2026-11-03 installed the plugin from
+this tree and listed it
 installed and enabled at version 1.3.0, and its live
 session over the hero range built a packet whose check
 passed and whose manifest read verified true, as the
@@ -33,8 +34,8 @@ capture record in docs/images states.
 
 Invocation of the installed plugin copy inside a live
 Codex session stays unverified, and implicit invocation
-stays untested, because the WP2 session executed the
-workspace skill copy after an explicit invocation by its
+stays untested, because the storefront programme session
+executed the workspace skill copy after an explicit invocation by its
 dollar name, as its capture record names in the open.
 
 **What a Codex session never sees**
@@ -42,8 +43,8 @@ dollar name, as its capture record names in the open.
 Codex embeds at most 32,768 bytes of a repo AGENTS.md
 into first turn instructions, under the
 `project_doc_max_bytes` value the Codex review brief
-records. This repo AGENTS.md stands at 60,405 bytes, so
-its last 27,637 bytes never reach a Codex session. The
+records. This repo AGENTS.md stands at 60,412 bytes, so
+its last 27,644 bytes never reach a Codex session. The
 lost bytes are the greater part of the Current state
 chronicle at the foot of the file. Every operative
 section stands inside the cap, so a Codex session holds
@@ -236,8 +237,8 @@ reported installation unverified, and the review of this
 build corrected that sentence, because the install
 subcommand is named add. Invocation of the installed
 plugin copy inside a live Codex session stays unverified,
-and implicit invocation stays untested, because the WP2
-session of 2026-11-03 executed the workspace skill copy
+and implicit invocation stays untested, because the storefront programme session of 2026-11-03
+executed the workspace skill copy
 after an explicit invocation by its dollar name. The
 claims in this brief that rest on that live session are
 the ones its capture record names, and they rest on the

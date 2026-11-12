@@ -1001,6 +1001,29 @@ class TestRound16CodexReadmeFigures(unittest.TestCase):
                 problems,
             )
 
+    def test_a_planted_brief_form_size_figure_fails(self):
+        # Round 17, red team Plant 5. The brief form of the
+        # AGENTS sum stood read over the brief alone, so the
+        # same form planted in the README with a moved figure
+        # passed the gate and the suite alike.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = (
+                text
+                + "\nThis repo AGENTS.md stands at "
+                + "61,405 bytes.\n"
+            )
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "README.md states the AGENTS file" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
     def test_a_restated_readme_lost_figure_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.base.make_layout(tmp)

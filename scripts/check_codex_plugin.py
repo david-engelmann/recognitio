@@ -41,34 +41,32 @@ ROOT = Path(__file__).resolve().parents[1]
 
 NAMESPACE = "com.openai"
 CANONICAL_SENTENCE = (
-    "Pulls the relevant changes from a pull request or a commit "
-    "range, with the context a reviewer needs, into one verified "
-    "review packet."
+    "Pulls the relevant changes from a pull request, a commit "
+    "range or a single commit, with the context a reviewer needs, "
+    "into one verified review packet."
 )
 LONG_DESCRIPTION = (
-    "Recognitio is an agent skill that assembles the evidence "
-    "for a code review before the review begins. It reads a "
-    "pull request or a commit range from the local clone and "
-    "builds one review packet in four tiers, T0 Triage, "
-    "T1 The change, T2 Companions and T3 History, and a "
-    "closing recount receipt. A manifest records every changed file "
-    "and hunk, and the packet is called verified only when an "
-    "independent recount of the recorded change agrees with "
-    "the manifest. Install it as a plugin or a skill in a "
-    "supported agent host, then ask the host to build a packet "
-    "for the change under review and hand the packet to the "
-    "review. The Claude marketplace listing in this "
-    "repository also offers recognitio-mod, the "
-    "spawn gate on its own, and the full plugin already "
-    "includes that gate, so install one entry or the other "
-    "and never both. Recognitio assembles evidence and "
-    "nothing more. It does not judge the change, post "
-    "comments, or approve anything, and it never builds a "
-    "packet from a hosted diff, because hosted diffs cap "
-    "their file counts and drop oversized patches without a "
-    "flag. A packet whose verified flag is false is not "
-    "reviewed as if it were whole. MIT licensed. Published by "
-    "David Engelmann, with the source at "
+    "Recognitio is an agent skill that assembles the evidence for a "
+    "code review before the review begins. It reads a pull request, "
+    "a commit range or a single commit from the local clone and "
+    "builds one review packet in four tiers, T0 Triage, T1 The "
+    "change, T2 Companions and T3 History, and a closing recount "
+    "receipt. A manifest records every changed file and hunk, and "
+    "the packet is called verified only when a recount of the "
+    "recorded change run again through the same extractor under "
+    "separate git invocations agrees with the manifest. Install it "
+    "as a plugin or a skill in a supported agent host, then ask the "
+    "host to build a packet for the change under review and hand the "
+    "packet to the review. The Claude marketplace listing in this "
+    "repository also offers recognitio-mod, the spawn gate on its "
+    "own, and the full plugin already includes that gate, so install "
+    "one entry or the other and never both. Recognitio assembles "
+    "evidence and nothing more. It does not judge the change, post "
+    "comments, or approve anything, and it never builds a packet "
+    "from a hosted diff, because hosted diffs cap their file counts "
+    "and drop patches without a flag. A packet whose verified flag "
+    "is false is not reviewed as if it were whole. MIT licensed. "
+    "Published by David Engelmann, with the source at "
     "github.com/david-engelmann/recognitio."
 )
 DISPLAY_NAME = "Recognitio"
@@ -93,8 +91,8 @@ INTERFACE_FIELDS = {
     "websiteURL",
 }
 SHORT_DESCRIPTION = (
-    "Builds one verified review packet from a pull request or a "
-    "commit range in the local clone"
+    "Builds one verified review packet from a pull request, a "
+    "commit range or a single commit in the local clone."
 )
 SKILL_DEFAULT_PROMPT = (
     "Use recognitio to build a verified review packet for this change"
@@ -141,8 +139,9 @@ BRIEF_SENTENCES = (
     ),
     (
         "the implicit invocation limit",
-        "implicit invocation stays untested, because the WP2 "
-        "session of 2026-11-03 executed the workspace skill copy",
+        "implicit invocation stays untested, because the "
+        "storefront programme session of 2026-11-03 executed the "
+        "workspace skill copy",
     ),
     (
         "the CLI probe version",
@@ -966,6 +965,16 @@ def brief_problems(root, problems):
                         "README.md states the AGENTS file "
                         "at %s bytes, which differs from "
                         "the measured %s bytes"
+                        % (stated, format(file_bytes, ","))
+                    )
+            for stated in re.findall(
+                    r"This repo AGENTS\.md stands at ([\d,]+) bytes",
+                    readme_text):
+                if int(stated.replace(",", "")) != file_bytes:
+                    problems.append(
+                        "README.md states the AGENTS file "
+                        "at %s bytes in the brief form, which "
+                        "differs from the measured %s bytes"
                         % (stated, format(file_bytes, ","))
                     )
             for stated in re.findall(
