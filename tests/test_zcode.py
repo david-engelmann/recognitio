@@ -260,12 +260,12 @@ class TestCheckZcode(unittest.TestCase):
             root = self.make_layout(tmp)
             manifest = root / ".zcode-plugin" / "plugin.json"
             text = manifest.read_text(encoding="utf-8")
-            manifest.write_text(
-                text.replace(
-                    "into one verified review packet.",
-                    "into one verified review packet. "
-                    "Verified live in the ZCode client.", 1),
-                encoding="utf-8")
+            broken = text.replace(
+                "into one verified review packet.",
+                "into one verified review packet. "
+                "Verified live in the ZCode client.", 1)
+            self.assertNotEqual(broken, text)
+            manifest.write_text(broken, encoding="utf-8")
             problems = self.problems(root)
             self.assertTrue(
                 any("not the pinned description" in p
@@ -326,10 +326,9 @@ class TestCheckZcode(unittest.TestCase):
             root = self.make_layout(tmp)
             manifest = root / ".zcode-plugin" / "plugin.json"
             text = manifest.read_text(encoding="utf-8")
-            manifest.write_text(
-                text.replace('"1.3.0"', '"9.9.9"', 1),
-                encoding="utf-8",
-            )
+            broken = text.replace('"1.3.0"', '"9.9.9"', 1)
+            self.assertNotEqual(broken, text)
+            manifest.write_text(broken, encoding="utf-8")
             problems = self.problems(root)
             self.assertTrue(
                 any("does not match the repo version" in p

@@ -907,13 +907,12 @@ class TestCheckPackage(unittest.TestCase):
             root = self.make_layout(tmp)
             brief = root / "docs" / "agent-plugins-brief.md"
             text = brief.read_text(encoding="utf-8")
-            brief.write_text(
-                text.replace(
-                    "stand proven on two hosts",
-                    "stand unproven in this brief",
-                ),
-                encoding="utf-8",
+            broken = text.replace(
+                "stand proven on two hosts",
+                "stand unproven in this brief",
             )
+            self.assertNotEqual(broken, text)
+            brief.write_text(broken, encoding="utf-8")
             problems = self.problems(root)
             self.assertTrue(
                 any("live installs" in problem
@@ -1071,6 +1070,10 @@ class TestRound5Package(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.inner.make_layout(tmp)
             data = self.inner.read_native(root)
+            self.assertIn(
+                "into one verified review packet.",
+                data["description"],
+            )
             data["description"] = data["description"].replace(
                 "into one verified review packet.",
                 "into one unverified review packet.")
@@ -1089,6 +1092,10 @@ class TestRound5Package(unittest.TestCase):
                 ROOT / ".claude-plugin" / "marketplace.json", target)
             data = json.loads(target.read_text(encoding="utf-8"))
             entry = data["plugins"][0]
+            self.assertIn(
+                "into one verified review packet.",
+                entry["description"],
+            )
             entry["description"] = entry["description"].replace(
                 "into one verified review packet.",
                 "into one unverified review packet.")

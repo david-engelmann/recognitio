@@ -1156,6 +1156,67 @@ class ModContractTestCase(unittest.TestCase):
             problems,
         )
 
+
+    def test_a_flag_free_disjunct_beside_the_verified_comparison_fails_the_operator_pin(self):
+        # Round 19 red team M4, Major. Every disjunct the
+        # family above plants restates the verified flag,
+        # so the flag count reading refuses those plants
+        # with or without the disjunct half of the strict
+        # reading, and a disjunct carrying no flag at all
+        # stood unpriced. A ready flag standing beside the
+        # shipped comparison as a disjunct widens the gate
+        # to that flag, and the pin refuses it on the
+        # disjunct reading alone.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true",
+            "manifest.verified === true || manifest.ready",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
+    def test_a_flag_free_disjunct_before_the_verified_comparison_fails_the_operator_pin(self):
+        # Round 19 red team M4, the mirrored order. The
+        # flag free disjunct standing before the shipped
+        # comparison widens the gate the same way, and the
+        # pin refuses it on the same reading.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true",
+            "manifest.ready || manifest.verified === true",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
+    def test_a_second_read_of_the_verified_flag_fails_the_operator_pin(self):
+        # Round 19 red team M2, Minor. The strict form
+        # reads the verified flag exactly once in the
+        # return that carries the comparison, and no plant
+        # named that reading, so it stood unpriced beside
+        # the disjunct reading that prices its neighbours.
+        # A second read of the flag standing as a conjunct
+        # beside the shipped comparison leaves the shipped
+        # form, and the pin refuses it.
+        text = MODULE.read_text(encoding="utf-8")
+        broken = text.replace(
+            "manifest.verified === true",
+            "manifest.verified === true && manifest.verified === true",
+        )
+        self.assertNotEqual(broken, text)
+        problems = self.problems_for(broken)
+        self.assertTrue(
+            any("strict" in p and "verified" in p for p in problems),
+            problems,
+        )
+
     def test_a_widened_return_before_a_clean_return_fails_the_operator_pin(self):
         # Round 18. A widened return carrying the
         # comparison draws the refusal even when a clean

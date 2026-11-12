@@ -1660,6 +1660,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1673,6 +1674,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1685,6 +1687,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The focus table as a constraint"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1698,6 +1701,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1711,6 +1715,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1726,6 +1731,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1739,6 +1745,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1754,6 +1761,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1767,6 +1775,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "## The two axes"
+            self.assertIn(anchor, text)
             self.inner.write_brief(
                 root, text.replace(
                     anchor,
@@ -1795,6 +1804,7 @@ class TestRound5SecondSeatCoderabbit(unittest.TestCase):
             root = self.inner.make_layout(tmp)
             text = self.inner.read_brief(root)
             anchor = "### G5."
+            self.assertIn(anchor, text)
             idx = text.find(anchor)
             self.assertGreaterEqual(idx, 0)
             end = text.find("\n", idx)

@@ -306,9 +306,10 @@ class TestExtractorVerifierPair(CopyPairFixture):
         out = Path(self.tmp.name) / "mislabelled"
         shutil.copytree(self.out, out)
         text = (out / "packet.md").read_text(encoding="utf-8")
-        text = text.replace("copied from", "renamed from")
-        text = text.replace("Copied from:", "Renamed from:")
-        (out / "packet.md").write_text(text, encoding="utf-8")
+        planted = text.replace("copied from", "renamed from")
+        planted = planted.replace("Copied from:", "Renamed from:")
+        self.assertNotEqual(planted, text)
+        (out / "packet.md").write_text(planted, encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
     def test_the_old_inherited_instruction_flag_is_refused(self):
@@ -324,11 +325,12 @@ class TestExtractorVerifierPair(CopyPairFixture):
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
         text = (out / "packet.md").read_text(encoding="utf-8")
-        text = text.replace(
+        planted = text.replace(
             "- notes.txt (copied from AGENTS.md)",
             "- notes.txt (copied from AGENTS.md, instruction file)",
         )
-        (out / "packet.md").write_text(text, encoding="utf-8")
+        self.assertNotEqual(planted, text)
+        (out / "packet.md").write_text(planted, encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
 
 

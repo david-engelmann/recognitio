@@ -600,6 +600,7 @@ class TestCheckQwen(unittest.TestCase):
             text = self.read_brief(root)
             first = text.find("Derives from")
             self.assertTrue(first > 0)
+            self.assertIn("Derives from", text)
             broken = text[:first] + text[first:].replace(
                 "Derives from", "Noted from", 1
             )

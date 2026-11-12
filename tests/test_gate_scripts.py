@@ -6399,6 +6399,7 @@ class TestBrandAssets(unittest.TestCase):
                 "docs/c.png": 400,
                 "docs/d.png": 800,
                 "docs/e.png": 1600,
+                "docs/f.png": 3200,
             }
             for name, size in sizes.items():
                 (root / name).write_bytes(b"x" * size)
@@ -6415,15 +6416,22 @@ class TestBrandAssets(unittest.TestCase):
                 '<img src="https://example.com/outside.png">',
                 "",
                 '<IMG SRC="docs/e.png">',
+                "",
+                '<source SRCSET="docs/f.png 1x">',
             ])
             # The a picture stands under two forms and weighs
             # once. The external target weighs nothing. The e
             # picture stands behind an uppercase attribute
             # name, which HTML reads the same as its lowercase
             # spelling, and the weighing reads it the same way.
+            # The f picture stands behind an uppercase srcset
+            # name, planted for Round 19, closing the Round 10
+            # remainder that carried the uppercase src plant
+            # with no uppercase srcset plant beside it, and the
+            # weighing reads that name the same way too.
             self.assertEqual(
                 readme_page_weight(root, readme),
-                100 + 200 + 400 + 800 + 1600,
+                100 + 200 + 400 + 800 + 1600 + 3200,
             )
 
     def test_a_srcset_naming_a_missing_file_fails_by_name(self):

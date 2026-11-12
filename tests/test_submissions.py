@@ -118,9 +118,15 @@ class TestCheckSubmissions(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             path = root / rel
-            path.write_text(
-                change(path.read_text(encoding="utf-8")),
-                encoding="utf-8")
+            before = path.read_text(encoding="utf-8")
+            after = change(before)
+            # Round 19 standards Minor 1. The plant this
+            # helper carries stands certified here, so a
+            # change whose needle has drifted out of the
+            # shipped text fails at the plant and not in
+            # silence downstream.
+            self.assertNotEqual(after, before)
+            path.write_text(after, encoding="utf-8")
             return self.problems(root)
 
     def mutate_raw(self, rel, text):
@@ -131,6 +137,61 @@ class TestCheckSubmissions(unittest.TestCase):
 
     def test_the_shipped_tree_holds(self):
         self.assertEqual(self.mod.submissions_problems(ROOT), [])
+
+    def test_the_no_bound_judgement_reads_a_figure_as_itself(self):
+        # Round 19 red team S1, Major. A figure stated
+        # with no bound word around it is stated as the
+        # figure itself, and the falsified figure
+        # batteries stay green when that judgement is
+        # read as a floor, because their shapes are
+        # refused by the dedicated readings in front of
+        # it. This test prices the judgement at its own
+        # function, the proof the red team ran against
+        # the gate, with the stated relations standing
+        # as controls beside it.
+        bound = self.mod.bound_holds
+        self.assertFalse(bound(None, 1, 999))
+        self.assertTrue(bound(None, 999, 999))
+        self.assertFalse(bound(None, 1000, 999))
+        self.assertTrue(bound("gte", 1, 999))
+        self.assertTrue(bound("lte", 1000, 999))
+        self.assertFalse(bound("gte", 1000, 999))
+
+    def test_tree_measurements_agree_with_an_independent_walk(self):
+        # Round 19 red team S2 and S3, the submissions
+        # narrow miss family. The falsified figure tests
+        # build their layouts by restating the pack
+        # figures from this gate its own measurement, so
+        # a broken measurement restates the layout to
+        # match itself and those tests cannot see the
+        # break by construction. These readings price
+        # the measurement against the shipped tree
+        # itself, its paths recounted and its sizes
+        # re-read from the disk here.
+        measured = self.mod.tree_measurements(ROOT)
+        self.assertIsNotNone(measured)
+        paths = measured["paths"]
+        self.assertEqual(measured["count"], len(paths))
+        self.assertEqual(measured["scan_files"], len(paths))
+        sizes = {
+            rel: (ROOT / rel).lstat().st_size for rel in paths
+        }
+        self.assertEqual(measured["largest_size"], max(sizes.values()))
+        self.assertEqual(
+            sizes[measured["largest_path"]], measured["largest_size"]
+        )
+        plain = {
+            rel: size for rel, size in sizes.items()
+            if Path(rel).suffix.lower()
+            not in self.mod.MEDIA_SUFFIXES
+        }
+        self.assertEqual(
+            measured["largest_plain_size"], max(plain.values())
+        )
+        self.assertEqual(
+            plain[measured["largest_plain_path"]],
+            measured["largest_plain_size"],
+        )
 
     def figure_layout(self, tmp):
         """A layout whose pack figures are restated to its own tree.

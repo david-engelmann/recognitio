@@ -460,6 +460,7 @@ class TestCheckCodexPlugin(unittest.TestCase):
                 broken = text.replace(marker, plant + marker, 1)
             else:
                 broken = text + plant
+            self.assertNotEqual(broken, text)
             self.write(root, rel, broken)
             problems = self.problems(root)
             self.assertTrue(

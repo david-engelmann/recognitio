@@ -666,6 +666,41 @@ class TestCheckTestVacuity(unittest.TestCase):
                 problems,
             )
 
+
+    def test_a_fixture_read_compared_with_itself_fails(self):
+        # Round 19 red team V3, Major. The self comparison
+        # plants this suite carried before this round bound
+        # their names to constants, so the constant reading
+        # refused them with or without the self comparison
+        # reading, and that reading stood unpriced. A name
+        # read from a fixture at run time is no constant,
+        # and comparing it with itself still argues about
+        # nothing, so the guard must refuse this case on
+        # the self comparison reading alone.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_self_compared_read(self):\n"
+            "        value = (ROOT / 'fixture.txt').read_text()\n"
+            "        assert value == value\n"
+            "        touched = ROOT.name\n"
+        )
+        self.assert_vacuous(body)
+        # The control. The same case comparing its read
+        # against a second read stands clean, so the
+        # refusal above turns on the self comparison and
+        # not on the fixture shape around it.
+        control = body.replace(
+            "assert value == value",
+            "assert value == (ROOT / 'other.txt').read_text()",
+        )
+        self.assertNotEqual(control, body)
+        self.assert_clean(control)
+
     def test_a_constant_shared_by_two_names_fails(self):
         body = (
             "import unittest\n"

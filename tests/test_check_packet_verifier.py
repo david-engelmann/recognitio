@@ -28,6 +28,7 @@ import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTRACT_PATH = (
@@ -435,6 +436,86 @@ class TestFabricationBattery(VerifierFixture):
         self.assertIn('"verified": false, "verified": true', raw)
         (out / "manifest.json").write_text(raw, encoding="utf-8")
         self.assertEqual(self.run_check(out), 1)
+
+
+    def test_a_manifest_lying_on_the_instruction_flag_fails(self):
+        # Round 19 red team P1, Major. The checker recount
+        # compares every field of every file record against
+        # a fresh record, the instruction flag among them,
+        # and no plant named that field, so the field could
+        # leave the compared list in silence. This plant
+        # flips the flag on a plain file in the manifest
+        # and restates the triage file list line to match,
+        # so the packet body and the manifest agree with
+        # each other and only the recount comparison can
+        # refuse the packet, naming the field it caught.
+        out = self.clone("edit-instruction-flag")
+        manifest = self.manifest(out)
+        entry = next(
+            e for e in manifest["files"] if e["path"] == "b.py"
+        )
+        self.assertFalse(entry["instruction_file"])
+        entry["instruction_file"] = True
+        self.save_manifest(out, manifest)
+        text = self.packet_text(out)
+        plain_line = "- b.py (modified)"
+        self.assertIn(plain_line, text)
+        text = text.replace(
+            plain_line, "- b.py (modified, instruction file)", 1
+        )
+        self.assertIn("- b.py (modified, instruction file)", text)
+        self.save_packet(out, text)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("instruction_file", err)
+
+    def test_a_manifest_lying_on_the_credential_flag_fails(self):
+        # Round 19 red team confirmation Q1, Major. The
+        # credential flag stands compared on its own line
+        # of the recount, outside the compared field list
+        # the instruction flag rides in, and no plant named
+        # it, so that comparison could be struck in silence
+        # and a manifest lying on the flag would verify.
+        # This plant flips the flag on a plain file in the
+        # manifest and restates the packet body to match,
+        # the triage file list line and the change tier
+        # body both, so the packet body and the manifest
+        # agree with each other and only the recount
+        # comparison can refuse the packet, naming the
+        # field it caught.
+        out = self.clone("edit-credential-flag")
+        manifest = self.manifest(out)
+        entry = next(
+            e for e in manifest["files"] if e["path"] == "b.py"
+        )
+        self.assertFalse(entry["credential_file"])
+        entry["credential_file"] = True
+        self.save_manifest(out, manifest)
+        text = self.packet_text(out)
+        plain_line = "- b.py (modified)"
+        self.assertIn(plain_line, text)
+        text = text.replace(
+            plain_line, "- b.py (modified, credential file)", 1
+        )
+        self.assertIn("- b.py (modified, credential file)", text)
+        notice = extract_mod.credential_notice(entry)
+        lines = text.split("\n")
+        tier = lines.index("## T1 The change")
+        head = lines.index("### b.py", tier)
+        fence_at = next(
+            i for i in range(head, len(lines))
+            if re.fullmatch(r"`{3,}diff", lines[i])
+        )
+        fence = lines[fence_at]
+        close_at = lines.index(fence, fence_at + 1)
+        self.assertGreater(close_at, fence_at + 1)
+        lines[fence_at + 1:close_at] = [notice]
+        planted = "\n".join(lines)
+        self.assertNotEqual(planted, text)
+        self.save_packet(out, planted)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("credential_file", err)
 
     def manifest_edit_fails(self, name, edit):
         out = self.clone(name)
@@ -1527,6 +1608,29 @@ class TestManifestSchema(unittest.TestCase):
         self.assertEqual(
             check_mod.manifest_schema_problems(self.genuine_manifest()),
             [],
+        )
+
+
+    def test_a_boolean_under_a_minimum_is_not_judged_as_a_number(self):
+        # Round 19 red team P5, Minor. The schema bounds
+        # reading judges a minimum only against a number,
+        # and a boolean is not a number in that reading
+        # even on a field whose type admits it, so a
+        # boolean standing under a floor draws no floor
+        # problem. Every minimum in the shipped schema
+        # stands on an integer field, where the type
+        # reading refuses a boolean first, so this plant
+        # stands on the bounds reading directly, with an
+        # integer under the same floor as its control.
+        problems = check_mod.schema_problems_at(
+            True, {"type": "boolean", "minimum": 2}, {}, "planted"
+        )
+        self.assertEqual(problems, [])
+        problems = check_mod.schema_problems_at(
+            1, {"type": "integer", "minimum": 2}, {}, "planted"
+        )
+        self.assertTrue(
+            any("below the floor" in p for p in problems), problems
         )
 
     def test_schema_type_refusal_names_the_wanted_type(self):
@@ -3576,6 +3680,72 @@ class TestVerifyCountsBoundary(unittest.TestCase):
             )
         self.assertEqual(len(set(docs)), 1)
 
+    def build_genuine(self, tmp):
+        repo = Path(tmp) / "repo"
+        init_repo(repo)
+        (repo / "a.py").write_text(
+            "def a():\n    return 1\n", encoding="utf-8"
+        )
+        commit_all(repo, "A")
+        (repo / "b.py").write_text(
+            "def b():\n    return 1\n", encoding="utf-8"
+        )
+        commit_all(repo, "B")
+        (repo / "b.py").write_text(
+            "def b():\n    return 2\n", encoding="utf-8"
+        )
+        (repo / "c.py").write_text(
+            "def c():\n    return 1\n", encoding="utf-8"
+        )
+        commit_all(repo, "C")
+        out = extract_packet(
+            repo, Path(tmp) / "genuine", "--range", "HEAD~1..HEAD"
+        )
+        return repo, json.loads(
+            (out / "manifest.json").read_text(encoding="utf-8")
+        )
+
+    def test_verify_counts_accepts_the_genuine_records(self):
+        # The boundary class held only the docstring that
+        # states this pass's boundary, so the recount the
+        # verified flag rests on stood unpriced inside its
+        # own class. The genuine records must recount clean.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, manifest = self.build_genuine(tmp)
+            discrepancies = extract_mod.verify_counts(
+                repo,
+                manifest["merge_base"],
+                manifest["head"],
+                manifest["files"],
+            )
+            self.assertEqual(discrepancies, [])
+
+    def test_verify_counts_names_a_status_lie(self):
+        # Round 19 red team X2, in the extractor narrow
+        # miss family. The per file status comparison in
+        # the verification recount is the reading this
+        # class exists to price, and an inverted comparison
+        # stood green here while the module answered with
+        # failures. A manifest that states a plain lie
+        # about one file's status must draw the discrepancy
+        # that names the file and the field.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, manifest = self.build_genuine(tmp)
+            files = json.loads(json.dumps(manifest["files"]))
+            entry = next(e for e in files if e["path"] == "b.py")
+            self.assertEqual(entry["status"], "modified")
+            entry["status"] = "added"
+            discrepancies = extract_mod.verify_counts(
+                repo, manifest["merge_base"], manifest["head"], files
+            )
+            self.assertTrue(
+                any(
+                    "status mismatch for b.py" in d
+                    for d in discrepancies
+                ),
+                discrepancies,
+            )
+
 
 class TestSkillDeterminismScope(unittest.TestCase):
     """Round 3. The determinism sentence scopes itself truthfully."""
@@ -3724,15 +3894,15 @@ class TestRound12GraftStamp(VerifierFixture):
         caller_grafts.write_text(
             "%s %s\n" % (self.head, orphan_head), encoding="utf-8"
         )
-        previous = os.environ.get("GIT_GRAFT_FILE")
-        os.environ["GIT_GRAFT_FILE"] = str(caller_grafts)
-        try:
+        # Round 19 standards Note 1. The graft variable
+        # stands written inside a patch dict here, as every
+        # other environment write in the suite stands, so
+        # the restore rides the context manager and not a
+        # hand rolled finally.
+        with mock.patch.dict(
+            os.environ, {"GIT_GRAFT_FILE": str(caller_grafts)}
+        ):
             code = self.run_check(self.genuine)
-        finally:
-            if previous is None:
-                del os.environ["GIT_GRAFT_FILE"]
-            else:
-                os.environ["GIT_GRAFT_FILE"] = previous
         self.assertEqual(code, 0)
 
     def test_a_grafts_directory_still_stamps_with_a_warning(self):

@@ -1716,6 +1716,10 @@ class TestCheckCursor(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             text = self.read_brief(root)
+            self.assertIn(
+                "The manifest also carries the discovery fields",
+                text,
+            )
             text = text.replace(
                 "The manifest also carries the discovery fields",
                 "The manifest also carries the listing fields",

@@ -2652,6 +2652,29 @@ class TestStructuralLineCounts(unittest.TestCase):
         )
         self.assertEqual(extract_mod.count_chunk_lines(chunk), (1, 0))
 
+
+    def test_a_zero_count_hunk_yields_no_changed_range(self):
+        # Round 19 red team X10, Minor. A hunk whose new
+        # side holds no lines touches no new side range,
+        # and the changed range reading once let such a
+        # hunk yield a range all the same, with no test
+        # reading it. The ranges of a chunk carrying a
+        # deletion only hunk beside a real hunk stand
+        # priced here at the reading itself.
+        chunk = (
+            "diff --git a/q.sql b/q.sql\n"
+            "--- a/q.sql\n"
+            "+++ b/q.sql\n"
+            "@@ -2,1 +3,0 @@\n"
+            "-old note\n"
+            "@@ -5,0 +6,2 @@\n"
+            "+new line\n"
+            "+other line\n"
+        )
+        self.assertEqual(
+            extract_mod.changed_ranges(chunk), [(6, 7)]
+        )
+
     def test_removed_sql_comment_verifies(self):
         with RetryingTemporaryDirectory() as tmp:
             repo = make_repo(tmp, [
@@ -3323,6 +3346,31 @@ class TestRound10CapNotesAndRefusals(unittest.TestCase):
     and red team Minor 6 the range diff section that printed
     one unpaired dash line and nothing else.
     """
+
+
+    def test_cap_text_marks_the_cut_in_the_capped_text(self):
+        # Round 19 red team X4, Minor. The cap notes name
+        # the cap in the manifest, and the capped text
+        # itself carries the mark of its cut, and no test
+        # read for the mark, so the marking could leave
+        # the capped text in silence and no reading would
+        # notice. This test prices the mark at the capping
+        # function itself, with an under limit pass standing
+        # as its control.
+        capped, was_capped = extract_mod.cap_text(
+            "x" * 50, 10, "sample passage"
+        )
+        self.assertTrue(was_capped)
+        self.assertTrue(capped.startswith("x" * 10))
+        self.assertIn(
+            "[recognitio] sample passage capped at 10 characters.",
+            capped,
+        )
+        plain, was_capped = extract_mod.cap_text(
+            "short", 10, "sample passage"
+        )
+        self.assertFalse(was_capped)
+        self.assertEqual(plain, "short")
 
     def test_evolution_cap_note_names_cap_and_total(self):
         base_body = "".join(
