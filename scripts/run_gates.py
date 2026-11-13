@@ -69,7 +69,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PINNED_TEST_FLOOR = 3060
+PINNED_TEST_FLOOR = 3068
 
 RAN_RE = re.compile(r"^Ran (\d+) tests", re.M)
 
@@ -114,6 +114,16 @@ def step_name(argv):
 
 
 def _git(root, *args):
+    # Timeout basis. The runner asks git only for local
+    # reads over one tree, in rev-parse and status and
+    # diff shapes, and those reads measured in single
+    # digit milliseconds on this tree in the Round 20 fix
+    # pass. The 120 second bound is a stall guard in the
+    # same figure the extractor carries for its children,
+    # whose comment names the slowest legitimate command
+    # at about 11 seconds under load, so a read still
+    # working at this limit is read as stalled rather
+    # than slow.
     try:
         out = subprocess.run(
             ["git", "-C", str(root), *args],
@@ -276,6 +286,20 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
         name = names[index]
         started = time.time()
         try:
+            # Timeout basis. One step is one Makefile check
+            # step, and the heaviest step is the test
+            # discover. Its recorded spans stand at 380
+            # seconds at 2,344 tests in run 302 and at
+            # about 1,058 seconds for the full suite on the
+            # slower check job of the Round 19 landing,
+            # with the whole gate step at about 1,014
+            # seconds on hosted run 42636057863. The 3,600
+            # second bound stands above every recorded step
+            # span as a stall ceiling for local runs on a
+            # slow or loaded machine. It stands above the
+            # 30 minute hosted job bound of 1,800 seconds,
+            # so inside the hosted job the job bound fires
+            # first and this bound binds only local runs.
             proc = subprocess.run(
                 argv, cwd=str(root), capture_output=True,
                 text=True, timeout=3600,

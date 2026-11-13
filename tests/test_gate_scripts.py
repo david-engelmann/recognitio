@@ -5252,10 +5252,13 @@ class TestVideoForms(unittest.TestCase):
     length. The pins below hold the recorded facts, read
     through the suite's own stdlib probes, so a money shot
     whose video form is removed, truncated, or replaced by
-    a dummy file fails this gate by name. The gate certifies each video by its container structure, its sample placement, its coded unit framing, its frame tags, and its exact recorded size. It does not decode the encoded picture data, so a file fabricated to the recorded shape at the recorded size with framed but undecodable picture data is not refused by the gate. The provenance of the shipped films rests on the frame checks recorded in this section. The video files
+    a dummy file fails this gate by name. The gate certifies each video by its container structure, its sample placement, its coded unit framing, its frame tags, and its exact recorded size. It does not decode the encoded picture data, so a file fabricated to the recorded shape at the recorded size with framed but undecodable picture data is not refused by the gate. The provenance of the shipped films rests on the frame checks recorded in this section. Linked video files
     stand outside the weighed page set under the ruling
     pinned in TestBrandAssets, because a linked video is
-    click to play and no page load pulls it.
+    click to play and no page load pulls it. A film
+    embedded in a video element weighs in full, because
+    the weighing reads its source as a carried form and
+    a browser may pull such a film without a click.
     """
 
     IMAGES = ROOT / "docs" / "images"
@@ -6009,6 +6012,32 @@ class TestWp5SessionScreenshots(unittest.TestCase):
             self.assertIn(name, record)
 
 
+def _page_weight_destination(value):
+    """One weighed destination in its plain spelling.
+
+    A destination may carry a leading dot slash in any form
+    family, and that prefix names the same file under the
+    same root, so it is stripped before the destination is
+    weighed or keyed. Dot segments inside the path resolve
+    in full, a dot segment naming the directory it stands
+    in and a parent segment stepping back to the directory
+    above it, so one file under a plain spelling and under
+    a spelling that steps aside and back carries the one
+    destination. A parent segment with no directory above
+    it to step back to stands as written, and any other
+    spelling stands as written.
+    """
+    parts = []
+    for part in value.split("/"):
+        if part in ("", "."):
+            continue
+        if part == ".." and parts and parts[-1] != "..":
+            parts.pop()
+            continue
+        parts.append(part)
+    return "/".join(parts)
+
+
 def readme_page_weight_refs(readme):
     """Every local image reference a README page carries.
 
@@ -6017,18 +6046,45 @@ def readme_page_weight_refs(readme):
     definition line, and the HTML image attributes in either
     quote spelling. A srcset contributes every one of its
     candidates, not only the first, because the browser may
-    fetch any of them. External targets stand outside the
-    weighing, as they always have.
+    fetch any of them. The poster attribute of a video
+    element stands among the weighed forms, because the
+    browser fetches the poster at page load to stand in the
+    frame before any play. An inline destination may stand
+    in the angle bracket spelling, and a destination in any
+    form family may carry a leading dot slash, and both
+    spellings weigh the file they name. A destination in
+    every form family is admitted on its normalised form,
+    the spelling the destination helper returns, tested
+    against the weighed prefix, so the admission and the
+    lookup judge the one form. A leading dot segment may
+    stand any number of times or none, because the helper
+    removes them all before the test. A label stands on
+    its first definition, the definition the rendered
+    page follows, and a later definition of the same
+    label changes nothing in the store. External targets
+    stand outside the weighing, as they always have.
     """
     refs = []
-    refs += re.findall(r"!\[[^\]]*\]\((docs/[^)\s]+)[^)]*\)", readme)
-    definitions = {}
     for match in re.finditer(
-        r"^\s{0,3}\[([^\]]+)\]:\s*<?(docs/[^\s>]+)>?",
+        r"!\[[^\]]*\]\(\s*<?([^\s>)]+)>?[^)]*\)",
+        readme,
+    ):
+        value = _page_weight_destination(match.group(1))
+        if value.startswith("docs/"):
+            refs.append(value)
+    definitions = {}
+    seen = set()
+    for match in re.finditer(
+        r"^\s{0,3}\[([^\]]+)\]:\s*<?([^\s>]+)>?",
         readme, re.M,
     ):
         label = " ".join(match.group(1).split()).lower()
-        definitions[label] = match.group(2)
+        if label in seen:
+            continue
+        seen.add(label)
+        value = _page_weight_destination(match.group(2))
+        if value.startswith("docs/"):
+            definitions[label] = value
     for match in re.finditer(r"!\[([^\]]*)\]\[([^\]]*)\]", readme):
         label = match.group(2) or match.group(1)
         label = " ".join(label.split()).lower()
@@ -6041,7 +6097,9 @@ def readme_page_weight_refs(readme):
     for match in re.finditer(
         r"\bsrc\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
     ):
-        value = match.group(1) or match.group(2)
+        value = _page_weight_destination(
+            match.group(1) or match.group(2)
+        )
         if value.startswith("docs/"):
             refs.append(value)
     for match in re.finditer(
@@ -6050,8 +6108,18 @@ def readme_page_weight_refs(readme):
         value = match.group(1) or match.group(2)
         for candidate in value.split(","):
             fields = candidate.split()
-            if fields and fields[0].startswith("docs/"):
-                refs.append(fields[0])
+            if fields:
+                target = _page_weight_destination(fields[0])
+                if target.startswith("docs/"):
+                    refs.append(target)
+    for match in re.finditer(
+        r"\bposter\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
+    ):
+        value = _page_weight_destination(
+            match.group(1) or match.group(2)
+        )
+        if value.startswith("docs/"):
+            refs.append(value)
     return refs
 
 
@@ -6062,17 +6130,29 @@ def readme_page_weight(root, readme):
     carry their GitHub theme fragments. A fragment is a
     rendering instruction and not part of the file path, so
     it is stripped before the file is weighed. Each local
-    asset is weighed once however many forms carry it. A
-    reference naming a file that does not stand under the
+    asset is weighed once however many forms carry it. The
+    once key is the normalised destination, with a leading
+    dot slash stripped, duplicate slashes collapsed, and
+    dot segments resolved in full, parent segments
+    included, so one file carried under two spellings of
+    its path weighs once, while the reference
+    first carrying it stands as written for the file lookup
+    and for any refusal that names it. A reference naming
+    a file that does not stand under the
     root fails by name here, so a weighing can never surface
     as a bare file error from the stat call.
     """
-    unique = list(
-        dict.fromkeys(
-            ref.split("#", 1)[0]
-            for ref in readme_page_weight_refs(readme)
+    unique = []
+    seen = set()
+    for ref in readme_page_weight_refs(readme):
+        plain = _page_weight_destination(ref.split("#", 1)[0])
+        key = "/".join(
+            part for part in plain.split("/")
+            if part not in ("", ".")
         )
-    )
+        if key not in seen:
+            seen.add(key)
+            unique.append(plain)
     total = 0
     for ref in unique:
         if not (root / ref).is_file():
@@ -6433,6 +6513,305 @@ class TestBrandAssets(unittest.TestCase):
                 readme_page_weight(root, readme),
                 100 + 200 + 400 + 800 + 1600 + 3200,
             )
+
+    def test_the_page_weight_weighs_destination_spellings(self):
+        # Round 20 standards Major 1 and red team RT-1 and
+        # spec Note 2. The angle bracket destination of an
+        # inline Markdown image and a leading dot slash on a
+        # destination in any form family named the same file
+        # under the same root and rendered as the same
+        # reference, and the weighing collected neither
+        # spelling, so an asset of any size could pass the
+        # ceiling uncounted in an ordinary spelling of a
+        # form the discipline names.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            sizes = {
+                "docs/a.png": 100,
+                "docs/b.png": 200,
+                "docs/c.png": 400,
+                "docs/d.png": 800,
+                "docs/e.png": 1600,
+                "docs/f.png": 3200,
+            }
+            for name, size in sizes.items():
+                (root / name).write_bytes(b"x" * size)
+            readme = "\n".join([
+                "![the a picture](<docs/a.png>)",
+                "",
+                "![the b picture](./docs/b.png)",
+                "",
+                "![the c picture][cref]",
+                "",
+                "[cref]: ./docs/c.png",
+                "",
+                '<img src="./docs/d.png">',
+                "",
+                '<source srcset="./docs/e.png 1x">',
+                "",
+                "![the f picture](<./docs/f.png>)",
+            ])
+            for spelling in (
+                "(<docs/a.png>)", "(./docs/b.png)",
+                "[cref]: ./docs/c.png", 'src="./docs/d.png"',
+                'srcset="./docs/e.png 1x"', "(<./docs/f.png>)",
+            ):
+                self.assertIn(spelling, readme)
+            refs = readme_page_weight_refs(readme)
+            for name in sizes:
+                self.assertIn(name, refs)
+            self.assertEqual(
+                readme_page_weight(root, readme),
+                100 + 200 + 400 + 800 + 1600 + 3200,
+            )
+
+    def test_a_video_poster_weighs_its_still(self):
+        # Round 20 spec Minor 1 and red team RT-2. The
+        # capture record states the posters the page pulls
+        # stay weighed, and the browser fetches a video
+        # element poster at page load to stand in the frame
+        # before any play, while the weighing read no poster
+        # attribute in any spelling, so a poster carried in
+        # the form built for it passed uncounted.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            still = root / "docs" / "images" / "poster.png"
+            still.write_bytes(b"x" * 700)
+            film = root / "docs" / "images" / "film.mp4"
+            film.write_bytes(b"x" * 5000)
+            readme = "\n".join([
+                '<video poster="docs/images/poster.png">',
+                '<source src="docs/images/film.mp4">',
+                "</video>",
+            ])
+            self.assertIn(
+                'poster="docs/images/poster.png"', readme
+            )
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/poster.png", refs)
+            self.assertEqual(
+                readme_page_weight(root, readme), 700 + 5000
+            )
+            poster_only = (
+                '<video poster="docs/images/poster.png">'
+                "</video>"
+            )
+            self.assertEqual(
+                readme_page_weight(root, poster_only), 700
+            )
+
+    def test_one_file_under_two_spellings_weighs_once(self):
+        # Round 20 standards Minor 1 and red team RT-7. The
+        # weighed once promise was keyed on the spelling and
+        # not on the file, so one file carried under a plain
+        # path and again under a duplicate slash or a dot
+        # segment spelling of the same path weighed twice
+        # against the promise that each local asset is
+        # weighed once however many forms carry it.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "a.png").write_bytes(b"x" * 100)
+            readme = "\n".join([
+                "![the a picture](docs/a.png)",
+                "",
+                '<img src="docs//a.png">',
+                "",
+                "![the a picture again](docs/./a.png)",
+                "",
+                '<img src="./docs/a.png">',
+            ])
+            for spelling in (
+                "(docs/a.png)", 'src="docs//a.png"',
+                "(docs/./a.png)", 'src="./docs/a.png"',
+            ):
+                self.assertIn(spelling, readme)
+            self.assertEqual(
+                readme_page_weight(root, readme), 100
+            )
+
+    def test_one_file_under_a_parent_segment_spelling_weighs_once(self):
+        # Round 20 owner re-audit claim eight, first
+        # precision, on the second run of red team RT-7.
+        # The weighed once key removed dot segments, and a
+        # parent segment spelling of the same path kept its
+        # segment in the key, so one file carried under a
+        # plain path and again under a spelling that steps
+        # into a directory and back out of it weighed twice
+        # against the promise that each local asset is
+        # weighed once however many forms carry it.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "a.png").write_bytes(b"x" * 100)
+            readme = "\n".join([
+                "![the a picture](docs/a.png)",
+                "",
+                '<img src="docs/images/../a.png">',
+                "",
+                "![the a picture again](docs/images/../a.png)",
+            ])
+            for spelling in (
+                "(docs/a.png)", 'src="docs/images/../a.png"',
+                "(docs/images/../a.png)",
+            ):
+                self.assertIn(spelling, readme)
+            self.assertEqual(
+                readme_page_weight(root, readme), 100
+            )
+
+    def test_a_destination_stepping_out_of_the_weighed_set_weighs_nothing(self):
+        # Round 20 red team confirmation finding one. The
+        # Markdown families admitted a destination on its
+        # spelling as written while the keying and the
+        # lookup followed the normalised destination, so a
+        # destination whose parent segments step out of the
+        # weighed root, or out of the docs folder inside
+        # the root, weighed the file it landed on at full
+        # size in the inline and reference families, where
+        # the HTML families weighed the same spellings at
+        # nothing because their admission test runs on the
+        # normalised form, and with the outside file absent
+        # the Markdown families refused the page under a
+        # name standing outside the weighed root altogether.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            (root / "docs").mkdir(parents=True)
+            (Path(tmp) / "outside.png").write_bytes(b"x" * 300)
+            (root / "outside2.png").write_bytes(b"x" * 200)
+            (root / "docs" / "big.png").write_bytes(b"x" * 100)
+            readme = "\n".join([
+                "![the outside picture](docs/../../outside.png)",
+                "",
+                "![the second outside picture][oref]",
+                "",
+                "[oref]: docs/../outside2.png",
+                "",
+                '<img src="docs/../../outside.png">',
+                "",
+                "![the inside picture](docs/../docs/big.png)",
+            ])
+            for spelling in (
+                "(docs/../../outside.png)",
+                "[oref]: docs/../outside2.png",
+                'src="docs/../../outside.png"',
+                "(docs/../docs/big.png)",
+            ):
+                self.assertIn(spelling, readme)
+            refs = readme_page_weight_refs(readme)
+            self.assertNotIn("docs/../../outside.png", refs)
+            self.assertNotIn("docs/../outside2.png", refs)
+            self.assertIn("docs/big.png", refs)
+            self.assertEqual(readme_page_weight(root, readme), 100)
+            bare = Path(tmp) / "bare" / "root"
+            (bare / "docs").mkdir(parents=True)
+            stepping = "\n".join([
+                "![the outside picture](docs/../../outside.png)",
+                "",
+                "![the second outside picture][oref]",
+                "",
+                "[oref]: docs/../outside2.png",
+            ])
+            self.assertEqual(readme_page_weight(bare, stepping), 0)
+
+    def test_a_doubled_leading_dot_slash_weighs_its_file(self):
+        # Round 20 red team confirmation finding two. The
+        # Markdown families admitted a leading dot slash by
+        # a pattern that allowed the prefix once, while the
+        # destination helper removes the dot segment any
+        # number of times, so a destination whose leading
+        # dot slash stood doubled weighed nothing in the
+        # inline and reference families and its full size
+        # in the HTML families, the first finding of the
+        # Round 20 audit one repeated prefix further on.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "big.png").write_bytes(b"x" * 100)
+            readme = "\n".join([
+                "![the big picture](././docs/big.png)",
+                "",
+                "![the big picture again](<././docs/big.png>)",
+                "",
+                "![the big picture once more][dref]",
+                "",
+                "[dref]: ././docs/big.png",
+            ])
+            for spelling in (
+                "(././docs/big.png)", "(<././docs/big.png>)",
+                "[dref]: ././docs/big.png",
+            ):
+                self.assertIn(spelling, readme)
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/big.png", refs)
+            self.assertEqual(readme_page_weight(root, readme), 100)
+
+    def test_a_label_defined_twice_weighs_its_first_definition(self):
+        # Round 20 red team delta confirmation finding
+        # three. The definitions store of the reference
+        # family took each later definition of a label
+        # over the earlier one, while the page as rendered
+        # follows the first definition standing for a
+        # label, so a label defined twice weighed the file
+        # the second definition named, a file the page
+        # never loads, and missed the file the page does
+        # load, and where the first definition named a
+        # heavy file and the second a light one the
+        # weighed page read lighter than the page a reader
+        # fetches, in silence.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "docs" / "heavy.png").write_bytes(b"x" * 400)
+            (root / "docs" / "light.png").write_bytes(b"x" * 70)
+            (root / "outside.png").write_bytes(b"x" * 900)
+            readme = "\n".join([
+                "![the picture][dup]",
+                "",
+                "[dup]: docs/heavy.png",
+                "",
+                "[dup]: docs/light.png",
+            ])
+            for spelling in (
+                "[dup]: docs/heavy.png", "[dup]: docs/light.png",
+            ):
+                self.assertIn(spelling, readme)
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/heavy.png", refs)
+            self.assertNotIn("docs/light.png", refs)
+            self.assertEqual(readme_page_weight(root, readme), 400)
+            opposite = "\n".join([
+                "![the picture][dup]",
+                "",
+                "[dup]: docs/light.png",
+                "",
+                "[dup]: docs/heavy.png",
+            ])
+            for spelling in (
+                "[dup]: docs/light.png", "[dup]: docs/heavy.png",
+            ):
+                self.assertIn(spelling, opposite)
+            refs = readme_page_weight_refs(opposite)
+            self.assertIn("docs/light.png", refs)
+            self.assertNotIn("docs/heavy.png", refs)
+            self.assertEqual(readme_page_weight(root, opposite), 70)
+            stepping = "\n".join([
+                "![the picture][dup]",
+                "",
+                "[dup]: docs/../outside.png",
+                "",
+                "[dup]: docs/heavy.png",
+            ])
+            for spelling in (
+                "[dup]: docs/../outside.png",
+                "[dup]: docs/heavy.png",
+            ):
+                self.assertIn(spelling, stepping)
+            refs = readme_page_weight_refs(stepping)
+            self.assertNotIn("docs/heavy.png", refs)
+            self.assertEqual(readme_page_weight(root, stepping), 0)
 
     def test_a_srcset_naming_a_missing_file_fails_by_name(self):
         with RetryingTemporaryDirectory() as tmp:

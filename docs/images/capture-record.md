@@ -287,4 +287,4 @@ Every check in this section was performed on frames extracted from the shipped M
 
 ### Page weight
 
-The video files stand outside the weighed page set. A linked video is click to play, and no page load pulls it, so the weighed total the gate pins is unchanged by this programme. The previews, posters, and stills the page does pull stay weighed as before.
+Linked video files stand outside the weighed page set. A linked video is click to play, and no page load pulls it, so the weighed total the gate pins is unchanged by this programme. A film embedded in a video element weighs in full, because the weighing reads its source as a carried form and a browser may pull such a film without a click. The previews, posters, and stills the page does pull stay weighed as before.

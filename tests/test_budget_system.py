@@ -1042,6 +1042,36 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
         self.assert_inside_the_estimator_band("g" * 20000, 10000)
         self.assert_inside_the_estimator_band("b" * 20000, 5000)
 
+    def test_underscore_runs_stand_on_the_named_limit(self):
+        # Round 20 red team RT-8. A run of one repeated
+        # underscore prices through the repeated character
+        # rule at half a token a character, while the
+        # cl100k tokenizer merges such runs far harder, so
+        # the shape stands outside the band and on the
+        # named limit the estimator docstring and the
+        # budget reference print in agreement. A pure run
+        # of 20,000 underscores estimates at 10,000 against
+        # a real count of 313, which is 0.031 times the
+        # estimate and under the band floor of 0.49.
+        estimate = extract_mod.estimate_tokens("_" * 20000)
+        self.assertEqual(estimate, 10000)
+        self.assertLess(313 * 100, 49 * estimate)
+        self.assertGreaterEqual(313 * 1000, 31 * estimate)
+        docstring = " ".join(
+            extract_mod.estimate_tokens.__doc__.split()
+        )
+        reference = " ".join(
+            (
+                ROOT / ".agents" / "skills" / "recognitio"
+                / "references" / "budget-system.md"
+            ).read_text(encoding="utf-8").split()
+        )
+        self.assertIn("underscore", docstring)
+        self.assertIn("underscore", reference)
+        for figure in ("0.031", "0.14", "0.40"):
+            self.assertIn(figure, docstring)
+            self.assertIn(figure, reference)
+
 
 class TestRound14BothTierShedding(unittest.TestCase):
     """Round 14. A budget that sheds both tiers is judged tier by tier.

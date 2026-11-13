@@ -135,6 +135,15 @@ GIT_PIN = [
     "-c", "core.attributesFile=",
     "-c", "attr.tree=",
 ]
+# Timeout basis. This checker runs git children of the
+# same shape the extractor runs, reads against the head a
+# review is being stamped against, and it carries the
+# extractor its 120 second figure under the discipline
+# its header claims. The comment over the extractor
+# constant names the measured basis, the slowest
+# legitimate command at about 11 seconds under load, so
+# a child still working at this limit is read as stalled
+# rather than slow, here as there.
 PROCESS_TIMEOUT_SECONDS = 120
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 SCHEMA_PATH = Path(__file__).resolve().parent / "packet-manifest.schema.json"

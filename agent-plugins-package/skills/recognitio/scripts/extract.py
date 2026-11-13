@@ -983,7 +983,7 @@ def estimate_tokens(text):
     real count between 0.49 and 1.35 times this estimate, so
     the estimate never underprices a measured family by a
     multiple and never overprices one by more than about twice.
-    Three families stand outside that band as named limits. A run
+    Four families stand outside that band as named limits. A run
     of unspelled letters, a keyboard walk or a run of rare
     letters standing alone or beside a digit group, prices
     under the letter or embedded or digit readings while a
@@ -1002,7 +1002,15 @@ def estimate_tokens(text):
     runs far harder or splits them finer, so its real count
     can stand far outside the band in either direction, down
     to about 0.02 times the estimate on a repeated dash and
-    up to about 3.1 times on a repeated tab.
+    up to about 3.1 times on a repeated tab. A run of one
+    repeated underscore character prices at the repeated
+    rate through the word run reading, while a real
+    tokenizer merges such runs far harder, so its real
+    count can stand down to about 0.031 times the estimate
+    on a pure run, at about 0.14 times on lines of forty
+    underscores, and at about 0.40 times on lines of eight
+    underscores, the separator line shape of plain text
+    documents standing as the ordinary carrier of the run.
     It is still an estimate and not a tokenizer, and every surface
     that names a budget names this method beside it.
     """

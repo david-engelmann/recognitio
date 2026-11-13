@@ -888,8 +888,8 @@ must agree with the manifest before the packet is called verified.
   one frame per harness over the same range and a
   capture record section behind each frame, and the
   paired eval proof follows the strip, with the page
-  held at its prior word count by the stated method and
-  the weighed page total stood at 814,836 bytes under
+  held under the page weight discipline and its ceiling
+  and the weighed page total stood at 814,836 bytes under
   a ceiling moved once to 850,000 in the open for the
   four harness frames at that stage of the landing.
   The recognitio-mod README gains the same story with
