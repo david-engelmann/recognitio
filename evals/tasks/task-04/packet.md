@@ -1,14 +1,14 @@
-# The pericope for range 48e7de6a3026e7074bcc733f1b210796331d3c14..c0d80a5df82a467ba1ea35fbc3b9528511fc29d2
+# The pericope for range 7373232364f8824bcf872882b3dbbeceaaf6ecef..58dab3b8342edefa9df60655e81b1a8588f6b0e1
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 48e7de6a3026e7074bcc733f1b210796331d3c14
+Base: 7373232364f8824bcf872882b3dbbeceaaf6ecef
 
-Head: c0d80a5df82a467ba1ea35fbc3b9528511fc29d2
+Head: 58dab3b8342edefa9df60655e81b1a8588f6b0e1
 
-Merge base: 48e7de6a3026e7074bcc733f1b210796331d3c14
+Merge base: 7373232364f8824bcf872882b3dbbeceaaf6ecef
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-c0d80a5 head
+58dab3b head
 ```
 
 ## T1 The change
@@ -74,6 +74,8 @@ index 988299e..d9838dc 100644
 ## T2 Companions
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
+
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
 
 ### Call sites for render in report.py
 
@@ -111,7 +113,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### report.py
 
 ```
-Eval Fixture c0d80a5d lines 4
+Eval Fixture 58dab3b8 lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -119,7 +121,7 @@ Eval Fixture c0d80a5d lines 4
 #### render in report.py
 
 ```
-commit c0d80a5 head
+commit 58dab3b head
 
 diff --git a/report.py b/report.py
 --- a/report.py
@@ -128,7 +130,7 @@ diff --git a/report.py b/report.py
  def render():
 -    return "ok"
 +    return "OK "
-commit 48e7de6 base
+commit 7373232 base
 
 diff --git a/report.py b/report.py
 --- /dev/null
@@ -152,13 +154,13 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1275
+Packet estimate in tokens: 1305
 
 T0 included at about 66 tokens across 1 files
 
 T1 included at about 128 tokens across 1 files
 
-T2 included at about 184 tokens across 1 files
+T2 included at about 215 tokens across 1 files
 
 T3 included at about 392 tokens across 1 files
 

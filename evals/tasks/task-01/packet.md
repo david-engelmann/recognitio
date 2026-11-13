@@ -1,14 +1,14 @@
-# The pericope for range e38cec9e5daafb54a034552f38cb293ba5589dcf..86563f5ea20a5e2f885c07d635a087da158579fd
+# The pericope for range 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4..41607fb398d26044a13e42d85f18a8fca176745d
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: e38cec9e5daafb54a034552f38cb293ba5589dcf
+Base: 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4
 
-Head: 86563f5ea20a5e2f885c07d635a087da158579fd
+Head: 41607fb398d26044a13e42d85f18a8fca176745d
 
-Merge base: e38cec9e5daafb54a034552f38cb293ba5589dcf
+Merge base: 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-86563f5 head
+41607fb head
 ```
 
 ## T1 The change
@@ -72,6 +72,8 @@ index 739e5a7..7dc0e10 100644
 ## T2 Companions
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
+
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
 
 ### Call sites for price in calc.py
 
@@ -116,7 +118,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### calc.py
 
 ```
-Eval Fixture 86563f5e lines 2
+Eval Fixture 41607fb3 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -124,7 +126,7 @@ Eval Fixture 86563f5e lines 2
 #### price in calc.py
 
 ```
-commit 86563f5 head
+commit 41607fb head
 
 diff --git a/calc.py b/calc.py
 --- a/calc.py
@@ -134,7 +136,7 @@ diff --git a/calc.py b/calc.py
 -    return qty * rate
 +def price(qty, rate, tax):
 +    return qty * rate + tax + tax
-commit e38cec9 base
+commit 2c31a94 base
 
 diff --git a/calc.py b/calc.py
 --- /dev/null
@@ -158,13 +160,13 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1352
+Packet estimate in tokens: 1389
 
 T0 included at about 65 tokens across 1 files
 
 T1 included at about 138 tokens across 1 files
 
-T2 included at about 249 tokens across 1 files
+T2 included at about 280 tokens across 1 files
 
 T3 included at about 413 tokens across 1 files
 

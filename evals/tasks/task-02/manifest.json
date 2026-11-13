@@ -5,18 +5,18 @@
   "command": [
     "extract.py",
     "--repo",
-    "/tmp/tmpib167h3h/repo",
+    "/run/hatch/resume/r22-fixforward3/tmp/tmp174iby37/repo",
     "--range",
-    "cc0c3d66ac41259cc022f89745219ae82913bc8c..1a2f5fd07acc65aba7c0ca9d8462e483e7d99d1f",
+    "d8546aa35eb5e392b8764d6bd47f84bf4ab8819b..e89d9e4c351584d6c0181002922e00a026715e4d",
     "--out",
-    "/tmp/tmpib167h3h/out"
+    "/run/hatch/resume/r22-fixforward3/tmp/tmp174iby37/out"
   ],
-  "created_utc": "2026-10-31T00:24:52.665849+00:00",
+  "created_utc": "2026-11-13T20:57:07.848712+00:00",
   "mode": "range",
-  "label": "range cc0c3d66ac41259cc022f89745219ae82913bc8c..1a2f5fd07acc65aba7c0ca9d8462e483e7d99d1f",
-  "base": "cc0c3d66ac41259cc022f89745219ae82913bc8c",
-  "head": "1a2f5fd07acc65aba7c0ca9d8462e483e7d99d1f",
-  "merge_base": "cc0c3d66ac41259cc022f89745219ae82913bc8c",
+  "label": "range d8546aa35eb5e392b8764d6bd47f84bf4ab8819b..e89d9e4c351584d6c0181002922e00a026715e4d",
+  "base": "d8546aa35eb5e392b8764d6bd47f84bf4ab8819b",
+  "head": "e89d9e4c351584d6c0181002922e00a026715e4d",
+  "merge_base": "d8546aa35eb5e392b8764d6bd47f84bf4ab8819b",
   "since": null,
   "pr": null,
   "files": [
@@ -61,15 +61,15 @@
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 264,
-      "emitted_tokens": 264,
+      "estimated_tokens": 295,
+      "emitted_tokens": 295,
       "files": 1
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 418,
-      "emitted_tokens": 418,
+      "estimated_tokens": 417,
+      "emitted_tokens": 417,
       "files": 1
     }
   },
@@ -82,7 +82,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1390,
+    "estimated_tokens": 1420,
     "dropped": []
   },
   "cap_notes": [],

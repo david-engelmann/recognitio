@@ -364,6 +364,8 @@ index 0327324..522392d 100644
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
 
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
+
 ### Call sites for naming_problems in scripts/check_devin.py
 
 No call sites found outside the changed file.
@@ -597,13 +599,13 @@ Cap note: history for semantic_problems capped at 4000 of 17427.
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 6031
+Packet estimate in tokens: 6062
 
 T0 included at about 114 tokens across 2 files
 
 T1 included at about 3285 tokens across 2 files
 
-T2 included at about 323 tokens across 2 files
+T2 included at about 354 tokens across 2 files
 
 T3 included at about 1853 tokens across 2 files
 

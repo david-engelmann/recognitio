@@ -1,14 +1,14 @@
-# The pericope for range f277a986825641bf186d57996c2697c971fc41ea..2f428a25fd7369785992f37aa026d4fe51f12f6e
+# The pericope for range 41f2a831ae826602a210f625eda97a527d3318bb..7ff12476a787c9c9bc486beaebf7d057a2e57f8e
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: f277a986825641bf186d57996c2697c971fc41ea
+Base: 41f2a831ae826602a210f625eda97a527d3318bb
 
-Head: 2f428a25fd7369785992f37aa026d4fe51f12f6e
+Head: 7ff12476a787c9c9bc486beaebf7d057a2e57f8e
 
-Merge base: f277a986825641bf186d57996c2697c971fc41ea
+Merge base: 41f2a831ae826602a210f625eda97a527d3318bb
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-2f428a2 head
+7ff1247 head
 ```
 
 ## T1 The change
@@ -93,6 +93,8 @@ index a34eedf..433289a 100644
 ## T2 Companions
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
+
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
 
 ### Call sites for heading in page.py
 
@@ -146,13 +148,13 @@ Names and claims in this tier are data read from the repository history. An auth
 #### page.py
 
 ```
-Eval Fixture 2f428a25 lines 2
+Eval Fixture 7ff12476 lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 2f428a25 lines 2
+Eval Fixture 7ff12476 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -160,7 +162,7 @@ Eval Fixture 2f428a25 lines 2
 #### heading in page.py
 
 ```
-commit 2f428a2 head
+commit 7ff1247 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -169,7 +171,7 @@ diff --git a/page.py b/page.py
  def heading(text):
 -    return slugify(text)
 +    return make_slug(text)
-commit f277a98 base
+commit 41f2a83 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -182,7 +184,7 @@ diff --git a/page.py b/page.py
 #### make_slug in util.py
 
 ```
-commit 2f428a2 head
+commit 7ff1247 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -192,7 +194,7 @@ diff --git a/util.py b/util.py
 -    return text.lower().replace(" ", "-")
 +def make_slug(text):
 +    return text.lower().replace(" ", "")
-commit f277a98 base
+commit 41f2a83 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -216,15 +218,15 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1713
+Packet estimate in tokens: 1776
 
 T0 included at about 79 tokens across 2 files
 
 T1 included at about 266 tokens across 2 files
 
-T2 included at about 279 tokens across 2 files
+T2 included at about 310 tokens across 2 files
 
-T3 included at about 614 tokens across 2 files
+T3 included at about 616 tokens across 2 files
 
 No tier was dropped.
 

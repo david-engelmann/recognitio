@@ -1,14 +1,14 @@
-# The pericope for range cc0c3d66ac41259cc022f89745219ae82913bc8c..1a2f5fd07acc65aba7c0ca9d8462e483e7d99d1f
+# The pericope for range d8546aa35eb5e392b8764d6bd47f84bf4ab8819b..e89d9e4c351584d6c0181002922e00a026715e4d
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: cc0c3d66ac41259cc022f89745219ae82913bc8c
+Base: d8546aa35eb5e392b8764d6bd47f84bf4ab8819b
 
-Head: 1a2f5fd07acc65aba7c0ca9d8462e483e7d99d1f
+Head: e89d9e4c351584d6c0181002922e00a026715e4d
 
-Merge base: cc0c3d66ac41259cc022f89745219ae82913bc8c
+Merge base: d8546aa35eb5e392b8764d6bd47f84bf4ab8819b
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-1a2f5fd head
+e89d9e4 head
 ```
 
 ## T1 The change
@@ -73,6 +73,8 @@ index 1a21324..165412f 100644
 ## T2 Companions
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
+
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
 
 ### Call sites for parse_port in parse.py
 
@@ -118,7 +120,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### parse.py
 
 ```
-Eval Fixture 1a2f5fd0 lines 3
+Eval Fixture e89d9e4c lines 3
 ```
 
 ### Recent evolution of changed functions
@@ -126,7 +128,7 @@ Eval Fixture 1a2f5fd0 lines 3
 #### parse_port in parse.py
 
 ```
-commit 1a2f5fd head
+commit e89d9e4 head
 
 diff --git a/parse.py b/parse.py
 --- a/parse.py
@@ -137,7 +139,7 @@ diff --git a/parse.py b/parse.py
 +    if not text.isdigit():
 +        return None
 +    return int(text) + 1
-commit cc0c3d6 base
+commit d8546aa base
 
 diff --git a/parse.py b/parse.py
 --- /dev/null
@@ -161,15 +163,15 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1390
+Packet estimate in tokens: 1420
 
 T0 included at about 66 tokens across 1 files
 
 T1 included at about 137 tokens across 1 files
 
-T2 included at about 264 tokens across 1 files
+T2 included at about 295 tokens across 1 files
 
-T3 included at about 418 tokens across 1 files
+T3 included at about 417 tokens across 1 files
 
 No tier was dropped.
 

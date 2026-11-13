@@ -5,18 +5,18 @@
   "command": [
     "extract.py",
     "--repo",
-    "/tmp/tmpn_lgea_i/repo",
+    "/run/hatch/resume/r22-fixforward3/tmp/tmpm6ucpbp2/repo",
     "--range",
-    "ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b..6a801671813a078baa4170001acc8964cc712061",
+    "e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
     "--out",
-    "/tmp/tmpn_lgea_i/out"
+    "/run/hatch/resume/r22-fixforward3/tmp/tmpm6ucpbp2/out"
   ],
-  "created_utc": "2026-10-31T00:25:21.645327+00:00",
+  "created_utc": "2026-11-13T20:57:16.068429+00:00",
   "mode": "range",
-  "label": "range ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b..6a801671813a078baa4170001acc8964cc712061",
-  "base": "ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b",
-  "head": "6a801671813a078baa4170001acc8964cc712061",
-  "merge_base": "ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b",
+  "label": "range e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
+  "base": "e9c113e57299ebcd01714181aaaabc44a5feef67",
+  "head": "474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
+  "merge_base": "e9c113e57299ebcd01714181aaaabc44a5feef67",
   "since": null,
   "pr": null,
   "files": [
@@ -62,8 +62,8 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 79,
-      "emitted_tokens": 79,
+      "estimated_tokens": 80,
+      "emitted_tokens": 80,
       "files": 2
     },
     "T1": {
@@ -76,15 +76,15 @@
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 315,
-      "emitted_tokens": 315,
+      "estimated_tokens": 346,
+      "emitted_tokens": 346,
       "files": 2
     },
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 676,
-      "emitted_tokens": 676,
+      "estimated_tokens": 680,
+      "emitted_tokens": 680,
       "files": 2
     }
   },
@@ -97,7 +97,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1824,
+    "estimated_tokens": 1853,
     "dropped": []
   },
   "cap_notes": [],

@@ -3917,7 +3917,7 @@ class TestRound13BudgetAccount(unittest.TestCase):
     """Round 13. The budget account is held against the budget pass.
 
     The plants stand on the shipped example packet pair. Its
-    genuine figures are a packet estimate of 6031 tokens with
+    genuine figures are a packet estimate of 6062 tokens with
     the history tier settled at 1853 tokens, and the dropped
     plant settles its packet estimate the way the red team
     record describes, by measuring the packet with the
@@ -3961,13 +3961,13 @@ class TestRound13BudgetAccount(unittest.TestCase):
 
     def test_the_genuine_example_packet_passes_the_budget_reading(self):
         manifest = self.example_manifest()
-        self.assertEqual(manifest["budget"]["estimated_tokens"], 6031)
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 6062)
         self.assertEqual(check_mod.budget_problems(manifest), [])
 
     def test_an_estimate_over_its_recorded_budget_is_refused(self):
         # Red team Minor 1, plant a6. No tier drops, the
         # recorded budget stands at 5000, and the settled
-        # packet estimate stands at the genuine 6031.
+        # packet estimate stands at the genuine 6062.
         manifest = self.example_manifest()
         manifest["budget"]["budget_tokens"] = 5000
         manifest["command"] = manifest["command"] + [
@@ -3976,7 +3976,7 @@ class TestRound13BudgetAccount(unittest.TestCase):
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "packet estimate of 6031 tokens exceeds the "
+                "packet estimate of 6062 tokens exceeds the "
                 "budget of 5000 tokens" in problem
                 for problem in problems
             ),
@@ -4249,12 +4249,12 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
     inside the window between the netted and unnetted
     restoration figures. The plants stand on the shipped
     example packet, whose settled figures are a packet
-    estimate of 6031 tokens with the history tier settled at
-    1853 and the companion tier settled at 323, and the
+    estimate of 6062 tokens with the history tier settled at
+    1853 and the companion tier settled at 354, and the
     settled dropped packet measures 3900, so restoring the
-    companion tier alone measures 4200, restoring the
+    companion tier alone measures 4231, restoring the
     history tier alone measures 5731, and restoring both
-    measures the genuine 6031. Reverting the per tier
+    measures the genuine 6062. Reverting the per tier
     reading or the placeholder netting in the checker
     returns each refusal plant below to a pass. The
     naming pin at the foot of this class covers the
@@ -4300,26 +4300,26 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
     def test_both_drops_under_a_budget_no_restoration_fits_passes(self):
         # The control. At a recorded budget of 4199 the
         # settled dropped packet fits, and restoring the
-        # companion tier alone measures 4200, the history
-        # tier alone 5731 and both 6031, so every drop the
+        # companion tier alone measures 4231, the history
+        # tier alone 5731 and both 6062, so every drop the
         # account records was forced and no problem stands.
         manifest = self.dropped_example(4199, ("T3", "T2"))
         self.assertEqual(manifest["budget"]["estimated_tokens"], 3900)
         self.assertEqual(check_mod.budget_problems(manifest), [])
 
     def test_both_drops_refused_when_the_companion_restoration_fits(self):
-        # At 4200 the companion tier alone restored measures
+        # At 4231 the companion tier alone restored measures
         # exactly the recorded budget, so its drop was never
-        # required even though the full restoration at 6031
+        # required even though the full restoration at 6062
         # stands over the budget and the older reading
         # passed this account.
-        manifest = self.dropped_example(4200, ("T3", "T2"))
+        manifest = self.dropped_example(4231, ("T3", "T2"))
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "records T2 as dropped under a budget of 4200 "
+                "records T2 as dropped under a budget of 4231 "
                 "tokens, but the packet with that tier alone "
-                "restored measures about 4200 tokens" in problem
+                "restored measures about 4231 tokens" in problem
                 for problem in problems
             ),
             problems,
@@ -4341,7 +4341,7 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
         )
 
     def test_both_drops_at_6030_refuse_on_the_per_tier_reading_alone(self):
-        # At 6030 the full netted restoration measures 6031
+        # At 6030 the full netted restoration measures 6062
         # and stands over the budget, so the full restoration
         # reading states no problem and the refusal rests on
         # the per tier reading alone.
@@ -4358,15 +4358,15 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
 
     def test_a_single_drop_inside_the_placeholder_window_is_refused(self):
         # The netting plant. The history tier alone dropped
-        # settles the packet at 4200, its placeholder stands
+        # settles the packet at 4231, its placeholder stands
         # at 22 emitted tokens against a settled estimate of
-        # 1853, and at a recorded budget of 6040 the netted
-        # restoration measures the genuine 6031 and fits,
-        # while the unnetted figure of 6053 stands over the
+        # 1853, and at a recorded budget of 6071 the netted
+        # restoration measures the genuine 6062 and fits,
+        # while the unnetted figure of 6084 stands over the
         # budget, so the pre repair reading passed and the
         # netted reading refuses.
-        manifest = self.dropped_example(6040, ("T3",))
-        self.assertEqual(manifest["budget"]["estimated_tokens"], 4200)
+        manifest = self.dropped_example(6071, ("T3",))
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 4231)
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
@@ -4389,12 +4389,12 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
         # returns this test to a failure.
         manifest = self.dropped_example(5900, ())
         self.assertEqual(
-            manifest["budget"]["estimated_tokens"], 6031
+            manifest["budget"]["estimated_tokens"], 6062
         )
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "estimate of 6031 tokens exceeds the budget "
+                "estimate of 6062 tokens exceeds the budget "
                 "of 5900 tokens" in problem
                 for problem in problems
             ),

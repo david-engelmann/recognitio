@@ -133,6 +133,8 @@ index 7a3ad00..9ee1f09 100644
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
 
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
+
 ### Call sites for main in src/a.py
 
 No call sites found outside the changed file.
@@ -286,13 +288,13 @@ Cap note: evolution functions capped at 3 of 4.
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 2215
+Packet estimate in tokens: 2246
 
 T0 included at about 119 tokens across 4 files
 
 T1 included at about 492 tokens across 4 files
 
-T2 included at about 256 tokens across 4 files
+T2 included at about 287 tokens across 4 files
 
 T3 included at about 853 tokens across 3 files
 

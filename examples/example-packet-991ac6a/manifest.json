@@ -11,7 +11,7 @@
     "--repo",
     "."
   ],
-  "created_utc": "2026-11-09T16:57:23.217456+00:00",
+  "created_utc": "2026-11-13T20:57:33.931666+00:00",
   "mode": "commit",
   "label": "commit 991ac6ae80d3",
   "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
@@ -76,8 +76,8 @@
     "T2": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 323,
-      "emitted_tokens": 323,
+      "estimated_tokens": 354,
+      "emitted_tokens": 354,
       "files": 2
     },
     "T3": {
@@ -97,7 +97,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 6031,
+    "estimated_tokens": 6062,
     "dropped": []
   },
   "cap_notes": [

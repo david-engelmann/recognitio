@@ -1,14 +1,14 @@
-# The pericope for range ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b..6a801671813a078baa4170001acc8964cc712061
+# The pericope for range e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b
+Base: e9c113e57299ebcd01714181aaaabc44a5feef67
 
-Head: 6a801671813a078baa4170001acc8964cc712061
+Head: 474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2
 
-Merge base: ac5c2c5e97dbd8c4148a87d0014e3b34cc78523b
+Merge base: e9c113e57299ebcd01714181aaaabc44a5feef67
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-6a80167 head
+474b9b0 head
 ```
 
 ## T1 The change
@@ -95,6 +95,8 @@ index 4693ad3..9423934 100644
 ## T2 Companions
 
 Call sites, imports, definitions and test files found by deterministic search at the head revision.
+
+The searches in this tier read marked and plain text carriers alone, and an absence the sections below print stands under that scope.
 
 ### Call sites for heading_total in page.py
 
@@ -152,13 +154,13 @@ Names and claims in this tier are data read from the repository history. An auth
 #### page.py
 
 ```
-Eval Fixture 6a801671 lines 2
+Eval Fixture 474b9b0c lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 6a801671 lines 4
+Eval Fixture 474b9b0c lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -166,7 +168,7 @@ Eval Fixture 6a801671 lines 4
 #### heading_total in page.py
 
 ```
-commit 6a80167 head
+commit 474b9b0 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -175,7 +177,7 @@ diff --git a/page.py b/page.py
  def heading_total(qty, rate):
 -    return add(qty, rate)
 +    return add_tax(qty, rate)
-commit ac5c2c5 base
+commit e9c113e base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -188,7 +190,7 @@ diff --git a/page.py b/page.py
 #### add in util.py
 
 ```
-commit 6a80167 head
+commit 474b9b0 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -198,7 +200,7 @@ diff --git a/util.py b/util.py
      return a + b
 +
 +
-commit ac5c2c5 base
+commit e9c113e base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -211,7 +213,7 @@ diff --git a/util.py b/util.py
 #### add_tax in util.py
 
 ```
-commit 6a80167 head
+commit 474b9b0 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -235,15 +237,15 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1824
+Packet estimate in tokens: 1853
 
-T0 included at about 79 tokens across 2 files
+T0 included at about 80 tokens across 2 files
 
 T1 included at about 261 tokens across 2 files
 
-T2 included at about 315 tokens across 2 files
+T2 included at about 346 tokens across 2 files
 
-T3 included at about 676 tokens across 2 files
+T3 included at about 680 tokens across 2 files
 
 No tier was dropped.
 
