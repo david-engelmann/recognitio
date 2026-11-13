@@ -3927,12 +3927,22 @@ class TestRound6PublicClaims(unittest.TestCase):
             "The tag candidate head for this release is", flat
         )
         # The claim must not survive in another word order or
-        # in another section of the same file. The release
-        # notes name no candidate at all, and the checklist
-        # holds exactly the three standing mentions of the
-        # candidate head its items carry, so a claim added to
-        # either section in any wording raises one of these
-        # readings.
+        # in another section of the same file. The readings
+        # judge the claim on the whole file, in the manner
+        # of the counts that guard the opening and the
+        # checklist. The word candidate stands counted over
+        # the whole file at its five standing mentions, two
+        # in the opening, none in the release notes and
+        # three in the checklist, so a claim spending that
+        # word in any section raises the count. The release
+        # notes carry no mention of the tag at all. And the
+        # only heads the file names are the storefront
+        # landing head and the tree that landing carried,
+        # in that order, so a claim naming any other head
+        # in any section raises the heads reading. A claim
+        # that spends neither counted word and names no
+        # head stands outside these readings, and nothing
+        # here claims it.
         self.assertNotIn("tag candidate head", flat)
         self.assertNotIn("as the tag candidate", flat)
         self.assertNotIn("current head of main", flat)
@@ -3940,8 +3950,17 @@ class TestRound6PublicClaims(unittest.TestCase):
             "## The tag checklist", 1
         )[0]
         self.assertNotIn("candidate", notes.lower())
+        self.assertEqual(re.findall(r"\btag\b", notes.lower()), [])
         checklist = release.split("## The tag checklist", 1)[1]
         self.assertEqual(checklist.lower().count("candidate"), 3)
+        self.assertEqual(flat.lower().count("candidate"), 5)
+        self.assertEqual(
+            re.findall(r"\b[0-9a-f]{40}\b", release),
+            [
+                "357ba2d43d74f295c8e1953fe3dadd3406c2eb63",
+                "5bd54e64ceec144b9408e9ee5a61730d735abce4",
+            ],
+        )
 
 
 class TestDocsIndex(unittest.TestCase):
@@ -9551,6 +9570,31 @@ class TestTreeFigureCensus(unittest.TestCase):
             % format(measured["largest_plain_size"], ",")
         )
         self.assertEqual(flat.count(plain), 1)
+
+    def test_the_changelog_weighed_total_matches_the_measured_page(self):
+        # Capstone Round 21. The changelog states the
+        # weighed page total in a standing sentence, and
+        # no reading set that statement beside the total
+        # the weighing helpers compute from the shipped
+        # page, so the statement could move in silence.
+        # The statement now stands judged against the
+        # measured total and the ceiling the brand assets
+        # class holds, and it must stand exactly once.
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        total = readme_page_weight(ROOT, readme)
+        changelog = (ROOT / "CHANGELOG.md").read_text(
+            encoding="utf-8"
+        )
+        flat = " ".join(changelog.split())
+        sentence = (
+            "The weighed page total stands at %s bytes "
+            "under the %s ceiling"
+            % (
+                format(total, ","),
+                format(TestBrandAssets.PAGE_CEILING, ","),
+            )
+        )
+        self.assertEqual(flat.count(sentence), 1)
 
 
 class TestRound15SkillMainRoot(unittest.TestCase):

@@ -1071,6 +1071,18 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
         for figure in ("0.031", "0.14", "0.40"):
             self.assertIn(figure, docstring)
             self.assertIn(figure, reference)
+        # The count word stands in agreement as well. The
+        # docstring counts the named limit families at
+        # four and the reference opens its passage with
+        # the count of the families it goes on to name,
+        # so the word cannot drift from the enumeration
+        # standing under it in either home.
+        self.assertIn(
+            "Four families stand outside that band", docstring
+        )
+        self.assertIn(
+            "Four families stand outside that bound", reference
+        )
 
 
 class TestRound14BothTierShedding(unittest.TestCase):

@@ -523,13 +523,25 @@ class TestRound7CopyClaims(unittest.TestCase):
         # gate except the one pinned workflow comment. Every
         # current figure statement in the prose surfaces now
         # reconciles against the loader count.
+        # Round 21 widens the surface from the top level of
+        # the docs folder to the whole docs tree, after the
+        # red team stood a stale figure in the capture
+        # record in the docs images folder and the reading
+        # never reached it. The widened count and the
+        # capture record membership stand asserted, so a
+        # future narrowing fails here rather than passing
+        # in silence.
         surfaces = [
             ROOT / "README.md",
             ROOT / "DESIGN.md",
             ROOT / "CHANGELOG.md",
         ]
-        surfaces.extend(sorted((ROOT / "docs").glob("*.md")))
-        self.assertGreater(len(surfaces), 20)
+        surfaces.extend(sorted((ROOT / "docs").rglob("*.md")))
+        self.assertGreater(len(surfaces), 35)
+        self.assertIn(
+            ROOT / "docs" / "images" / "capture-record.md",
+            surfaces,
+        )
         # The reading proves its own pattern live on a
         # planted sentence first, so a future rewording of
         # the pattern cannot leave it passing on silence.
