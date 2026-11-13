@@ -853,6 +853,13 @@ class TestGateScrubParity(unittest.TestCase):
 
     FORCED_OFF = ("GIT_NO_REPLACE_OBJECTS", "GIT_ATTR_NOSYSTEM")
 
+    # The graft file name stands forced on rather than dropped
+    # in the pair that runs the extraction and its recount, and
+    # dropped in the sibling gates, so the absence reading below
+    # exempts it and the forced value reading holds it to the
+    # empty file the run controls.
+    GRAFT_PINNED = ("extract", "check_packet")
+
     def dropped_names(self):
         # The planted key set is derived from the scrub
         # tuples the helpers themselves carry, so the plant
@@ -975,11 +982,17 @@ class TestGateScrubParity(unittest.TestCase):
             with mock.patch.dict(os.environ, poisoned):
                 env = helper()
             for name in planted:
+                if name == "GIT_GRAFT_FILE" and label in self.GRAFT_PINNED:
+                    continue
                 self.assertNotIn(name, env, "%s kept %s" % (label, name))
             for name in self.FORCED_OFF:
                 self.assertEqual(
                     env[name], "1", "%s left %s unset" % (label, name)
                 )
+            if label in self.GRAFT_PINNED:
+                pin = Path(env["GIT_GRAFT_FILE"])
+                self.assertTrue(pin.is_file(), label)
+                self.assertEqual(pin.read_bytes(), b"", label)
             self.assertIn("PATH", env)
 
 

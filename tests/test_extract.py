@@ -1099,6 +1099,8 @@ class TestBlameTextconv(unittest.TestCase):
 
         def fake_run_git(repo, args, check=True, global_flags=()):
             calls.append(list(args))
+            if args and args[0] == "ls-tree":
+                return extract_mod.Proc(0, "", "")
             return extract_mod.Proc(1, "", "no data")
 
         with mock.patch.object(extract_mod, "run_git", fake_run_git):
@@ -1417,6 +1419,57 @@ class TestChildEnvironment(unittest.TestCase):
         finally:
             subprocess.run = original
         self.assertIn("git rev-parse HEAD", str(caught.exception))
+
+
+class TestRound22GraftPin(unittest.TestCase):
+    """Round 22 repair F1. The graft pin covers every child call."""
+
+    def test_a_graft_planted_mid_run_moves_nothing(self):
+        with RetryingTemporaryDirectory() as tmp:
+            lines = ["def target():"] + [
+                "    x%03d = %d" % (i, i) for i in range(120)
+            ] + ["    return x000"]
+            middle = "\n".join(lines) + "\n"
+            changed = list(lines)
+            for i in range(1, 11):
+                changed[i] = "    x%03d = %d" % (i - 1, 900 + i)
+            repo = make_repo(tmp, [
+                {"mod.py": "seed = 1\n"},
+                {"mod.py": middle},
+                {"mod.py": "\n".join(changed) + "\n"},
+            ])
+            base = git(repo, "rev-parse", "HEAD~2")
+            head = git(repo, "rev-parse", "HEAD")
+            clean_out = Path(tmp) / "clean"
+            result = run_extract_cli(
+                repo, clean_out, "--range", "%s..%s" % (base, head)
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(clean_out)["verified"])
+            clean_packet = (clean_out / "packet.md").read_text()
+            graft_line = "%s %s" % (head, base)
+            grafts_path = str(repo / ".git" / "info" / "grafts")
+            body = "      echo \"" + graft_line + "\" > \"" + grafts_path + "\"\n"
+            env, marker = install_blame_shim(tmp, body)
+            graft_out = Path(tmp) / "grafted"
+            result = run_extract_cli(
+                repo, graft_out, "--range", "%s..%s" % (base, head),
+                env=env,
+            )
+            self.assertTrue(marker.exists(), "the graft never planted")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(graft_out)["verified"])
+            self.assertEqual(
+                (graft_out / "packet.md").read_text(), clean_packet
+            )
+
+    def test_the_child_environment_pins_the_graft_file(self):
+        env = extract_mod.scrubbed_child_env()
+        pin = env.get("GIT_GRAFT_FILE")
+        self.assertIsNotNone(pin)
+        self.assertTrue(Path(pin).is_file())
+        self.assertEqual(Path(pin).read_bytes(), b"")
+
 
 
 class TestShallowAndRootCommits(unittest.TestCase):
@@ -6391,6 +6444,43 @@ def install_blame_shim(tmp, body):
     return env, marker
 
 
+def install_lstree_shim(tmp, fail_at):
+    """A git stand in that fails the numbered ls-tree call.
+
+    Every invocation whose arguments name ls-tree increments a
+    counter file, and the invocation whose count reaches the
+    numbered call exits in failure without running git, so a
+    test can fail exactly one listing reading of a run and read
+    from the run itself which reading stood where.
+    """
+    bindir = Path(tmp) / ("lstree-shim-%d" % fail_at)
+    bindir.mkdir(exist_ok=True)
+    real_git = shutil.which("git")
+    counter = Path(tmp) / ("lstree-counter-%d" % fail_at)
+    counter.write_text("0")
+    script = (
+        "#!/bin/sh\n"
+        "for a in \"$@\"; do\n"
+        "  if [ \"$a\" = \"ls-tree\" ]; then\n"
+        "    n=$(cat \"%s\")\n"
+        "    n=$((n+1))\n"
+        "    echo $n > \"%s\"\n"
+        "    if [ \"$n\" = \"%d\" ]; then\n"
+        "      echo shim-failure >&2\n"
+        "      exit 3\n"
+        "    fi\n"
+        "  fi\n"
+        "done\n"
+        "exec \"%s\" \"$@\"\n"
+    ) % (counter, counter, fail_at, real_git)
+    shim = bindir / "git"
+    shim.write_text(script)
+    shim.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = str(bindir) + os.pathsep + env["PATH"]
+    return env
+
+
 class TestOutputPathDiscipline(unittest.TestCase):
     """The output directory discipline of rounds 7, 16 and 23.
 
@@ -7918,5 +8008,919 @@ class TestRound12CompanionsAndGrafts(unittest.TestCase):
             )
 
 
+class TestRound22CompanionScope(unittest.TestCase):
+    """Round 22 repair F2. The tier states its scope and its skips."""
+
+    SCOPE = (
+        "The searches in this tier read marked and plain text "
+        "carriers alone, and an absence the sections below print "
+        "stands under that scope."
+    )
+
+    def test_the_companion_tier_states_its_carrier_scope(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "def helper(x):\n    return x + 1\n"},
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(self.SCOPE, packet)
+            tier = packet.split("## T2 Companions", 1)[1]
+            tier = tier.split("## T3", 1)[0]
+            self.assertLess(
+                tier.index(self.SCOPE),
+                tier.index("No test files mention"),
+            )
+
+    def test_a_binary_marked_changed_file_names_its_skipped_names(self):
+        with RetryingTemporaryDirectory() as tmp:
+            carrier = (
+                b"def widget(x):\n    return x + 1\n"
+                b"\x00\x01\x02 binary tail\n"
+            )
+            repo = make_repo(tmp, [
+                {
+                    "data.py": carrier,
+                    "caller.py": (
+                        "from data import widget\nprint(widget(3))\n"
+                    ),
+                },
+                {
+                    "data.py": carrier.replace(b"x + 1", b"x + 2"),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("### Call sites for the changed names", packet)
+            self.assertIn(
+                "data.py stands marked binary in the change, so no "
+                "names were gathered from it and no call sites stand "
+                "for its names.", packet
+            )
+            self.assertNotIn("Call sites for widget in data.py", packet)
+
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRound22StringMask(unittest.TestCase):
+    """Round 22 repair F3. String and comment spans gather no names."""
+
+    def test_a_definition_inside_a_string_literal_gathers_nothing(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": (
+                        'SAMPLE = "text"\n\n\n'
+                        "def real(x):\n    return x\n"
+                    ),
+                    "test_mod.py": (
+                        "phantom = 1\n"
+                        "phantom = phantom + 1\n"
+                    ),
+                },
+                {
+                    "mod.py": (
+                        'SAMPLE = """\n'
+                        "def phantom(x):\n"
+                        "    return x\n"
+                        '"""\n\n\n'
+                        "def real(x):\n"
+                        "    return x + 1\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("phantom", packet.split("## T2", 1)[1])
+            self.assertIn("real", packet.split("## T2", 1)[1])
+
+    def test_the_mask_unit_cases(self):
+        cases = [
+            (
+                (
+                    '+SAMPLE = """\n+def phantom(x):\n'
+                    '+    return x\n+"""\n+def real(x):\n'
+                ),
+                "mod.py", ["real"],
+            ),
+            (
+                "+# def ghost(x):\n+def real(x):\n",
+                "mod.py", ["real"],
+            ),
+            (
+                '+S = "class Fake:"\n+class Real:\n',
+                "mod.py", ["Real"],
+            ),
+            (
+                '+const s = "function fake() {";\n+function real() {\n',
+                "app.js", ["real"],
+            ),
+            (
+                "+// function ghost() {\n+function real() {\n",
+                "app.js", ["real"],
+            ),
+            (
+                "+// func ghost() {\n+func real() {\n",
+                "main.go", ["real"],
+            ),
+            (
+                "+pub fn real(x: i32) -> i32 {\n",
+                "lib.rs", ["real"],
+            ),
+            (
+                '+S = """x"""\n+def real(x):\n',
+                "mod.py", ["real"],
+            ),
+            (
+                '@@ -1,2 +1,2 @@ def enclosing(x):\n-x = 1\n+x = 2\n',
+                "mod.py", ["enclosing"],
+            ),
+            (
+                "+/*\n+function ghost() {\n+*/\n+function real() {\n",
+                "app.js", ["real"],
+            ),
+            (
+                (
+                    "+x = 1; /* open\n+function ghost() {\n"
+                    "+*/\n+function real() {\n"
+                ),
+                "app.js", ["real"],
+            ),
+            (
+                "+/* function ghost() { */\n+function real() {\n",
+                "app.js", ["real"],
+            ),
+            (
+                "+--[[ \n+function ghost()\n+]]\n+function real()\n",
+                "mod.lua", ["real"],
+            ),
+            (
+                "+-- function ghost()\n+function real()\n",
+                "mod.lua", ["real"],
+            ),
+            (
+                "+fn alpha<'a>(x: &str) {\n+fn beta() {\n",
+                "lib.rs", ["alpha", "beta"],
+            ),
+            (
+                "+s = 'unterminated\n+def swallowed():\n+def after():\n",
+                "mod.py", ["swallowed", "after"],
+            ),
+            (
+                (
+                    '+s = "unterminated\n+function swallowed() {\n'
+                    "+function after() {\n"
+                ),
+                "app.js", ["swallowed", "after"],
+            ),
+            (
+                (
+                    "+const s = `\n+function phantom() {\n"
+                    "+`;\n+function real() {\n"
+                ),
+                "app.js", ["real"],
+            ),
+        ]
+        for chunk, path, expected in cases:
+            self.assertEqual(
+                extract_mod.extract_function_names(chunk, path),
+                expected, "case for %s" % path,
+            )
+
+    def test_a_definition_inside_a_block_comment_gathers_nothing(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "app.js": (
+                        "function real() {\n  return 1;\n}\n"
+                    ),
+                    "use.js": (
+                        "ghost = 1;\n"
+                        "ghost = ghost + 1;\n"
+                    ),
+                },
+                {
+                    "app.js": (
+                        "/*\n"
+                        "function ghost() {\n"
+                        "  return 0;\n"
+                        "}\n"
+                        "*/\n"
+                        "function real(x) {\n"
+                        "  return x;\n"
+                        "}\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("ghost", packet.split("## T2", 1)[1])
+            self.assertIn("real", packet.split("## T2", 1)[1])
+
+    def test_a_lifetime_apostrophe_keeps_both_definitions(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "lib.rs": (
+                        "pub fn alpha(x: i32) -> i32 { x }\n"
+                    ),
+                    "call.rs": (
+                        "pub fn use_beta() -> usize {\n"
+                        "    beta()\n"
+                        "}\n"
+                    ),
+                },
+                {
+                    "lib.rs": (
+                        "pub fn alpha<'a>(x: &str) -> usize {\n"
+                        "    x.len()\n"
+                        "}\n"
+                        "\n"
+                        "pub fn beta() -> usize {\n"
+                        "    alpha(\"hi\")\n"
+                        "}\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Call sites for alpha", packet)
+            self.assertIn("Call sites for beta", packet)
+            self.assertIn("call.rs:2:     beta()", packet)
+
+    def test_a_changed_class_gathers_its_call_sites_end_to_end(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.ts": (
+                        "export function helper(x: number): number {\n"
+                        "  return x + 1;\n}\n"
+                    ),
+                    "caller.ts": (
+                        "import { Widget } from './mod';\n"
+                        "console.log(new Widget());\n"
+                    ),
+                },
+                {
+                    "mod.ts": (
+                        "export function helper(x: number): number {\n"
+                        "  return x + 1;\n}\n\n"
+                        "export class Widget {\n  render() {\n"
+                        "    return 1;\n  }\n}\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("Call sites for Widget", packet)
+            self.assertIn("console.log(new Widget())", packet)
+
+    def test_a_definition_shaped_hit_line_inside_a_string_is_no_definition(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": (
+                        "def widget():\n    return 1\n"
+                    ),
+                    "lib.py": (
+                        'TEXT = """\n'
+                        "def widget():\n"
+                        "    return 0\n"
+                        '"""\n'
+                    ),
+                    "realdef.py": (
+                        "def widget():\n    return 9\n"
+                    ),
+                },
+                {
+                    "mod.py": (
+                        "def widget(scale):\n"
+                        "    return 2 * scale\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            section = packet.split(
+                "### Definitions of changed names elsewhere", 1
+            )[1].split("\n### ", 1)[0]
+            self.assertIn("realdef.py:1: def widget():", section)
+            self.assertNotIn("lib.py", section)
+
+    def test_a_definition_shaped_hit_line_inside_a_block_comment_is_no_definition(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "app.js": (
+                        "function widget() {\n  return 1;\n}\n"
+                    ),
+                    "lib.js": (
+                        "/*\n"
+                        "function widget() {\n"
+                        "  return 0;\n"
+                        "}\n"
+                        "*/\n"
+                    ),
+                    "realdef.js": (
+                        "function widget() {\n  return 9;\n}\n"
+                    ),
+                },
+                {
+                    "app.js": (
+                        "function widget(x) {\n  return x;\n}\n"
+                    ),
+                },
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            section = packet.split(
+                "### Definitions of changed names elsewhere", 1
+            )[1].split("\n### ", 1)[0]
+            self.assertIn("realdef.js:1: function widget() {", section)
+            self.assertNotIn("lib.js", section)
+
+
+class TestRound22WithheldBodies(unittest.TestCase):
+    """Round 22 repair F4. Withheld bodies name their operation."""
+
+    def _section(self, packet, name):
+        tier = packet.split("## T1 The change", 1)[1]
+        for part in tier.split("\n### ")[1:]:
+            if part.split("\n", 1)[0].strip() == name:
+                return part
+        raise AssertionError("no change tier section for %s" % name)
+
+    def test_a_binary_copy_and_rename_name_the_operation_in_the_body(self):
+        blob = bytes(range(256)) * 2
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"bin.dat": blob},
+                {"bincopy.dat": blob},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "(copied from bin.dat. (binary file of 512 bytes "
+                "at the head revision. No textual diff is shown.))",
+                self._section(packet, "bincopy.dat"),
+            )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"bin.dat": blob})
+            commit_all(repo, "base")
+            (repo / "bin.dat").rename(repo / "binmoved.dat")
+            commit_all(repo, "rename")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "(renamed from bin.dat. (binary file of 512 bytes "
+                "at the head revision. No textual diff is shown.))",
+                self._section(packet, "binmoved.dat"),
+            )
+
+    def test_a_generated_copy_names_the_operation_in_the_body(self):
+        body = (
+            "# Code generated by the fixture tool. DO NOT EDIT.\n"
+            + "".join("row %d\n" % i for i in range(40))
+        )
+        edited = body.replace("row 0\n", "row zero\n", 1)
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"gen.py": body},
+                {"gen.py": edited, "gen_copy.py": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            section = self._section(packet, "gen_copy.py")
+            self.assertIn(
+                "(copied from gen.py. (generated file. The diff is "
+                "withheld from the packet and its 1 additions and 1 "
+                "deletions across 1 hunks are counted in the "
+                "manifest))",
+                section,
+            )
+
+    def test_the_withheld_bodies_balance_their_parentheses(self):
+        blob = bytes(range(256)) * 2
+        shapes = []
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"bin.dat": blob},
+                {"bin.dat": blob + b"x", "bincopy.dat": blob},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            for name in ("bin.dat", "bincopy.dat"):
+                section = self._section(packet, name)
+                for line in section.splitlines():
+                    if "binary file of" in line:
+                        shapes.append((name, line.strip()))
+        body = (
+            "# Code generated by the fixture tool. DO NOT EDIT.\n"
+            + "".join("row %d\n" % i for i in range(40))
+        )
+        edited = body.replace("row 0\n", "row zero\n", 1)
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"gen.py": body},
+                {"gen.py": edited, "gen_copy.py": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            section = self._section(packet, "gen_copy.py")
+            for line in section.splitlines():
+                if "The diff is withheld" in line:
+                    shapes.append(("gen_copy.py", line.strip()))
+        self.assertEqual(len(shapes), 3, shapes)
+        for name, line in shapes:
+            self.assertEqual(
+                line.count("("), line.count(")"), (name, line)
+            )
+
+    def test_the_credential_notice_names_the_operation_for_a_rename(self):
+        entry = {
+            "status": "renamed", "old_path": ".kube/config",
+            "path": ".kube/config2",
+            "additions": 3, "deletions": 2,
+        }
+        self.assertEqual(
+            extract_mod.credential_notice(entry),
+            "(Renamed from .kube/config. Credential file with 3 "
+            "additions and 2 deletions. Its diff is not printed, "
+            "because the lines of a credential file are secrets by "
+            "shape. The counts stand in the manifest.)",
+        )
+        plain = {
+            "status": "modified", "old_path": None,
+            "path": ".kube/config",
+            "additions": 3, "deletions": 2,
+        }
+        self.assertTrue(
+            extract_mod.credential_notice(plain).startswith(
+                "(credential file with 3 additions"
+            )
+        )
+
+
+class TestRound22FailedReadings(unittest.TestCase):
+    """Round 22 repair F5. A failed reading never stands as an absence."""
+
+    class Failed:
+        returncode = 2
+        stdout = ""
+        stderr = "fatal: the reading failed"
+
+    def _swap(self, name, replacement):
+        original = getattr(extract_mod, name)
+        setattr(extract_mod, name, replacement)
+        self.addCleanup(setattr, extract_mod, name, original)
+        return original
+
+    def test_a_failed_tree_listing_fails_the_run(self):
+        def failing(repo_arg, args, check=True, global_flags=()):
+            if args and args[0] == "ls-tree":
+                return self.Failed()
+            raise AssertionError("unexpected call %r" % (args,))
+
+        self._swap("run_git", failing)
+        with self.assertRaises(extract_mod.GitError) as caught:
+            extract_mod.tree_entries_at_head("repo", "head")
+        self.assertIn("git ls-tree failed with exit 2", str(caught.exception))
+
+    def test_a_failed_carrier_merge_listing_fails_the_run(self):
+        with RetryingTemporaryDirectory() as tmp:
+            carrier = (
+                "import mod\n"
+                "\n"
+                "def test_widget():\n"
+                "    result = mod.widget()\n"
+                "    assert result == 1\n"
+            )
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def widget():\n    return 1\n",
+                    "carrier_test.py": (
+                        b"\xff\xfe" + carrier.encode("utf-16-le")
+                    ),
+                },
+                {"mod.py": "def widget():\n    return 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            base = git(repo, "rev-parse", "HEAD~1")
+            control_out = Path(tmp) / "control"
+            result = run_extract_cli(
+                repo, control_out, "--range", "%s..%s" % (base, head)
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(control_out)["verified"])
+            packet = (control_out / "packet.md").read_text()
+            self.assertIn("result = mod.widget()", packet)
+            for fail_at in (1, 2, 3, 4):
+                env = install_lstree_shim(tmp, fail_at)
+                out = Path(tmp) / ("fail%d" % fail_at)
+                result = run_extract_cli(
+                    repo, out, "--range", "%s..%s" % (base, head),
+                    env=env,
+                )
+                self.assertEqual(
+                    result.returncode, 2,
+                    (fail_at, result.stdout, result.stderr),
+                )
+                self.assertIn("git ls-tree failed", result.stderr)
+
+    def test_a_tree_listing_still_reads_entries(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [{"a.py": "x = 1\n"}])
+            head = git(repo, "rev-parse", "HEAD")
+            entries = extract_mod.tree_entries_at_head(repo, head)
+            self.assertEqual([entry[3] for entry in entries], ["a.py"])
+
+    def test_blame_unavailability_replaces_the_absence_sentence(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "x = 1\n"},
+                {"mod.py": "x = 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+
+            def failing_blame(*args, **kwargs):
+                return self.Failed()
+
+            self._swap("run_blame", failing_blame)
+            notes = []
+            lines = extract_mod.blame_section(
+                repo, head,
+                [{"path": "mod.py"}],
+                {"mod.py": [(1, 1)]},
+                notes,
+            )
+            text = "\n".join(lines)
+            self.assertIn(
+                "Blame is unavailable for the changed ranges of "
+                "this file, so no blame summary was gathered.", text
+            )
+            self.assertNotIn(
+                "No blame data for the changed ranges.", text
+            )
+
+    def test_a_partial_blame_failure_keeps_its_tally_and_notes(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "x = 1\ny = 1\n"},
+                {"mod.py": "x = 2\ny = 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            original_blame = extract_mod.run_blame
+            calls = []
+
+            def flaky(*args, **kwargs):
+                calls.append(1)
+                if len(calls) == 1:
+                    return self.Failed()
+                return original_blame(*args, **kwargs)
+
+            self._swap("run_blame", flaky)
+            notes = []
+            lines = extract_mod.blame_section(
+                repo, head,
+                [{"path": "mod.py"}],
+                {"mod.py": [(1, 1), (2, 2)]},
+                notes,
+            )
+            text = "\n".join(lines)
+            self.assertIn(" lines 1", text)
+            self.assertTrue(
+                any(
+                    "blame readings for mod.py failed for 1 of 2 ranges"
+                    in note for note in notes
+                ), notes,
+            )
+
+    def test_history_unavailability_replaces_the_absence_sentence(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": "def helper(x):\n    return x + 1\n"},
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            original_run_git = extract_mod.run_git
+
+            def failing(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "log" and "-L" in args:
+                    return self.Failed()
+                return original_run_git(
+                    repo_arg, args, check=check, global_flags=global_flags
+                )
+
+            self._swap("run_git", failing)
+            notes = []
+            lines = extract_mod.evolution_section(
+                repo, head,
+                [{"path": "mod.py"}],
+                {"mod.py": ["helper"]},
+                notes,
+            )
+            text = "\n".join(lines)
+            self.assertIn(
+                "History is unavailable for this function, so no "
+                "history was gathered.", text
+            )
+            self.assertNotIn(
+                "No history available for this function.", text
+            )
+
+    def test_the_byte_reader_names_its_failure_shape(self):
+        doc = extract_mod.file_bytes.__doc__
+        self.assertIn("a read that failed", doc)
+        self.assertIn("recount", doc)
+
+
+class TestRound22RefusalSkeleton(unittest.TestCase):
+    """Round 22 repair F6. One skeleton walks both clone refusals."""
+
+    def _repo_with_info(self, tmp):
+        repo = make_repo(tmp, [{"a.py": "x = 1\n"}])
+        return repo, repo / ".git" / "info"
+
+    def test_both_refusals_share_the_one_skeleton(self):
+        import inspect
+        for name in ("refuse_grafts", "refuse_info_attributes"):
+            source = inspect.getsource(getattr(extract_mod, name))
+            self.assertIn("_refuse_info_file", source, name)
+            self.assertNotIn("os.stat", source, name)
+
+    def test_both_refusals_refuse_their_effective_file(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, info = self._repo_with_info(tmp)
+            (info / "grafts").write_text("a b\n")
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.refuse_grafts(repo)
+            self.assertIn("carries grafts", str(caught.exception))
+        with RetryingTemporaryDirectory() as tmp:
+            repo, info = self._repo_with_info(tmp)
+            (info / "attributes").write_text("f.py binary\n")
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.refuse_info_attributes(repo)
+            self.assertIn("carries attributes", str(caught.exception))
+
+    def test_comment_only_files_refuse_neither(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, info = self._repo_with_info(tmp)
+            (info / "grafts").write_text("# a note\n\n")
+            (info / "attributes").write_text("# a note\n\n")
+            outcomes = []
+            for call in (
+                extract_mod.refuse_grafts,
+                extract_mod.refuse_info_attributes,
+            ):
+                try:
+                    call(repo)
+                except extract_mod.GitError:
+                    outcomes.append("refused")
+                else:
+                    outcomes.append("passed")
+            self.assertEqual(outcomes, ["passed", "passed"])
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "no mkfifo on this host")
+    def test_a_fifo_at_either_path_refuses_in_its_own_words(self):
+        for name, call in (
+            ("grafts", extract_mod.refuse_grafts),
+            ("attributes", extract_mod.refuse_info_attributes),
+        ):
+            with RetryingTemporaryDirectory() as tmp:
+                repo, info = self._repo_with_info(tmp)
+                target = info / name
+                if target.exists() or target.is_symlink():
+                    target.unlink()
+                os.mkfifo(target)
+                with self.assertRaises(extract_mod.GitError) as caught:
+                    call(repo)
+                self.assertIn("named pipe", str(caught.exception), name)
+
+    def test_a_failed_stat_passes_silently_in_both_refusals(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo, info = self._repo_with_info(tmp)
+            original_stat = os.stat
+            attempts = []
+
+            def broken(path, *args, **kwargs):
+                if str(path).endswith(("grafts", "attributes")):
+                    attempts.append(Path(path).name)
+                    raise OSError("stat failed")
+                return original_stat(path, *args, **kwargs)
+
+            outcomes = []
+            with mock.patch.object(os, "stat", broken):
+                for call in (
+                    extract_mod.refuse_grafts,
+                    extract_mod.refuse_info_attributes,
+                ):
+                    try:
+                        call(repo)
+                    except extract_mod.GitError:
+                        outcomes.append("refused")
+                    else:
+                        outcomes.append("passed")
+            self.assertEqual(outcomes, ["passed", "passed"])
+            self.assertEqual(attempts, ["grafts", "attributes"])
+
+
+class TestRound22ConstantPlants(unittest.TestCase):
+    """Round 22 repair F7. Four bound values carry behavioural plants."""
+
+    def test_the_process_timeout_value_stands_in_its_refusal(self):
+        walked = []
+
+        def stalled(argv, **kwargs):
+            walked.append(kwargs.get("timeout"))
+            raise subprocess.TimeoutExpired(
+                argv, kwargs.get("timeout")
+            )
+
+        with mock.patch.object(extract_mod.subprocess, "run", stalled):
+            with self.assertRaises(extract_mod.GitError) as caught:
+                extract_mod.run_process(
+                    [sys.executable, "-c", "pass"]
+                )
+        self.assertEqual(walked, [120])
+        self.assertIn(
+            "command timed out after 120 seconds",
+            str(caught.exception),
+        )
+        original = extract_mod.PROCESS_TIMEOUT_SECONDS
+        extract_mod.PROCESS_TIMEOUT_SECONDS = 1
+        self.addCleanup(
+            setattr, extract_mod, "PROCESS_TIMEOUT_SECONDS", original
+        )
+        with self.assertRaises(extract_mod.GitError) as caught:
+            extract_mod.run_process(
+                [sys.executable, "-c", "import time; time.sleep(5)"]
+            )
+        self.assertIn(
+            "command timed out after 1 seconds", str(caught.exception)
+        )
+
+    def test_the_range_diff_cap_marks_an_overlong_range_diff(self):
+        def big(changed):
+            rows = [
+                "filler line %04d with prose padding to widen "
+                "the patch" % n
+                for n in range(400)
+            ]
+            if changed:
+                rows = [
+                    row + " changed" if n % 7 == 0 else row
+                    for n, row in enumerate(rows)
+                ]
+            return "\n".join(rows) + "\n"
+
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"seed.py": "seed\n"})
+            commit_all(repo, "base")
+            base = git(repo, "rev-parse", "HEAD")
+            write_tree(repo, {"big.py": big(False)})
+            commit_all(repo, "big old")
+            since = git(repo, "rev-parse", "HEAD")
+            git(repo, "checkout", "-b", "rework", base)
+            write_tree(repo, {"big.py": big(True)})
+            commit_all(repo, "big new")
+            head = git(repo, "rev-parse", "HEAD")
+            text = extract_mod.build_rereview(
+                repo, base, head, since, []
+            )
+            self.assertIn(
+                "[recognitio] range diff capped at 8000 characters.",
+                text,
+            )
+
+    def test_the_definitions_cap_notes_a_fourth_definition(self):
+        with RetryingTemporaryDirectory() as tmp:
+            files = {
+                "mod.py": "def helper(x):\n    return x\n",
+            }
+            for index in range(4):
+                files["defs%d.py" % index] = (
+                    "def helper(x):\n    return x + %d\n" % index
+                )
+            repo = make_repo(tmp, [
+                files,
+                {"mod.py": "def helper(x):\n    return x + 9\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            notes = []
+            lines = extract_mod.definitions_section(
+                repo, head,
+                [{
+                    "path": "mod.py", "status": "modified",
+                    "old_path": None,
+                }],
+                {"mod.py": ["helper"]},
+                notes,
+            )
+            self.assertTrue(
+                any(
+                    note == "definitions of helper capped at 3 of 4"
+                    for note in notes
+                ), notes,
+            )
+            self.assertEqual("\n".join(lines).count("def helper"), 3)
+
+    def test_the_test_files_cap_notes_an_eleventh_test_file(self):
+        with RetryingTemporaryDirectory() as tmp:
+            files = {
+                "mod.py": "def helper(x):\n    return x\n",
+            }
+            for index in range(11):
+                files["tests/test_%02d.py" % index] = (
+                    "from mod import helper\n"
+                    "assert helper(1) is not None\n"
+                )
+            repo = make_repo(tmp, [
+                files,
+                {"mod.py": "def helper(x):\n    return x + 9\n"},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            notes = []
+            lines = extract_mod.test_files_section(
+                repo, head,
+                [{
+                    "path": "mod.py", "status": "modified",
+                    "old_path": None,
+                }],
+                {"mod.py": ["helper"]},
+                notes,
+            )
+            self.assertTrue(
+                any(
+                    note == "test files capped at 10 of 11"
+                    for note in notes
+                ), notes,
+            )
+            self.assertEqual("\n".join(lines).count("#### tests/"), 10)

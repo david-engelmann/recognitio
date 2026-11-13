@@ -66,6 +66,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -82,10 +83,12 @@ GIT_SCRUB_VARS = (
     "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_COMMON_DIR",
-    "GIT_GRAFT_FILE",
     "GIT_NAMESPACE",
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
+    # Forced on in the child environment like the extractor
+    # pair, naming an empty file this run controls.
+    "GIT_GRAFT_FILE",
 )
 # The same driver and configuration scrub the extractor runs under.
 # Configuration supplied through the environment can define a driver
@@ -166,7 +169,39 @@ def scrubbed_child_env():
     }
     env["GIT_NO_REPLACE_OBJECTS"] = "1"
     env["GIT_ATTR_NOSYSTEM"] = "1"
+    # The same graft pin the extractor runs under, because the
+    # recount children read the same clone inside the same window
+    # the extractor reads it in, and a graft planted after the
+    # upfront refusal must move neither reading.
+    graft_pin = _graft_pin_path()
+    if graft_pin is not None:
+        env["GIT_GRAFT_FILE"] = graft_pin
     return env
+
+
+# One empty grafts file stands created on first use and held for
+# the life of the process, so the graft pin below always names a
+# file that stands in place. The empty file grafts nothing. A
+# failure to create it leaves the pin unset, in which shape the
+# upfront graft refusal and the scrub of the caller variable
+# still stand.
+_GRAFT_PIN_PATH = None
+
+
+def _graft_pin_path():
+    """Create the run's empty grafts file once and return its path."""
+    global _GRAFT_PIN_PATH
+    if _GRAFT_PIN_PATH is None:
+        try:
+            import tempfile
+            handle, path = tempfile.mkstemp(
+                prefix="recognitio-grafts-"
+            )
+            os.close(handle)
+            _GRAFT_PIN_PATH = path
+        except OSError:
+            return None
+    return _GRAFT_PIN_PATH
 
 
 def run_git_detailed(repo, args):
@@ -3737,7 +3772,7 @@ def rebuild_problems(packet_text, manifest, repo, fresh_change, extractor,
     chunks = fresh_change["chunks"]
     functions = {
         entry["path"]: extractor.extract_function_names(
-            chunks.get(entry["path"], "")
+            chunks.get(entry["path"], ""), entry["path"]
         )
         for entry in files
     }

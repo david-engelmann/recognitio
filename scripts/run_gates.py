@@ -60,7 +60,9 @@ keyed tree at or above the pinned floor.
 """
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -69,7 +71,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PINNED_TEST_FLOOR = 3069
+PINNED_TEST_FLOOR = 3100
 
 RAN_RE = re.compile(r"^Ran (\d+) tests", re.M)
 
@@ -113,6 +115,31 @@ def step_name(argv):
     return "-".join(argv[1:]) or argv[0]
 
 
+# One empty grafts file stands created on first use and held
+# for the life of the process, so the graft pin in the runner
+# identity reads always names a file that stands in place. The
+# empty file grafts nothing. A failure to create it leaves the
+# pin unset, in which shape the runner refuses any root that is
+# not a clean checkout anyway.
+_GRAFT_PIN_PATH = None
+
+
+def _graft_pin_path():
+    """Create the runner's empty grafts file once and return it."""
+    global _GRAFT_PIN_PATH
+    if _GRAFT_PIN_PATH is None:
+        try:
+            import tempfile
+            handle, path = tempfile.mkstemp(
+                prefix="recognitio-grafts-"
+            )
+            os.close(handle)
+            _GRAFT_PIN_PATH = path
+        except OSError:
+            return None
+    return _GRAFT_PIN_PATH
+
+
 def _git(root, *args):
     # Timeout basis. The runner asks git only for local
     # reads over one tree, in rev-parse and status and
@@ -124,10 +151,14 @@ def _git(root, *args):
     # at about 11 seconds under load, so a read still
     # working at this limit is read as stalled rather
     # than slow.
+    env = dict(os.environ)
+    graft_pin = _graft_pin_path()
+    if graft_pin is not None:
+        env["GIT_GRAFT_FILE"] = graft_pin
     try:
         out = subprocess.run(
             ["git", "-C", str(root), *args],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, timeout=120, env=env,
         )
     except (OSError, subprocess.SubprocessError):
         return None

@@ -48,6 +48,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -682,11 +683,18 @@ GIT_LOCATION_VARS = (
     "GIT_NAMESPACE",
     "GIT_NO_REPLACE_OBJECTS",
     "GIT_REPLACE_REF_BASE",
-    # The graft file variable hands every child a grafts file of
-    # the caller's choosing, which rewrites the parentage of the
-    # history the packet certifies while the packet keeps the real
-    # head name. It is scrubbed here and a clone carrying its own
-    # grafts file is refused where the inputs are resolved.
+    # The graft file variable is forced on in the child
+    # environment and never dropped, so the parity plant
+    # derives it from the scrub list here and holds the
+    # forced value to account rather than to absence. The
+    # pin names an empty file the run controls, so a caller
+    # supplied grafts file never reaches a child either.
+    # Left to the caller, the variable would hand every
+    # child a grafts file of the caller's choosing, which
+    # rewrites the parentage of the history the packet
+    # certifies while the packet keeps the real head name,
+    # and a clone carrying its own grafts file is refused
+    # where the inputs are resolved.
     "GIT_GRAFT_FILE",
 )
 
@@ -751,7 +759,45 @@ def scrubbed_child_env():
     # beside the user attributes file the pin list switches off,
     # so its readings are refused here as well.
     env["GIT_ATTR_NOSYSTEM"] = "1"
+    # Every child reads grafts from the one empty file this run
+    # controls, never from the clone under review. The graft
+    # refusal at input resolution reads the clone file once, and
+    # before this pin a graft planted after that reading was
+    # honoured by the calls that assemble and recount the packet,
+    # which then certified the grafted parentage under the real
+    # head name. The replace refusal needed no such pin because
+    # its flag rides on every invocation. The graft file variable
+    # stands scrubbed above, so the spelling set here is the only
+    # one a child can see.
+    graft_pin = _graft_pin_path()
+    if graft_pin is not None:
+        env["GIT_GRAFT_FILE"] = graft_pin
     return env
+
+
+# One empty grafts file stands created on first use and held for
+# the life of the process, so the graft pin below always names a
+# file that stands in place. The empty file grafts nothing. A
+# failure to create it leaves the pin unset, in which shape the
+# upfront graft refusal and the scrub of the caller variable
+# still stand.
+_GRAFT_PIN_PATH = None
+
+
+def _graft_pin_path():
+    """Create the run's empty grafts file once and return its path."""
+    global _GRAFT_PIN_PATH
+    if _GRAFT_PIN_PATH is None:
+        try:
+            import tempfile
+            handle, path = tempfile.mkstemp(
+                prefix="recognitio-grafts-"
+            )
+            os.close(handle)
+            _GRAFT_PIN_PATH = path
+        except OSError:
+            return None
+    return _GRAFT_PIN_PATH
 
 
 # Every child process gets a timeout, the network calls to the GitHub
@@ -1355,6 +1401,59 @@ def refuse_shallow(repo):
         )
 
 
+def _refuse_info_file(repo, name, mechanism, remedy):
+    """Refuse a clone carrying one effective info directory file.
+
+    The grafts refusal and the info attributes refusal share this
+    one skeleton, because both refuse a file git reads from the
+    clone info directory under its own rules and neither reading
+    can be confined by a pin this run carries. The walk resolves
+    the common directory through the shared helper, stats the
+    path, refuses a named pipe in the caller's words, and raises
+    on any effective line in the caller's words. A path that does
+    not stand, or whose stat fails, returns in silence, and any
+    other path that is not a regular file draws the same silent
+    treatment, because a directory standing at one of these paths
+    reads the same way in git as well.
+    """
+    common_path = common_dir_path(repo)
+    if common_path is None:
+        return
+    target = common_path / "info" / name
+    # Two tests stand before the read. A named pipe at this
+    # path refuses the run outright, because git reads the
+    # same path as its own file and opening a pipe would block
+    # the git calls themselves, so no silent treatment can
+    # save the run here. Any other path that is not a regular
+    # file draws the same silent treatment the unreadable
+    # path below has always drawn.
+    try:
+        target_mode = os.stat(target).st_mode
+    except OSError:
+        return
+    if stat.S_ISFIFO(target_mode):
+        raise GitError(
+            "the clone carries a named pipe at %s and git "
+            "reads that path as its %s, so the git calls this "
+            "run makes would block on opening it. Remove the "
+            "pipe, then run again" % (target, mechanism)
+        )
+    if not target.is_file():
+        return
+    try:
+        text = target.read_text(
+            encoding="utf-8", errors="surrogateescape"
+        )
+    except OSError:
+        return
+    effective = [
+        line for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if effective:
+        raise GitError(remedy % target)
+
+
 def refuse_grafts(repo):
     """Refuse a clone carrying an effective graft.
 
@@ -1370,47 +1469,17 @@ def refuse_grafts(repo):
     a child, because the graft file variable stands in the scrub
     list, so the file this refusal reads is the clone's own.
     """
-    common = run_git(
-        repo, ["rev-parse", "--git-common-dir"], check=False
+    _refuse_info_file(
+        repo,
+        "grafts",
+        "grafts file",
+        "the clone carries grafts in %s and a graft rewrites "
+        "the parentage of the history the packet certifies "
+        "while the packet keeps the real head name, so no "
+        "packet built in this clone can certify the change of "
+        "the commit it names. Empty or remove that file, "
+        "then run again",
     )
-    if common.returncode != 0 or not common.stdout.strip():
-        return
-    common_path = Path(common.stdout.strip())
-    if not common_path.is_absolute():
-        common_path = Path(repo) / common_path
-    grafts = common_path / "info" / "grafts"
-    try:
-        graft_mode = os.stat(grafts).st_mode
-    except OSError:
-        return
-    if stat.S_ISFIFO(graft_mode):
-        raise GitError(
-            "the clone carries a named pipe at %s and git reads "
-            "that path as its grafts file, so the git calls this "
-            "run makes would block on opening it. Remove the "
-            "pipe, then run again" % grafts
-        )
-    if not grafts.is_file():
-        return
-    try:
-        text = grafts.read_text(
-            encoding="utf-8", errors="surrogateescape"
-        )
-    except OSError:
-        return
-    effective = [
-        line for line in text.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
-    if effective:
-        raise GitError(
-            "the clone carries grafts in %s and a graft rewrites "
-            "the parentage of the history the packet certifies "
-            "while the packet keeps the real head name, so no "
-            "packet built in this clone can certify the change of "
-            "the commit it names. Empty or remove that file, "
-            "then run again" % grafts
-        )
 
 
 def refuse_info_attributes(repo):
@@ -1427,57 +1496,16 @@ def refuse_info_attributes(repo):
     holding only comments and blank lines assigns nothing and
     does not refuse the run.
     """
-    common = run_git(
-        repo, ["rev-parse", "--git-common-dir"], check=False
+    _refuse_info_file(
+        repo,
+        "attributes",
+        "clone attributes file",
+        "the clone carries attributes in %s and those attributes "
+        "sit outside the reviewed tree while git reads them ahead "
+        "of the tree attributes themselves, so no packet built in "
+        "this clone can credit its markings to the tree under "
+        "review. Empty or remove that file, then run again",
     )
-    if common.returncode != 0 or not common.stdout.strip():
-        return
-    common_path = Path(common.stdout.strip())
-    if not common_path.is_absolute():
-        common_path = Path(repo) / common_path
-    info_attributes = common_path / "info" / "attributes"
-    # Two tests stand before the read. A named pipe at this
-    # path refuses the run outright, because git reads the
-    # same path as its clone attributes file and opening a
-    # pipe would block the git calls themselves, so no
-    # silent treatment can save the run here. Any other
-    # path that is not a regular file draws the same silent
-    # treatment the unreadable path below has always drawn,
-    # and a directory standing here reads that same way in
-    # git as well.
-    try:
-        info_mode = os.stat(info_attributes).st_mode
-    except OSError:
-        info_mode = None
-    if info_mode is not None and stat.S_ISFIFO(info_mode):
-        raise GitError(
-            "the clone carries a named pipe at %s and git "
-            "reads that path as its clone attributes file, "
-            "so the git calls this run makes would block on "
-            "opening it. Remove the pipe, then run again"
-            % info_attributes
-        )
-    if not info_attributes.is_file():
-        return
-    try:
-        text = info_attributes.read_text(
-            encoding="utf-8", errors="surrogateescape"
-        )
-    except OSError:
-        return
-    effective = [
-        line for line in text.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
-    if effective:
-        raise GitError(
-            "the clone carries attributes in %s and those attributes "
-            "sit outside the reviewed tree while git reads them ahead "
-            "of the tree attributes themselves, so no packet built in "
-            "this clone can credit its markings to the tree under "
-            "review. Empty or remove that file, then run again"
-            % info_attributes
-        )
 
 
 def resolve_pr(repo, args, since_sha):
@@ -1838,7 +1866,8 @@ def old_side_ranges(chunk):
     return ranges
 
 
-def extract_function_names(chunk):
+def extract_function_names(chunk, path=None):
+    state = {"quote": None, "block": None}
     names = []
     for line in chunk.splitlines():
         if line.startswith("@@"):
@@ -1851,6 +1880,8 @@ def extract_function_names(chunk):
             probe = line[1:].strip()
         else:
             continue
+        if not line.startswith("@@"):
+            probe = _mask_spans_for_names(probe, path, state)
         probe = _DEFINITION_PREFIX_RE.sub("", probe, count=1)
         for pattern in FUNC_PATTERNS:
             match = pattern.match(probe)
@@ -1858,7 +1889,232 @@ def extract_function_names(chunk):
                 name = match.group(1)
                 if name not in names:
                     names.append(name)
+        match = CLASS_PATTERN.match(probe)
+        if match:
+            name = match.group(1)
+            if name not in names:
+                names.append(name)
     return names
+
+# The span state one mask walk stands in rides in a small
+# mapping the caller hands down, holding the closing delimiter
+# of the string the walk stands inside, or None outside any
+# string, and the closing delimiter of the block comment the
+# walk stands inside, or None outside any comment. The name
+# gathering creates one mapping per chunk and hands it to
+# every line of that chunk in order, so a span that
+# legitimately crosses lines masks every line it spans. A
+# reader of single lines creates one mapping per line, so no
+# state crosses between the lines it judges.
+
+
+def _mask_spans_for_names(text, path, state=None):
+    """Blank string and comment spans of one line for the name reading.
+
+    The name gathering reads changed lines textually, so a
+    definition shaped line standing inside a string literal or
+    a comment was gathered as a changed function and ordinary
+    assignments were then credited as its call sites. This mask
+    runs over the stripped line the gathering reads and blanks
+    the characters inside the spans it holds, so the definition
+    patterns read only the code of the line. The quote
+    characters of a string span stand, so a definition whose
+    argument list carries a string keeps its opening.
+
+    Which spans stand blanked turns on the family the file
+    suffix names. The hash comment family, the Python and Ruby
+    and shell suffixes, blanks its string spans and its hash
+    comments, and carries no block comment form. Every other
+    suffix takes the C comment rules and blanks its string
+    spans, its line comments and its block comments. A Lua
+    file blanks its string spans, its line comments and its
+    long comments in the plain bracketed form, and its long
+    strings in the same form. A block comment that opens mid
+    line blanks from its opening, and a span the walk stands
+    inside when the line opens blanks until its close. Three
+    shapes stand outside the mask and are read as written. A
+    block comment nested inside another closes at the first
+    close the walk meets, so a definition shaped line standing
+    between an inner close and an outer one is read as code.
+    The levelled Lua bracket forms and the Ruby block comment
+    form stand outside it. The interpolation expression of a
+    template literal is read as string, never as code.
+
+    The gathering hands the mask the lines of one chunk in
+    order under one state mapping it creates for the chunk,
+    and the span state the walk stands in rides in that
+    mapping between the calls. Only the forms that
+    legitimately span lines carry that state, the triple
+    quoted strings, the template literals, the long Lua forms
+    and the block comments, so a definition shaped line
+    standing inside one of them is never read as code. A
+    single or double quote that never closes on its line
+    carries nothing and masks nothing. The mask stands down
+    for that line alone and leaves it read as written, rather
+    than masking the lines after it on a guess the quote
+    opened a string at all, which a lifetime apostrophe and an
+    apostrophe in prose both defeat. A call made with no
+    state mapping starts outside any span and carries nothing
+    past the line it reads.
+    """
+    suffix = Path(path).suffix.lower() if path else ""
+    hash_comments = suffix in (".py", ".sh", ".bash", ".zsh", ".rb")
+    lua = suffix == ".lua"
+    if state is None:
+        state = {"quote": None, "block": None}
+    state.setdefault("quote", None)
+    state.setdefault("block", None)
+    stood_inside = (
+        state["quote"] is not None or state["block"] is not None
+    )
+    out = []
+    index = 0
+    size = len(text)
+    if state["block"] is not None:
+        # The line opens inside a block comment an earlier line
+        # of the chunk opened. Its characters stand blanked
+        # until the comment closes on this line or the line
+        # ends inside it.
+        closer = state["block"]
+        found = text.find(closer)
+        if found < 0:
+            return " " * size
+        out.append(" " * (found + len(closer)))
+        index = found + len(closer)
+        state["block"] = None
+    elif state["quote"] is not None:
+        # The line opens inside a string an earlier line of
+        # the chunk opened, one of the forms that legitimately
+        # span lines. Its characters stand blanked until the
+        # string closes on this line or the line ends inside
+        # it. A Lua long form carries no escapes, so its close
+        # is read plain, and a quoted form skips an escaped
+        # character without reading it as a close.
+        closer = state["quote"]
+        closed = False
+        while index < size:
+            if (
+                closer != "]]"
+                and text[index] == "\\"
+                and index + 1 < size
+            ):
+                out.append("  ")
+                index += 2
+                continue
+            if text.startswith(closer, index):
+                out.append(closer)
+                index += len(closer)
+                state["quote"] = None
+                closed = True
+                break
+            out.append(" ")
+            index += 1
+        if not closed:
+            return "".join(out)
+    while index < size:
+        char = text[index]
+        if hash_comments and char == "#":
+            out.append(" " * (size - index))
+            index = size
+            break
+        if lua and char == "-" and text.startswith("--", index):
+            if text.startswith("--[[", index):
+                end = text.find("]]", index + 4)
+                if end < 0:
+                    out.append(" " * (size - index))
+                    state["block"] = "]]"
+                    return "".join(out)
+                out.append(" " * (end + 2 - index))
+                index = end + 2
+                continue
+            out.append(" " * (size - index))
+            index = size
+            break
+        if not hash_comments and not lua and char == "/":
+            if index + 1 < size and text[index + 1] == "/":
+                out.append(" " * (size - index))
+                index = size
+                break
+            if index + 1 < size and text[index + 1] == "*":
+                end = text.find("*/", index + 2)
+                if end < 0:
+                    out.append(" " * (size - index))
+                    state["block"] = "*/"
+                    return "".join(out)
+                out.append(" " * (end + 2 - index))
+                index = end + 2
+                continue
+        if lua and char == "[" and text.startswith("[[", index):
+            end = text.find("]]", index + 2)
+            if end < 0:
+                out.append(" " * (size - index))
+                state["quote"] = "]]"
+                return "".join(out)
+            out.append(" " * (end + 2 - index))
+            index = end + 2
+            continue
+        if char in ("'", '"', "`"):
+            run = 1
+            while index + run < size and text[index + run] == char:
+                run += 1
+            if run >= 3:
+                # A triple quoted string opens here and its
+                # close is a run of the same three characters,
+                # on this line or on a later line of the chunk.
+                closer = char * 3
+                out.append(closer)
+                scan = text.find(closer, index + 3)
+                if scan >= 0:
+                    out.append(" " * (scan - (index + 3)))
+                    out.append(closer)
+                    index = scan + 3
+                    continue
+                out.append(" " * (size - (index + 3)))
+                state["quote"] = closer
+                return "".join(out)
+            out.append(char)
+            index += 1
+            span_closed = False
+            while index < size:
+                inner = text[index]
+                if inner == "\\" and index + 1 < size:
+                    out.append("  ")
+                    index += 2
+                    continue
+                if inner == char:
+                    out.append(inner)
+                    index += 1
+                    span_closed = True
+                    break
+                out.append(" ")
+                index += 1
+            if span_closed:
+                continue
+            if char == "`":
+                # A template literal spans lines in the shape
+                # of a triple quoted string, so the state
+                # carries into the next line of the chunk.
+                state["quote"] = "`"
+                return "".join(out)
+            if stood_inside:
+                # The line opened inside a span that closed on
+                # it, so the stand down cannot hand the line
+                # back as written. The tail the unclosed quote
+                # swallowed stands blanked and no state carries.
+                return "".join(out)
+            # A single or double quote that never closes on
+            # its line stands down for that line alone. The
+            # line is read as written and the state stands
+            # clear, so the lines after it read on their own.
+            state["quote"] = None
+            state["block"] = None
+            return text
+        out.append(char)
+        index += 1
+    state["quote"] = None
+    state["block"] = None
+    return "".join(out)
+
 
 def companion_stems(entry):
     """Search stems for one source entry, each in both Unicode forms.
@@ -2002,7 +2258,17 @@ def term_matches_line(term, content):
 
 
 def file_bytes(repo, ref, path):
-    """Return the raw bytes of a file at a ref, or None when absent."""
+    """Return the raw bytes of a file at a ref, or None when absent.
+
+    None also stands for a read that failed, a ref or a path the
+    clone cannot resolve or a show command that errors, and this
+    reader does not separate the two shapes. Its callers treat
+    None as no bytes on that side and build their placeholder or
+    skip on that reading, and the recount stands behind them as
+    the backstop, because a reading lost this way moves the
+    counts the recount rebuilds and the disagreement surfaces
+    there rather than passing in silence.
+    """
     if ref is None or path is None:
         return None
     result = run_process(
@@ -2330,11 +2596,20 @@ def measure_binary_entry(repo, diff_base, head, entry, chunks, precise):
     if not looks_textual(data):
         entry["binary"] = True
         entry["head_bytes"] = len(data)
+        prefix = ""
+        if entry.get("old_path"):
+            prefix = "(%s from %s. " % (
+                source_verb(entry), display_path(entry["old_path"])
+            )
+        suffix = ")" if prefix else ""
         entry["placeholder"] = (
-            "(binary file of %d bytes at the %s revision. No "
-            "textual diff is shown.)"
-            % (len(data), "head" if entry["status"] != "deleted"
-               else "base")
+            prefix
+            + "(binary file of %d bytes at the %s revision. No "
+            "textual diff is shown.)" % (
+                len(data), "head" if entry["status"] != "deleted"
+                else "base"
+            )
+            + suffix
         )
         receipt = {
             "path": path,
@@ -2422,11 +2697,19 @@ def generated_placeholder(repo, diff_base, head, entry, adds, dels):
                       "shown in full",
             "shown_as_text": True,
         }
+    prefix = ""
+    if entry.get("old_path"):
+        prefix = "(%s from %s. " % (
+            source_verb(entry), display_path(entry["old_path"])
+        )
+    suffix = ")" if prefix else ""
     entry["placeholder"] = (
-        "(%s. The diff is withheld from the packet and its "
+        prefix
+        + "(%s. The diff is withheld from the packet and its "
         "%d additions and %d deletions across %d hunks are "
         "counted in the manifest)"
         % (reason, adds, dels, entry["hunks"])
+        + suffix
     )
     return {
         "path": path,
@@ -3202,6 +3485,18 @@ def credential_notice(entry):
     so the withheld diff is a stated shape with its counts
     named rather than an absence a reader must guess at.
     """
+    if entry.get("old_path"):
+        return (
+            "(%s from %s. Credential file with %d additions "
+            "and %d deletions. Its diff is not printed, because "
+            "the lines of a credential file are secrets by "
+            "shape. The counts stand in the manifest.)"
+            % (
+                source_verb(entry).capitalize(),
+                display_path(entry["old_path"]),
+                entry["additions"], entry["deletions"],
+            )
+        )
     return (
         "(credential file with %d additions and %d "
         "deletions. Its diff is not printed, because the "
@@ -3631,7 +3926,13 @@ def _merge_utf16_hits(repo, head, hits, terms):
     batch, so its cost does not grow with the batch count. Its
     hits merge by path and line, so a line the byte search also
     returned stands once in the per term order its path and line
-    give it.
+    give it. The scan takes the head listing from the raising
+    reader every other consumer of the listing takes, since the
+    carrier evidence it folds in stands inside what the packet
+    certifies. A listing that fails at this reading fails the
+    run in the run voice, as it does on every other path. A
+    failure inside the scan itself, on arguments the caller
+    computed, still raises.
     """
     extra = utf16_companion_hits(
         repo, head, terms, tree_entries_at_head(repo, head)
@@ -3652,13 +3953,23 @@ def tree_entries_at_head(repo, head):
     listing of the tree. The companion readers that walk the
     whole tree share this reader, so the listing is parsed in
     one place and a scope decision about modes is made once.
+
+    A listing that fails raises in the run voice, under the rule
+    the companion search states at its own spot. A search that
+    failed is not a search that found nothing, and an empty
+    listing returned in silence would narrow every reading the
+    five consumers take from it, so no consumer can read a
+    failure as the true tree.
     """
     result = run_git(
         repo, ["ls-tree", "-r", "-z", head], check=False,
         global_flags=["--attr-source=" + head],
     )
     if result.returncode != 0:
-        return []
+        raise GitError(
+            "git ls-tree failed with exit %d: %s"
+            % (result.returncode, result.stderr.strip())
+        )
     entries = []
     for record in result.stdout.split("\0"):
         if not record.strip():
@@ -3985,14 +4296,52 @@ def imports_section(repo, head, files, notes):
     return lines
 
 
-def line_defines(line, name):
-    probe = _DEFINITION_PREFIX_RE.sub("", line.strip(), count=1)
+def _probe_defines(probe, name):
+    """Whether one masked line defines the name.
+
+    The probe is a line whose string and comment spans the
+    caller has already masked, read under the definition
+    patterns with the export prefix stripped. Both definition
+    readings, the single line reading and the in context
+    reading over a whole file, judge through this one shape.
+    """
+    probe = _DEFINITION_PREFIX_RE.sub("", probe, count=1)
     for pattern in FUNC_PATTERNS:
         match = pattern.match(probe)
         if match and match.group(1) == name:
             return True
     match = CLASS_PATTERN.match(probe)
     return bool(match and match.group(1) == name)
+
+
+def line_defines(line, name, path=None):
+    return _probe_defines(
+        _mask_spans_for_names(line.strip(), path), name
+    )
+
+
+def _masked_file_lines(repo, head, path):
+    """The lines of one head file with their spans masked, or None.
+
+    The definitions reading judges a hit line in the context
+    of its file, so a definition shaped line standing inside a
+    string or a block comment the file opened earlier stands
+    masked on its line and is credited to nothing. The mask
+    walks the file's lines under one span state, in the order
+    the name gathering walks the lines of a chunk. A file that
+    does not read as text at the head hands back None, and the
+    reading falls back to judging the hit line on its own
+    text, the byte reader's named failure shape standing as
+    the reason a carrier file keeps the single line judgement.
+    """
+    content = show_file(repo, head, path)
+    if content is None:
+        return None
+    state = {"quote": None, "block": None}
+    return [
+        _mask_spans_for_names(line.strip(), path, state)
+        for line in content.split("\n")
+    ]
 
 
 def definitions_section(repo, head, files, functions_by_file, notes,
@@ -4006,16 +4355,34 @@ def definitions_section(repo, head, files, functions_by_file, notes,
             repo, head, companion_terms(files, functions_by_file)
         )
     any_found = False
+    masked_by_path = {}
     for entry in source_entries(files):
         for name in functions_by_file.get(entry["path"], []):
             # One search per name replaces the five prefix searches
             # this section once ran. A line that defines the name
             # carries the name as a word, so the name search returns
             # every candidate the prefix searches could return, and
-            # the definition check below keeps the same lines.
+            # the definition check below keeps the same lines. The
+            # check judges the hit line in the context of its
+            # file, its spans masked across the file's lines, so a
+            # definition shaped line standing inside a string or a
+            # block comment the file opened earlier is no
+            # definition. A hit file that does not read as text
+            # keeps the single line judgement.
             hits = []
             for hit in hits_by_term.get(name, []):
-                if hit[0] not in changed_paths and line_defines(hit[2], name):
+                if hit[0] in changed_paths:
+                    continue
+                if hit[0] not in masked_by_path:
+                    masked_by_path[hit[0]] = _masked_file_lines(
+                        repo, head, hit[0]
+                    )
+                masked = masked_by_path[hit[0]]
+                if masked is not None and 1 <= hit[1] <= len(masked):
+                    defines = _probe_defines(masked[hit[1] - 1], name)
+                else:
+                    defines = line_defines(hit[2], name, hit[0])
+                if defines:
                     hits.append(hit)
             hits = sorted(set(hits))
             if not hits:
@@ -4134,6 +4501,27 @@ def build_t2(repo, head, files, functions_by_file):
     lines.append("")
     notes = []
     sources = source_entries(files)
+    lines.append(
+        "The searches in this tier read marked and plain text carriers "
+        "alone, and an absence the sections below print stands under "
+        "that scope."
+    )
+    lines.append("")
+    skipped_binary = [
+        entry["path"] for entry in sources
+        if entry.get("binary")
+        and not functions_by_file.get(entry["path"])
+    ]
+    if skipped_binary:
+        lines.append("### Call sites for the changed names")
+        lines.append("")
+        for path in skipped_binary:
+            lines.append(
+                "%s stands marked binary in the change, so no names "
+                "were gathered from it and no call sites stand for "
+                "its names." % display_path(path)
+            )
+        lines.append("")
     if not sources:
         lines.append("No changed source files, so no companions were gathered.")
         lines.append("")
@@ -4289,6 +4677,7 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
         if not ranges:
             continue
         tally = {}
+        failed_ranges = 0
         for start, end in ranges:
             if range_count >= MAX_BLAME_RANGES:
                 ranges_note = (
@@ -4301,6 +4690,7 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
             range_count += 1
             result = run_blame(repo, git_dir, head, start, end, path)
             if result.returncode != 0:
+                failed_ranges += 1
                 continue
             pending_sha = None
             pending_count = 0
@@ -4315,6 +4705,18 @@ def blame_section(repo, head, top_files, ranges_by_file, notes):
                     pending_sha = None
         lines.append("#### %s" % display_path(path))
         lines.append("")
+        if failed_ranges and failed_ranges == len(ranges):
+            lines.append(
+                "Blame is unavailable for the changed ranges of "
+                "this file, so no blame summary was gathered."
+            )
+            lines.append("")
+            continue
+        if failed_ranges:
+            notes.append(
+                "blame readings for %s failed for %d of %d ranges"
+                % (display_path(path), failed_ranges, len(ranges))
+            )
         if not tally:
             lines.append("No blame data for the changed ranges.")
             lines.append("")
@@ -4747,7 +5149,10 @@ def evolution_section(repo, head, top_files, functions_by_file, notes):
         lines.append("#### %s in %s" % (name, display_path(path)))
         lines.append("")
         if result.returncode != 0:
-            lines.append("No history available for this function.")
+            lines.append(
+                "History is unavailable for this function, so no "
+                "history was gathered."
+            )
             lines.append("")
             continue
         history_source = anchor_history_insertions(
@@ -6653,7 +7058,9 @@ def assemble_tiers(args, repo, resolved, diff_base, change, files,
     head = resolved["head"]
     chunks = change["chunks"]
     functions_by_file = {
-        entry["path"]: extract_function_names(chunks.get(entry["path"], ""))
+        entry["path"]: extract_function_names(
+            chunks.get(entry["path"], ""), entry["path"]
+        )
         for entry in files
     }
     ranges_by_file = {
