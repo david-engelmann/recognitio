@@ -319,8 +319,14 @@ def _reject_duplicate_keys(pairs):
     return record
 
 
+def _reject_loose_constant(value):
+    raise ValueError("loose JSON constant %r" % (value,))
+
+
 def strict_json_loads(text):
-    return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+    return json.loads(
+        text, object_pairs_hook=_reject_duplicate_keys,
+        parse_constant=_reject_loose_constant)
 
 
 def guarded_read_text(path, *args, **kwargs):

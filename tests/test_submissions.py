@@ -3022,3 +3022,156 @@ class TestRound16CursorPackFigures(unittest.TestCase):
                 ),
                 problems,
             )
+
+
+class TestRunnerOutputStandsAside(unittest.TestCase):
+    """Round 24 red team Major 1, the runner poisons its own step.
+
+    The gate runner writes its run record and step logs into
+    .gate-logs under the tree it judges, and the folder is
+    gitignored, so the tree reads clean while the submissions
+    walk counted every artefact in it. On the landed tree two
+    planted files moved the measured count from 274 to 276 and
+    the gate refused the committed tree, and inside the runner
+    its own run record alone moved the count to 275 before any
+    step ran. The walk now sets the folder aside beside the
+    caches, and these tests plant the audit constructions.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_submissions")
+        self.base = TestCheckSubmissions()
+        self.base.mod = self.mod
+
+    def plant_runner_output(self, root):
+        folder = root / ".gate-logs" / "sometreehash"
+        folder.mkdir(parents=True)
+        (folder / "run.json").write_text(
+            '{"verdict": "running"}\n', encoding="utf-8")
+        (folder / "01-discover.log").write_text(
+            "Ran 3123 tests\n", encoding="utf-8")
+        (folder / "01-discover.json").write_text(
+            '{"step": "discover"}\n', encoding="utf-8")
+
+    def test_tree_files_never_names_the_runner_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            (root / "docs").mkdir(parents=True)
+            (root / "docs" / "page.md").write_text(
+                "page\n", encoding="utf-8")
+            (root / "real.txt").write_text("x\n", encoding="utf-8")
+            self.plant_runner_output(root)
+            found = dict(self.mod.tree_files(root))
+            self.assertEqual(
+                sorted(found), ["docs/page.md", "real.txt"])
+
+    def test_planted_runner_output_leaves_the_verdict(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            self.plant_runner_output(root)
+            self.assertEqual(self.base.problems(root), before)
+
+    def test_the_same_files_outside_the_folder_still_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            folder = root / "docs" / "runner-output"
+            folder.mkdir(parents=True)
+            (folder / "run.json").write_text(
+                '{"verdict": "running"}\n', encoding="utf-8")
+            (folder / "01-discover.log").write_text(
+                "Ran 3123 tests\n", encoding="utf-8")
+            problems = self.base.problems(root)
+            fresh = [p for p in problems if p not in before]
+            self.assertTrue(
+                any("files in the tree" in p for p in fresh),
+                problems,
+            )
+
+
+class TestTrackedRunnerOutputIsMeasured(unittest.TestCase):
+    """Round 24 delta, red team confirmation Minor 1.
+
+    The aside as J1 shipped it set the runner output folder
+    aside by name at any depth, tracked or not, so committed
+    content inside the folder stood invisible to the
+    measurement, and a tree tracking a large payload there
+    passed the standalone gate while both pack statements
+    the gate exists to judge stood false of it. The walk
+    now sets aside only the untracked content under the
+    folder, on the same distinction git status draws, and
+    these tests plant the confirmation construction in a
+    git held layout with its two controls beside it.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_submissions")
+        self.base = TestCheckSubmissions()
+        self.base.mod = self.mod
+
+    def git(self, root, *args):
+        import subprocess
+        return subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True, text=True, check=True,
+            env=scrubbed_git_env(),
+        )
+
+    def plant_payload(self, root):
+        folder = root / ".gate-logs"
+        folder.mkdir(parents=True)
+        payload = folder / "payload.txt"
+        payload.write_bytes(b"x" * 500000)
+        return payload
+
+    def hold_in_git(self, root):
+        self.git(root, "init", "-q")
+        self.git(root, "config", "user.email",
+                 "test@example.invalid")
+        self.git(root, "config", "user.name", "Submissions Test")
+
+    def test_a_tracked_payload_inside_the_folder_is_measured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.mod.tree_measurements(root)
+            self.assertIsNotNone(before)
+            self.plant_payload(root)
+            self.hold_in_git(root)
+            self.git(root, "add", "-f", ".gate-logs/payload.txt")
+            self.git(root, "commit", "-q", "-m", "tracked payload")
+            found = dict(self.mod.tree_files(root))
+            self.assertEqual(found[".gate-logs/payload.txt"], 500000)
+            measured = self.mod.tree_measurements(root)
+            self.assertEqual(measured["count"], before["count"] + 1)
+            self.assertEqual(
+                measured["largest_plain_path"],
+                ".gate-logs/payload.txt")
+            self.assertEqual(measured["largest_plain_size"], 500000)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("the tree holds" in p for p in problems),
+                problems)
+            self.assertTrue(
+                any("largest file that is not an image" in p
+                    for p in problems),
+                problems)
+
+    def test_an_untracked_payload_inside_the_folder_stands_aside(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            self.plant_payload(root)
+            self.hold_in_git(root)
+            found = dict(self.mod.tree_files(root))
+            self.assertNotIn(".gate-logs/payload.txt", found)
+            self.assertEqual(self.base.problems(root), before)
+
+    def test_the_folder_stands_aside_whole_where_git_cannot_say(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            self.plant_payload(root)
+            found = dict(self.mod.tree_files(root))
+            self.assertNotIn(".gate-logs/payload.txt", found)
+            self.assertEqual(self.base.problems(root), before)

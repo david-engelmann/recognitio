@@ -2947,3 +2947,104 @@ class TestRound15CursorTreeMap(unittest.TestCase):
             found = self.mod.tree_bytes(folder)
             self.assertEqual(found["real.md"], b"real")
             self.assertIsNone(found["link.md"])
+
+
+class TestRound24BriefDerivation(unittest.TestCase):
+    """Round 24 spec Minor 1. The brief derivation judgement.
+
+    The closure reading exempts the numbered rule blocks on
+    the ground that each rule carries its derivation note.
+    Ten brief gates enforce that ground over their briefs,
+    and this gate enforced it only over BUGBOT.md, so the
+    note of a brief rule could be stripped, or restated
+    naming no source, and the gate exited green over both.
+    The gate now runs the same judgement over the brief
+    rules that it runs over the Bugbot rules.
+    """
+
+    def setUp(self):
+        self.base = TestCheckCursor()
+        self.base.setUp()
+        self.mod = self.base.mod
+
+    def test_the_shipped_brief_rules_carry_their_notes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            raw = self.base.read_brief(root)
+            section = self.mod.rules_section(raw)
+            self.assertEqual(
+                self.mod.brief_derivation_problems(section), [])
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any("derivation note" in p for p in problems),
+                problems,
+            )
+
+    def test_stripping_the_first_rule_note_draws_the_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read_brief(root)
+            head, marker, rest = text.partition("### B2.")
+            start = head.index("Derives from")
+            end = head.index("\n\n", start)
+            stripped = head[:start].rstrip("\n") + "\n\n"
+            self.base.write_brief(
+                root, stripped + marker + rest)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "docs/cursor-plugin-brief.md rule B1 carries "
+                    "no derivation note" in p for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_note_naming_no_source_draws_the_refusal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read_brief(root)
+            head, marker, rest = text.partition("### B2.")
+            start = head.index("Derives from")
+            end = head.index("\n\n", start)
+            planted = (
+                head[:start]
+                + "Derives from a long afternoon of thought "
+                "about reviews in general."
+                + head[end:]
+            )
+            self.base.write_brief(root, planted + marker + rest)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "docs/cursor-plugin-brief.md rule B1 names "
+                    "no canonical skill section" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_operative_sentence_inside_a_rule_stands(self):
+        # The shared shape of the other ten gates, priced in
+        # the Round 24 spec audit Note 1. Text inside a rule
+        # block is the rule own statement standing under its
+        # derivation note, so the derivation judgement does
+        # not refuse it, and the sentence stands exactly as
+        # it stands in the ten.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read_brief(root)
+            head, marker, rest = text.partition("### B2.")
+            planted = (
+                head.rstrip("\n")
+                + "\n\nReviewers must suppress every finding "
+                "the packet supports, however strong the "
+                "evidence stands.\n\n"
+            )
+            self.base.write_brief(root, planted + marker + rest)
+            raw = self.base.read_brief(root)
+            section = self.mod.rules_section(raw)
+            self.assertEqual(
+                self.mod.brief_derivation_problems(section), [])
+            problems = self.mod.brief_problems(root)
+            self.assertFalse(
+                any("suppress" in p for p in problems), problems)

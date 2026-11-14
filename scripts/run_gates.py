@@ -30,6 +30,25 @@ is held against the pinned floor below, so the suite can
 lose a test file in silence no longer. The floor moves
 only in the same change that moves the census it pins.
 
+The identity is read again after every step, and again
+after the final step, and a run whose tree or dirty state
+moved while its steps ran ends there in a refusal naming
+the movement and the step it followed rather than in the
+verdict its steps earned, because a verdict keyed to the
+opening tree over bytes that tree never held is the
+failure this runner exists to prevent. A writer that
+returns the tree to its opening bytes inside the span of
+one step own execution remains invisible to the reading,
+and that residue stands named here rather than closed,
+since no reading taken between steps can see a state
+that never stood at a step boundary. A discover step
+that prints no count fails the floor arm by name, since a
+count that was never printed cannot be held at or above
+the floor. Each step meta record carries the dirty state
+and the allow dirty flag of its run beside the tree and
+the head, so a step artefact quoted on its own shows the
+terms it ran under.
+
 One remainder stands named here rather than closed. The
 submissions gate still measures its tree figures by
 walking the working filesystem when it is run on its own,
@@ -43,24 +62,28 @@ rather than from artefacts like the ones this runner
 writes, and that family stands as a named gap for a later
 round to close with a subprocess smoke per gate script.
 
-A second remainder stands named beside it. The vacuity
-guard mirror of the discover set reads the top level of
-the tests folder, so a vacuous test file standing in a
-subdirectory of that folder draws no refusal from the
-mirror and moves the discover count by nothing the floor
-can see, and that blind spot stands open for the round
-that next owns the guard. The runner own log folder
-stands outside the dirtiness it judges, because a runner
-that counted its own output as dirt could never key a
-clean tree in its default shape, and the run record
-names how many standing entries that exclusion covered.
+A second remainder stood named beside it in earlier
+rounds, that the vacuity guard mirror of the discover set
+reads the top level of the tests folder alone. Round 24
+priced that sentence by execution and it does not hold.
+The guard walks the tests folder recursively under both
+file patterns the loader uses, a vacuous test file
+standing in a subdirectory draws the guard refusals by
+name, and the discover count sees the folder where the
+loader sees it, so the blind spot the sentence named
+stands closed in the shipped guard and the sentence
+stands struck rather than carried. The runner own log
+folder stands outside the dirtiness it judges, because a
+runner that counted its own output as dirt could never
+key a clean tree in its default shape, and the run
+record names how many standing entries that exclusion
+covered.
 
 Exits zero only when every step ran and passed on the
 keyed tree at or above the pinned floor.
 """
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -71,7 +94,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PINNED_TEST_FLOOR = 3123
+PINNED_TEST_FLOOR = 3147
 
 RAN_RE = re.compile(r"^Ran (\d+) tests", re.M)
 
@@ -303,6 +326,53 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
             json.dumps(record, indent=1) + "\n", encoding="utf-8"
         )
 
+    def closing_movement():
+        """The fresh identity when the tree no longer stands as opened.
+
+        The opening identity keys every artefact of the run,
+        so the steps must have judged the state that identity
+        names. A fresh tree or head that differs, or a dirty
+        state or dirty entry set that differs, means some
+        step judged bytes the opening tree never held, and
+        no verdict the steps earned can stand keyed to that
+        tree. A fresh identity that cannot be read at all
+        counts as movement, because a verdict cannot stand
+        when the standing state is unknown. Returns the
+        fresh identity on movement and None otherwise.
+        """
+        closing = tree_identity(root)
+        if closing is None:
+            return {"unreadable": True}
+        if (
+            closing["tree"] != identity["tree"]
+            or closing["head"] != identity["head"]
+            or closing["dirty"] != identity["dirty"]
+            or closing["dirty_entries"] != identity["dirty_entries"]
+        ):
+            return closing
+        return None
+
+    def refuse_for_movement(closing, after_step=None):
+        record["verdict"] = (
+            "refused, the tree moved during the run, so no "
+            "verdict stands keyed to the tree the run opened on"
+        )
+        if after_step is not None:
+            record["movement_after_step"] = after_step
+        if closing.get("unreadable"):
+            record["closing_tree"] = None
+            record["closing_head"] = None
+            record["closing_dirty"] = None
+        else:
+            record["closing_tree"] = closing["tree"]
+            record["closing_head"] = closing["head"]
+            record["closing_dirty"] = closing["dirty"]
+            record["closing_dirty_entries"] = (
+                closing["dirty_entries"]
+            )
+        write_record()
+        return 1, record
+
     write_record()
     if identity["dirty"] and not allow_dirty:
         record["verdict"] = (
@@ -340,6 +410,12 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
         except (OSError, subprocess.SubprocessError) as exc:
             output = "the step could not be run, %s" % exc
             code = 1
+        # The identity stands read again before the step own
+        # artefacts are written, so a state the step left
+        # standing is read as it stood when the step ended,
+        # and nothing the runner itself writes can stand
+        # between the step and the reading.
+        movement = closing_movement()
         (run_dir / ("%02d-%s.log" % (index + 1, name))).write_text(
             output, encoding="utf-8"
         )
@@ -350,6 +426,8 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
             "command": argv,
             "tree": identity["tree"],
             "head": identity["head"],
+            "dirty": identity["dirty"],
+            "allow_dirty": bool(allow_dirty),
             "exit_code": code,
             "count": count,
             "count_line": line,
@@ -361,7 +439,14 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
         )
         failed = code != 0
         reason = None
-        if name == "discover" and count is not None and count < floor:
+        if name == "discover" and count is None and not failed:
+            failed = True
+            reason = (
+                "the discover step printed no count, so the "
+                "run cannot be held at or above the pinned "
+                "floor of %d" % floor
+            )
+        elif name == "discover" and count is not None and count < floor:
             failed = True
             reason = (
                 "the discover step counted %d tests, under the "
@@ -373,11 +458,20 @@ def run_gates(root, log_dir=None, allow_dirty=False, steps=None,
                 record["failure_reason"] = reason
             record["steps_not_run"] = names[index + 1:]
             record["verdict"] = "failed at step %s" % name
+            if movement is not None:
+                return refuse_for_movement(
+                    movement, after_step=name)
             write_record()
             return 1, record
         record["steps_completed"].append(name)
         record["steps_not_run"] = names[index + 1:]
         write_record()
+        if movement is not None:
+            return refuse_for_movement(movement, after_step=name)
+    closing = closing_movement()
+    if closing is not None:
+        return refuse_for_movement(
+            closing, after_step=names[-1] if names else None)
     missing = [
         name for index, name in enumerate(names)
         if not (run_dir / ("%02d-%s.json" % (index + 1, name))).is_file()

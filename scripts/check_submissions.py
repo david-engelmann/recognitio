@@ -60,6 +60,7 @@ Exits nonzero with one line per problem when anything fails.
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -104,7 +105,7 @@ PACK_PINS = {
         "held 274 files",
         "at 274 files against a cap of 512 files",
         "demo recording at 24,222,065 bytes",
-        "tests/test_gate_scripts.py at 396,193 bytes",
+        "tests/test_gate_scripts.py at 401,695 bytes",
         "scan over all 274 files in the tree",
     ),
     PORTABLE_PACK: (
@@ -394,19 +395,107 @@ CREDENTIAL_SCAN_PATTERNS = (
 )
 
 
+# The git location scrub its sibling gates run under. An
+# exported GIT_DIR defeats git -C, so a gate launched from
+# a git hook or a configured shell would otherwise read
+# the repository the environment names instead of the one
+# it was handed, and the tracked reading below would name
+# the paths of that other repository. Only the location
+# names stand scrubbed here, because the one git child
+# this gate spawns reads the index and nothing else.
+GIT_LOCATION_VARS = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_GRAFT_FILE",
+)
+
+
+def _tracked_paths(root):
+    """The paths the git index names under a root.
+
+    Returns None where git cannot be read over the root,
+    because a root that is not a worktree tracks nothing
+    and a git that cannot run names nothing. The reading
+    is the index, the same distinction git status draws
+    between a tracked path and an untracked one.
+    """
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in GIT_LOCATION_VARS
+    }
+    try:
+        # Timeout basis. The reading is one local index
+        # read, and it measured in single digit
+        # milliseconds on this tree in the Round 24 delta
+        # pass. The 120 second bound is a stall guard in
+        # the same figure the gate runner carries for its
+        # own git reads, so a read still working at this
+        # limit is read as stalled rather than slow.
+        proc = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            capture_output=True, timeout=120, env=env,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    text = proc.stdout.decode("utf-8", "surrogateescape")
+    return {path for path in text.split("\0") if path}
+
+
+def _runner_output_stands_aside(rel, tracked):
+    """Whether one walked path stands aside as runner output.
+
+    A path stands aside only where one of its components
+    names the runner output folder and the index does not
+    name the path itself. A tracked reading of None means
+    git could not be read over the root, in which case no
+    path under the root is tracked and every path under
+    the folder stands aside.
+    """
+    if ".gate-logs" not in rel.split("/"):
+        return False
+    if tracked is None:
+        return True
+    return rel not in tracked
+
+
 def tree_files(root):
     """Every file and link under a root, caches aside.
 
     The git directory and the bytecode caches stand aside,
     because neither is a file the pack describes and the
     caches come and go with every test run on a working tree.
-    Sizes are read with lstat so a link counts at the length
-    of its target spelling, the same size the tree listing
-    records for it.
+    The gate runner output folder stands aside only for
+    the content git does not track under it. Its logs and
+    run records are artefacts the runner writes into the
+    tree it judges while that tree tracks none of them, and
+    a measurement that counted them would refuse a tree for
+    the runner own writing. Content the index names under
+    the folder is committed content wherever it stands, so
+    it is measured like any other file, because the figures
+    the pack states describe the tracked tree and a forced
+    add can put real content under the folder name. Where
+    git cannot be read at all, no path under the root is
+    tracked and the whole folder stands aside. Sizes are
+    read with lstat so a link counts at the length of its
+    target spelling, the same size the tree listing records
+    for it.
     """
+    tracked = _tracked_paths(root)
     found = []
     for dirpath, dirnames, filenames in os.walk(root):
-        for skipped in (".git", "__pycache__", ".pytest_cache"):
+        for skipped in (
+            ".git", "__pycache__", ".pytest_cache",
+        ):
             if skipped in dirnames:
                 dirnames.remove(skipped)
         # A link to a directory stands in the dirname list,
@@ -435,7 +524,10 @@ def tree_files(root):
             except OSError:
                 continue
             found.append((rel, size))
-    return sorted(found)
+    return sorted(
+        (rel, size) for rel, size in found
+        if not _runner_output_stands_aside(rel, tracked)
+    )
 
 
 def frontmatter_description_length(root, rel):
@@ -3106,7 +3198,8 @@ def main():
         "in their own text that nothing in them has been "
         "submitted and state the shipped version, and every "
         "manifest fact their evidence checks rest on holds "
-        "in the tree"
+        "in the working files as they stand, the measurement "
+        "this gate takes from the filesystem"
     )
     return 0
 

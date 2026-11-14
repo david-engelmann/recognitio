@@ -967,13 +967,16 @@ class DuplicateKeyError(ValueError):
 
 
 def strict_json_loads(text):
-    """Parse JSON refusing a repeated key, like the other gates.
+    """Parse JSON refusing a repeated key and the loose constants.
 
     A plain load keeps the last value of a repeated key in
     silence, which would let a second entry hide beside the
-    one the gate certifies. This is the same reader the
-    other gate scripts carry, kept as a second copy because
-    the gate scripts never import each other.
+    one the gate certifies, and it reads the loose constants
+    NaN and Infinity as floats, which no manifest in the
+    tree may carry. This is the same reader the submissions,
+    regeneration, and packet checker scripts carry, kept as
+    a second copy because the gate scripts never import
+    each other.
     """
     def reject(pairs):
         seen = {}
@@ -982,7 +985,12 @@ def strict_json_loads(text):
                 raise DuplicateKeyError("repeated key %r" % key)
             seen[key] = value
         return seen
-    return json.loads(text, object_pairs_hook=reject)
+
+    def reject_constant(value):
+        raise ValueError("loose JSON constant %r" % (value,))
+    return json.loads(
+        text, object_pairs_hook=reject,
+        parse_constant=reject_constant)
 
 
 def scan_manifest(violations, path):
@@ -993,6 +1001,7 @@ def scan_manifest(violations, path):
         UnicodeDecodeError,
         json.JSONDecodeError,
         DuplicateKeyError,
+        ValueError,
     ) as exc:
         violations.append(
             "%s does not parse for the copy scan: %s"

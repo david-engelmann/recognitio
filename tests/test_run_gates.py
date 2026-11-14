@@ -246,3 +246,256 @@ class TestCountLineLastMatch(unittest.TestCase):
 
     def test_no_count_line_returns_no_count(self):
         self.assertEqual(self.mod.count_line("no counts\n"), (None, None))
+
+
+class TestRunnerRekeyAndFloorArms(RunnerFixture):
+    """Round 24. The end of run re-key and the null count arm.
+
+    Red team Major 2 priced the runner keying its verdict
+    once, before the first step, and never reading its tree
+    again, so a mid run edit re-keyed the remaining steps to
+    foreign bytes under the original tree in both directions.
+    Standards Minor 1 priced the floor arm passing a discover
+    step that printed no count at all. The step stubs below
+    are the writers, standing in for the timed writers the
+    audit drove, and each construction is deterministic.
+
+    Round 24 delta. The red team confirmation priced the
+    round trip the closing reading cannot see, a substitute
+    held across one step own read and restored byte exact
+    before the close, and the runner now reads the identity
+    again after every step, so a movement stops the run at
+    the step it followed and no later step runs over moved
+    bytes. The first two constructions below changed their
+    frontier under that reading by design, and the round
+    trip pair prices the narrowed window and its residue.
+    """
+
+    def test_a_discover_step_printing_no_count_fails_by_name(self):
+        self.write("discover.py", "print('the suite holds')\n")
+        self.write("check_stub.py", OK_STUB)
+        steps = [
+            [sys.executable, "discover.py"],
+            [sys.executable, "check_stub.py"],
+        ]
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertEqual(record["failing_step"], "discover")
+        self.assertIn("printed no count", record["failure_reason"])
+        meta = json.loads(
+            (self.logs / record["tree"] / "01-discover.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertIsNone(meta["count"])
+
+    def test_a_step_that_dirties_the_tree_mid_run_is_refused(self):
+        self.write("tracked.txt", "clean\n")
+        self.write(
+            "writer.py",
+            "open('tracked.txt', 'a').write("
+            "'a colon: lands mid run\\n')\n",
+        )
+        steps = self.steps()
+        steps.insert(1, [sys.executable, "writer.py"])
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertIn("the tree moved during the run",
+                      record["verdict"])
+        # The delta reading stops the run at the step the
+        # movement followed, so the check step never runs.
+        self.assertEqual(record["steps_completed"],
+                         ["discover", "writer"])
+        self.assertEqual(record["steps_not_run"], ["check_stub"])
+        self.assertEqual(record["movement_after_step"], "writer")
+        self.assertFalse(record["dirty"])
+        self.assertTrue(record["closing_dirty"])
+
+    def test_a_step_that_cleans_a_refusing_tree_earns_no_pass(self):
+        self.write(
+            "tracked.txt", "a colon: stands committed\n")
+        self.write(
+            "restorer.py",
+            "open('tracked.txt', 'w').write('clean\\n')\n",
+        )
+        self.write(
+            "gate_stub.py",
+            "import sys\n"
+            "sys.exit(1 if ':' in open('tracked.txt').read()"
+            " else 0)\n",
+        )
+        steps = self.steps()
+        steps[1] = [sys.executable, "restorer.py"]
+        steps.append([sys.executable, "gate_stub.py"])
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertIn("the tree moved during the run",
+                      record["verdict"])
+        # The delta reading stops the run at the step the
+        # movement followed, so the gate step that would
+        # have passed over the cleaned bytes never runs.
+        self.assertEqual(record["steps_completed"],
+                         ["discover", "restorer"])
+        self.assertEqual(record["steps_not_run"], ["gate_stub"])
+        self.assertEqual(record["movement_after_step"], "restorer")
+        self.assertTrue(record["closing_dirty"])
+
+    def test_a_step_that_commits_mid_run_is_refused(self):
+        self.write(
+            "committer.py",
+            "import subprocess\n"
+            "open('landed.txt', 'w').write('new\\n')\n"
+            "subprocess.run(['git', 'add', '-A'], check=True)\n"
+            "subprocess.run(['git', 'commit', '-q', '-m', "
+            "'mid run'], check=True)\n",
+        )
+        steps = self.steps()
+        steps.insert(1, [sys.executable, "committer.py"])
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertIn("the tree moved during the run",
+                      record["verdict"])
+        self.assertNotEqual(record["closing_head"], record["head"])
+        self.assertNotEqual(record["closing_tree"], record["tree"])
+
+    def test_step_metas_carry_the_terms_of_their_run(self):
+        steps = self.steps()
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 0, record)
+        meta = json.loads(
+            (self.logs / record["tree"] / "01-discover.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertFalse(meta["dirty"])
+        self.assertFalse(meta["allow_dirty"])
+        self.write("check_stub.py", OK_STUB + "# local edit\n")
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5,
+            allow_dirty=True,
+        )
+        self.assertEqual(code, 0, record)
+        meta = json.loads(
+            (self.logs / record["tree"] / "01-discover.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertTrue(meta["dirty"])
+        self.assertTrue(meta["allow_dirty"])
+
+
+    def test_a_substitute_held_across_a_step_is_refused_there(self):
+        # The confirmation round trip. The writer swaps
+        # clean bytes over a refusing file, the judging step
+        # would read them and pass, and the restorer returns
+        # the committed bytes, so the closing state equals
+        # the opening state and the J2 closing reading alone
+        # passed the swap. The between steps reading meets
+        # the movement at the step that made it.
+        self.write("tracked.txt", "a colon: stands committed\n")
+        self.write(
+            "writer.py",
+            "open('tracked.txt', 'w').write('clean\\n')\n")
+        self.write(
+            "gate_stub.py",
+            "import sys\n"
+            "sys.exit(1 if ':' in open('tracked.txt').read()"
+            " else 0)\n")
+        self.write(
+            "restorer.py",
+            "open('tracked.txt', 'w').write("
+            "'a colon: stands committed\\n')\n")
+        steps = [
+            [sys.executable, "writer.py"],
+            [sys.executable, "gate_stub.py"],
+            [sys.executable, "restorer.py"],
+        ]
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertIn("the tree moved during the run",
+                      record["verdict"])
+        self.assertEqual(record["movement_after_step"], "writer")
+        self.assertEqual(record["steps_completed"], ["writer"])
+        self.assertEqual(record["steps_not_run"],
+                         ["gate_stub", "restorer"])
+        self.assertTrue(record["closing_dirty"])
+
+    def test_a_round_trip_inside_one_step_is_the_named_residue(self):
+        # The residue the runner docstring names in the
+        # open. A swap and a restore inside the span of one
+        # step own execution never stands at a step
+        # boundary, so no reading between steps can see it,
+        # and the run passes. The plant prices the boundary
+        # of the repair rather than claiming the window
+        # closed whole.
+        self.write("tracked.txt", "a colon: stands committed\n")
+        self.write(
+            "swapper.py",
+            "open('tracked.txt', 'w').write('clean\\n')\n"
+            "open('tracked.txt', 'w').write("
+            "'a colon: stands committed\\n')\n")
+        self.write("check_stub.py", OK_STUB)
+        steps = [
+            [sys.executable, "swapper.py"],
+            [sys.executable, "check_stub.py"],
+        ]
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 0, record)
+        self.assertEqual(record["verdict"], "pass")
+        self.assertNotIn("movement_after_step", record)
+
+
+class TestRunnerUnreadableClosingIdentity(RunnerFixture):
+    """Round 24 delta, standards confirmation Note 2.
+
+    The unreadable closing identity arm of the end of run
+    re-key shipped with no plant in the suite, the standards
+    seat proving the behaviour by a probe whose step moved
+    the git directory away mid run. This class plants that
+    shape in the suite. The plant fails when the arm is
+    struck, since a reading that treated an unreadable
+    state as standing still would let the run continue over
+    a root whose tree can no longer be named.
+    """
+
+    def test_a_step_that_moves_the_git_directory_away_is_refused(self):
+        self.write(
+            "mover.py",
+            "import os\n"
+            "os.rename('.git', '.git-away')\n")
+        self.write("check_stub.py", OK_STUB)
+        steps = [
+            [sys.executable, "mover.py"],
+            [sys.executable, "check_stub.py"],
+        ]
+        self.commit()
+        code, record = runner.run_gates(
+            self.root, log_dir=self.logs, steps=steps, floor=5
+        )
+        self.assertEqual(code, 1, record)
+        self.assertIn("the tree moved during the run",
+                      record["verdict"])
+        self.assertIsNone(record["closing_tree"])
+        self.assertIsNone(record["closing_head"])
+        self.assertIsNone(record["closing_dirty"])
+        self.assertEqual(record["movement_after_step"], "mover")
+        self.assertEqual(record["steps_completed"], ["mover"])
+        self.assertEqual(record["steps_not_run"], ["check_stub"])

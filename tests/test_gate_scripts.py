@@ -9698,3 +9698,171 @@ class TestRound16ReadmeVersionForm(unittest.TestCase):
         self.assertEqual(
             self.mod.readme_version_problems(text, "1.3.0"), []
         )
+
+
+class TestStrictJsonReaderFamily(unittest.TestCase):
+    """Round 24 standards Minor 3. One reader, four copies, one behaviour.
+
+    The four strict JSON reader copies the round charged,
+    in the copy, submissions, regeneration, and packet
+    checker gates, had diverged, all refusing a repeated
+    key and only the submissions copy refusing the loose
+    constants a plain load reads as floats, while the copy
+    gate docstring claimed the copies were the same reader.
+    The four now answer identically, and the claim stands
+    true of the set it names.
+    """
+
+    READERS = (
+        "check_copy",
+        "check_submissions",
+        "check_regeneration",
+        "check_packet",
+    )
+
+    def test_every_copy_refuses_the_loose_constants(self):
+        for name in self.READERS:
+            mod = load_script(name)
+            for text in (
+                '{"a": NaN}',
+                '{"a": Infinity}',
+                '{"a": -Infinity}',
+                "[NaN]",
+            ):
+                with self.assertRaises(
+                    ValueError, msg=(name, text)
+                ):
+                    mod.strict_json_loads(text)
+
+    def test_every_copy_refuses_a_repeated_key(self):
+        for name in self.READERS:
+            mod = load_script(name)
+            with self.assertRaises(ValueError, msg=name):
+                mod.strict_json_loads('{"a": 1, "a": 2}')
+
+    def test_every_copy_reads_a_clean_document(self):
+        for name in self.READERS:
+            mod = load_script(name)
+            self.assertEqual(
+                mod.strict_json_loads(
+                    '{"a": [1, true, null, "x"]}'
+                ),
+                {"a": [1, True, None, "x"]},
+                name,
+            )
+
+
+class TestCopyMarkBlocksAgree(unittest.TestCase):
+    """Round 24 standards Note 1. The two hand written mark blocks.
+
+    The copy gate judges prose marks twice over, once in
+    the line scan and once in the manifest field scan, in
+    two hand written blocks whose agreement no test pinned.
+    Over the planted corpus below the two blocks now answer
+    with the same set of judged marks, so a drift in either
+    block fails here by name.
+    """
+
+    MARKS = ("em dash", "en dash", "semicolon", "a colon")
+
+    CORPUS = (
+        "plain words about a verified packet",
+        "a dash — stands in the sentence",
+        "a dash – stands in the sentence",
+        "a pause; then the sentence goes on",
+        "a list: one item follows",
+        "a dash — and a pause; both stand",
+    )
+
+    def judged(self, violations):
+        return {
+            mark
+            for mark in self.MARKS
+            if any(mark in v for v in violations)
+        }
+
+    def line_judged(self, mod, text):
+        violations = []
+        mod.scan(violations, Path("planted.md"), [(1, text)])
+        return self.judged(violations)
+
+    def manifest_judged(self, mod, text):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "plugin.json"
+            path.write_text(
+                json.dumps({"description": text}),
+                encoding="utf-8",
+            )
+            violations = []
+            mod.scan_manifest(violations, path)
+            return self.judged(violations)
+
+    def test_the_two_blocks_judge_identically(self):
+        mod = load_script("check_copy")
+        for text in self.CORPUS:
+            self.assertEqual(
+                self.line_judged(mod, text),
+                self.manifest_judged(mod, text),
+                text,
+            )
+
+    def test_the_corpus_is_not_vacuous(self):
+        mod = load_script("check_copy")
+        self.assertEqual(
+            self.line_judged(mod, self.CORPUS[0]), set())
+        self.assertEqual(
+            self.line_judged(mod, self.CORPUS[5]),
+            {"em dash", "semicolon"},
+        )
+
+
+class TestOperativeProseCopiesIdentical(unittest.TestCase):
+    """Round 24 standards Note 2. The eleven operative prose copies.
+
+    The eleven brief gates carry the closure reading as
+    eleven copies of one function, byte identical today and
+    pinned by nothing, where the read family beside them
+    stands pinned. The copies now stand pinned the same
+    way, extracted from each script parse tree and compared
+    whole, so the first copy to drift fails here naming its
+    home.
+    """
+
+    SCRIPTS = (
+        "check_antigravity",
+        "check_coderabbit",
+        "check_codex",
+        "check_codex_plugin",
+        "check_comate",
+        "check_copilot",
+        "check_cursor",
+        "check_devin",
+        "check_kimi",
+        "check_qwen",
+        "check_zcode",
+    )
+
+    def test_the_eleven_copies_stand_byte_identical(self):
+        groups = {}
+        for name in self.SCRIPTS:
+            path = ROOT / "scripts" / (name + ".py")
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            found = [
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "operative_prose_problems"
+            ]
+            self.assertEqual(len(found), 1, name)
+            segment = ast.get_source_segment(source, found[0])
+            self.assertIsNotNone(segment, name)
+            groups.setdefault(segment, []).append(name)
+        self.assertEqual(
+            len(groups),
+            1,
+            {
+                names[0]: names
+                for names in groups.values()
+            },
+        )

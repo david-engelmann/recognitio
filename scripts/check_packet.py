@@ -304,16 +304,24 @@ def _reject_duplicate_keys(pairs):
     return obj
 
 
+def _reject_loose_constant(value):
+    raise ValueError("loose JSON constant %r" % (value,))
+
+
 def strict_json_loads(text):
     """Parse JSON while refusing a repeated key at any depth.
 
     A plain reader resolves a repeated key to its last value, so a
     manifest that carries verified twice, first false and then true,
-    reads as verified. The fanout validator already refuses such a
-    file, and the packet check now reads the manifest the same way,
-    so one artefact cannot read verified here and corrupt there.
+    reads as verified, and it reads the loose constants NaN and
+    Infinity as floats, which no manifest may carry. The fanout
+    validator already refuses such a file, and the packet check now
+    reads the manifest the same way, so one artefact cannot read
+    verified here and corrupt there.
     """
-    return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+    return json.loads(
+        text, object_pairs_hook=_reject_duplicate_keys,
+        parse_constant=_reject_loose_constant)
 
 
 # ---------------------------------------------------------------------
@@ -4332,7 +4340,7 @@ def main(argv=None):
                     "manifest.json carries a repeated key and so "
                     "does not parse as one manifest (%s)" % exc
                 )
-            except json.JSONDecodeError as exc:
+            except ValueError as exc:
                 problems.append(
                     "manifest.json in %s does not parse as JSON, "
                     "so its record cannot be checked and the "

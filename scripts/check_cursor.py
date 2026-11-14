@@ -1548,6 +1548,47 @@ def operative_prose_problems(raw, section, label):
     return problems
 
 
+def brief_derivation_problems(section):
+    """Problems with the brief rules derivation discipline.
+
+    The judgement bugbot_rules_problems runs over the
+    Bugbot rules, run here over the rules of the brief
+    itself. The closure reading exempts the numbered rule
+    blocks on the ground that each rule carries its
+    derivation note, and in this gate that ground stood
+    enforced only over BUGBOT.md, so a brief rule could
+    lose its note, or carry a note naming no source, and
+    no reading over the brief would fire. Each block must
+    carry its note, and the note must name a source on
+    purpose under the same reading the Bugbot rules
+    answer to.
+    """
+    problems = []
+    blocks = rule_blocks(section)
+    if not blocks:
+        return [
+            "docs/cursor-plugin-brief.md carries no B "
+            "numbered rules"
+        ]
+    for index, block in enumerate(blocks, start=1):
+        flat = re.sub(r"\s+", " ", block)
+        if "Derives from" not in flat:
+            problems.append(
+                "docs/cursor-plugin-brief.md rule B%d carries "
+                "no derivation note, so it would be a rival "
+                "instruction source" % index
+            )
+            continue
+        note = flat.split("Derives from", 1)[1]
+        if not deliberate_source(note):
+            problems.append(
+                "docs/cursor-plugin-brief.md rule B%d names no "
+                "canonical skill section, gate, or primary "
+                "Cursor citation in its derivation note" % index
+            )
+    return problems
+
+
 def brief_problems(root=None):
     """Problems with the Build 10 brief's stated contract."""
     root = ROOT if root is None else root
@@ -1578,7 +1619,13 @@ def brief_problems(root=None):
                 % fragment
             )
     section = rules_section(raw)
-    if section is not None:
+    if section is None:
+        problems.append(
+            "docs/cursor-plugin-brief.md carries no %r section"
+            % RULES_HEADING
+        )
+    else:
+        problems.extend(brief_derivation_problems(section))
         problems.extend(
             operative_prose_problems(
                 raw, section, "docs/cursor-plugin-brief.md")
