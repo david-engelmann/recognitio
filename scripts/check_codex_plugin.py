@@ -368,7 +368,7 @@ def cache_is_build_state(path):
     was. A cache naming one is build state only while the
     loader on this interpreter would pass it by, its magic
     foreign or its header stale against the source it
-    shadows, or while its payload is byte for byte the
+    shadows, or while its payload is the
     compiled form of that source. A cache the loader would
     run carrying any other code stands in the measurement
     like any other file, so the comparison names it in
@@ -430,11 +430,99 @@ def cache_matches_source(path, source):
     the cache itself records, so a cache compiled from the
     source through any path spelling still matches, and a
     cache carrying weakened or foreign code never does.
-    The comparison runs in one fixed encoding, because the
-    encoding a writer chose carries marks of its own process
-    that are no part of the code it wrote. A payload that
-    cannot be read as a code object at all matches nothing.
+    The comparison walks both code objects into one
+    canonical form instead of comparing their marshalled
+    bytes, because a marshalled stream carries marks of the
+    process that wrote it that are no part of the code it
+    holds. A set constant stands in a stream in the member
+    order of the writing process on the older interpreters
+    this gate runs on, and a fresh compile of the same
+    source can carry the same set in another order, so a
+    byte comparison refuses a faithful cache over a mark
+    that is not code, while the newer interpreters write
+    the members in an order that hides the refusal. The
+    canonical form writes a set or frozenset constant as
+    the sorted canonical forms of its members, so member
+    order holds no voice in the comparison on any
+    interpreter, and everything else the marshalled
+    comparison priced stands priced in it, the bytecode,
+    the constants in their order, the names, the variable
+    names, the free and cell variables, the line table,
+    and the flags. A payload that cannot be read as a code
+    object at all matches nothing, and a value the walk
+    does not know matches nothing.
     """
+    code_type = type(compile("", "", "exec"))
+
+    def framed(tag, payload):
+        return (
+            tag
+            + b"<"
+            + str(len(payload)).encode("ascii")
+            + b">"
+            + payload
+        )
+
+    def canonical(value):
+        if isinstance(value, code_type):
+            fields = [
+                value.co_name,
+                value.co_filename,
+                value.co_flags,
+                value.co_code,
+                value.co_consts,
+                value.co_names,
+                value.co_varnames,
+                value.co_freevars,
+                value.co_cellvars,
+                value.co_firstlineno,
+            ]
+            if hasattr(value, "co_qualname"):
+                fields.append(value.co_qualname)
+            if hasattr(value, "co_linetable"):
+                fields.append(value.co_linetable)
+            elif hasattr(value, "co_lnotab"):
+                fields.append(value.co_lnotab)
+            if hasattr(value, "co_exceptiontable"):
+                fields.append(value.co_exceptiontable)
+            return framed(b"c", canonical(tuple(fields)))
+        if isinstance(value, (set, frozenset)):
+            members = sorted(
+                canonical(member) for member in value
+            )
+            return framed(b"f", b"".join(members))
+        if isinstance(value, tuple):
+            return framed(
+                b"t",
+                b"".join(
+                    canonical(item) for item in value
+                ),
+            )
+        if value is None:
+            return b"n<0>"
+        if value is True:
+            return b"y<0>"
+        if value is False:
+            return b"z<0>"
+        if isinstance(value, int):
+            return framed(b"i", str(value).encode("ascii"))
+        if isinstance(value, float):
+            return framed(b"d", repr(value).encode("ascii"))
+        if isinstance(value, complex):
+            return framed(
+                b"x", canonical((value.real, value.imag))
+            )
+        if isinstance(value, str):
+            return framed(
+                b"s",
+                value.encode("utf-8", "surrogatepass"),
+            )
+        if isinstance(value, bytes):
+            return framed(b"b", value)
+        if value is Ellipsis:
+            return b"e<0>"
+        raise ValueError("uncanonical value %r" % (value,))
+
     try:
         data = path.read_bytes()
         code = marshal.loads(data[16:])
@@ -443,9 +531,9 @@ def cache_matches_source(path, source):
             dont_inherit=True,
             optimize=cache_optimize_level(path),
         )
+        return canonical(code) == canonical(fresh)
     except Exception:
         return False
-    return marshal.dumps(code, 2) == marshal.dumps(fresh, 2)
 
 
 def cache_optimize_level(path):

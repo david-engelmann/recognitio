@@ -9907,6 +9907,89 @@ class TestCacheBuildStateReading(unittest.TestCase):
                         name,
                     )
 
+    FROZEN_NAMES = tuple(
+        "name-%03d" % i for i in range(200)
+    )
+
+    def frozen_source(self, swapped=False):
+        lines = [
+            'MARKER = "pristine"',
+            "def picks(value):",
+            "    return value in {",
+        ]
+        for name in self.FROZEN_NAMES:
+            if swapped and name == "name-199":
+                name = "name-999"
+            lines.append('        "%s",' % name)
+        lines.append("    }")
+        return "\n".join(lines) + "\n"
+
+    def make_frozen_home(self, tmp):
+        home = Path(tmp) / "home"
+        scripts = home / "scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        (scripts / "extract.py").write_text(
+            self.frozen_source(), encoding="utf-8"
+        )
+        return home
+
+    def test_a_faithful_cache_over_a_set_constant_is_build_state(self):
+        # The Round 25 fix-forward plant. A membership
+        # test over a large literal set compiles to a
+        # frozenset constant, and a marshalled stream
+        # lists that constant in the writing process's
+        # member order on Python 3.10, while a fresh
+        # compile can carry the same set in another
+        # order, so the byte comparison the reading
+        # carried refused this faithful cache on that
+        # interpreter and the hosted 3.10 leg of the
+        # Round 25 landing failed on the one shape. The
+        # canonical comparison prices the code and not
+        # the order, so the faithful cache stands as
+        # build state on every interpreter.
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_frozen_home(tmp)
+                cache = self.write_cache(
+                    home, "unchecked",
+                    payload=self.frozen_source(),
+                )
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+                if name in self.TREE_GATES:
+                    self.assertNotIn(
+                        self.rel(home),
+                        mod.tree_bytes(home),
+                        name,
+                    )
+
+    def test_a_weakened_cache_over_a_set_constant_is_measured(self):
+        # The other direction of the same plant. One
+        # member of the set constant is swapped, so the
+        # payload is weakened code the loader would run,
+        # and the order insensitivity of the canonical
+        # comparison must not become blindness to the
+        # content it carries.
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_frozen_home(tmp)
+                cache = self.write_cache(
+                    home, "unchecked",
+                    payload=self.frozen_source(swapped=True),
+                )
+                self.assertFalse(
+                    mod.cache_is_build_state(cache), name
+                )
+                if name in self.TREE_GATES:
+                    self.assertIn(
+                        self.rel(home),
+                        mod.tree_bytes(home),
+                        name,
+                    )
+
     def test_the_cache_an_interpreter_writes_is_build_state(self):
         for name in self.GATES:
             mod = load_script(name)
