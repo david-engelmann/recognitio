@@ -5,18 +5,18 @@
   "command": [
     "extract.py",
     "--repo",
-    "/run/hatch/resume/r22-fixforward3/tmp/tmpm6ucpbp2/repo",
+    "/run/hatch/resume/r23-fix/regen-tmp/tmpysn189kz/repo",
     "--range",
-    "e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
+    "8be23a7c235c9d0e25be85dff7af057704619aff..0597aea9f204eb9a5406ae67c9bd514e4e741038",
     "--out",
-    "/run/hatch/resume/r22-fixforward3/tmp/tmpm6ucpbp2/out"
+    "/run/hatch/resume/r23-fix/regen-tmp/tmpysn189kz/out"
   ],
-  "created_utc": "2026-11-13T20:57:16.068429+00:00",
+  "created_utc": "2026-11-13T23:49:24.415938+00:00",
   "mode": "range",
-  "label": "range e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
-  "base": "e9c113e57299ebcd01714181aaaabc44a5feef67",
-  "head": "474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2",
-  "merge_base": "e9c113e57299ebcd01714181aaaabc44a5feef67",
+  "label": "range 8be23a7c235c9d0e25be85dff7af057704619aff..0597aea9f204eb9a5406ae67c9bd514e4e741038",
+  "base": "8be23a7c235c9d0e25be85dff7af057704619aff",
+  "head": "0597aea9f204eb9a5406ae67c9bd514e4e741038",
+  "merge_base": "8be23a7c235c9d0e25be85dff7af057704619aff",
   "since": null,
   "pr": null,
   "files": [
@@ -62,8 +62,8 @@
     "T0": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 80,
-      "emitted_tokens": 80,
+      "estimated_tokens": 79,
+      "emitted_tokens": 79,
       "files": 2
     },
     "T1": {
@@ -83,8 +83,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 680,
-      "emitted_tokens": 680,
+      "estimated_tokens": 707,
+      "emitted_tokens": 707,
       "files": 2
     }
   },
@@ -97,12 +97,12 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 1853,
+    "estimated_tokens": 1898,
     "dropped": []
   },
   "cap_notes": [],
   "verified": true,
   "discrepancies": [],
   "findings_sha256": null,
-  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nThis passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
 }

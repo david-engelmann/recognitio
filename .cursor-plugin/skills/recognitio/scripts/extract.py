@@ -1320,6 +1320,12 @@ def estimate_tokens(text):
 
 PRIOR_PRS_HEADING = "### Prior pull requests touching these files"
 
+PRIOR_PRS_CAVEAT = (
+    "This passage was gathered live when this packet was "
+    "built and stands as the extractor recorded it, and "
+    "the packet checker does not recount it."
+)
+
 
 def prior_prs_passage(text):
     """The prior pull requests passage of a history tier text.
@@ -4846,10 +4852,16 @@ def commit_deleted_lines(repo, commit, path):
 
     The map reads the commit against its parent under a zero
     context diff, so every deleted line stands in it under its
-    own old line number. A commit with no parent, or a file the
-    commit does not touch, gives an empty map, and a caller
-    that needs a deletion at one named line then finds none
-    and leaves its text alone. Every line opening with a minus
+    own old line number. A commit with no parent gives an
+    empty map, and a file the commit does not touch gives an
+    empty map through a diff that reads it and finds nothing,
+    and a caller that needs a deletion at one named line then
+    finds none and leaves its text alone. A diff reading that
+    fails on a commit that stands with a parent raises
+    instead, because a failure folded into the empty map
+    would leave history text unanchored in silence and the
+    packet would carry no word that a reading failed. Every
+    line opening with a minus
     sign while a hunk stands open counts as a deletion, with
     no exception for a line that opens with three minus signs.
     The file header line of the diff reads that way too, and
@@ -4860,6 +4872,20 @@ def commit_deleted_lines(repo, commit, path):
     because comment lines in several languages open with two
     hyphens and their deletion is evidence like any other.
     """
+    standing = run_git(
+        repo, ["rev-parse", "--verify", commit + "^{commit}"],
+        check=False,
+    )
+    if standing.returncode != 0:
+        raise GitError(
+            "git could not read commit %s for the deleted lines "
+            "of %s, so its history cannot be anchored" % (commit, path)
+        )
+    parent = run_git(
+        repo, ["rev-parse", "--verify", commit + "^"], check=False
+    )
+    if parent.returncode != 0:
+        return {}
     result = run_git(
         repo,
         ["diff", "--histogram", "-U0"] + DIFF_FLAGS
@@ -4868,7 +4894,11 @@ def commit_deleted_lines(repo, commit, path):
         global_flags=["--attr-source=" + commit],
     )
     if result.returncode != 0:
-        return {}
+        raise GitError(
+            "git diff for the deleted lines of %s in commit %s "
+            "failed, so its history cannot be anchored"
+            % (path, commit)
+        )
     deleted = {}
     old_lineno = None
     for line in result.stdout.split("\n"):
@@ -5247,6 +5277,8 @@ def prior_prs_section(repo, top_files):
         "that fetch and they are not a live claim about any "
         "pull request."
     )
+    lines.append("")
+    lines.append(PRIOR_PRS_CAVEAT)
     lines.append("")
     paths = [entry["path"] for entry in top_files]
     found = prior_prs(repo, paths) if paths else []
@@ -5961,6 +5993,12 @@ def tier_placeholder(tier, state):
         body = (
             "Dropped under the token budget. The change in T1 is complete."
         )
+        if tier == "T3":
+            # The passage this tier would have carried stands
+            # recorded in the manifest alone in this shape, so
+            # the placeholder carries the passage caveat where
+            # the passage itself would have stood.
+            body = "%s\n\n%s" % (body, PRIOR_PRS_CAVEAT)
     else:
         body = "Not selected for this run. The change in T1 is complete."
     return "%s\n\n%s\n" % (title, body)

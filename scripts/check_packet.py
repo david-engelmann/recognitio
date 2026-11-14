@@ -1521,28 +1521,29 @@ def recount_problems(repo, manifest, extractor):
     fields = (
         "old_path", "status", "status_code", "additions", "deletions",
         "hunks", "binary", "attribute_text", "binary_transition",
-        "placeholder", "instruction_file",
+        "placeholder", "instruction_file", "credential_file",
     )
     # The credential flag arrived after packets already stood
     # recorded, so a record that carries it nowhere reads as
     # false here rather than as drift, in the same legacy shape
     # the eval gate grants the instruction flag. A record that
-    # carries it is compared in full.
+    # carries it is compared in full, through the tuple above
+    # and not through a bespoke block of its own.
     for path in sorted(set(recorded_by_path) & set(fresh_by_path)):
         mine = recorded_by_path[path]
         theirs = fresh_by_path[path]
         for field in fields:
-            if mine.get(field) != theirs.get(field):
+            # The credential flag reads as false where a record
+            # carries it nowhere, under the legacy shape above.
+            mine_value = mine.get(field, False) \
+                if field == "credential_file" else mine.get(field)
+            theirs_value = theirs.get(field, False) \
+                if field == "credential_file" else theirs.get(field)
+            if mine_value != theirs_value:
                 problems.append(
                     "the manifest record for %s disagrees with the "
                     "recount on %s" % (path, field)
                 )
-        if mine.get("credential_file", False) != \
-                theirs.get("credential_file", False):
-            problems.append(
-                "the manifest record for %s disagrees with the "
-                "recount on credential_file" % path
-            )
     if [entry["path"] for entry in recorded] != \
             [entry["path"] for entry in fresh_records]:
         if not problems:
@@ -2616,7 +2617,11 @@ def parse_command_flags(manifest):
     repeated flag, so every reading in this script takes the
     last value too. A check that read the first value would
     stamp a command the extractor itself would have run
-    differently.
+    differently. A flag whose next token is itself a flag
+    spelling stands with no value, the shape the extractor
+    argument parser also refuses, and the token that follows
+    is read as the flag it is rather than swallowed as the
+    value of the flag before it.
     """
     problems = []
     command = manifest.get("command")
@@ -2641,12 +2646,14 @@ def parse_command_flags(manifest):
             continue
         if not equals:
             index += 1
-            if index >= len(tokens):
+            if index >= len(tokens) or (
+                tokens[index].startswith("--") and len(tokens[index]) > 2
+            ):
                 problems.append(
                     "the manifest command flag %s carries no value"
                     % name
                 )
-                break
+                continue
             value = tokens[index]
         flags.setdefault(name, []).append(value)
         index += 1
@@ -2693,9 +2700,10 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
     the hash it resolved to. A symbolic range spelling is left
     to the warnings, because the range hashes are pinned in the
     manifest fields themselves and a branch spelling can
-    honestly have moved since the run. The output flag the
-    extractor requires must stand in the command. The output
-    and repository values themselves name paths on the machine
+    honestly have moved since the run. The output flag and
+    the repository flag the extractor requires must each
+    stand in the command with a value. The output and
+    repository values themselves name paths on the machine
     that ran the extraction, and a packet is portable across
     copies and clones, so those two values are read for
     presence and nothing more.
@@ -2874,7 +2882,12 @@ def command_problems(manifest, repo, packet_text=None, extractor=None):
             "the manifest command output flag carries an empty "
             "value"
         )
-    if "--repo" in flags and not last_flag(flags, "--repo"):
+    if "--repo" not in flags:
+        problems.append(
+            "the manifest command carries no repository flag, "
+            "and the extractor requires one on every run"
+        )
+    elif not last_flag(flags, "--repo"):
         problems.append(
             "the manifest command repository flag carries an "
             "empty value"
@@ -2997,6 +3010,12 @@ PASSAGE_SNAPSHOT_LINE = (
     "pull request."
 )
 
+PASSAGE_CAVEAT_LINE = (
+    "This passage was gathered live when this packet was "
+    "built and stands as the extractor recorded it, and "
+    "the packet checker does not recount it."
+)
+
 PASSAGE_UNAVAILABLE_LINE = (
     "Prior pull requests are unavailable in this environment, "
     "so no pull request history was gathered."
@@ -3015,6 +3034,25 @@ PASSAGE_SHOWING_LINE = re.compile(
 )
 
 
+def passage_scope_line(extractor):
+    """The scope line of a prior pull requests passage.
+
+    The line names the lookup limits the extractor itself
+    works under, so a recorded passage is held to the limits
+    of the extractor that stands loaded, never to a copy of
+    the figures written into this script.
+    """
+    return (
+        "Scope of the lookup: the %d most changed files, "
+        "checked against the %d most recent pull requests, "
+        "with at most %d matches shown. A pull request outside "
+        "that window is not reported here."
+        % (extractor.MAX_HISTORY_FILES,
+           extractor.MAX_PRIOR_PR_LIST,
+           extractor.MAX_PRIOR_PRS)
+    )
+
+
 def recorded_passage_shape_problems(passage, extractor):
     """Check a recorded passage against the extractor construction.
 
@@ -3022,8 +3060,10 @@ def recorded_passage_shape_problems(passage, extractor):
     size settles against a record the packet itself supplies,
     so the record is held to the exact shape the extractor
     writes. The heading, the scope line with its lookup limits
-    taken from the extractor itself, and the snapshot line
-    stand fixed, and the body is one of the two closing lines
+    taken from the extractor itself, the snapshot line and
+    the caveat line that names this passage as the one part
+    of the packet the checker does not recount stand fixed,
+    and the body is one of the two closing lines
     the extractor writes or a run of entry lines no longer
     than the shown cap, closed by a showing line whose counts
     agree with the entries and the list limit where the
@@ -3040,22 +3080,15 @@ def recorded_passage_shape_problems(passage, extractor):
     if not isinstance(passage, str):
         return [refusal]
     lines = passage.rstrip("\n").split("\n")
-    scope = (
-        "Scope of the lookup: the %d most changed files, "
-        "checked against the %d most recent pull requests, "
-        "with at most %d matches shown. A pull request outside "
-        "that window is not reported here."
-        % (extractor.MAX_HISTORY_FILES,
-           extractor.MAX_PRIOR_PR_LIST,
-           extractor.MAX_PRIOR_PRS)
-    )
-    if len(lines) < 6 or \
+    scope = passage_scope_line(extractor)
+    if len(lines) < 8 or \
             lines[0] != extractor.PRIOR_PRS_HEADING or \
             lines[1] != "" or lines[2] != scope or \
             lines[3] != "" or lines[4] != PASSAGE_SNAPSHOT_LINE or \
-            lines[5] != "":
+            lines[5] != "" or lines[6] != PASSAGE_CAVEAT_LINE or \
+            lines[7] != "":
         return [refusal]
-    rest = lines[6:]
+    rest = lines[8:]
     if rest and rest[-1] == "":
         rest = rest[:-1]
     if rest in ([PASSAGE_UNAVAILABLE_LINE],
@@ -3078,6 +3111,50 @@ def recorded_passage_shape_problems(passage, extractor):
             return [refusal]
         index += 1
     if index != len(rest):
+        return [refusal]
+    return []
+
+
+def recorded_passage_disclosure_problems(passage, extractor):
+    """Check the disclosure stands at its place in a recorded passage.
+
+    The passage of an included history tier is live gathered
+    text, and the rebuild reading masks it on both sides
+    before it compares them, so no recount judges it. The
+    stamp rests on the passage carrying the disclosure line
+    that names it as the one part of the packet the checker
+    does not recount. That line and the fixed lines that
+    frame its standing place are written the same way on
+    every run, so they are held here to the exact head of
+    the shape the extractor writes, the heading, the scope
+    line with its lookup limits taken from the extractor
+    itself, the snapshot line and the caveat line verbatim,
+    each standing between its blanks. A passage whose caveat
+    line stands missing, moved or restated, and a passage
+    with an entry standing above the snapshot line, fail
+    that head, because the entry moves the snapshot line out
+    of its place and the caveat place the head pins stands
+    before the first entry line in every passage that
+    passes. The gathered body below the head is the live
+    content itself and stands outside this reading, as it
+    stands outside the recount.
+    """
+    refusal = (
+        "the prior pull requests passage the manifest records "
+        "for the included history tier does not stand in the "
+        "shape the extractor writes at the lines that carry "
+        "its disclosure, so the disclosure cannot be trusted "
+        "to stand in that passage"
+    )
+    if not isinstance(passage, str):
+        return [refusal]
+    lines = passage.rstrip("\n").split("\n")
+    if len(lines) < 8 or \
+            lines[0] != extractor.PRIOR_PRS_HEADING or \
+            lines[1] != "" or lines[2] != passage_scope_line(extractor) or \
+            lines[3] != "" or lines[4] != PASSAGE_SNAPSHOT_LINE or \
+            lines[5] != "" or lines[6] != PASSAGE_CAVEAT_LINE or \
+            lines[7] != "":
         return [refusal]
     return []
 
@@ -3118,7 +3195,14 @@ def passage_problems(packet_text, manifest, extractor):
     the packet by its shape, and its recorded passage is the
     record the dropped tier size is settled against, so that
     shape stands on the shape reading above and not on this
-    one.
+    one. An included passage is held to the head of the shape
+    the extractor writes by the disclosure reading, which
+    judges the recorded passage. Where the packet passage
+    differs from the recorded one the agreement below refuses
+    on its own, and where the two agree the one judgement
+    covers both sides. The rebuild reading cannot carry that
+    judgement, because it masks the passage on both sides
+    before it compares them.
     """
     if extractor is None:
         return []
@@ -3139,13 +3223,20 @@ def passage_problems(packet_text, manifest, extractor):
     else:
         packet_passage = extractor.prior_prs_passage(span)
     recorded_passage = manifest.get("prior_pull_requests_passage")
-    if packet_passage == recorded_passage:
-        return []
-    return [
-        "the prior pull requests passage in the packet history "
-        "tier does not match the passage the manifest records "
-        "for it, so the packet cannot be stamped"
-    ]
+    problems = []
+    if tier.get("state") == "included" and recorded_passage is not None:
+        problems.extend(
+            recorded_passage_disclosure_problems(
+                recorded_passage, extractor
+            )
+        )
+    if packet_passage != recorded_passage:
+        problems.append(
+            "the prior pull requests passage in the packet history "
+            "tier does not match the passage the manifest records "
+            "for it, so the packet cannot be stamped"
+        )
+    return problems
 
 
 FINDING_VERDICTS = (

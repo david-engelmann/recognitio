@@ -786,8 +786,19 @@ class TestHistoryHeaderCanonicalisation(unittest.TestCase):
             extract_mod.commit_deleted_lines(
                 Path("."), "b" * 40, "q.py"
             )
-        self.assertEqual(len(seen), 1)
-        args = seen[0]
+        # Round 23 G4. Two verification readings now stand
+        # before the diff, proving the commit stands and a
+        # parent stands, so the parentless case returns its
+        # honest empty map without a diff reading and a failed
+        # diff on a parented commit raises instead of folding.
+        self.assertEqual(len(seen), 3)
+        self.assertEqual(
+            seen[0], ["rev-parse", "--verify", "b" * 40 + "^{commit}"]
+        )
+        self.assertEqual(
+            seen[1], ["rev-parse", "--verify", "b" * 40 + "^"]
+        )
+        args = seen[2]
         self.assertEqual(args[0], "diff")
         self.assertIn("-U0", args)
         self.assertIn("b" * 40 + "^", args)
@@ -930,6 +941,13 @@ class TestHistoryHeaderCanonicalisation(unittest.TestCase):
                 return extract_mod.Proc(0, history_text, "")
             if args[0] == "diff":
                 return extract_mod.Proc(0, self.WRAPPED_DIFF, "")
+            if args[0] == "rev-parse":
+                # Round 23 G4. The anchoring helper proves the
+                # commit and its parent stand before its diff,
+                # and the fabricated commit stands with a parent
+                # in this fixture, so the verifications answer
+                # as the diff does. Every other call still fails.
+                return extract_mod.Proc(0, "abc1234\n", "")
             return extract_mod.Proc(1, "", "unexpected call")
 
         def fake_show_file(repo, ref, path):
@@ -992,6 +1010,13 @@ class TestHistoryHeaderCanonicalisation(unittest.TestCase):
                 return extract_mod.Proc(0, history_text, "")
             if args[0] == "diff":
                 return extract_mod.Proc(0, self.WRAPPED_DIFF, "")
+            if args[0] == "rev-parse":
+                # Round 23 G4. The anchoring helper proves the
+                # commit and its parent stand before its diff,
+                # and the fabricated commit stands with a parent
+                # in this fixture, so the verifications answer
+                # as the diff does. Every other call still fails.
+                return extract_mod.Proc(0, "abc1234\n", "")
             return extract_mod.Proc(1, "", "unexpected call")
 
         def fake_show_file(repo, ref, path):
@@ -1751,7 +1776,7 @@ class TestBudget(unittest.TestCase):
         both_out = Path(self.tmp.name) / "both"
         result = run_extract_cli(
             self.repo, both_out, "--range", "HEAD~1..HEAD",
-            "--budget", str(core_tokens + 80),
+            "--budget", str(core_tokens + 100),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         both = read_manifest(both_out)
@@ -1762,7 +1787,7 @@ class TestBudget(unittest.TestCase):
             ["T3", "T2"],
         )
         both_tokens = extract_mod.estimate_tokens((both_out / "packet.md").read_text(encoding="utf-8", errors="surrogateescape"))
-        self.assertLessEqual(both_tokens, core_tokens + 80)
+        self.assertLessEqual(both_tokens, core_tokens + 100)
         # The manifest estimate is the emitted packet's own measure,
         # so the budget the run accepted is the budget it kept.
         self.assertEqual(both["budget"]["estimated_tokens"], both_tokens)
@@ -2636,6 +2661,126 @@ class TestTierContent(unittest.TestCase):
             )
             self.assertNotIn("GitHub CLI is missing", packet)
             self.assertNotIn("not a GitHub checkout", packet)
+
+
+class TestRound23PassageCaveat(unittest.TestCase):
+    """Round 23 G1. The passage caveat stands in the packet.
+
+    The prior pull requests passage is the one part of a packet
+    the checker does not recount, and it now carries a standing
+    caveat sentence in the packet itself, inside the passage
+    after the snapshot paragraph, and in the placeholder that
+    stands for a dropped history tier.
+    """
+
+    CAVEAT = (
+        "This passage was gathered live when this packet was "
+        "built and stands as the extractor recorded it, and "
+        "the packet checker does not recount it."
+    )
+
+    def test_the_passage_carries_the_caveat_in_packet_and_manifest(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"module.py": MODULE_V1},
+                {"module.py": MODULE_V2},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(repo, out, "--range", "HEAD~1..HEAD")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = (out / "packet.md").read_text()
+            self.assertIn(self.CAVEAT, packet)
+            manifest = read_manifest(out)
+            passage = manifest["prior_pull_requests_passage"]
+            self.assertIsNotNone(passage)
+            self.assertIn(self.CAVEAT, passage)
+            snapshot = (
+                "The states in this list are a snapshot from the "
+                "fetch that built this packet."
+            )
+            self.assertLess(
+                passage.index(snapshot), passage.index(self.CAVEAT)
+            )
+            self.assertLess(
+                passage.index(self.CAVEAT),
+                passage.index("Prior pull requests are unavailable"),
+            )
+
+    def test_the_dropped_history_placeholder_carries_the_caveat(self):
+        dropped = extract_mod.tier_placeholder("T3", "dropped")
+        self.assertIn(self.CAVEAT, dropped)
+        self.assertNotIn(
+            self.CAVEAT, extract_mod.tier_placeholder("T3", "not selected")
+        )
+        self.assertNotIn(
+            self.CAVEAT, extract_mod.tier_placeholder("T2", "dropped")
+        )
+
+
+class TestRound23DeletedLines(unittest.TestCase):
+    """Round 23 G4. A failed diff reading raises in the anchoring helper.
+
+    The honest empty cases stand, being a commit with no parent
+    and a file the commit does not touch. A diff that fails on a
+    parented commit is a failed reading, and the helper raises
+    in the F5 manner rather than folding it into the empty map.
+    """
+
+    def build_repo(self, tmp):
+        return make_repo(tmp, [
+            {"module.py": "line one\nline two\n"},
+            {"module.py": "line one\n"},
+        ])
+
+    def head_of(self, repo):
+        return subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"],
+            capture_output=True, text=True,
+        ).stdout.strip()
+
+    def test_a_failed_diff_reading_raises(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = self.build_repo(tmp)
+            head = self.head_of(repo)
+            real_run_git = extract_mod.run_git
+
+            def failing_diff(repo_arg, args, check=True, global_flags=()):
+                if args and args[0] == "diff":
+                    return mock.Mock(
+                        returncode=1, stdout="", stderr="fatal: forced"
+                    )
+                return real_run_git(
+                    repo_arg, args, check=check, global_flags=global_flags
+                )
+
+            with mock.patch.object(
+                extract_mod, "run_git", side_effect=failing_diff
+            ):
+                with self.assertRaises(extract_mod.GitError):
+                    extract_mod.commit_deleted_lines(
+                        repo, head, "module.py"
+                    )
+
+    def test_the_honest_empty_cases_and_the_true_map_stand(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = self.build_repo(tmp)
+            head = self.head_of(repo)
+            root = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD~1"],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            self.assertEqual(
+                extract_mod.commit_deleted_lines(repo, root, "module.py"),
+                {},
+            )
+            self.assertEqual(
+                extract_mod.commit_deleted_lines(repo, head, "absent.py"),
+                {},
+            )
+            self.assertEqual(
+                extract_mod.commit_deleted_lines(repo, head, "module.py"),
+                {2: "line two"},
+            )
 
 
 class TestReplaceRefs(unittest.TestCase):

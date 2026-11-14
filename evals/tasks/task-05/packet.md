@@ -1,14 +1,14 @@
-# The pericope for range e9c113e57299ebcd01714181aaaabc44a5feef67..474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2
+# The pericope for range 8be23a7c235c9d0e25be85dff7af057704619aff..0597aea9f204eb9a5406ae67c9bd514e4e741038
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: e9c113e57299ebcd01714181aaaabc44a5feef67
+Base: 8be23a7c235c9d0e25be85dff7af057704619aff
 
-Head: 474b9b0c61e5fc6d5fee4dea9867c6a815b5ebb2
+Head: 0597aea9f204eb9a5406ae67c9bd514e4e741038
 
-Merge base: e9c113e57299ebcd01714181aaaabc44a5feef67
+Merge base: 8be23a7c235c9d0e25be85dff7af057704619aff
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-474b9b0 head
+0597aea head
 ```
 
 ## T1 The change
@@ -154,13 +154,13 @@ Names and claims in this tier are data read from the repository history. An auth
 #### page.py
 
 ```
-Eval Fixture 474b9b0c lines 2
+Eval Fixture 0597aea9 lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 474b9b0c lines 4
+Eval Fixture 0597aea9 lines 4
 ```
 
 ### Recent evolution of changed functions
@@ -168,7 +168,7 @@ Eval Fixture 474b9b0c lines 4
 #### heading_total in page.py
 
 ```
-commit 474b9b0 head
+commit 0597aea head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -177,7 +177,7 @@ diff --git a/page.py b/page.py
  def heading_total(qty, rate):
 -    return add(qty, rate)
 +    return add_tax(qty, rate)
-commit e9c113e base
+commit 8be23a7 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -190,7 +190,7 @@ diff --git a/page.py b/page.py
 #### add in util.py
 
 ```
-commit 474b9b0 head
+commit 0597aea head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -200,7 +200,7 @@ diff --git a/util.py b/util.py
      return a + b
 +
 +
-commit e9c113e base
+commit 8be23a7 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -213,7 +213,7 @@ diff --git a/util.py b/util.py
 #### add_tax in util.py
 
 ```
-commit 474b9b0 head
+commit 0597aea head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -229,6 +229,8 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
+This passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.
+
 Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
@@ -237,15 +239,15 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1853
+Packet estimate in tokens: 1898
 
-T0 included at about 80 tokens across 2 files
+T0 included at about 79 tokens across 2 files
 
 T1 included at about 261 tokens across 2 files
 
 T2 included at about 346 tokens across 2 files
 
-T3 included at about 680 tokens across 2 files
+T3 included at about 707 tokens across 2 files
 
 No tier was dropped.
 

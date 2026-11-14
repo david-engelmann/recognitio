@@ -11,7 +11,7 @@
     "--repo",
     "."
   ],
-  "created_utc": "2026-11-13T20:57:33.931666+00:00",
+  "created_utc": "2026-11-13T23:49:21.483099+00:00",
   "mode": "commit",
   "label": "commit 991ac6ae80d3",
   "base": "eba549658f9c21e78115f6caf96034dd142af4e6",
@@ -83,8 +83,8 @@
     "T3": {
       "state": "included",
       "included": true,
-      "estimated_tokens": 1853,
-      "emitted_tokens": 1853,
+      "estimated_tokens": 1886,
+      "emitted_tokens": 1886,
       "files": 2
     }
   },
@@ -97,7 +97,7 @@
   ],
   "budget": {
     "budget_tokens": null,
-    "estimated_tokens": 6062,
+    "estimated_tokens": 6096,
     "dropped": []
   },
   "cap_notes": [
@@ -106,5 +106,5 @@
   "verified": true,
   "discrepancies": [],
   "findings_sha256": null,
-  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
+  "prior_pull_requests_passage": "### Prior pull requests touching these files\n\nScope of the lookup: the 3 most changed files, checked against the 30 most recent pull requests, with at most 5 matches shown. A pull request outside that window is not reported here.\n\nThe states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.\n\nThis passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.\n\nPrior pull requests are unavailable in this environment, so no pull request history was gathered.\n"
 }

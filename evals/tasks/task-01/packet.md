@@ -1,14 +1,14 @@
-# The pericope for range 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4..41607fb398d26044a13e42d85f18a8fca176745d
+# The pericope for range 627add21ccb0cd7ab63db4bcb21ed597cccb8503..0e875aa90d25e17d8022a73aaea2fc382ff5cf9e
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4
+Base: 627add21ccb0cd7ab63db4bcb21ed597cccb8503
 
-Head: 41607fb398d26044a13e42d85f18a8fca176745d
+Head: 0e875aa90d25e17d8022a73aaea2fc382ff5cf9e
 
-Merge base: 2c31a9494eb35e9517ea849a03dc6f3f6eed21f4
+Merge base: 627add21ccb0cd7ab63db4bcb21ed597cccb8503
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-41607fb head
+0e875aa head
 ```
 
 ## T1 The change
@@ -118,7 +118,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### calc.py
 
 ```
-Eval Fixture 41607fb3 lines 2
+Eval Fixture 0e875aa9 lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -126,7 +126,7 @@ Eval Fixture 41607fb3 lines 2
 #### price in calc.py
 
 ```
-commit 41607fb head
+commit 0e875aa head
 
 diff --git a/calc.py b/calc.py
 --- a/calc.py
@@ -136,7 +136,7 @@ diff --git a/calc.py b/calc.py
 -    return qty * rate
 +def price(qty, rate, tax):
 +    return qty * rate + tax + tax
-commit 2c31a94 base
+commit 627add2 base
 
 diff --git a/calc.py b/calc.py
 --- /dev/null
@@ -152,6 +152,8 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
+This passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.
+
 Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
@@ -160,7 +162,7 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1389
+Packet estimate in tokens: 1434
 
 T0 included at about 65 tokens across 1 files
 
@@ -168,7 +170,7 @@ T1 included at about 138 tokens across 1 files
 
 T2 included at about 280 tokens across 1 files
 
-T3 included at about 413 tokens across 1 files
+T3 included at about 447 tokens across 1 files
 
 No tier was dropped.
 

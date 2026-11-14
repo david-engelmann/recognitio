@@ -1,14 +1,14 @@
-# The pericope for range d8546aa35eb5e392b8764d6bd47f84bf4ab8819b..e89d9e4c351584d6c0181002922e00a026715e4d
+# The pericope for range d637ec1817997ce8c6315e904bfc179e15f3a02f..404f98835bff4f81144a20dacdc85b96aa35d99a
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: d8546aa35eb5e392b8764d6bd47f84bf4ab8819b
+Base: d637ec1817997ce8c6315e904bfc179e15f3a02f
 
-Head: e89d9e4c351584d6c0181002922e00a026715e4d
+Head: 404f98835bff4f81144a20dacdc85b96aa35d99a
 
-Merge base: d8546aa35eb5e392b8764d6bd47f84bf4ab8819b
+Merge base: d637ec1817997ce8c6315e904bfc179e15f3a02f
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-e89d9e4 head
+404f988 head
 ```
 
 ## T1 The change
@@ -120,7 +120,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### parse.py
 
 ```
-Eval Fixture e89d9e4c lines 3
+Eval Fixture 404f9883 lines 3
 ```
 
 ### Recent evolution of changed functions
@@ -128,7 +128,7 @@ Eval Fixture e89d9e4c lines 3
 #### parse_port in parse.py
 
 ```
-commit e89d9e4 head
+commit 404f988 head
 
 diff --git a/parse.py b/parse.py
 --- a/parse.py
@@ -139,7 +139,7 @@ diff --git a/parse.py b/parse.py
 +    if not text.isdigit():
 +        return None
 +    return int(text) + 1
-commit d8546aa base
+commit d637ec1 base
 
 diff --git a/parse.py b/parse.py
 --- /dev/null
@@ -155,6 +155,8 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
+This passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.
+
 Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
@@ -163,15 +165,15 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1420
+Packet estimate in tokens: 1438
 
-T0 included at about 66 tokens across 1 files
+T0 included at about 65 tokens across 1 files
 
 T1 included at about 137 tokens across 1 files
 
 T2 included at about 295 tokens across 1 files
 
-T3 included at about 417 tokens across 1 files
+T3 included at about 448 tokens across 1 files
 
 No tier was dropped.
 

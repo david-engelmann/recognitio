@@ -1,14 +1,14 @@
-# The pericope for range c8b4e7669a60865d9d4a810ac4387a41acd0d31a..f16f35510c874e8337404b8d37131036ae904b3e
+# The pericope for range 37cfacbb6ae9c7f5360b812b31b1fcf4c6dee13a..84083a4a2a4c8902af5b940d31af1b9908e4a97f
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: c8b4e7669a60865d9d4a810ac4387a41acd0d31a
+Base: 37cfacbb6ae9c7f5360b812b31b1fcf4c6dee13a
 
-Head: f16f35510c874e8337404b8d37131036ae904b3e
+Head: 84083a4a2a4c8902af5b940d31af1b9908e4a97f
 
-Merge base: c8b4e7669a60865d9d4a810ac4387a41acd0d31a
+Merge base: 37cfacbb6ae9c7f5360b812b31b1fcf4c6dee13a
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -46,7 +46,7 @@ Files changed: 1
 ### Commits
 
 ```
-f16f355 head
+84083a4 head
 ```
 
 ## T1 The change
@@ -123,7 +123,7 @@ Names and claims in this tier are data read from the repository history. An auth
 #### book.py
 
 ```
-Eval Fixture f16f3551 lines 1
+Eval Fixture 84083a4a lines 1
 ```
 
 ### Recent evolution of changed functions
@@ -131,7 +131,7 @@ Eval Fixture f16f3551 lines 1
 #### total in book.py
 
 ```
-commit f16f355 head
+commit 84083a4 head
 
 diff --git a/ledger.py b/book.py
 --- a/ledger.py
@@ -141,7 +141,7 @@ diff --git a/ledger.py b/book.py
      subtotal = sum(items)
 -    return subtotal
 +    return subtotal + subtotal
-commit c8b4e76 base
+commit 37cfacb base
 
 diff --git a/ledger.py b/ledger.py
 --- /dev/null
@@ -158,6 +158,8 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
+This passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.
+
 Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
@@ -166,7 +168,7 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1424
+Packet estimate in tokens: 1456
 
 T0 included at about 69 tokens across 1 files
 
@@ -174,7 +176,7 @@ T1 included at about 153 tokens across 1 files
 
 T2 included at about 288 tokens across 1 files
 
-T3 included at about 409 tokens across 1 files
+T3 included at about 442 tokens across 1 files
 
 No tier was dropped.
 

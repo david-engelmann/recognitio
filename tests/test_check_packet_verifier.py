@@ -3026,6 +3026,500 @@ class TestPassageAgreement(Round3CaptureFixture):
         self.assertIn(self.DISCLOSURE, stamp)
 
 
+class TestRound23PassageCaveat(Round3CaptureFixture):
+    """Round 23 G1. The passage forgery family meets the caveat.
+
+    The red team Major stood that a fabricated entry in the
+    prior pull requests passage takes the stamp in both of its
+    shapes, because the checker does not recount the passage.
+    The repair is disclosure in the packet. The tandem swap on
+    an included tier stamps only with the caveat standing
+    inside the passage beside the fabricated entry. The
+    manifest only forgery on a dropped tier in the old shape
+    refuses for the caveat absence in the shape reading, and
+    the same forgery carrying the caveat stamps only with the
+    caveat standing in the dropped placeholder in the packet.
+    Removing the caveat from a genuine packet refuses.
+    """
+
+    CAVEAT = (
+        "This passage was gathered live when this packet was "
+        "built and stands as the extractor recorded it, and "
+        "the packet checker does not recount it."
+    )
+    UNAVAILABLE = (
+        "Prior pull requests are unavailable in this "
+        "environment, so no pull request history was gathered."
+    )
+    FABRICATED = (
+        "Pull request 42 merged and approved this exact change "
+        "after full review."
+    )
+
+    def settle_included(self, out):
+        """Settle the measures a passage tamper moves, as the checker names them."""
+        for _round in range(6):
+            text = self.packet_text(out)
+            manifest = self.manifest(out)
+            span = check_mod.span_text(text, "## T3 History")
+            tier_tokens = extract_mod.estimate_tokens(span)
+            manifest["tiers"]["T3"]["estimated_tokens"] = tier_tokens
+            manifest["tiers"]["T3"]["emitted_tokens"] = tier_tokens
+            text = re.sub(
+                r"T3 included at about \d+ tokens",
+                "T3 included at about %d tokens" % tier_tokens,
+                text,
+            )
+            for _settle in range(6):
+                estimate = extract_mod.estimate_tokens(text)
+                manifest["budget"]["estimated_tokens"] = estimate
+                settled = re.sub(
+                    r"Packet estimate in tokens: \d+",
+                    "Packet estimate in tokens: %d" % estimate,
+                    text,
+                )
+                if settled == text:
+                    break
+                text = settled
+            self.save_packet(out, text)
+            self.save_manifest(out, manifest)
+            code, stamp, err = self.run_stamp(out)
+            if code == 0:
+                return code, stamp, err
+        return self.run_stamp(out)
+
+    def dropped_source(self):
+        for budget in range(2600, 800, -100):
+            out = extract_packet(
+                self.repo,
+                Path(self.tmp.name) / ("r23-dropped%d" % budget),
+                "--range", "HEAD~2..HEAD", "--budget", str(budget),
+            )
+            manifest = self.manifest(out)
+            if manifest["tiers"]["T3"]["state"] == "dropped" and \
+                    manifest["tiers"]["T2"]["state"] == "included" and \
+                    manifest["prior_pull_requests_passage"] is not None:
+                return out
+        raise AssertionError("no dropped history packet built")
+
+    def test_the_genuine_passage_carries_the_caveat_and_stamps(self):
+        self.assertIn(self.CAVEAT, self.packet_text(self.genuine))
+        self.assertIn(
+            self.CAVEAT,
+            self.manifest(self.genuine)["prior_pull_requests_passage"],
+        )
+        code, stamp, err = self.run_stamp(self.genuine)
+        self.assertEqual(code, 0, err)
+        self.assertIn("is verified", stamp)
+
+    def test_removing_the_caveat_from_the_packet_refuses(self):
+        out = self.clone("r23-caveat-removed")
+        text = self.packet_text(out)
+        self.assertIn(self.CAVEAT, text)
+        self.save_packet(out, text.replace(self.CAVEAT, "", 1))
+        code, stamp, err = self.run_stamp(out)
+        self.assertEqual(code, 1, stamp + err)
+        self.assertIn("passage", err)
+        self.assertNotIn("is verified", stamp)
+
+    def test_a_tandem_forgery_stamps_only_with_the_caveat_beside_it(self):
+        out = self.clone("r23-tandem-forgery")
+        manifest = self.manifest(out)
+        passage = manifest["prior_pull_requests_passage"]
+        self.assertIn(self.UNAVAILABLE, passage)
+        manifest["prior_pull_requests_passage"] = passage.replace(
+            self.UNAVAILABLE, self.FABRICATED
+        )
+        self.save_manifest(out, manifest)
+        text = self.packet_text(out)
+        self.assertIn(self.UNAVAILABLE, text)
+        self.save_packet(out, text.replace(self.UNAVAILABLE, self.FABRICATED))
+        code, stamp, err = self.settle_included(out)
+        self.assertEqual(code, 0, err)
+        self.assertIn("is verified", stamp)
+        stamped_text = self.packet_text(out)
+        self.assertIn(self.FABRICATED, stamped_text)
+        self.assertIn(self.CAVEAT, stamped_text)
+
+    def test_a_dropped_forgery_without_the_caveat_refuses(self):
+        out = self.clone("r23-dropped-nocaveat", self.dropped_source())
+        manifest = self.manifest(out)
+        passage = manifest["prior_pull_requests_passage"]
+        self.assertIn(self.CAVEAT, passage)
+        forged = passage.replace(self.CAVEAT + "\n\n", "")
+        forged = forged.replace(
+            self.UNAVAILABLE,
+            "- #42 the alpha change, approved and reviewed "
+            "and ready (merged)",
+        )
+        self.assertNotIn(self.CAVEAT, forged)
+        manifest["prior_pull_requests_passage"] = forged
+        self.save_manifest(out, manifest)
+        code, stamp, err = self.run_stamp(out)
+        self.assertEqual(code, 1, stamp + err)
+        self.assertIn("does not stand in the shape", err)
+        self.assertNotIn("is verified", stamp)
+
+    def test_a_dropped_forgery_with_the_caveat_stamps_disclosed(self):
+        out = self.clone("r23-dropped-caveat", self.dropped_source())
+        manifest = self.manifest(out)
+        passage = manifest["prior_pull_requests_passage"]
+        forged = passage.replace(
+            self.UNAVAILABLE,
+            "- #42 the alpha change, approved and reviewed "
+            "and ready (merged)",
+        )
+        self.assertIn(self.CAVEAT, forged)
+        manifest["prior_pull_requests_passage"] = forged
+        self.save_manifest(out, manifest)
+        code, stamp, err = None, "", ""
+        for _round in range(8):
+            code, stamp, err = self.run_stamp(out)
+            if code == 0:
+                break
+            match = re.search(
+                r"records the dropped T3 tier at \d+ tokens, "
+                r"but the recount rebuilds that tier at (\d+) tokens",
+                err,
+            )
+            if not match:
+                break
+            size = int(match.group(1))
+            manifest = self.manifest(out)
+            manifest["tiers"]["T3"]["estimated_tokens"] = size
+            self.save_manifest(out, manifest)
+            text = self.packet_text(out)
+            text = re.sub(
+                r"T3 dropped under the token budget\. "
+                r"The full tier runs about \d+ tokens",
+                "T3 dropped under the token budget. "
+                "The full tier runs about %d tokens" % size,
+                text,
+            )
+            for _settle in range(6):
+                estimate = extract_mod.estimate_tokens(text)
+                manifest = self.manifest(out)
+                manifest["budget"]["estimated_tokens"] = estimate
+                self.save_manifest(out, manifest)
+                settled = re.sub(
+                    r"Packet estimate in tokens: \d+",
+                    "Packet estimate in tokens: %d" % estimate,
+                    text,
+                )
+                if settled == text:
+                    break
+                text = settled
+            self.save_packet(out, text)
+        self.assertEqual(code, 0, err)
+        self.assertIn("is verified", stamp)
+        stamped_text = self.packet_text(out)
+        self.assertIn(
+            extract_mod.tier_placeholder("T3", "dropped"), stamped_text
+        )
+        self.assertIn(self.CAVEAT, stamped_text)
+
+
+class TestRound23PassageDisclosure(Round3CaptureFixture):
+    """Round 23 delta H1. The disclosure stands at its place.
+
+    The red team confirmation stood the tandem forgery with
+    the caveat deleted from both sides stamping on the fix
+    candidate, because no reading required the caveat to
+    stand in a passage on an included tier, and the repair
+    shape it priced is a presence reading for the caveat on
+    an included passage in the manner of the dropped tier
+    shape reading. The disclosure reading holds the recorded
+    passage to the head of the shape the extractor writes,
+    the lines that carry the disclosure. These plants run
+    the confirmation constructions against it. A tandem
+    forgery that keeps the caveat standing at its place
+    still stamps with the disclosure beside the fabricated
+    entry, the outcome the fix record designs, and a genuine
+    passage stamps untouched.
+    """
+
+    CAVEAT = (
+        "This passage was gathered live when this packet was "
+        "built and stands as the extractor recorded it, and "
+        "the packet checker does not recount it."
+    )
+    WEAKENED = (
+        "This passage was gathered live when this packet was "
+        "built and stands as the extractor recorded it."
+    )
+    UNAVAILABLE = (
+        "Prior pull requests are unavailable in this "
+        "environment, so no pull request history was gathered."
+    )
+    SNAPSHOT = (
+        "The states in this list are a snapshot from the fetch "
+        "that built this packet. They are not refreshed after "
+        "that fetch and they are not a live claim about any "
+        "pull request."
+    )
+    ENTRY = (
+        "- #42 the alpha change, approved and reviewed "
+        "and ready (merged)"
+    )
+
+    def tandem_edit(self, name, edit):
+        """Apply one edit to the passage on both sides of the stamp."""
+        out = self.clone(name)
+        manifest = self.manifest(out)
+        passage = manifest["prior_pull_requests_passage"]
+        self.assertIn(self.CAVEAT, passage)
+        forged = edit(passage)
+        manifest["prior_pull_requests_passage"] = forged
+        self.save_manifest(out, manifest)
+        text = self.packet_text(out)
+        self.assertIn(passage, text)
+        self.save_packet(out, text.replace(passage, forged))
+        return out
+
+    def settle_included(self, out):
+        """Settle the measures a passage tamper moves, as the checker names them."""
+        for _round in range(6):
+            text = self.packet_text(out)
+            manifest = self.manifest(out)
+            span = check_mod.span_text(text, "## T3 History")
+            tier_tokens = extract_mod.estimate_tokens(span)
+            manifest["tiers"]["T3"]["estimated_tokens"] = tier_tokens
+            manifest["tiers"]["T3"]["emitted_tokens"] = tier_tokens
+            text = re.sub(
+                r"T3 included at about \d+ tokens",
+                "T3 included at about %d tokens" % tier_tokens,
+                text,
+            )
+            for _settle in range(6):
+                estimate = extract_mod.estimate_tokens(text)
+                manifest["budget"]["estimated_tokens"] = estimate
+                settled = re.sub(
+                    r"Packet estimate in tokens: \d+",
+                    "Packet estimate in tokens: %d" % estimate,
+                    text,
+                )
+                if settled == text:
+                    break
+                text = settled
+            self.save_packet(out, text)
+            self.save_manifest(out, manifest)
+            code, stamp, err = self.run_stamp(out)
+            if code == 0:
+                return code, stamp, err
+        return self.run_stamp(out)
+
+    def assert_disclosure_refusal(self, out):
+        code, stamp, err = self.run_stamp(out)
+        self.assertEqual(code, 1, stamp + err)
+        self.assertIn("included history tier", err)
+        self.assertIn("does not stand in the shape", err)
+        self.assertNotIn("is verified", stamp)
+
+    def test_the_genuine_included_passage_stamps(self):
+        code, stamp, err = self.run_stamp(self.genuine)
+        self.assertEqual(code, 0, err)
+        self.assertIn("is verified", stamp)
+        self.assertIn(
+            self.CAVEAT,
+            self.manifest(self.genuine)["prior_pull_requests_passage"],
+        )
+
+    def test_a_tandem_forgery_with_the_caveat_deleted_refuses(self):
+        def edit(passage):
+            forged = passage.replace(self.CAVEAT + "\n\n", "")
+            self.assertNotIn(self.CAVEAT, forged)
+            return forged.replace(
+                self.UNAVAILABLE,
+                "Pull request 42 merged and approved this exact "
+                "change after full review.",
+            )
+        out = self.tandem_edit("r23delta-nocaveat", edit)
+        self.assert_disclosure_refusal(out)
+
+    def test_a_tandem_forgery_with_the_caveat_moved_refuses(self):
+        def edit(passage):
+            moved = passage.replace(self.CAVEAT + "\n\n", "")
+            self.assertNotIn(self.CAVEAT, moved)
+            return moved.rstrip("\n") + "\n\n" + self.CAVEAT + "\n"
+        out = self.tandem_edit("r23delta-moved", edit)
+        self.assert_disclosure_refusal(out)
+
+    def test_a_tandem_forgery_with_the_caveat_weakened_refuses(self):
+        def edit(passage):
+            forged = passage.replace(self.CAVEAT, self.WEAKENED)
+            self.assertNotIn("does not recount it", forged)
+            return forged
+        out = self.tandem_edit("r23delta-weakened", edit)
+        self.assert_disclosure_refusal(out)
+
+    def test_a_tandem_forgery_above_the_snapshot_refuses(self):
+        def edit(passage):
+            self.assertIn(self.SNAPSHOT, passage)
+            return passage.replace(
+                self.SNAPSHOT, self.ENTRY + "\n\n" + self.SNAPSHOT
+            )
+        out = self.tandem_edit("r23delta-above", edit)
+        self.assert_disclosure_refusal(out)
+
+    def test_a_tandem_entry_with_the_caveat_standing_stamps(self):
+        def edit(passage):
+            return passage.replace(self.UNAVAILABLE, self.ENTRY)
+        out = self.tandem_edit("r23delta-entry", edit)
+        code, stamp, err = self.settle_included(out)
+        self.assertEqual(code, 0, err)
+        self.assertIn("is verified", stamp)
+        stamped_text = self.packet_text(out)
+        self.assertIn(self.ENTRY, stamped_text)
+        self.assertIn(self.CAVEAT, stamped_text)
+
+
+class TestRound23Command(Round27Fixture):
+    """Round 23 G2. Both path flags stand in the recorded command.
+
+    The repository flag joins the output flag in the presence
+    reading. The values themselves stay unpriced on the
+    portability grounds the docstring states, so restating
+    either value still verifies.
+    """
+
+    def command_edit(self, name, source, edit):
+        out = self.clone(name, source)
+        manifest = self.manifest(out)
+        edit(manifest["command"])
+        self.save_manifest(out, manifest)
+        return out
+
+    def test_a_command_with_no_repository_flag_fails(self):
+        def edit(command):
+            at = command.index("--repo")
+            del command[at:at + 2]
+        out = self.command_edit("r23cmdnorepo", self.genuine, edit)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("no repository flag", err)
+
+    def test_a_command_with_an_empty_repository_value_fails(self):
+        def edit(command):
+            command.extend(["--repo"])
+        out = self.command_edit("r23cmdrepoempty", self.genuine, edit)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("flag --repo carries no value", err)
+
+    def test_a_command_with_an_empty_output_value_fails(self):
+        def edit(command):
+            command.extend(["--out"])
+        out = self.command_edit("r23cmdoutempty", self.genuine, edit)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("flag --out carries no value", err)
+
+    def test_a_command_with_the_repository_value_removed_fails(self):
+        def edit(command):
+            at = command.index("--repo")
+            del command[at + 1]
+        out = self.command_edit("r23cmdrepovalueless", self.genuine, edit)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("flag --repo carries no value", err)
+        self.assertNotIn("does not take", err)
+
+    def test_restating_the_repository_value_still_verifies(self):
+        def edit(command):
+            at = command.index("--repo")
+            command[at + 1] = "/no/such/clone"
+        out = self.command_edit("r23cmdrepovalue", self.genuine, edit)
+        self.assertEqual(self.run_check(out), 0)
+
+    def test_restating_the_output_value_still_verifies(self):
+        def edit(command):
+            at = command.index("--out")
+            command[at + 1] = "/no/such/out"
+        out = self.command_edit("r23cmdoutvalue", self.genuine, edit)
+        self.assertEqual(self.run_check(out), 0)
+
+
+class TestRound23CredentialTuple(VerifierFixture):
+    """Round 23 G3. The credential flag rides the compared tuple.
+
+    The bespoke block below the tuple is gone. Striking the
+    field from the tuple in a scratch copy of the checker
+    leaves the recount silent on a manifest lying on the
+    flag, which proves the tuple is the carrier the shipped
+    recount plant prices.
+    """
+
+    def test_the_tuple_carries_the_credential_field(self):
+        source = CHECK_PATH.read_text(encoding="utf-8")
+        start = source.index("    fields = (")
+        end = source.index(")", start)
+        self.assertIn('"credential_file"', source[start:end])
+        self.assertNotIn('mine.get("credential_file", False)', source)
+
+    def test_striking_the_field_from_the_tuple_passes_the_lie(self):
+        # The strike is graded at the recount reading itself,
+        # the strike definition the standards inventory uses,
+        # because the packet level readings compare the packet
+        # against the manifest and a lie told in the manifest
+        # alone is also named there. At the recount, the tuple
+        # is the one comparison against the ground truth the
+        # recount builds, so striking the field from the tuple
+        # in a scratch copy of the checker leaves the recount
+        # silent on a manifest that lies on the flag, while the
+        # shipped recount names the field.
+        out = self.clone("r23-lying-manifest")
+        manifest = self.manifest(out)
+        entry = next(
+            e for e in manifest["files"] if e["path"] == "b.py"
+        )
+        self.assertFalse(entry["credential_file"])
+        entry["credential_file"] = True
+        self.save_manifest(out, manifest)
+        code, err = self.run_check_captured(out)
+        self.assertEqual(code, 1)
+        self.assertIn("credential_file", err)
+        problems, _change = check_mod.recount_problems(
+            self.repo, manifest, extract_mod
+        )
+        self.assertTrue(
+            any("credential_file" in problem for problem in problems),
+            problems,
+        )
+        scratch = Path(self.tmp.name) / "scratchroot"
+        (scratch / "scripts").mkdir(parents=True)
+        source = CHECK_PATH.read_text(encoding="utf-8")
+        struck = source.replace(
+            '"instruction_file", "credential_file",',
+            '"instruction_file",',
+        )
+        self.assertNotEqual(struck, source)
+        (scratch / "scripts" / "check_packet.py").write_text(
+            struck, encoding="utf-8"
+        )
+        shutil.copy(
+            SCHEMA_PATH, scratch / "scripts" / "packet-manifest.schema.json"
+        )
+        link = (
+            scratch / ".agents" / "skills" / "recognitio"
+            / "scripts" / "extract.py"
+        )
+        link.parent.mkdir(parents=True)
+        shutil.copy(EXTRACT_PATH, link)
+        struck_mod = load_at(
+            scratch / "scripts" / "check_packet.py", "check_packet_struck"
+        )
+        struck_problems, _change = struck_mod.recount_problems(
+            self.repo, manifest, struck_mod.load_extractor()
+        )
+        self.assertFalse(
+            any(
+                "credential_file" in problem
+                for problem in struck_problems
+            ),
+            struck_problems,
+        )
+
+
 class TestRound3PullRequestFallback(Round3CaptureFixture):
     """Round 3. The manifest fallback stamp names itself."""
 
@@ -3917,8 +4411,8 @@ class TestRound13BudgetAccount(unittest.TestCase):
     """Round 13. The budget account is held against the budget pass.
 
     The plants stand on the shipped example packet pair. Its
-    genuine figures are a packet estimate of 6062 tokens with
-    the history tier settled at 1853 tokens, and the dropped
+    genuine figures are a packet estimate of 6096 tokens with
+    the history tier settled at 1886 tokens, and the dropped
     plant settles its packet estimate the way the red team
     record describes, by measuring the packet with the
     history tier standing as its dropped placeholder, so the
@@ -3961,13 +4455,13 @@ class TestRound13BudgetAccount(unittest.TestCase):
 
     def test_the_genuine_example_packet_passes_the_budget_reading(self):
         manifest = self.example_manifest()
-        self.assertEqual(manifest["budget"]["estimated_tokens"], 6062)
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 6096)
         self.assertEqual(check_mod.budget_problems(manifest), [])
 
     def test_an_estimate_over_its_recorded_budget_is_refused(self):
         # Red team Minor 1, plant a6. No tier drops, the
         # recorded budget stands at 5000, and the settled
-        # packet estimate stands at the genuine 6062.
+        # packet estimate stands at the genuine 6096.
         manifest = self.example_manifest()
         manifest["budget"]["budget_tokens"] = 5000
         manifest["command"] = manifest["command"] + [
@@ -3976,7 +4470,7 @@ class TestRound13BudgetAccount(unittest.TestCase):
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "packet estimate of 6062 tokens exceeds the "
+                "packet estimate of 6096 tokens exceeds the "
                 "budget of 5000 tokens" in problem
                 for problem in problems
             ),
@@ -4249,12 +4743,12 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
     inside the window between the netted and unnetted
     restoration figures. The plants stand on the shipped
     example packet, whose settled figures are a packet
-    estimate of 6062 tokens with the history tier settled at
-    1853 and the companion tier settled at 354, and the
-    settled dropped packet measures 3900, so restoring the
-    companion tier alone measures 4231, restoring the
-    history tier alone measures 5731, and restoring both
-    measures the genuine 6062. Reverting the per tier
+    estimate of 6096 tokens with the history tier settled at
+    1886 and the companion tier settled at 354, and the
+    settled dropped packet measures 3934, so restoring the
+    companion tier alone measures 4265, restoring the
+    history tier alone measures 5765, and restoring both
+    measures the genuine 6096. Reverting the per tier
     reading or the placeholder netting in the checker
     returns each refusal plant below to a pass. The
     naming pin at the foot of this class covers the
@@ -4300,48 +4794,48 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
     def test_both_drops_under_a_budget_no_restoration_fits_passes(self):
         # The control. At a recorded budget of 4199 the
         # settled dropped packet fits, and restoring the
-        # companion tier alone measures 4231, the history
-        # tier alone 5731 and both 6062, so every drop the
+        # companion tier alone measures 4265, the history
+        # tier alone 5765 and both 6096, so every drop the
         # account records was forced and no problem stands.
         manifest = self.dropped_example(4199, ("T3", "T2"))
-        self.assertEqual(manifest["budget"]["estimated_tokens"], 3900)
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 3934)
         self.assertEqual(check_mod.budget_problems(manifest), [])
 
     def test_both_drops_refused_when_the_companion_restoration_fits(self):
-        # At 4231 the companion tier alone restored measures
+        # At 4265 the companion tier alone restored measures
         # exactly the recorded budget, so its drop was never
-        # required even though the full restoration at 6062
+        # required even though the full restoration at 6096
         # stands over the budget and the older reading
         # passed this account.
-        manifest = self.dropped_example(4231, ("T3", "T2"))
+        manifest = self.dropped_example(4265, ("T3", "T2"))
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "records T2 as dropped under a budget of 4231 "
+                "records T2 as dropped under a budget of 4265 "
                 "tokens, but the packet with that tier alone "
-                "restored measures about 4231 tokens" in problem
+                "restored measures about 4265 tokens" in problem
                 for problem in problems
             ),
             problems,
         )
 
     def test_both_drops_refused_when_the_history_restoration_fits(self):
-        # At 5731 the history tier alone restored fits, so
+        # At 5765 the history tier alone restored fits, so
         # the refusal names the history tier.
-        manifest = self.dropped_example(5731, ("T3", "T2"))
+        manifest = self.dropped_example(5765, ("T3", "T2"))
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "records T3 as dropped under a budget of 5731 "
+                "records T3 as dropped under a budget of 5765 "
                 "tokens, but the packet with that tier alone "
-                "restored measures about 5731 tokens" in problem
+                "restored measures about 5765 tokens" in problem
                 for problem in problems
             ),
             problems,
         )
 
     def test_both_drops_at_6030_refuse_on_the_per_tier_reading_alone(self):
-        # At 6030 the full netted restoration measures 6062
+        # At 6030 the full netted restoration measures 6096
         # and stands over the budget, so the full restoration
         # reading states no problem and the refusal rests on
         # the per tier reading alone.
@@ -4358,15 +4852,15 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
 
     def test_a_single_drop_inside_the_placeholder_window_is_refused(self):
         # The netting plant. The history tier alone dropped
-        # settles the packet at 4231, its placeholder stands
-        # at 22 emitted tokens against a settled estimate of
-        # 1853, and at a recorded budget of 6071 the netted
-        # restoration measures the genuine 6062 and fits,
-        # while the unnetted figure of 6084 stands over the
+        # settles the packet at 4265, its placeholder stands
+        # at 55 emitted tokens against a settled estimate of
+        # 1886, and at a recorded budget of 6105 the netted
+        # restoration measures the genuine 6096 and fits,
+        # while the unnetted figure of 6151 stands over the
         # budget, so the pre repair reading passed and the
         # netted reading refuses.
-        manifest = self.dropped_example(6071, ("T3",))
-        self.assertEqual(manifest["budget"]["estimated_tokens"], 4231)
+        manifest = self.dropped_example(6105, ("T3",))
+        self.assertEqual(manifest["budget"]["estimated_tokens"], 4265)
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
@@ -4389,12 +4883,12 @@ class TestRound14BudgetPerTierAndNetting(unittest.TestCase):
         # returns this test to a failure.
         manifest = self.dropped_example(5900, ())
         self.assertEqual(
-            manifest["budget"]["estimated_tokens"], 6062
+            manifest["budget"]["estimated_tokens"], 6096
         )
         problems = check_mod.budget_problems(manifest)
         self.assertTrue(
             any(
-                "estimate of 6062 tokens exceeds the budget "
+                "estimate of 6096 tokens exceeds the budget "
                 "of 5900 tokens" in problem
                 for problem in problems
             ),

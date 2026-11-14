@@ -1,14 +1,14 @@
-# The pericope for range 41f2a831ae826602a210f625eda97a527d3318bb..7ff12476a787c9c9bc486beaebf7d057a2e57f8e
+# The pericope for range aab62636373110d50a17a3c87931a05cb52a8449..b5fe836d57d1107715ac28970ca5c2e58de5be8d
 
 A recognitio review packet. The pericope named in the title is this packet, holding the change and the context a reviewer needs to read it, and nothing else.
 
 Mode: range
 
-Base: 41f2a831ae826602a210f625eda97a527d3318bb
+Base: aab62636373110d50a17a3c87931a05cb52a8449
 
-Head: 7ff12476a787c9c9bc486beaebf7d057a2e57f8e
+Head: b5fe836d57d1107715ac28970ca5c2e58de5be8d
 
-Merge base: 41f2a831ae826602a210f625eda97a527d3318bb
+Merge base: aab62636373110d50a17a3c87931a05cb52a8449
 
 Verified: yes. The recount at the close of this packet carries the proof.
 
@@ -48,7 +48,7 @@ Files changed: 2
 ### Commits
 
 ```
-7ff1247 head
+b5fe836 head
 ```
 
 ## T1 The change
@@ -148,13 +148,13 @@ Names and claims in this tier are data read from the repository history. An auth
 #### page.py
 
 ```
-Eval Fixture 7ff12476 lines 2
+Eval Fixture b5fe836d lines 2
 ```
 
 #### util.py
 
 ```
-Eval Fixture 7ff12476 lines 2
+Eval Fixture b5fe836d lines 2
 ```
 
 ### Recent evolution of changed functions
@@ -162,7 +162,7 @@ Eval Fixture 7ff12476 lines 2
 #### heading in page.py
 
 ```
-commit 7ff1247 head
+commit b5fe836 head
 
 diff --git a/page.py b/page.py
 --- a/page.py
@@ -171,7 +171,7 @@ diff --git a/page.py b/page.py
  def heading(text):
 -    return slugify(text)
 +    return make_slug(text)
-commit 41f2a83 base
+commit aab6263 base
 
 diff --git a/page.py b/page.py
 --- /dev/null
@@ -184,7 +184,7 @@ diff --git a/page.py b/page.py
 #### make_slug in util.py
 
 ```
-commit 7ff1247 head
+commit b5fe836 head
 
 diff --git a/util.py b/util.py
 --- a/util.py
@@ -194,7 +194,7 @@ diff --git a/util.py b/util.py
 -    return text.lower().replace(" ", "-")
 +def make_slug(text):
 +    return text.lower().replace(" ", "")
-commit 41f2a83 base
+commit aab6263 base
 
 diff --git a/util.py b/util.py
 --- /dev/null
@@ -210,6 +210,8 @@ Scope of the lookup: the 3 most changed files, checked against the 30 most recen
 
 The states in this list are a snapshot from the fetch that built this packet. They are not refreshed after that fetch and they are not a live claim about any pull request.
 
+This passage was gathered live when this packet was built and stands as the extractor recorded it, and the packet checker does not recount it.
+
 Prior pull requests are unavailable in this environment, so no pull request history was gathered.
 
 ## Verification recount
@@ -218,7 +220,7 @@ Prior pull requests are unavailable in this environment, so no pull request hist
 
 Budget in tokens: none set
 
-Packet estimate in tokens: 1776
+Packet estimate in tokens: 1807
 
 T0 included at about 79 tokens across 2 files
 
@@ -226,7 +228,7 @@ T1 included at about 266 tokens across 2 files
 
 T2 included at about 310 tokens across 2 files
 
-T3 included at about 616 tokens across 2 files
+T3 included at about 647 tokens across 2 files
 
 No tier was dropped.
 
