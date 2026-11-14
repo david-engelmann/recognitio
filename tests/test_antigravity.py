@@ -744,6 +744,55 @@ class TestCheckAntigravity(unittest.TestCase):
                 problems,
             )
 
+    def test_a_weakened_hook_script_fails(self):
+        # Round 25 red team Minor 2. The gate pinned the
+        # wiring command and the script existence and never
+        # read the script, so softening its unverified
+        # manifest answer from deny to auto_approve passed
+        # the gate whole while the brief claims the gate
+        # holds the build. The gate now holds the shipped
+        # bytes, so the weakening refuses here.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            script = (root / ".antigravity" / "scripts"
+                      / "packet_gate.py")
+            source = script.read_text(encoding="utf-8")
+            weakened = source.replace(
+                '"deny",\n'
+                '                "the packet manifest is not '
+                'verified',
+                '"auto_approve",\n'
+                '                "the packet manifest is not '
+                'verified',
+            )
+            self.assertNotEqual(weakened, source)
+            script.write_text(weakened, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("shipped bytes" in p for p in problems),
+                problems,
+            )
+
+    def test_a_neutral_hook_script_edit_fails(self):
+        # The pin is on the bytes the wiring runs, not on a
+        # reading of what the script decides, so even an
+        # edit that changes no decision refuses until the
+        # shipped bytes are the bytes under review again.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            script = (root / ".antigravity" / "scripts"
+                      / "packet_gate.py")
+            source = script.read_text(encoding="utf-8")
+            script.write_text(
+                source + "# a note the review has not read\n",
+                encoding="utf-8",
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("shipped bytes" in p for p in problems),
+                problems,
+            )
+
     def test_a_manifest_with_a_version_key_fails(self):
         # The primary manifest schema permits the name and
         # the description beside the $schema key and no

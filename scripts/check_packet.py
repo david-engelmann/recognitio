@@ -60,13 +60,13 @@ Exits nonzero and lists every problem when the packet cannot be used.
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import types
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -986,10 +986,35 @@ def repo_state_problems(repo, notes=None):
 # the check measures a change exactly the way the run that built the
 # packet measured it and the two can never drift into rival counting
 # rules. A tree without the extractor cannot recount, and the check
-# fails closed there rather than stamping on trust.
+# fails closed there rather than stamping on trust. The load runs
+# from the source bytes alone, never through the import system file
+# loader, because that loader consults a compiled cache standing
+# beside the source before it reads the source itself, and a hash
+# based cache in its unchecked form is accepted without the source
+# being consulted at all, so a compiled shadow of the extractor
+# would run in place of the source every gate reads.
 # ---------------------------------------------------------------------
 
 _EXTRACTOR_CACHE = {}
+
+
+def load_source_module(name, path):
+    """Load one shipped module from its source bytes alone.
+
+    Compiling the bytes the tree carries gives no compiled
+    cache a voice in what executes, so the module that runs
+    is the module whose source stands in the tree, on this
+    load and on every load in this repo that follows the
+    same shape.
+    """
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    module.__package__ = ""
+    code = compile(
+        path.read_bytes(), str(path), "exec", dont_inherit=True
+    )
+    exec(code, module.__dict__)
+    return module
 
 
 def load_extractor():
@@ -998,11 +1023,9 @@ def load_extractor():
     module = None
     if EXTRACTOR_PATH.is_file():
         try:
-            spec = importlib.util.spec_from_file_location(
+            module = load_source_module(
                 "recognitio_extract_for_check", EXTRACTOR_PATH
             )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
         except Exception:
             module = None
     _EXTRACTOR_CACHE["module"] = module

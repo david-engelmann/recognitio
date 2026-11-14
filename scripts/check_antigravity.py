@@ -21,7 +21,8 @@ namespace placeholder sentence, the plugin manifest with
 exactly the keys its primary schema permits, the hook file
 in the primary hooks form with its one named hook, its one
 PreToolUse entry, its matcher and its one command handler
-naming the shipped packet gate script, the documented
+naming the shipped packet gate script and the packet gate
+script itself at its shipped bytes, the documented
 harness contract with a derivation note on every contract
 statement, and the decision record with its decision 4
 statement, so the scoped guidance cannot become a rival
@@ -35,6 +36,7 @@ no claim. That family is narrow and named, and prose
 outside it stays a human review surface.
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -224,6 +226,16 @@ HOOK_MATCHER = "invoke_subagent"
 HOOK_NAME = "recognitio-packet-gate"
 HOOK_COMMAND = "python3 ./scripts/packet_gate.py"
 HOOK_SCRIPT = "scripts/packet_gate.py"
+
+# The digest of the shipped packet gate script, read as
+# bytes. The suite runs the script itself over the packet
+# manifest states, and this pin holds the bytes the wiring
+# runs to the same reading, so an edit that softens a
+# decision the script makes refuses at this gate as well
+# as in the suite.
+HOOK_SCRIPT_SHA256 = (
+    "35ab4e8fe94e4e42eb47b6bcb28284dd5e5b36164fbfad1c698d4ea48fad80ea"
+)
 
 # The keys the primary plugins page schema permits in the
 # plugin manifest, beside the $schema key its own example
@@ -746,6 +758,15 @@ def hook_problems(root=None):
             "the packet gate script at .antigravity/%s is "
             "missing or not a regular file, so the command "
             "the wiring names runs nothing" % HOOK_SCRIPT
+        )
+    elif hashlib.sha256(script.read_bytes()).hexdigest() != (
+        HOOK_SCRIPT_SHA256
+    ):
+        problems.append(
+            "the packet gate script at .antigravity/%s does "
+            "not stand at its shipped bytes, so the command "
+            "the wiring names runs a script whose decisions "
+            "this gate has not read" % HOOK_SCRIPT
         )
     return problems
 

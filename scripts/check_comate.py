@@ -37,6 +37,8 @@ repo. Decision 32 must record the build with its decision
 4 statement.
 """
 
+import importlib.util
+import marshal
 import re
 import sys
 from pathlib import Path
@@ -332,20 +334,133 @@ def is_bytecode_cache(path):
     )
 
 
+def cache_is_build_state(path):
+    """Whether a bytecode cache file is skipped as build state.
+
+    The shape alone settled this before Round 25, and the
+    red team of that round stood a weakened extractor inside
+    the shape, compiled in the unchecked hash based form
+    the import system accepts without consulting the source,
+    where a shipped loader executed it while every gate read
+    the pristine source. A cache file is build state only
+    while it cannot run in place of a shipped module. A
+    cache naming no shipped module, no source file standing
+    beside the cache directory, is build state as it always
+    was. A cache naming one is build state only while the
+    loader on this interpreter would pass it by, its magic
+    foreign or its header stale against the source it
+    shadows, or while its payload is byte for byte the
+    compiled form of that source. A cache the loader would
+    run carrying any other code stands in the measurement
+    like any other file, so the comparison names it in
+    either direction.
+    """
+    if not is_bytecode_cache(path):
+        return False
+    source = path.parent.parent / (
+        path.name.split(".")[0] + ".py"
+    )
+    if not source.is_file():
+        return True
+    return not cache_would_run(path, source) or (
+        cache_matches_source(path, source)
+    )
+
+
+def cache_would_run(path, source):
+    """Whether the import loader would run a cache in place of its source.
+
+    The loader honors a cache only under its own magic. A
+    timestamp cache is honored only while its recorded
+    modification time and size still match the source, and
+    a hash based cache is honored while it asks for no
+    source check at all or while its recorded hash is the
+    hash of the source it shadows.
+    """
+    try:
+        data = path.read_bytes()
+        source_bytes = source.read_bytes()
+    except OSError:
+        return False
+    if len(data) < 16 or data[:4] != importlib.util.MAGIC_NUMBER:
+        return False
+    flags = int.from_bytes(data[4:8], "little")
+    if flags & 0b1:
+        if flags & 0b10:
+            return data[8:16] == importlib.util.source_hash(
+                source_bytes
+            )
+        return True
+    mtime = int.from_bytes(data[8:12], "little")
+    size = int.from_bytes(data[12:16], "little")
+    try:
+        stat = source.stat()
+    except OSError:
+        return False
+    return (
+        mtime == int(stat.st_mtime) % (2 ** 32)
+        and size == stat.st_size % (2 ** 32)
+    )
+
+
+def cache_matches_source(path, source):
+    """Whether a cache payload is the compiled form of its source.
+
+    The payload is read back as a code object and compared
+    against a fresh compile of the source under the filename
+    the cache itself records, so a cache compiled from the
+    source through any path spelling still matches, and a
+    cache carrying weakened or foreign code never does.
+    The comparison runs in one fixed encoding, because the
+    encoding a writer chose carries marks of its own process
+    that are no part of the code it wrote. A payload that
+    cannot be read as a code object at all matches nothing.
+    """
+    try:
+        data = path.read_bytes()
+        code = marshal.loads(data[16:])
+        fresh = compile(
+            source.read_bytes(), code.co_filename, "exec",
+            dont_inherit=True,
+            optimize=cache_optimize_level(path),
+        )
+    except Exception:
+        return False
+    return marshal.dumps(code, 2) == marshal.dumps(fresh, 2)
+
+
+def cache_optimize_level(path):
+    """The optimization level a cache filename tag records.
+
+    An untagged cache name records the plain level, and a
+    tag carrying an opt marker records that level, the two
+    shapes the interpreter writes.
+    """
+    for part in path.name.split("."):
+        if part.startswith("opt-"):
+            try:
+                return int(part[4:])
+            except ValueError:
+                return 0
+    return 0
+
+
 def tree_bytes(directory):
     """Map every file under a directory to its bytes.
 
     Compiled bytecode caches are build state, not skill content,
-    so bytecode cache files are excluded the way the other copy
-    gates exclude them. The exclusion is keyed on the bytecode
-    shape alone, so a file that merely wears a cache name is
-    read and compared like any other file.
+    so a bytecode cache file the build state reading below
+    passes is excluded the way the other copy gates exclude
+    it. A file that merely wears a cache name is read and
+    compared like any other file, and a cache that would run
+    in place of a shipped module carrying other code is read
+    and compared as well, so the comparison names it.
     """
     found = {}
     for path in sorted(directory.rglob("*")):
         if not path.is_file() or path.is_symlink():
             continue
-        if is_bytecode_cache(path):
+        if cache_is_build_state(path):
             continue
         rel = str(path.relative_to(directory))
         found[rel] = path.read_bytes()
@@ -410,13 +525,16 @@ def placement_problems(root, problems):
         )
         return
     # A cache directory is excluded only when everything under
-    # it is a bytecode cache file. A cache directory holding
-    # anything else stands in the census whole, so a manifest
-    # or plugin file inside it is named as the stray it is.
+    # it is a bytecode cache file standing as build state. A
+    # cache directory holding anything else stands in the
+    # census whole, so a manifest or plugin file inside it is
+    # named as the stray it is, and a cache carrying code its
+    # source does not carry counts as something else under the
+    # build state reading the tree map carries.
     pure_cache_dirs = set()
     for path in comate.rglob("__pycache__"):
         if path.is_dir() and all(
-            is_bytecode_cache(item)
+            cache_is_build_state(item)
             for item in path.rglob("*")
             if item.is_file()
         ):

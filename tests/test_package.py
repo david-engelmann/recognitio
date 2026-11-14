@@ -27,10 +27,12 @@ keeps the absent reading at both paths.
 """
 
 import importlib.util
+import marshal
 import io
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -73,6 +75,63 @@ EXTENSION_PATHS = (
     ".antigravity/plugin.json",
     ".antigravity/hooks.json",
 )
+
+
+def write_extractor_shadow(source):
+    """Plant a weakened compiled shadow of the extractor beside it.
+
+    The shadow is the Round 25 red team construction, the
+    extractor compiled with its companion definition cap
+    weakened, carried in the unchecked hash based form the
+    import system accepts without consulting the source.
+    """
+    data = source.read_bytes()
+    weakened = data.replace(
+        b"MAX_DEFINITIONS_PER_NAME = 3",
+        b"MAX_DEFINITIONS_PER_NAME = 3000",
+    )
+    if weakened == data:
+        raise AssertionError("the shipped cap line stands moved")
+    code = compile(
+        weakened, str(source.resolve()), "exec", dont_inherit=True
+    )
+    header = (
+        importlib.util.MAGIC_NUMBER
+        + struct.pack("<I", 1)
+        + importlib.util.source_hash(weakened)
+    )
+    cache = source.parent / "__pycache__"
+    cache.mkdir(exist_ok=True)
+    tag = "cpython-%d%d" % sys.version_info[:2]
+    shadow = cache / ("extract.%s.pyc" % tag)
+    shadow.write_bytes(header + marshal.dumps(code))
+    return shadow
+
+
+def write_faithful_cache(source):
+    """Write the cache an interpreter writes from the source itself.
+
+    The write suppression a gate under test switched on for
+    its own process is lifted for the load and restored
+    after it, and the cache must stand written, so this
+    fixture can never pass in silence over no cache at all.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "faithful_extract", source
+    )
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = False
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
+    cache = Path(
+        importlib.util.cache_from_source(str(source))
+    )
+    if not cache.is_file():
+        raise AssertionError("no cache stands written")
+    return cache
 
 
 class TestCheckPackage(unittest.TestCase):
@@ -708,6 +767,47 @@ class TestCheckPackage(unittest.TestCase):
                 problems,
             )
 
+    def test_a_compiled_shadow_of_the_extractor_in_the_copy_fails(self):
+        # Round 25 red team Major 1. A weakened extractor
+        # compiled into the cache shape the tree maps used to
+        # skip on shape alone is measured now, so the gate
+        # names it instead of certifying the copy over it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            write_extractor_shadow(
+                root / "agent-plugins-package" / "skills" / "recognitio" / "scripts" / "extract.py"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("extract.cpython" in p for p in problems),
+                problems,
+            )
+
+    def test_a_compiled_shadow_of_the_extractor_in_the_canonical_skill_fails(self):
+        # The same shadow on the canonical side, the side an
+        # honest run leaves its own faithful cache on, is
+        # named in the other direction.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            write_extractor_shadow(
+                root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py"
+            )
+            problems = self.problems(root)
+            self.assertTrue(
+                any("extract.cpython" in p for p in problems),
+                problems,
+            )
+
+    def test_a_faithful_cache_of_the_extractor_passes(self):
+        # Control. The cache an interpreter writes from the
+        # shipped source itself is build state, so a run that
+        # imported the extractor leaves the pin standing, in
+        # the copy and on the canonical side alike.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout(tmp)
+            write_faithful_cache(root / ".agents" / "skills" / "recognitio" / "scripts" / "extract.py")
+            write_faithful_cache(root / "agent-plugins-package" / "skills" / "recognitio" / "scripts" / "extract.py")
+            self.assertEqual(self.problems(root), [])
     def test_a_bytecode_cache_file_in_a_cache_folder_passes(self):
         # Control. A genuine bytecode cache file, a .pyc file
         # inside a cache folder, stays excluded as build state

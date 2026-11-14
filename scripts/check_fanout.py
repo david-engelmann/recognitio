@@ -40,12 +40,12 @@ primary sources behind each rule.
 """
 
 import argparse
-import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -274,6 +274,25 @@ def steering_problems(text, where, field="summary"):
     return []
 
 
+def load_source_module(name, path):
+    """Load one shipped module from its source bytes alone.
+
+    Compiling the bytes the tree carries gives no compiled
+    cache a voice in what executes, so the module that runs
+    is the module whose source stands in the tree, on this
+    load and on every load in this repo that follows the
+    same shape.
+    """
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    module.__package__ = ""
+    code = compile(
+        path.read_bytes(), str(path), "exec", dont_inherit=True
+    )
+    exec(code, module.__dict__)
+    return module
+
+
 def load_packet_checker():
     """The shipped packet check, loaded as a sibling module.
 
@@ -295,11 +314,7 @@ def load_packet_checker():
             "it is not a regular file"
         ]
     try:
-        spec = importlib.util.spec_from_file_location(
-            "fanout_check_packet", path
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = load_source_module("fanout_check_packet", path)
     except Exception as exc:
         return None, ["cannot read the packet checker: %s" % exc]
     return module, []

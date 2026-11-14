@@ -23,6 +23,7 @@ token counts recorded in the estimator shapes were measured with
 the cl100k tokenizer over the exact strings the tests build.
 """
 
+import ast
 import base64
 import importlib.util
 import json
@@ -1083,6 +1084,55 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
         self.assertIn(
             "Four families stand outside that bound", reference
         )
+
+    def test_the_remaining_named_limits_stand_in_every_home(self):
+        # Round 25 red team Minor 1. The underscore family
+        # stood pinned by the test above while the printed
+        # figures of the other three named limit families
+        # stood read by no gate and no test, so a drift of
+        # the unspelled figure across the whole reference
+        # home passed everything the audit ran. Every
+        # printed figure of every remaining family now
+        # stands read in both homes of every copy that
+        # carries them, the estimator docstring and the
+        # budget reference, so a drift of any figure in
+        # any one home fails here naming its home.
+        homes = (
+            ROOT / ".agents" / "skills" / "recognitio",
+            ROOT / "agent-plugins-package" / "skills"
+            / "recognitio",
+            ROOT / ".cursor-plugin" / "skills" / "recognitio",
+            ROOT / ".comate" / "skills" / "recognitio",
+        )
+        for home in homes:
+            tree = ast.parse(
+                (home / "scripts" / "extract.py").read_text(
+                    encoding="utf-8"
+                )
+            )
+            function = next(
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "estimate_tokens"
+            )
+            docstring = " ".join(
+                ast.get_docstring(function).split()
+            )
+            reference = " ".join(
+                (
+                    home / "references" / "budget-system.md"
+                ).read_text(encoding="utf-8").split()
+            )
+            for marker in (
+                "unspelled",
+                "hex letters",
+                "repeated mark or whitespace",
+            ):
+                self.assertIn(marker, docstring, str(home))
+                self.assertIn(marker, reference, str(home))
+            for figure in ("5.1", "0.24", "0.02", "3.1"):
+                self.assertIn(figure, docstring, str(home))
+                self.assertIn(figure, reference, str(home))
 
 
 class TestRound14BothTierShedding(unittest.TestCase):

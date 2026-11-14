@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import marshal
 import os
 import re
 import shutil
@@ -9711,6 +9712,17 @@ class TestStrictJsonReaderFamily(unittest.TestCase):
     gate docstring claimed the copies were the same reader.
     The four now answer identically, and the claim stands
     true of the set it names.
+
+    Round 25 standards Minor 1 then charged the same
+    repair at the zcode and package copies, whose
+    docstrings claimed the same reader the other gate
+    scripts carry while their readers still read the
+    loose constants as floats. The family now stands at
+    six copies answering identically, and the two
+    restated docstrings name the set they are true of.
+    The twelve copies outside the family stand as the
+    standing remainder the round record names, neither
+    repaired in silence nor dropped from the count.
     """
 
     READERS = (
@@ -9718,6 +9730,8 @@ class TestStrictJsonReaderFamily(unittest.TestCase):
         "check_submissions",
         "check_regeneration",
         "check_packet",
+        "check_zcode",
+        "check_package",
     )
 
     def test_every_copy_refuses_the_loose_constants(self):
@@ -9751,6 +9765,366 @@ class TestStrictJsonReaderFamily(unittest.TestCase):
                 name,
             )
 
+
+class TestCacheBuildStateReading(unittest.TestCase):
+    """Round 25 red team Major 1. The cache shadow, measured.
+
+    The tree maps of the four copy gates skipped a compiled
+    file standing directly inside a cache directory on its
+    shape alone, and a weakened extractor compiled in the
+    unchecked hash based form stood inside the pinned copies
+    where no reading could see it, executable by every file
+    loader that met it. A cache naming a shipped module now
+    stands as build state only while the loader on this
+    interpreter would pass it by or would run exactly the
+    compiled form of the source it shadows, and any other
+    live shadow is measured like any other file.
+    """
+
+    GATES = (
+        "check_package",
+        "check_cursor",
+        "check_comate",
+        "check_codex_plugin",
+    )
+    TREE_GATES = ("check_package", "check_cursor", "check_comate")
+    SOURCE = 'MARKER = "pristine"\n'
+    WEAKENED = 'MARKER = "weakened"\n'
+
+    def make_home(self, tmp, name="extract"):
+        home = Path(tmp) / "home"
+        scripts = home / "scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        (scripts / (name + ".py")).write_text(
+            self.SOURCE, encoding="utf-8"
+        )
+        return home
+
+    def cache_path(self, home, name="extract"):
+        tag = "cpython-%d%d" % sys.version_info[:2]
+        cache = home / "scripts" / "__pycache__"
+        cache.mkdir(exist_ok=True)
+        return cache / ("%s.%s.pyc" % (name, tag))
+
+    def write_cache(self, home, form, payload=None, name="extract"):
+        payload = self.WEAKENED if payload is None else payload
+        source = home / "scripts" / (name + ".py")
+        code = compile(
+            payload, str(source.resolve()), "exec",
+            dont_inherit=True,
+        )
+        body = marshal.dumps(code)
+        if form == "unchecked":
+            header = (
+                importlib.util.MAGIC_NUMBER
+                + struct.pack("<I", 1)
+                + importlib.util.source_hash(payload.encode())
+            )
+        elif form == "checked":
+            header = (
+                importlib.util.MAGIC_NUMBER
+                + struct.pack("<I", 3)
+                + importlib.util.source_hash(
+                    self.SOURCE.encode()
+                )
+            )
+        elif form in ("timestamp", "stale"):
+            stat = source.stat()
+            mtime = int(stat.st_mtime)
+            if form == "stale":
+                mtime -= 1000
+            header = importlib.util.MAGIC_NUMBER + struct.pack(
+                "<III", 0, mtime % (2 ** 32),
+                stat.st_size % (2 ** 32),
+            )
+        else:
+            raise AssertionError("unknown form %r" % form)
+        target = self.cache_path(home, name)
+        target.write_bytes(header + body)
+        return target
+
+    def rel(self, home, name="extract"):
+        return str(
+            self.cache_path(home, name).relative_to(home)
+        )
+
+    def test_an_unchecked_shadow_is_measured_in_every_copy(self):
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.write_cache(home, "unchecked")
+                self.assertFalse(
+                    mod.cache_is_build_state(cache), name
+                )
+                if name in self.TREE_GATES:
+                    self.assertIn(
+                        self.rel(home),
+                        mod.tree_bytes(home),
+                        name,
+                    )
+
+    def test_a_checked_hash_shadow_is_measured(self):
+        # The header carries the true hash of the source, so
+        # the loader runs the payload, and the payload is
+        # the weakened code, so the reading measures it.
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.write_cache(home, "checked")
+                self.assertFalse(
+                    mod.cache_is_build_state(cache), name
+                )
+
+    def test_a_forged_timestamp_shadow_is_measured(self):
+        # The header matches the source standing on disk, so
+        # the loader runs the weakened payload in its place.
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.write_cache(home, "timestamp")
+                self.assertFalse(
+                    mod.cache_is_build_state(cache), name
+                )
+
+    def test_a_faithful_cache_is_build_state(self):
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.write_cache(
+                    home, "unchecked", payload=self.SOURCE
+                )
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+                if name in self.TREE_GATES:
+                    self.assertNotIn(
+                        self.rel(home),
+                        mod.tree_bytes(home),
+                        name,
+                    )
+
+    def test_the_cache_an_interpreter_writes_is_build_state(self):
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                source = home / "scripts" / "extract.py"
+                spec = importlib.util.spec_from_file_location(
+                    "written_extract", source
+                )
+                module = importlib.util.module_from_spec(spec)
+                # A gate loaded earlier in this process may
+                # have switched cache writing off for its own
+                # hygiene, so the write stands lifted for the
+                # load and restored after it, and the cache
+                # below must stand written.
+                previous = sys.dont_write_bytecode
+                sys.dont_write_bytecode = False
+                try:
+                    spec.loader.exec_module(module)
+                finally:
+                    sys.dont_write_bytecode = previous
+                cache = self.cache_path(home)
+                self.assertTrue(cache.is_file(), name)
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+
+    def test_an_inert_cache_is_build_state(self):
+        # Foreign magic, a stale header, and a headerless
+        # stub are bytes no loader on this interpreter would
+        # run, so they stand as build state as they always
+        # have, beside the live shadows the reading measures.
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.cache_path(home)
+                cache.write_bytes(
+                    b"\x42\x0d\x0d\x0a cache bytes"
+                )
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+                cache.write_bytes(b"cache")
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+                stale = self.write_cache(home, "stale")
+                self.assertTrue(
+                    mod.cache_is_build_state(stale), name
+                )
+
+    def test_a_cache_naming_no_shipped_module_is_build_state(self):
+        for name in self.GATES:
+            mod = load_script(name)
+            with tempfile.TemporaryDirectory() as tmp:
+                home = self.make_home(tmp)
+                cache = self.write_cache(
+                    home, "unchecked", name="notes"
+                )
+                self.assertTrue(
+                    mod.cache_is_build_state(cache), name
+                )
+
+    def test_the_reading_stands_byte_identical_in_the_four_copies(self):
+        functions = (
+            "is_bytecode_cache",
+            "cache_is_build_state",
+            "cache_would_run",
+            "cache_matches_source",
+            "cache_optimize_level",
+        )
+        for function in functions:
+            groups = {}
+            for name in self.GATES:
+                path = ROOT / "scripts" / (name + ".py")
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source)
+                found = [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.FunctionDef)
+                    and node.name == function
+                ]
+                self.assertEqual(len(found), 1, (name, function))
+                segment = ast.get_source_segment(source, found[0])
+                self.assertIsNotNone(segment, (name, function))
+                groups.setdefault(segment, []).append(name)
+            self.assertEqual(
+                len(groups), 1, (function, groups)
+            )
+
+
+class TestSourceLoadsIgnoreShadows(unittest.TestCase):
+    """Round 25 red team Major 1. The loads run the source.
+
+    Every shipped load of a shipped module ran through the
+    import system file loader, which consults a compiled
+    cache standing beside the source before it reads the
+    source itself, so the weakened extractor compiled as an
+    unchecked cache beside the canonical skill is what the
+    packet checker loaded while every gate read the pristine
+    source. The loads now compile the source bytes alone,
+    and a shadow planted beside a target changes nothing
+    the loader returns.
+    """
+
+    TARGET = 'MARKER = "pristine"\n'
+    WEAKENED = 'MARKER = "weakened"\n'
+
+    def write_target(self, directory, name,
+                     target=None, weakened=None):
+        target = self.TARGET if target is None else target
+        weakened = self.WEAKENED if weakened is None else weakened
+        path = directory / (name + ".py")
+        path.write_text(target, encoding="utf-8")
+        code = compile(
+            weakened, str(path.resolve()), "exec",
+            dont_inherit=True,
+        )
+        header = (
+            importlib.util.MAGIC_NUMBER
+            + struct.pack("<I", 1)
+            + importlib.util.source_hash(weakened.encode())
+        )
+        cache = directory / "__pycache__"
+        cache.mkdir(exist_ok=True)
+        tag = "cpython-%d%d" % sys.version_info[:2]
+        (cache / ("%s.%s.pyc" % (name, tag))).write_bytes(
+            header + marshal.dumps(code)
+        )
+        return path
+
+    def copy_gate(self, tmp, name):
+        scripts = Path(tmp) / "scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            ROOT / "scripts" / (name + ".py"),
+            scripts / (name + ".py"),
+        )
+        return scripts
+
+    def test_the_packet_checker_loads_the_extractor_from_source(self):
+        mod = load_script("check_packet")
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            source = self.write_target(
+                directory,
+                "extract",
+                target="MAX_DEFINITIONS_PER_NAME = 3\n",
+                weakened="MAX_DEFINITIONS_PER_NAME = 3000\n",
+            )
+            original = mod.EXTRACTOR_PATH
+            mod._EXTRACTOR_CACHE.clear()
+            mod.EXTRACTOR_PATH = source
+            try:
+                loaded = mod.load_extractor()
+            finally:
+                mod.EXTRACTOR_PATH = original
+                mod._EXTRACTOR_CACHE.clear()
+            self.assertIsNotNone(loaded)
+            self.assertEqual(
+                loaded.MAX_DEFINITIONS_PER_NAME, 3
+            )
+
+    def test_the_evals_loader_reads_the_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = self.copy_gate(tmp, "check_evals")
+            self.write_target(scripts, "check_packet")
+            mod = load_script_at(
+                scripts / "check_evals.py", "r25_evals_gate"
+            )
+            loaded = mod.load_packet_checker(Path(tmp))
+            self.assertEqual(loaded.MARKER, "pristine")
+
+    def test_the_fanout_loader_reads_the_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = self.copy_gate(tmp, "check_fanout")
+            self.write_target(scripts, "check_packet")
+            mod = load_script_at(
+                scripts / "check_fanout.py", "r25_fanout_gate"
+            )
+            loaded, problems = mod.load_packet_checker()
+            self.assertEqual(problems, [])
+            self.assertEqual(loaded.MARKER, "pristine")
+
+    def test_the_headless_loader_reads_the_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = self.copy_gate(tmp, "check_headless")
+            self.write_target(scripts, "check_packet")
+            mod = load_script_at(
+                scripts / "check_headless.py", "r25_headless_gate"
+            )
+            loaded, problems = mod.load_packet_checker()
+            self.assertEqual(problems, [])
+            self.assertEqual(loaded.MARKER, "pristine")
+
+    def test_the_regeneration_loader_reads_the_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = self.copy_gate(tmp, "check_regeneration")
+            self.write_target(scripts, "check_packet")
+            mod = load_script_at(
+                scripts / "check_regeneration.py",
+                "r25_regeneration_gate",
+            )
+            loaded = mod.load_sibling("check_packet")
+            self.assertEqual(loaded.MARKER, "pristine")
+
+    def test_the_bridge_loader_reads_the_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = self.copy_gate(tmp, "merge_to_headless")
+            self.write_target(scripts, "check_fanout")
+            mod = load_script_at(
+                scripts / "merge_to_headless.py", "r25_bridge"
+            )
+            loaded, problems = mod.load_fanout()
+            self.assertEqual(problems, [])
+            self.assertEqual(loaded.MARKER, "pristine")
 
 class TestCopyMarkBlocksAgree(unittest.TestCase):
     """Round 24 standards Note 1. The two hand written mark blocks.

@@ -883,6 +883,13 @@ class TestRound15ZcodeStrictReader(unittest.TestCase):
             )
 
     def test_a_repeated_version_key_in_the_home_manifest_fails(self):
+        # Round 25 standards Minor 2, carried from Round 15.
+        # The home leg once folded this parse failure into
+        # an empty mapping, so the refusal read as a version
+        # mismatch against nothing and never named the
+        # repeated key. The leg now names the parse failure
+        # as its cause, in the shape the own manifest leg
+        # already used, and no mismatch sentence stands.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.base.make_layout(tmp)
             path = root / ".claude-plugin" / "plugin.json"
@@ -894,5 +901,14 @@ class TestRound15ZcodeStrictReader(unittest.TestCase):
             path.write_text(planted, encoding="utf-8")
             problems = self.base.problems(root)
             self.assertTrue(
-                any("does not match" in p for p in problems), problems
+                any(
+                    "does not parse" in p
+                    and "repeated key 'version'" in p
+                    for p in problems
+                ),
+                problems,
+            )
+            self.assertFalse(
+                any("does not match" in p for p in problems),
+                problems,
             )

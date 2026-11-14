@@ -22,10 +22,29 @@ instruction to the headless reviewer or to any gate.
 """
 
 import argparse
-import importlib.util
 import json
 import sys
+import types
 from pathlib import Path
+
+
+def load_source_module(name, path):
+    """Load one shipped module from its source bytes alone.
+
+    Compiling the bytes the tree carries gives no compiled
+    cache a voice in what executes, so the module that runs
+    is the module whose source stands in the tree, on this
+    load and on every load in this repo that follows the
+    same shape.
+    """
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    module.__package__ = ""
+    code = compile(
+        path.read_bytes(), str(path), "exec", dont_inherit=True
+    )
+    exec(code, module.__dict__)
+    return module
 
 
 def load_fanout():
@@ -47,11 +66,7 @@ def load_fanout():
             "it is not a regular file"
         ]
     try:
-        spec = importlib.util.spec_from_file_location(
-            "merge_check_fanout", path
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = load_source_module("merge_check_fanout", path)
     except Exception as exc:
         return None, [
             "cannot read the fan-out validator: %s" % exc

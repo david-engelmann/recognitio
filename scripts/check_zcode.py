@@ -439,13 +439,16 @@ class DuplicateKeyError(ValueError):
 
 
 def strict_json_loads(text):
-    """Parse JSON refusing a repeated key, like the other gates.
+    """Parse JSON refusing a repeated key and the loose constants.
 
     A plain load keeps the last value of a repeated key in
     silence, which would let a second entry hide beside the
-    one the gate certifies. This is the same reader the
-    other gate scripts carry, kept as a second copy because
-    the gate scripts never import each other.
+    one the gate certifies, and it reads the loose constants
+    NaN and Infinity as floats, which no manifest in the
+    tree may carry. This is the same reader the copy,
+    submissions, regeneration, and packet checker scripts
+    and the package gate carry, kept as a second copy
+    because the gate scripts never import each other.
     """
     def reject(pairs):
         seen = {}
@@ -454,7 +457,12 @@ def strict_json_loads(text):
                 raise DuplicateKeyError("repeated key %r" % key)
             seen[key] = value
         return seen
-    return json.loads(text, object_pairs_hook=reject)
+
+    def reject_constant(value):
+        raise ValueError("loose JSON constant %r" % (value,))
+    return json.loads(
+        text, object_pairs_hook=reject,
+        parse_constant=reject_constant)
 
 
 def manifest_problems(root=None):
@@ -527,14 +535,18 @@ def manifest_problems(root=None):
         if home_raw is not None:
             try:
                 home = strict_json_loads(home_raw)
-            except ValueError:
-                home = {}
-            if home.get("version") != data["version"]:
+            except ValueError as exc:
                 problems.append(
-                    ".zcode-plugin/plugin.json version %s does "
-                    "not match the repo version %s"
-                    % (data["version"], home.get("version"))
+                    ".claude-plugin/plugin.json does not parse: %s"
+                    % exc
                 )
+            else:
+                if home.get("version") != data["version"]:
+                    problems.append(
+                        ".zcode-plugin/plugin.json version %s does "
+                        "not match the repo version %s"
+                        % (data["version"], home.get("version"))
+                    )
     return problems
 
 
