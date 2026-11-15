@@ -2531,6 +2531,171 @@ class TestRound5Cursor(unittest.TestCase):
                 "stale Cursor Marketplace distribution claim" in p
                 and "cursor-plugin-brief" in p for p in problems), problems)
 
+    def test_a_plugin_posting_claim_in_the_brief_fails_by_name(self):
+        # Round 26 red team Minor 4. A capability claim
+        # in fresh words appended to the brief, that the
+        # plugin posts the finished review to the pull
+        # request as a comment on its own, stood outside
+        # the claims the brief gate enumerates and passed
+        # the gate and this suite whole. The posting
+        # family now refuses it by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe Cursor plugin posts the "
+                "finished review to the pull request as a "
+                "comment on its own.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "posts the finished review" in p
+                and "cursor-plugin-brief" in p for p in problems),
+                problems)
+
+    def test_a_negated_posting_sentence_in_the_brief_passes(self):
+        # The family reads negation at clause scope, so
+        # the honest denial of the same claim states no
+        # claim and draws no problem from the family.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe plugin never posts the "
+                "finished review to the pull request.\n")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "posts the finished review" in p
+                for p in problems), problems)
+
+    def test_a_pronoun_subject_posting_claim_in_the_brief_fails(self):
+        # Round 26 red team confirmation Minor 3, first
+        # shape. The claim restated with a pronoun in the
+        # subject place stood outside the named subject
+        # join and passed the gate and this suite whole.
+        # The family now reads the pronoun where it
+        # governs the verb itself.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nIt posts the finished "
+                "review to the pull request on its own.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "posts the finished review" in p
+                and "cursor-plugin-brief" in p for p in problems),
+                problems)
+
+    def test_a_swapped_verb_posting_claim_in_the_brief_fails(self):
+        # Round 26 red team confirmation Minor 3, second
+        # shape. The claim restated with a verb of leaving
+        # in the verb place stood outside the post and
+        # publish forms and passed the gate and this suite
+        # whole. The verb place now carries the leave and
+        # add forms beside them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe plugin leaves the "
+                "finished review on the pull request as a "
+                "comment.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "posts the finished review" in p
+                and "cursor-plugin-brief" in p for p in problems),
+                problems)
+
+    def test_a_negated_swapped_verb_sentence_in_the_brief_passes(self):
+        # Negation stands read at clause scope for every
+        # verb form in the widened family, so the honest
+        # denial in the swapped verb form states no claim.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nThe plugin never leaves the "
+                "finished review on the pull request.\n")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "posts the finished review" in p
+                for p in problems), problems)
+
+    def test_a_modal_pronoun_posting_claim_in_the_brief_fails(self):
+        # Round 26 red team delta confirmation Minor 3.
+        # The claim restated with a modal between the
+        # pronoun and the verb, it will post the finished
+        # review, stood one word outside the pronoun
+        # join and passed the gate whole. The join now
+        # admits the modal in that place.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nIt will post the finished "
+                "review to the pull request.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "posts the finished review" in p
+                and "cursor-plugin-brief" in p for p in problems),
+                problems)
+
+    def test_a_modal_pronoun_leave_claim_in_the_brief_fails(self):
+        # The modal join and the swapped verb compose,
+        # the pronoun governing the leave verb across
+        # the modal as the confirmation composed the
+        # pronoun and the leave verb directly.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nIt will leave the finished "
+                "review on the pull request as a comment.\n")
+            problems = self.inner.problems(root)
+            self.assertTrue(any(
+                "posts the finished review" in p
+                and "cursor-plugin-brief" in p for p in problems),
+                problems)
+
+    def test_a_modal_negated_posting_sentence_in_the_brief_passes(self):
+        # A modal denial states no claim, the not
+        # between the modal and the verb breaking the
+        # join, so the honest denial in the modal shape
+        # draws no problem from the family.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.inner.make_layout(tmp)
+            text = self.inner.read_brief(root)
+            self.inner.write_brief(
+                root, text + "\n\nIt will not post the "
+                "finished review to the pull request.\n")
+            problems = self.inner.problems(root)
+            self.assertFalse(any(
+                "posts the finished review" in p
+                for p in problems), problems)
+
+    def test_the_posting_family_boundary_sentence_stands_in_the_gate(self):
+        # Round 26 third delta. The posting family
+        # prices its claim in enumerated joins, and the
+        # second delta confirmation planted the claim
+        # outside them, in an upload verb form and in a
+        # pronoun join broken by a parenthetical. Under
+        # the owner ruling the close for an open prose
+        # family is the boundary stated on the face of
+        # the gate, and this test pins that sentence in
+        # the gate source, so its silent removal fails.
+        gate = (
+            ROOT / "scripts" / "check_cursor.py"
+        ).read_text(encoding="utf-8")
+        flat = re.sub(
+            r"\s+", " ", re.sub(r"(?m)^\s*# ?", "", gate))
+        self.assertIn(
+            "This family prices the named subjects and "
+            "the pronoun joins with the enumerated verb "
+            "set above, and it does not price other "
+            "verbs of placing a review or a pronoun join "
+            "broken by a parenthetical",
+            flat)
+
     def test_t0_member_removed_from_brief_b3_fails_by_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.inner.make_layout(tmp)

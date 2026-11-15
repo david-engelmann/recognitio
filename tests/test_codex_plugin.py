@@ -1002,6 +1002,170 @@ class TestRound16CodexReadmeFigures(unittest.TestCase):
                 problems,
             )
 
+    def test_a_varied_form_guidance_file_figure_fails(self):
+        # Round 26, carrying the Round 16 brief form
+        # Minor the spec seat re-executed by plant. The
+        # readings judge the total in the exact sentence
+        # forms the two homes carry, so a sentence in a
+        # varied form stating the guidance file at a
+        # false total, appended anywhere in the README,
+        # passed the gate, its suite, and every README
+        # named suite test. The sentence scoped reading
+        # now judges any total a guidance file sentence
+        # states against the measured file size.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nThe guidance file stands at 61,412 "
+                "bytes in all.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the guidance file at 61,412 "
+                    "bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_measures_form_guidance_file_figure_fails(self):
+        # Round 26 red team confirmation Minor 6, first
+        # shape. The false total restated in the measures
+        # form stood outside the two forms the sentence
+        # reading carried and passed the gate whole. The
+        # measures form now stands in the reading.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nThe guidance file measures 61,412 "
+                "bytes.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the guidance file at 61,412 "
+                    "bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_an_is_bytes_long_form_guidance_file_figure_fails(self):
+        # Round 26 red team confirmation Minor 6, second
+        # shape. The false total restated in the is bytes
+        # long form passed the gate whole on the same
+        # ground. That form now stands in the reading.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nAGENTS.md is 61,412 bytes long.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the guidance file at 61,412 "
+                    "bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_totals_form_guidance_file_figure_fails(self):
+        # Round 26 red team delta confirmation Minor 4.
+        # The false total restated in the totals form
+        # stood outside the four verb forms the widened
+        # reading carried and passed the gate whole.
+        # The reading now stands over the total itself,
+        # in the verb free form the round 16 record
+        # pointed at.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nAGENTS.md totals 61,412 bytes.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the guidance file at 61,412 "
+                    "bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_verb_free_guidance_file_figure_fails(self):
+        # The verb free reading judges the figure a
+        # guidance file sentence states with no total
+        # verb standing over it at all, the figure
+        # riding in a parenthetical shape beside the
+        # naming.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nThe shipped guidance file, 61,412 "
+                "bytes of operative guidance, stands "
+                "over the cap.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any(
+                    "states the guidance file at 61,412 "
+                    "bytes" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_a_true_total_in_the_totals_form_passes(self):
+        # The verb free reading judges the figure
+        # against the measured size, so the totals form
+        # stating the size the file measures draws no
+        # problem, and the cap and lost figures the
+        # honest sentences carry stand outside it.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.make_layout(tmp)
+            text = self.base.read(root, "README.md")
+            planted = text + (
+                "\n\nAGENTS.md totals 60,412 bytes.\n")
+            self.base.write(root, "README.md", planted)
+            problems = self.base.problems(root)
+            self.assertFalse(
+                any(
+                    "states the guidance file" in p
+                    for p in problems
+                ),
+                problems,
+            )
+
+    def test_the_guidance_total_boundary_sentence_stands_in_the_gate(self):
+        # Round 26 third delta. The verb free guidance
+        # total reading scans digit figures, and the
+        # second delta confirmation planted the false
+        # total in number words in the README. Under
+        # the owner ruling the close for the encoding
+        # the reading does not scan is the boundary
+        # stated on the face of the gate, and this test
+        # pins that sentence in the gate source, so its
+        # silent removal fails.
+        gate = (
+            ROOT / "scripts" / "check_codex_plugin.py"
+        ).read_text(encoding="utf-8")
+        flat = re.sub(
+            r"\s+", " ", re.sub(r"(?m)^\s*# ?", "", gate))
+        self.assertIn(
+            "This reading judges digit figures in "
+            "sentences naming the guidance file and "
+            "does not price figures stated in number "
+            "words, and a total stated in words in "
+            "either home stands unpriced by this reading",
+            flat)
+
     def test_a_planted_brief_form_size_figure_fails(self):
         # Round 17, red team Plant 5. The brief form of the
         # AGENTS sum stood read over the brief alone, so the

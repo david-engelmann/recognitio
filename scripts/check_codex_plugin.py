@@ -1191,6 +1191,93 @@ def brief_problems(root, problems):
                         "re-derived difference of %s bytes"
                         % (stated, format(lost, ","))
                     )
+            # Round 26, carrying the Round 16 brief form
+            # Minor the spec seat re-executed by plant.
+            # The readings above judge the total only in
+            # the exact sentence forms the two homes carry
+            # today, so a sentence in a varied form stating
+            # the guidance file at a false total, planted
+            # anywhere in the README, passed this gate, its
+            # suite, and every README named suite test in
+            # the round 16 and round 26 sweeps. A sentence
+            # in either home that names the guidance file,
+            # by its AGENTS.md name or as the guidance file,
+            # and states a total in the stands at form or
+            # the bytes in all form now stands judged
+            # against the measured file size, whatever
+            # subject the sentence gives it. The cap form,
+            # embeds at most so many bytes, states no total
+            # and stands outside this reading, as do the
+            # lost figure forms the readings above judge.
+            # Delta. The confirmation of that repair stated
+            # the false total in two further verb forms, the
+            # measures form and the is bytes long form, and
+            # both passed the gate whole, the Round 16 defect
+            # shape reproduced inside its own repair. The
+            # sentence reading now carries those two forms
+            # beside the first two, so a total stated for
+            # the guidance file stands judged in every verb
+            # form the family names.
+            # Second delta. The delta confirmation stated
+            # the false total in a further verb form, the
+            # totals form, and it passed on the same ground,
+            # a figure judged only in the verb forms its
+            # reading names. The reading now stands restated
+            # over the total itself in the verb free form
+            # the round 16 record pointed at. Every byte
+            # figure a guidance file sentence states stands
+            # judged against the measured size, whatever
+            # verb or copula carries the sentence, but for
+            # the two figures that state no total, the
+            # embedding cap under its at most form and the
+            # lost remainder under its last form, each
+            # judged by its own reading above.
+            # Third delta boundary. The second delta
+            # confirmation stated the false total in
+            # number words in the README, and the reading
+            # took no figure from the sentence, its scan
+            # running over digit figures alone. The
+            # boundary of this reading stands stated here
+            # on its face, in the shape of the confined
+            # residues the programme carries. This
+            # reading judges digit figures in sentences
+            # naming the guidance file and does not price
+            # figures stated in number words, and a total
+            # stated in words in either home stands
+            # unpriced by this reading.
+            for home, home_text in (
+                ("docs/codex-plugin-brief.md", text),
+                ("README.md", readme_text),
+            ):
+                for sentence in re.split(
+                        r"(?<=[.!?])\s+", home_text):
+                    low = sentence.lower()
+                    if "agents.md" not in low and (
+                        "guidance file" not in low
+                    ):
+                        continue
+                    stated = None
+                    for figure in re.finditer(
+                            r"([\d,]+) bytes", low):
+                        before = low[:figure.start()]
+                        if before.endswith(
+                            "at most "
+                        ) or before.endswith("last "):
+                            continue
+                        if int(figure.group(1).replace(
+                            ",", "")
+                        ) != file_bytes:
+                            stated = figure.group(1)
+                            break
+                    if stated is not None:
+                        problems.append(
+                            "%s states the guidance file "
+                            "at %s bytes in a sentence and "
+                            "the shipped AGENTS.md measures "
+                            "%s bytes"
+                            % (home, stated,
+                               format(file_bytes, ","))
+                        )
     section = rules_section(raw)
     if section is None:
         problems.append(

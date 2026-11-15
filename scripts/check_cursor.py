@@ -2340,6 +2340,110 @@ def round5_cursor_problems(root=None):
                     "beside its pinned unverified sentence"
                 )
                 break
+        # Round 26 red team Minor 4. The brief contract
+        # prices the claims it enumerates, and an appended
+        # sentence in fresh words stating that the plugin
+        # posts the finished review to the pull request
+        # stood outside the enumeration and passed the
+        # gate and the suite whole. The posting family now
+        # reads the brief whole, in the scoped shape of
+        # the verified family above. A sentence states
+        # the claim when it joins the plugin subject, the
+        # plugin or recognitio or the skill, to a post or
+        # publish verb form and a pull request object,
+        # and a negation in the claim clause states no
+        # claim. The platform actors the brief reports,
+        # Bugbot and the Security Review bot among them,
+        # carry no plugin subject in their sentences, so
+        # their stated behaviour stands untouched, and
+        # the standing contract the claim breaks is the
+        # one the canonical skill states, that the skill
+        # assembles evidence and nothing more.
+        # Delta. The confirmation of that repair stated
+        # the claim twice more and both forms passed, a
+        # pronoun standing in the subject place and a
+        # verb of leaving standing in the verb place. The
+        # family now reads its claim at family width. The
+        # verb place also carries the leave and add forms,
+        # the verbs of placing a review on the request
+        # beside the post and publish forms, and the
+        # subject place also carries the pronoun it where
+        # the pronoun governs the verb itself, with at
+        # most an adverb between them. The platform actor
+        # sentences stand clean under the widened reading
+        # as they stood under the first, their subjects
+        # carrying no plugin name and no governing
+        # pronoun, and negation stands read at clause
+        # scope for every verb form in the family.
+        # Second delta. The delta confirmation stated
+        # the claim with a modal between the pronoun and
+        # the verb, it will post the finished review,
+        # and the join admitted at most an adverb in
+        # that place and passed it whole. The pronoun
+        # join now admits a modal auxiliary in that
+        # place, with an adverb on either side of the
+        # modal and the be of the progressive after it,
+        # so the pronoun governs its verb across the
+        # modal as it governs it across the adverb. A
+        # modal denial states no claim, the not between
+        # the modal and the verb breaking the join, and
+        # the clause negation reading guarding the same
+        # ground for the named subject shapes.
+        # Third delta boundary. The second delta
+        # confirmation stated the claim twice more
+        # outside the joins this family enumerates, once
+        # with a verb of placing the verb set does not
+        # carry, the plugin uploads the finished review,
+        # and once with the pronoun join broken by a
+        # parenthetical, it, on its own, posts the
+        # finished review, and both passed whole. The
+        # boundary of this family stands stated here on
+        # the face of the gate, in the shape of the
+        # confined residues the programme carries. This
+        # family prices the named subjects and the
+        # pronoun joins with the enumerated verb set
+        # above, and it does not price other verbs of
+        # placing a review or a pronoun join broken by
+        # a parenthetical. Brief prose standing outside
+        # those joins stands unpriced by this family,
+        # and the upload verb form and the parenthetical
+        # pronoun form stand inside this stated
+        # boundary.
+        posting_verbs = (
+            r"\b(post|posts|posted|posting|publish|"
+            r"publishes|published|publishing|leave|leaves|"
+            r"left|leaving|add|adds|added|adding)\b")
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            low = sentence.lower()
+            if "pull request" not in low:
+                continue
+            named_subject = (
+                "plugin" in low or "recognitio" in low
+                or "skill" in low)
+            claimed = False
+            for verb in re.finditer(posting_verbs, low):
+                pronoun_subject = re.search(
+                    r"\bit\s+(?:[a-z]+ly\s+|also\s+)?"
+                    r"(?:(?:will|would|can|could|shall|"
+                    r"should|may|might|must)\s+)?"
+                    r"(?:[a-z]+ly\s+|also\s+)?(?:be\s+)?$",
+                    low[:verb.start()])
+                if (
+                    (named_subject or pronoun_subject)
+                    and not _claim_clause_negated(
+                        low, verb.start())
+                ):
+                    claimed = True
+                    break
+            if claimed:
+                problems.append(
+                    "docs/cursor-plugin-brief.md claims the "
+                    "plugin posts the finished review to the "
+                    "pull request, beside the standing "
+                    "contract that the skill assembles "
+                    "evidence and nothing more"
+                )
+                break
         section = rules_section(raw)
         if section is not None:
             for block in rule_blocks(section):

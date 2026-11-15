@@ -2939,6 +2939,100 @@ class TestReadmeStorefront(unittest.TestCase):
         self.assertIn("[![CI passing]", badge_lines[0])
         self.assertIn("[![License MIT]", badge_lines[0])
 
+    def test_the_ci_badge_links_at_the_shipped_ci_workflow(self):
+        # Round 26 red team Minor 5. The badge row pin
+        # priced the alt fragments and the one line shape
+        # and never the link target, so the badge a
+        # stranger clicks could lead to a workflow page
+        # naming a workflow file that does not stand in
+        # the tree, under a passing claim. The badge face
+        # is host rendered from the workflow state itself
+        # and no tree edit can plant it stale, so the
+        # link is the tree side surface of the badge, and
+        # it now stands pinned to the shipped ci workflow
+        # in both its image and its link, with the named
+        # workflow file standing in the tree.
+        badge_lines = [
+            line for line in self.readme.splitlines()
+            if line.startswith("[![")
+        ]
+        self.assertEqual(len(badge_lines), 1)
+        self.assertIn(
+            "actions/workflows/ci.yml/badge.svg", badge_lines[0])
+        self.assertIn(
+            "](https://github.com/david-engelmann/recognitio/"
+            "actions/workflows/ci.yml)", badge_lines[0])
+        self.assertTrue(
+            (ROOT / ".github" / "workflows" / "ci.yml").is_file())
+
+    def test_every_badge_in_the_row_names_a_standing_workflow(self):
+        # Round 26 red team confirmation Minor 4. The pin
+        # above judged the standing badge, and a second
+        # badge claiming CI passing for a workflow that
+        # does not stand in the tree, added to the same
+        # row, passed the suite whole. The reading now
+        # judges the population of the row. Every workflow
+        # a badge in the row names, in its image or in its
+        # link, stands as a file under the workflows
+        # folder, so an added badge for a workflow that
+        # does not stand fails this test by name.
+        badge_lines = [
+            line for line in self.readme.splitlines()
+            if line.startswith("[![")
+        ]
+        self.assertEqual(len(badge_lines), 1)
+        named = re.findall(
+            r"actions/workflows/([A-Za-z0-9_.-]+)",
+            badge_lines[0])
+        self.assertIn("ci.yml", named)
+        for name in named:
+            self.assertTrue(
+                (ROOT / ".github" / "workflows" / name).is_file(),
+                "the badge row names the workflow %s, which "
+                "does not stand in the tree" % name)
+
+    def test_every_ci_claiming_badge_names_a_standing_workflow(self):
+        # Round 26 red team delta confirmation Note 1.
+        # The population test above judges the workflows
+        # the row names, and a badge claiming CI passing
+        # while naming no workflow at all, a static
+        # shields image under a live link, joined the
+        # row unpriced, its claim duplicated beside the
+        # true one and able to go stale in silence. A
+        # badge that claims CI passing now stands held
+        # to the workflow it names, and a badge naming
+        # none fails on that ground. A badge claiming
+        # nothing about CI stands outside this reading,
+        # the license badge in the row among them.
+        badge_lines = [
+            line for line in self.readme.splitlines()
+            if line.startswith("[![")
+        ]
+        self.assertEqual(len(badge_lines), 1)
+        badges = re.findall(
+            r"\[!\[([^\]]*)\]\(([^)]*)\)\]\(([^)]*)\)",
+            badge_lines[0])
+        claiming = [
+            badge for badge in badges
+            if "ci passing" in badge[0].lower()
+        ]
+        self.assertTrue(claiming)
+        for alt, image, link in claiming:
+            named = re.findall(
+                r"actions/workflows/([A-Za-z0-9_.-]+)",
+                image + " " + link)
+            self.assertTrue(
+                named,
+                "the badge claiming %s names no workflow"
+                % alt)
+            for name in named:
+                self.assertTrue(
+                    (ROOT / ".github" / "workflows" / name
+                     ).is_file(),
+                    "the badge claiming %s names the "
+                    "workflow %s, which does not stand in "
+                    "the tree" % (alt, name))
+
     def test_the_canonical_sentence_opens_agents_and_the_cursor_readme(self):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn(self.CANONICAL, " ".join(agents.split()))
@@ -5412,6 +5506,38 @@ class TestVideoForms(unittest.TestCase):
                 stem,
             )
 
+    def test_the_capture_record_spend_figures_stand_pinned(self):
+        # Round 26 red team Minor 2. The capture record
+        # states its spend and token figures as facts
+        # taken from the programme spend ledger, and a
+        # census over the shipped scripts and tests found
+        # no occurrence of them, so an edit to a figure
+        # falsified the provenance record the README hero
+        # claims rest on while every gate passed. The
+        # record video sizes stand pinned in this class
+        # against the shipped files. The spend figures
+        # name no file in the tree, so they stand pinned
+        # word for word in the manner of the pack pins,
+        # and a restated figure fails here by name.
+        record = (
+            self.IMAGES / "capture-record.md"
+        ).read_text(encoding="utf-8")
+        flat = " ".join(record.split())
+        self.assertIn(
+            "The known rehearsal spend stands at "
+            "0.1573444 dollars with three runs unpriced "
+            "because the write fault ate their records, "
+            "and the take stands at 1.706394 dollars.",
+            flat,
+        )
+        self.assertIn(
+            "The token tally across the take's session "
+            "family records stands at input 384, output "
+            "259357, cache creation 1301619 and cache read "
+            "10288216 over 193 usage bearing messages.",
+            flat,
+        )
+
     def test_the_readme_links_the_films_and_clips(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         hero = readme.split("**Four harnesses, one range**", 1)[0]
@@ -7694,6 +7820,38 @@ class TestCheckEvals(unittest.TestCase):
             problems = self.mod.readme_eval_claim_problems(root)
             self.assertTrue(
                 any("construction caveat" in p for p in problems),
+                problems,
+            )
+
+    def test_a_principles_eval_figure_drift_fails(self):
+        # Round 26 red team Minor 6. The principles page
+        # states the paired eval figures in its own prose,
+        # priced in three sibling homes and unpriced
+        # there, so the packet figure restated one lower
+        # on the page passed the evals gate whole. The
+        # page figures now stand judged against the
+        # results table totals.
+        with RetryingTemporaryDirectory() as tmp:
+            root = self.copy_fixture(tmp)
+            target_dir = root / "docs"
+            target_dir.mkdir(parents=True)
+            target = target_dir / "principles.md"
+            shutil.copy2(
+                ROOT / "docs" / "principles.md", target)
+            self.assertEqual(
+                self.mod.principles_eval_claim_problems(root),
+                [])
+            text = target.read_text(encoding="utf-8")
+            broken = text.replace(
+                "packet pass found 8 of 8",
+                "packet pass found 7 of 8", 1)
+            self.assertNotEqual(broken, text)
+            target.write_text(broken, encoding="utf-8")
+            problems = self.mod.principles_eval_claim_problems(
+                root)
+            self.assertTrue(
+                any("principles page" in p and "7 of 8" in p
+                    for p in problems),
                 problems,
             )
 

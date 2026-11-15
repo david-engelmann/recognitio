@@ -105,7 +105,7 @@ PACK_PINS = {
         "held 274 files",
         "at 274 files against a cap of 512 files",
         "demo recording at 24,222,065 bytes",
-        "tests/test_gate_scripts.py at 419,733 bytes",
+        "tests/test_gate_scripts.py at 426,743 bytes",
         "scan over all 274 files in the tree",
     ),
     PORTABLE_PACK: (
@@ -148,6 +148,61 @@ PACK_BANNED_CLAIMS = {
         "operates a directory",
     ),
 }
+
+# Capability claims beyond the certified set, read on the
+# same flattened lower case text as the filed listing
+# claims above. The skill assembles evidence over the
+# change in front of it, in the languages its definition
+# patterns cover, so a pack sentence claiming the work
+# in any language at all claims a capability no home
+# certifies. Round 26 red team Minor 3 planted the claim
+# in fresh words in the Claude pack and the whole sweep
+# passed, the enumerated claim forms and the pinned
+# sentences standing silent beside it. The confirmation
+# of that repair planted the claim in two further
+# shapes, the whatever form and the language agnostic
+# form, and both passed, so the family now carries
+# those shapes beside the quantifier forms. The delta
+# confirmation of that widening planted the claim in
+# the no matter form, the one quantifier the family
+# did not name, and it passed whole, so the family
+# now carries the no matter forms beside the rest,
+# in the bare language form and in the two named
+# language forms, with and without the what.
+# Third delta boundary. The family is an enumerated
+# list of phrases and the reading is a scan over the
+# list, and the second delta confirmation planted
+# the claim in phrasings the list does not name, the
+# regardless of form and the bare any language form
+# and a form one word off the no matter form, and
+# each passed whole. The boundary of this family
+# stands stated here on the face of the gate, in the
+# shape of the confined residues the programme
+# carries. This family prices the enumerated forms
+# it carries and does not price other phrasings of
+# the same claim, and pack prose in a phrasing
+# outside the enumerated forms stands unpriced by
+# this family. The regardless of form and the bare
+# any language form and the one word off form stand
+# inside this stated boundary.
+UNIVERSAL_LANGUAGE_CLAIMS = (
+    "any programming language",
+    "any human language",
+    "every programming language",
+    "every human language",
+    "all programming languages",
+    "all human languages",
+    "whatever programming language",
+    "whatever human language",
+    "language agnostic",
+    "language-agnostic",
+    "no matter the programming language",
+    "no matter the human language",
+    "no matter the language",
+    "no matter what programming language",
+    "no matter what human language",
+    "no matter what language",
+)
 
 # No primary source states a review timeline for any of the
 # three routes, so a promised one fails in any pack, in
@@ -2940,6 +2995,12 @@ def pack_problems(root, version, problems):
                     "%s carries the filed listing claim %r and "
                     "nothing in the pack has been submitted"
                     % (rel, claim))
+        for claim in UNIVERSAL_LANGUAGE_CLAIMS:
+            if claim in lowered:
+                problems.append(
+                    "%s carries the capability claim %r and "
+                    "the skill holds no such capability"
+                    % (rel, claim))
         if TIMELINE_CLAIM.search(lowered):
             problems.append(
                 "%s promises a review timeline and no primary "
@@ -3174,6 +3235,191 @@ def cursor_pack_figure_problems(root, problems):
                    measured["count"]))
 
 
+_ENTRY_ORDINALS = (
+    "second", "third", "fourth", "fifth", "sixth",
+    "seventh", "eighth", "ninth", "tenth")
+
+
+def entry_denotes_the_form(entry):
+    """Whether an entry phrase denotes the WebM form itself.
+
+    Round 26 fourth delta. The evidence page names the
+    WebM form as the head of its largest entries, so
+    the largest entry of the page is the form. A figure
+    attributed to the largest entry, with no ordinal
+    standing in the phrase, stands attributed to the
+    form, while a figure attributed to an entry the
+    phrase names as another entry stands attributed to
+    that entry.
+    """
+    if "largest" not in entry:
+        return False
+    return not any(
+        ordinal in entry for ordinal in _ENTRY_ORDINALS)
+
+
+def evidence_page_problems(root, problems):
+    """Check the evidence page recording figure against its file.
+
+    Round 26. The hosted diff evidence page states the
+    size of the WebM form of the Claude Code demo
+    recording among the largest entries without a patch,
+    and that figure is the one figure on the page that
+    also stands as a current claim, because the file
+    stands in the tree at its stated size. The same
+    figure stands pinned in the Claude pack under the
+    pack pins above, while on the page it stood priced
+    by nothing, so a one token drift of the figure
+    falsified the measurement record itself under a
+    green gate. The page figure now stands judged
+    against the file it names, in the manner of the
+    pack pin. The remaining figures on the page are the
+    dated measurement of 2026-11-11 and name no file
+    standing in the tree, so they stand as that record.
+    The page itself is cited from the README, the
+    principles page and the docs index, whose readings
+    price its absence, so this reading judges the page
+    where it stands.
+
+    Delta and second delta. The first reading judged
+    the figure in the standing sentence alone, and the
+    confirmation of that repair stated the same false
+    size in an added sentence, and the confirmation of
+    the widening stated it with the figure standing
+    before the naming, and each shape passed in its
+    turn, the claim standing a family wide and the
+    reading one shape wide. The second delta
+    confirmation stated the false size twice more and
+    both passed, once with a noun between the figure
+    and the naming and once as a second figure for the
+    same form in one sentence beside a judged true
+    one, the reading of that pass taking one figure a
+    side.
+
+    Third delta. The reading now stands restated over
+    the claim itself. Every byte figure a sentence
+    naming the WebM form states stands judged against
+    the file, in either order, with any words between
+    the figure and the naming, and however many
+    figures the sentence carries. Two figures in such
+    a sentence stand outside this reading, on the
+    ground stated above. A figure the sentence states
+    as a bound over other entries, under so many
+    bytes, states no size of the form. A figure the
+    sentence attributes to another entry in the entry
+    at so many bytes shape, in a clause naming that
+    entry and not the form, states the size of that
+    entry, the test fixture and the test module of the
+    standing sentence among them. Both belong to the
+    dated measurement and name no file standing in the
+    tree at a stated size of its own beside the
+    recording the page names, and the figures standing
+    in sentences that name no WebM form stand as that
+    record on the same ground.
+
+    Fourth delta. The third delta confirmation found
+    the two exclusions taken wider than the statement
+    above and the figure taken in one form while the
+    headline claimed every form. The bound exclusion
+    now stands scoped to a bound over other entries,
+    and a bound the sentence states over the form
+    itself, the form standing under so many bytes,
+    stands judged as the size statement it is and
+    refuses when the file does not stand under the
+    stated bound. The entry at exclusion now stands
+    scoped to a figure attributed to an entry other
+    than the form, and a figure attributed to the
+    largest entry in a sentence naming the form stands
+    judged, the page naming the form as the head of
+    its largest entries, so the largest entry of the
+    page is the form and not another entry. The figure
+    stands taken in its hyphenated compound form
+    beside its spaced form, the compound statement
+    judged as the spaced statement is judged. This
+    reading judges digit figures in sentences naming
+    the WebM form and does not price figures stated
+    in number words, and a size stated in words on
+    the page stands unpriced by this reading.
+
+    Fifth delta. The fourth delta confirmation
+    priced the size stated in scaled units passing
+    with no boundary on the reading face naming the
+    unit, the encoding step the word encoding stood
+    at before the fourth delta stated its boundary.
+    This reading judges figures stated in bytes and
+    does not price a size stated in scaled units,
+    and a size stated in megabytes or in MB on the
+    page stands unpriced by this reading.
+    """
+    rel = "docs/hosted-diff-evidence.md"
+    path = root / rel
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    text = re.sub(r"\s+", " ", raw)
+    stated_figures = []
+    stated_bounds = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        low = sentence.lower()
+        if "webm" not in low:
+            continue
+        for figure in re.finditer(
+                r"([0-9][0-9,]*) bytes"
+                r"|([0-9][0-9,]*)-bytes?\b", low):
+            stated = figure.group(1) or figure.group(2)
+            start = figure.start()
+            comma = low.rfind(", ", 0, start)
+            conj = low.rfind(" and ", 0, start)
+            clause_start = 0
+            if comma >= 0:
+                clause_start = comma + 2
+            if conj >= 0:
+                clause_start = max(clause_start, conj + 5)
+            before = low[clause_start:start]
+            if before.endswith("under "):
+                if "webm" in before[:-6]:
+                    stated_bounds.append(stated)
+                continue
+            if before.endswith("at "):
+                entry = before[:-3].strip()
+                if entry and "webm" not in entry \
+                        and not entry_denotes_the_form(entry):
+                    continue
+            stated_figures.append(stated)
+    if not stated_figures and not stated_bounds:
+        problems.append(
+            "%s states no size for the WebM form of the "
+            "demo recording it names" % rel)
+        return
+    recording = (
+        root / "docs" / "images"
+        / "recognitio-claude-code-demo.webm")
+    if not recording.is_file():
+        problems.append(
+            "%s names the demo recording at "
+            "docs/images/recognitio-claude-code-demo.webm, "
+            "which does not stand in the tree" % rel)
+        return
+    measured = recording.stat().st_size
+    for stated in stated_figures:
+        claimed = int(stated.replace(",", ""))
+        if claimed != measured:
+            problems.append(
+                "%s states the WebM form of the demo "
+                "recording at %s bytes and the file "
+                "measures %s bytes"
+                % (rel, stated, format(measured, ",")))
+    for stated in stated_bounds:
+        claimed = int(stated.replace(",", ""))
+        if measured >= claimed:
+            problems.append(
+                "%s states the WebM form of the demo "
+                "recording at under %s bytes and the file "
+                "measures %s bytes"
+                % (rel, stated, format(measured, ",")))
+
+
 def submissions_problems(root=None):
     """Problems with the submission packs or their facts."""
     root = ROOT if root is None else root
@@ -3184,6 +3430,7 @@ def submissions_problems(root=None):
     pack_problems(root, version, problems)
     figure_problems(root, problems)
     cursor_pack_figure_problems(root, problems)
+    evidence_page_problems(root, problems)
     return problems
 
 

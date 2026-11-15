@@ -424,6 +424,61 @@ def readme_eval_claim_problems(root):
     return problems
 
 
+def principles_eval_claim_problems(root):
+    """Check the principles page paired eval figures.
+
+    Round 26. The paired eval figures stand priced in
+    three homes, the README claim under the reading
+    above, the results prose and totals under
+    results_problems, and the eval chart under the
+    suite occurrence counts. The principles page states
+    the same pair in its own prose, and that copy stood
+    priced by nothing, so a one token drift of its
+    packet figure falsified the page that states the
+    claims a review packet owes its reader while the
+    evals gate passed whole. The page figures now stand
+    judged against the results table totals, in the
+    shape results_problems judges the results prose.
+    """
+    path = root / "docs" / "principles.md"
+    try:
+        text = guarded_read_text(path, encoding="utf-8")
+    except OSError:
+        return ["the principles page cannot be read"]
+    results_path = root / "evals" / "RESULTS.md"
+    try:
+        results_text = guarded_read_text(
+            results_path, encoding="utf-8")
+    except OSError:
+        return ["the results file cannot be read"]
+    rows = table_rows(results_text)
+    if "Total" not in rows:
+        return ["the results table cannot be parsed"]
+    total = rows["Total"]
+    flat = re.sub(r"\s+", " ", text)
+    problems = []
+    for pattern, column, label in (
+        (r"packet pass found (\d+) of (\d+)", 2, "packet pass"),
+        (r"raw diff pass found (\d+) of (\d+)", 1,
+         "raw diff pass"),
+    ):
+        match = re.search(pattern, flat)
+        if match is None:
+            problems.append(
+                "the principles page holds no %s sentence "
+                "matching the recorded results" % label)
+            continue
+        found, planted = int(match.group(1)), int(match.group(2))
+        if found != total[column] or planted != total[0]:
+            problems.append(
+                "the principles page states the %s found "
+                "%d of %d and the results table total row "
+                "states %d of %d"
+                % (label, found, planted,
+                   total[column], total[0]))
+    return problems
+
+
 def task06_planted_rule(task_dir):
     """Parse the task-06 planted grading rule into checkable parts.
 
@@ -1745,6 +1800,7 @@ def all_problems(root):
     problems.extend(checksum_problems(root))
     problems.extend(results_problems(root))
     problems.extend(readme_eval_claim_problems(root))
+    problems.extend(principles_eval_claim_problems(root))
     problems.extend(task06_problems(root))
     for task_name in ("task-01", "task-02", "task-03", "task-04", "task-05"):
         problems.extend(task_anchor_problems(root, task_name))

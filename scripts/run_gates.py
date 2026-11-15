@@ -94,7 +94,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PINNED_TEST_FLOOR = 3175
+PINNED_TEST_FLOOR = 3226
 
 RAN_RE = re.compile(r"^Ran (\d+) tests", re.M)
 

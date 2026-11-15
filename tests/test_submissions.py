@@ -2516,6 +2516,117 @@ class TestCheckSubmissions(unittest.TestCase):
             any("listing is live" in p for p in problems),
             problems)
 
+    def test_a_universal_language_capability_claim_fails(self):
+        # Round 26 red team Minor 3. A capability claim
+        # in fresh words appended to the held Claude
+        # pack, that recognitio reviews changes written
+        # in any programming language and any human
+        # language, stood outside the enumerated claim
+        # forms and the pinned sentences and passed the
+        # whole sweep. The capability family now refuses
+        # it by name.
+        problems = self.mutate_text(
+            CLAUDE_PACK,
+            lambda t: t + (
+                "\nRecognitio reviews changes written in "
+                "any programming language and any human "
+                "language.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_a_universal_language_claim_fails_in_any_pack(self):
+        # The family is common to the three packs, the
+        # claim being false of the product in any home.
+        problems = self.mutate_text(
+            CURSOR_PACK,
+            lambda t: t + (
+                "\nThe plugin works in every human "
+                "language.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_a_whatever_language_capability_claim_fails(self):
+        # Round 26 red team confirmation Minor 2, first
+        # shape. The claim restated with the whatever
+        # quantifier stood outside the enumerated forms
+        # and passed the whole sweep.
+        problems = self.mutate_text(
+            CLAUDE_PACK,
+            lambda t: t + (
+                "\nRecognitio reviews a change whatever "
+                "programming language or human language "
+                "it is written in.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_a_language_agnostic_capability_claim_fails(self):
+        # Round 26 red team confirmation Minor 2, second
+        # shape. The claim restated as a language
+        # agnostic property stood outside the enumerated
+        # forms and passed the whole sweep.
+        problems = self.mutate_text(
+            PORTABLE_PACK,
+            lambda t: t + (
+                "\nThe skill is language agnostic across "
+                "both code and prose.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_a_no_matter_language_capability_claim_fails(self):
+        # Round 26 red team delta confirmation Minor 2.
+        # The claim restated in the no matter form, the
+        # one quantifier the widened family did not
+        # name, passed the whole sweep. The family now
+        # carries the no matter forms.
+        problems = self.mutate_text(
+            CLAUDE_PACK,
+            lambda t: t + (
+                "\nRecognitio reviews a change no matter "
+                "the programming language or human "
+                "language it is written in.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_a_no_matter_what_language_claim_fails(self):
+        # The no matter form in its what shape, planted
+        # in a second pack home, refuses on the same
+        # ground, the family being common to the three
+        # packs.
+        problems = self.mutate_text(
+            CURSOR_PACK,
+            lambda t: t + (
+                "\nThe plugin reviews a change no matter "
+                "what language it is written in.\n"))
+        self.assertTrue(
+            any("capability claim" in p for p in problems),
+            problems)
+
+    def test_the_pack_family_boundary_sentence_stands_in_the_gate(self):
+        # Round 26 third delta. The universal language
+        # family is an enumerated list, and the second
+        # delta confirmation planted the claim in
+        # phrasings the list does not name. Under the
+        # owner ruling the close for an open prose
+        # family is the boundary stated on the face of
+        # the gate, and this test pins that sentence in
+        # the gate source, so its silent removal fails.
+        gate = (
+            ROOT / "scripts" / "check_submissions.py"
+        ).read_text(encoding="utf-8")
+        flat = re.sub(r"\s+", " ", gate.replace("\n# ", " "))
+        self.assertIn(
+            "This family prices the enumerated forms "
+            "it carries and does not price other "
+            "phrasings of the same claim, and pack "
+            "prose in a phrasing outside the enumerated "
+            "forms stands unpriced by this family",
+            flat)
+
     def test_a_version_bump_the_packs_do_not_follow_fails(self):
         def change(d):
             d["version"] = "1.4.0"
@@ -3175,3 +3286,403 @@ class TestTrackedRunnerOutputIsMeasured(unittest.TestCase):
             found = dict(self.mod.tree_files(root))
             self.assertNotIn(".gate-logs/payload.txt", found)
             self.assertEqual(self.base.problems(root), before)
+
+
+class TestEvidencePageFigures(unittest.TestCase):
+    """Round 26. The hosted diff evidence page figure pin.
+
+    The evidence page states the size of the WebM form
+    of the demo recording, the one figure on the page
+    that also stands as a current claim. The submissions
+    gate judged that figure in its pack home alone, so a
+    one token drift on the page passed the whole sweep.
+    These tests price the page reading at its own
+    function, on a layout carrying the page and a
+    recording file of the stated size.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_submissions")
+
+    def make_root(self, tmp, page_text=None, size=24222065):
+        root = Path(tmp) / "root"
+        page = root / "docs" / "hosted-diff-evidence.md"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        if page_text is None:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+        page.write_text(page_text, encoding="utf-8")
+        recording = (
+            root / "docs" / "images"
+            / "recognitio-claude-code-demo.webm")
+        recording.parent.mkdir(parents=True, exist_ok=True)
+        with open(recording, "wb") as handle:
+            handle.truncate(size)
+        self.assertEqual(recording.stat().st_size, size)
+        return root
+
+    def problems(self, root):
+        problems = []
+        self.mod.evidence_page_problems(root, problems)
+        return problems
+
+    def test_the_shipped_page_and_recording_agree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_root(tmp)
+            problems = []
+            self.mod.evidence_page_problems(root, problems)
+            self.assertEqual(problems, [])
+
+    def test_a_drifted_page_figure_fails_by_name(self):
+        # The red team plant of this round, the stated
+        # size restated one byte higher on the page.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_root(tmp)
+            page = root / "docs" / "hosted-diff-evidence.md"
+            text = page.read_text(encoding="utf-8")
+            drifted = text.replace(
+                "WebM form at 24,222,065 bytes",
+                "WebM form at 24,222,066 bytes", 1)
+            self.assertNotEqual(drifted, text)
+            page.write_text(drifted, encoding="utf-8")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_recording_of_another_size_fails_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_root(tmp, size=24222064)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,064" in p for p in problems),
+                problems)
+
+    def test_a_page_stating_no_size_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_root(
+                tmp, page_text="# The hosted diff evidence\n")
+            problems = self.problems(root)
+            self.assertTrue(
+                any("states no size" in p for p in problems),
+                problems)
+
+    def test_an_added_sentence_stating_the_size_falsely_fails(self):
+        # Round 26 red team confirmation Minor 1. The
+        # first reading judged the figure in the standing
+        # sentence alone, and an added sentence stating
+        # the same size one byte higher passed the gate
+        # whole. The reading now judges every size
+        # statement the page makes for the WebM form.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form of the Claude Code demo "
+                "recording measures 24,222,066 bytes.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_an_added_sentence_stating_the_size_truly_passes(self):
+        # The widened reading judges the added statement
+        # against the file, so an added sentence stating
+        # the size the file measures draws no problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form of the demo recording "
+                "measures 24,222,065 bytes.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_size_stated_before_the_naming_fails(self):
+        # Round 26 red team delta confirmation Minor 1.
+        # The widened reading searched from the naming
+        # forward alone, and the same false size stated
+        # before the naming, at so many bytes, the WebM
+        # form heads the largest entries, passed the
+        # gate whole. The reading now takes the size a
+        # sentence states for the form on either side
+        # of the naming.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nAt 24,222,066 bytes, the WebM form "
+                "heads the largest entries without a "
+                "patch.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_true_size_stated_before_the_naming_passes(self):
+        # The either order reading judges the figure
+        # beside the naming against the file, so the
+        # same sentence shape stating the size the file
+        # measures draws no problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nAt 24,222,065 bytes, the WebM form "
+                "heads the largest entries without a "
+                "patch.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_size_with_a_noun_between_figure_and_naming_fails(self):
+        # Round 26 red team second delta confirmation
+        # Minor 1, first shape. The either order reading
+        # took the last figure before the naming only
+        # where nothing but an article or a governing
+        # preposition stood between, and the same false
+        # size stated with a noun between the figure and
+        # the naming passed the gate whole. The reading
+        # now stands restated over the claim itself and
+        # judges every figure the sentence states.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nAt 24,222,066 bytes in size, the WebM "
+                "form heads the largest entries without "
+                "a patch.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_second_false_figure_beside_a_true_one_fails(self):
+        # Round 26 red team second delta confirmation
+        # Minor 1, second shape. The either order reading
+        # took one figure a side, and a sentence stating
+        # the true size after the naming and a false size
+        # for the same form beside it passed the gate
+        # whole. Every figure the sentence carries now
+        # stands judged, so the false one refuses by name.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form measures 24,222,065 bytes "
+                "in the shipped file and 24,222,066 bytes "
+                "in the copy a reader downloads.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_bound_over_the_form_itself_fails(self):
+        # Round 26 red team third delta confirmation
+        # Minor 1, first shape. The restated reading
+        # skipped every figure whose clause stated it
+        # under the bound word, while its docstring
+        # stated that exclusion for a bound over other
+        # entries, and a bound stated over the form
+        # itself at one byte below the measured size
+        # passed the gate whole. The exclusion now
+        # stands scoped to bounds over other entries,
+        # and a bound over the form stands judged as
+        # the size statement it is.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form stands under 24,222,064 "
+                "bytes in the shipped file.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,064" in p for p in problems),
+                problems)
+
+    def test_a_true_bound_over_the_form_passes(self):
+        # The scoped bound reading judges the bound
+        # against the file, so a bound the file stands
+        # under draws no problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form stands under 24,222,066 "
+                "bytes in the shipped file.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_figure_attributed_to_the_largest_entry_fails(self):
+        # Round 26 red team third delta confirmation
+        # Minor 1, second shape. The restated reading
+        # took the entry at exclusion from the clause
+        # before the figure, while its docstring stated
+        # that exclusion for a figure attributed to
+        # another entry, and a figure attributed to the
+        # largest entry in a sentence naming the form
+        # passed the gate whole. The page names the form
+        # as the head of its largest entries, so the
+        # largest entry of the page is the form, and the
+        # figure now stands judged.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe demo recordings are headed by the "
+                "WebM form, the largest entry at "
+                "24,222,066 bytes, in the response.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_figure_for_another_entry_beside_the_form_passes(self):
+        # The scoped entry at exclusion still covers a
+        # figure the sentence attributes to another
+        # entry in a clause naming that entry, the
+        # confirmation own probe shape, a test fixture
+        # figure standing beside the naming of the form.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe response also carried a test "
+                "fixture at 147 bytes beside the WebM "
+                "form of the recording.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_the_compound_figure_form_fails(self):
+        # Round 26 red team third delta confirmation
+        # Minor 1, third shape. The restated reading
+        # took its figures from the spaced figure and
+        # bytes token alone, while its headline claimed
+        # every byte figure, and the false size in the
+        # adjectival compound form passed the gate
+        # whole. The figure now stands taken in its
+        # compound form beside its spaced form.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe response carried a 24,222,066-byte "
+                "WebM form among its largest entries.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            problems = self.problems(root)
+            self.assertTrue(
+                any("hosted-diff-evidence" in p
+                    and "24,222,066" in p for p in problems),
+                problems)
+
+    def test_a_true_compound_figure_passes(self):
+        # The compound reading judges the figure
+        # against the file, so the compound statement
+        # of the size the file measures draws no
+        # problem.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe response carried a 24,222,065-byte "
+                "WebM form among its largest entries.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])
+
+    def test_the_evidence_encoding_boundary_sentence_stands(self):
+        # Round 26 fourth delta. The evidence reading
+        # scans digit figures alone, and the third
+        # delta confirmation priced the size stated in
+        # number words passing with no boundary on the
+        # reading face naming the encoding, the close
+        # the guidance total family took in the same
+        # candidate. The boundary now stands stated in
+        # the reading docstring, and this test pins
+        # that sentence in the gate source, so its
+        # silent removal fails.
+        gate = (
+            ROOT / "scripts" / "check_submissions.py"
+        ).read_text(encoding="utf-8")
+        flat = re.sub(r"\s+", " ", gate)
+        self.assertIn(
+            "This reading judges digit figures in "
+            "sentences naming the WebM form and does "
+            "not price figures stated in number words, "
+            "and a size stated in words on the page "
+            "stands unpriced by this reading",
+            flat)
+
+    def test_the_evidence_unit_boundary_sentence_stands(self):
+        # Round 26 fifth delta. The evidence reading
+        # takes its figures stated in bytes alone, and
+        # the fourth delta confirmation priced the size
+        # stated in scaled units passing with no
+        # boundary on the reading face naming the unit,
+        # the ground the third delta confirmation
+        # graded the word encoding on before the fourth
+        # delta stated its boundary. The boundary now
+        # stands stated in the reading docstring, and
+        # this test pins that sentence in the gate
+        # source, so its silent removal fails.
+        gate = (
+            ROOT / "scripts" / "check_submissions.py"
+        ).read_text(encoding="utf-8")
+        flat = re.sub(r"\s+", " ", gate)
+        self.assertIn(
+            "This reading judges figures stated in "
+            "bytes and does not price a size stated in "
+            "scaled units, and a size stated in "
+            "megabytes or in MB on the page stands "
+            "unpriced by this reading",
+            flat)
+
+    def test_a_size_stated_in_scaled_units_draws_no_problem(self):
+        # The stated unit boundary carries the scaled
+        # forms. A size stated in scaled units stands
+        # unpriced by the reading whether its figure is
+        # false or the honest rounding, the false size
+        # at 25 megabytes and in its shortened form and
+        # the true rounding at 24.2 megabytes each
+        # drawing no problem beside the judged standing
+        # sentence of the page.
+        with tempfile.TemporaryDirectory() as tmp:
+            page_text = (
+                ROOT / "docs" / "hosted-diff-evidence.md"
+            ).read_text(encoding="utf-8")
+            page_text += (
+                "\nThe WebM form measures 25 megabytes "
+                "in the shipped file.\n")
+            page_text += (
+                "\nThe WebM form measures 25 MB in the "
+                "shipped file.\n")
+            page_text += (
+                "\nThe WebM form measures 24.2 megabytes "
+                "in the shipped file.\n")
+            root = self.make_root(tmp, page_text=page_text)
+            self.assertEqual(self.problems(root), [])

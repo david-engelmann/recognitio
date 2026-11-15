@@ -49,6 +49,7 @@ paraphrase outside those families stays a human review
 surface.
 """
 
+import json
 import re
 import sys
 from collections import Counter
@@ -1293,6 +1294,24 @@ def read_text(path):
         return None
 
 
+class DuplicateKeyError(ValueError):
+    """A JSON object in a trusted record repeats a key."""
+
+
+def _reject_duplicate_keys(pairs):
+    record = {}
+    for key, value in pairs:
+        if key in record:
+            raise DuplicateKeyError("repeated key %r" % (key,))
+        record[key] = value
+    return record
+
+
+def strict_json_loads(text):
+    """Parse JSON refusing a repeated key in any object."""
+    return json.loads(text, object_pairs_hook=_reject_duplicate_keys)
+
+
 def utf8_problems():
     """Problems naming the files the readings could not decode."""
     return [
@@ -1742,6 +1761,99 @@ def qwen_problems(root=None):
                 "carries a dropped pin, namely " + name + ", "
                 "which the brief must state in its pinned form"
             )
+    # Round 26. The brief input passage quotes the
+    # shipped manifest description, and this gate held
+    # no copy of the sentence and never read the
+    # manifest, so a one word plant in the quote, a
+    # single change for a single commit, passed the
+    # gate and the suite whole while the sibling gates
+    # pin the canonical sentence as a constant. Where
+    # the shipped manifest stands in the root, the
+    # quote now stands judged against the description
+    # the manifest itself carries, read under the
+    # strict reader and extracted between the brief
+    # own quote markers, so the two shipped surfaces
+    # cannot drift apart in silence in either
+    # direction. Where the manifest does not stand,
+    # as in a partial scratch layout, the reading is
+    # silent and the manifest absence stands priced
+    # by the package gate in a whole tree.
+    # Delta. The passage attributes three values to
+    # the manifest, the name and the version and the
+    # description, and the first reading judged the
+    # description alone, so the confirmation restated
+    # the version value in the passage to 1.3.1 and the
+    # gate stood green beside its own version census.
+    # The reading now judges all three values the
+    # passage states against the fields the manifest
+    # itself carries, extracted from the one passage
+    # shape, so no value the passage attributes to the
+    # manifest can drift from the manifest in silence.
+    manifest_text = read_text(
+        root / ".claude-plugin" / "plugin.json")
+    if manifest_text is not None:
+        manifest_name = None
+        manifest_version = None
+        manifest_description = None
+        try:
+            manifest = strict_json_loads(manifest_text)
+            if isinstance(manifest, dict):
+                manifest_name = manifest.get("name")
+                manifest_version = manifest.get("version")
+                manifest_description = manifest.get(
+                    "description")
+        except (ValueError, DuplicateKeyError):
+            problems.append(
+                "the shipped plugin.json at .claude-plugin "
+                "does not parse, so the brief quote of its "
+                "description cannot be checked"
+            )
+        quote = None
+        brief_name = None
+        brief_version = None
+        passage = re.search(
+            r"where the name is (\S+) and the version is "
+            r"([0-9][0-9A-Za-z.-]*) and the description "
+            r"reads ", flat)
+        if passage is not None:
+            brief_name = passage.group(1)
+            brief_version = passage.group(2)
+            start = passage.end()
+            end = flat.find(". The input also carries",
+                            start)
+            if end >= 0:
+                quote = flat[start:end + 1]
+        if quote is None:
+            problems.append(
+                "docs/qwen-code-brief.md holds no manifest "
+                "description quote at its input passage"
+            )
+        else:
+            if (manifest_name is not None
+                    and brief_name != manifest_name):
+                problems.append(
+                    "docs/qwen-code-brief.md states the "
+                    "shipped manifest name as %r and the "
+                    "shipped plugin.json name reads %r"
+                    % (brief_name, manifest_name)
+                )
+            if (manifest_version is not None
+                    and brief_version != manifest_version):
+                problems.append(
+                    "docs/qwen-code-brief.md states the "
+                    "shipped manifest version as %r and the "
+                    "shipped plugin.json version reads %r"
+                    % (brief_version, manifest_version)
+                )
+            if (manifest_description is not None
+                    and quote != manifest_description):
+                problems.append(
+                    "docs/qwen-code-brief.md quotes the "
+                    "shipped manifest description as %r "
+                    "and the shipped plugin.json description "
+                    "reads %r"
+                    % (quote, manifest_description)
+                )
     # Round 15. The version sentence stands twice in the
     # brief, and the presence pin above reads only that it
     # stands somewhere, so moving a single occurrence to a

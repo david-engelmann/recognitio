@@ -172,6 +172,76 @@ class TestCheckQwen(unittest.TestCase):
             root = self.make_layout(tmp)
             self.assertEqual(self.problems(root), [])
 
+    def make_layout_with_manifest(self, tmp):
+        root = self.make_layout(tmp)
+        source = ROOT / ".claude-plugin" / "plugin.json"
+        target = root / ".claude-plugin" / "plugin.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        return root
+
+    def test_the_brief_quote_holds_where_the_manifest_stands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout_with_manifest(tmp)
+            self.assertEqual(self.problems(root), [])
+
+    def test_a_plant_in_the_brief_manifest_quote_fails(self):
+        # Round 26 red team Minor 7. The brief quotes
+        # the shipped manifest description at its input
+        # passage, and the gate held no copy of the
+        # sentence, so the quote restated with one word
+        # changed passed the gate and this suite whole.
+        # The quote now stands judged against the
+        # manifest bytes themselves.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout_with_manifest(tmp)
+            problems = self.break_brief(
+                root,
+                "or a single commit, with the context a "
+                "reviewer needs",
+                "or a single change, with the context a "
+                "reviewer needs")
+            self.assertTrue(any(
+                "quotes the shipped manifest description" in p
+                for p in problems), problems)
+
+    def test_a_plant_in_the_brief_manifest_version_fails(self):
+        # Round 26 red team confirmation Minor 5. The
+        # passage attributes three values to the shipped
+        # manifest and the first reading judged the
+        # description alone, so the version value in the
+        # passage restated to 1.3.1 passed the gate and
+        # this suite whole. All three values now stand
+        # judged against the manifest fields themselves.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout_with_manifest(tmp)
+            problems = self.break_brief(
+                root,
+                "and the version is 1.3.0 and the "
+                "description reads",
+                "and the version is 1.3.1 and the "
+                "description reads")
+            self.assertTrue(any(
+                "states the shipped manifest version as "
+                "'1.3.1'" in p for p in problems), problems)
+
+    def test_a_plant_in_the_brief_manifest_name_fails(self):
+        # The third value of the same passage, the name,
+        # stands judged on the same ground, so a restated
+        # name in the passage refuses beside the version.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.make_layout_with_manifest(tmp)
+            problems = self.break_brief(
+                root,
+                "where the name is recognitio and the "
+                "version",
+                "where the name is recognitio-two and the "
+                "version")
+            self.assertTrue(any(
+                "states the shipped manifest name as "
+                "'recognitio-two'" in p for p in problems),
+                problems)
+
     def run_main_on(self, root):
         out = io.StringIO()
         err = io.StringIO()
