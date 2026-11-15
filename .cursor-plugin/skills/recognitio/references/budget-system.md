@@ -10,7 +10,7 @@ The bound the gate stands on is the one the audit measured. On the shape familie
 
 ## The shedding choice
 
-When a packet runs over its budget, the script measures every drop set the gathered optional tiers allow, keeping both tiers, dropping the history tier, dropping the companion tier, and dropping both, and it keeps the fitting set whose packet carries the most estimated tokens. A tie goes to the set that drops history before companions, and the recorded drop order is always history before companions, so an unspent remainder at an accepted budget is smaller than the estimated cost of restoring any one dropped tier on its own. That whole tier granularity is the stated limit of the choice, because a tier is kept whole or dropped whole and is never trimmed to spend the last tokens of a budget. The core tiers never drop and the change itself is never truncated.
+When a packet runs over its budget, the script measures every drop set the gathered optional tiers allow, keeping both tiers, dropping the history tier, dropping the companion tier, and dropping both, and it keeps the fitting set whose packet carries the most estimated tokens. A tie goes to the set that drops history before companions, and the recorded drop order is always history before companions, so an unspent remainder at an accepted budget is always smaller than the smallest marginal cost of restoring any one dropped tier on its own. That whole tier granularity is the stated limit of the choice, because a tier is kept whole or dropped whole and is never trimmed to spend the last tokens of a budget. The core tiers never drop and the change itself is never truncated.
 
 ## The check on the account
 

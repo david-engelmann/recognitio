@@ -60,6 +60,10 @@ A derivation noted rule is a rule that carries a note naming the skill section o
 - [The Build 17 Devin playbook and coordinator build](devin-playbook-brief.md) (landed)
   writes the packet discipline as derivation noted rules for
   the Devin review surface and its coordinator surfaces.
+- The Build 18 Trae adaptation (deferred) ships nothing,
+  because no Trae skill or plugin surface stands in the
+  primary docs, so the build stands deferred with no Trae
+  brief, gate script or manifest.
 - [The Build 19 Codex plugin build](codex-plugin-brief.md) (landed)
   carries the OpenAI extension in the portable manifest, the
   repo marketplace that offers the package, and the one Codex

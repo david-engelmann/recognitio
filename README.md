@@ -7,7 +7,7 @@
 
 Pulls the relevant changes from a pull request, a commit range or a single commit, with the context a reviewer needs, into one verified review packet.
 
-For reviewers and the agents who assist them, judging a pull request or a commit range they did not write and needing the whole change with its context in hand before they judge it.
+For reviewers and the agents who assist them, the packet puts the whole change and its context in hand before they judge a pull request or a commit range they did not write.
 
 [What it does](#what-it-does) · [See it on a real change](#see-it-on-a-real-change) · [How it works](#how-it-works) · [Why](#why) · [Objections](#objections) · [Install](#install) · [Platform adaptations](#platform-adaptations) · [Usage](#usage) · [Going deeper](#going-deeper)
 
@@ -105,9 +105,9 @@ extract.py \
   --out packet --repo .
 ```
 
-3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message.
+3. Read the verdict the run prints. A run that ends on the word verified has passed its recount, and a failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message. Where no verified packet stands, a failed run writes one file into the output directory instead, a manifest recording the verified flag false and the error that ended the run, and that lone manifest is the failure receipt of the run, with no packet file beside it.
 
-4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The packet file carries the title the pericope for the change, and the pericope is the packet itself. The `manifest.json` file beside it is the manifest receipt for the run.
+4. Open `packet.md` in the packet folder and read the change inside its enclosing functions with its call sites and tests beside it. The packet file carries the title the pericope for the change, and the pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The `manifest.json` file beside it is the manifest receipt for the run.
 
 That is the whole first pass. The single commit flag takes HEAD or any commit you name, and pull request numbers and ranges swap into the same command, as Usage shows. Pin the clone to a reviewed commit SHA before you rely on it, as Install sets out.
 
@@ -462,7 +462,7 @@ extract.py \
 
 Two controls tune a run, a token budget that caps the packet size, counted with the per shape token estimate priced by character class, and a tier selection that adds only the tiers a review needs, with triage and the change always in. The budget keeps the drop set that fits and keeps the most content, shedding history before companions when the kept size ties, and a budget under one is refused before any output is touched.
 
-A run writes two files into the output directory. The packet file is the reading document, titled the pericope for the change. The pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The manifest file is the manifest receipt, with the resolved refs, the producing command, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message.
+A run writes two files into the output directory. The packet file is the reading document, titled the pericope for the change. The pericope is the packet itself, holding the change and the context a reviewer needs to read it, and nothing else. The manifest file is the manifest receipt, with the resolved refs, the producing command, the per file record, the tier accounting, the section headings the packet carries, and the verified flag. A failed run leaves a standing verified packet and its manifest untouched and reports its failure in its exit code and its message. Where no verified packet stands, a failed run writes the manifest alone into the output directory, recording the verified flag false and the error that ended the run, and that lone manifest is the failure receipt of the run.
 
 The script at `scripts/check_packet.py` validates a packet directory before a review is stamped on it, checking the manifest against the schema at `scripts/packet-manifest.schema.json`, confirming the recorded refs, recounting the recorded change, and reading the packet body against the manifest and the recount, so a packet edited or invented after its run cannot keep the stamp on anything the repository grounds. The one passage the stamp does not recount is the passage of the history tier naming prior pull requests touching the most changed files, which the check holds against the record the manifest carries beside the packet rather than re-deriving it from the repository, because two environments can honestly report different live state for it. The head the manifest records must be the current head of the repository the check runs against, and a packet whose recorded head stands behind that head is refused as stale, where stale names that condition alone and not any decay in the packet. A packet built for a named commit stamps in a checkout standing at that commit.
 

@@ -3636,8 +3636,9 @@ class TestReadmeWp2(unittest.TestCase):
         self.assertIn("--commit 991ac6a", first_screen)
         self.assertIn(
             "For reviewers and the agents who assist them, "
-            "judging a pull request or a commit range they did "
-            "not write",
+            "the packet puts the whole change and its context in "
+            "hand before they judge a pull request or a commit "
+            "range they did not write",
             self.flat,
         )
         for step in ("1. Clone this repo", "2. Build a packet",
@@ -6281,10 +6282,10 @@ def readme_page_weight(root, readme):
     dot slash stripped, duplicate slashes collapsed, and
     dot segments resolved in full, parent segments
     included, so one file carried under two spellings of
-    its path weighs once, while the reference
-    first carrying it stands as written for the file lookup
-    and for any refusal that names it. A reference naming
-    a file that does not stand under the
+    its path weighs once, while the normalised
+    destination stands for the file lookup and for any
+    refusal that names it. A reference naming a file
+    that does not stand under the
     root fails by name here, so a weighing can never surface
     as a bare file error from the stat call.
     """

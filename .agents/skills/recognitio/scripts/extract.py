@@ -7154,9 +7154,9 @@ def apply_budget(args, selected, tier_texts, tier_files, rereview,
     order breaks the tie, history before companions, which keeps
     the equal cost behaviour the old fixed order produced. The
     one limit that remains is tier granularity, because a tier is
-    kept whole or dropped whole, so the unspent remainder of an
-    accepted packet is always smaller than the smallest marginal
-    cost of restoring one dropped tier on its own. A fixed
+    kept whole or dropped whole, so an unspent remainder at an
+    accepted budget is always smaller than the smallest marginal
+    cost of restoring any one dropped tier on its own. A fixed
     allowance for the closing receipt undercounted it whenever
     the section grew, drop lines and all, and let emitted packets
     land over the budget they were accepted under. The
