@@ -14,7 +14,7 @@ The module validates clean on Claude Code 2.1.314 with its agent.spawn hook name
 
 **What is unverified**
 
-Agent team teammate spawns, the Desktop and VS Code surfaces, and an induced catch handler timeout stand unverified. The catch handler limit itself stands as the recorded limit section states it, on the word of the Claude Code mods reference, whose limits table states the one second limit for catch handlers. The gate certifies the shipped module and its structural family only, and the seven named residuals in the structural family section stand outside what it can judge.
+Agent team teammate spawns, the Desktop and VS Code surfaces, and an induced catch handler timeout stand unverified. The catch handler limit itself stands as the recorded limit section states it, on the word of the Claude Code mods reference, whose limits table states the one second limit for catch handlers. The gate certifies the shipped module and its structural family only, and the six named residuals in the structural family section stand outside what it can judge.
 
 ## Summary
 
@@ -507,7 +507,7 @@ section and in the census in the same change, and a
 shape nobody has named stands refused until someone
 does.
 
-Seven shapes stand as named residuals of this
+Six shapes stand as named residuals of this
 contract.
 The gate reads a loop condition's shape, not its
 value, so a loop condition that is constant in fact
@@ -525,9 +525,12 @@ the constructor reached through the global object,
 reads as a call on a name the census leaves alone
 while the write lands the same way. A write through
 a member standing as one clause of a comma sequence
-inside a returned value reads as the value it stands
-in, since the write readings judge statements and a
-sequence clause is a value position. A handler
+inside a returned value stands among the judged
+shapes and not among these residuals, because the
+write readings judge a member write in a value
+position the same way they judge one standing as a
+statement, and the census refuses it as an
+assignment through a member of an object. A handler
 standing under an export alias, or under a
 differently cased export name beside the name the
 registration binds, reads as the export it stands
@@ -541,14 +544,12 @@ stands over literal text and a hole is code. A
 condition constant in fact but not in spelling, a
 local call that never returns, a write call through
 a receiver whose identity the census does not judge,
-a write standing as a sequence clause in a returned
-value, a handler standing under an export alias, a
+a handler standing under an export alias, a
 call reached through a member chain, and a regex
 spelled inside a template hole are outside what a
 structural gate can judge, because judging them is
-judging what a value holds, what a call does, what
-a name stands for, and where a value's clauses run.
-The certified population is this
+judging what a value holds, what a call does, and
+what a name stands for. The certified population is this
 project's own shipped module in this project's own
 repo, and the gate's job is catching accidental
 breakage of that module's contract and keeping the

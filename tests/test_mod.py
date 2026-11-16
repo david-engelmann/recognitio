@@ -409,7 +409,7 @@ class ModContractTestCase(unittest.TestCase):
             any("version floor" in p for p in problems), problems
         )
 
-    # The seven named residuals of the contract, verbatim as
+    # The six named residuals of the contract, verbatim as
     # the brief states them, each with the label the gate
     # names it under. The list is the finality boundary of
     # the contract, so every sentence stands held here and
@@ -441,14 +441,6 @@ class ModContractTestCase(unittest.TestCase):
             "leaves alone while the write lands the same way.",
             "the write call through an unjudged receiver "
             "residual",
-        ),
-        (
-            "A write through a member standing as one clause "
-            "of a comma sequence inside a returned value "
-            "reads as the value it stands in, since the write "
-            "readings judge statements and a sequence clause "
-            "is a value position.",
-            "the comma sequence write residual",
         ),
         (
             "A handler standing under an export alias, or "
@@ -483,7 +475,7 @@ class ModContractTestCase(unittest.TestCase):
 
     def test_a_deleted_named_residual_fails_the_gate(self):
         # The gate plant for the residual pins. Deleting any
-        # one of the seven sentences from the brief the gate
+        # one of the six sentences from the brief the gate
         # reads must draw that residual's problem, so the
         # finality boundary cannot narrow in silence.
         text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
@@ -499,6 +491,143 @@ class ModContractTestCase(unittest.TestCase):
                 any(label in p for p in problems),
                 (label, problems),
             )
+
+    # The corrected comma sequence sentence, held the way
+    # the residual sentences are held. The shape it names
+    # stands judged by the census, so the sentence stands
+    # outside the residual list above, under the refusal
+    # label the gate names it by, and the plant below
+    # prices the refusal it states.
+    CORRECTED_SENTENCE = (
+        "A write through a member standing as one clause "
+        "of a comma sequence inside a returned value "
+        "stands among the judged shapes and not among "
+        "these residuals, because the write readings "
+        "judge a member write in a value position the "
+        "same way they judge one standing as a statement, "
+        "and the census refuses it as an assignment "
+        "through a member of an object."
+    )
+    CORRECTED_LABEL = "the comma sequence write refusal"
+
+    def test_the_corrected_comma_sequence_sentence_stands_in_the_brief(self):
+        # The corrected sentence stands held the way the
+        # residual sentences are held, so a brief that
+        # drops or rewords it fails here in words.
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        self.assertIn(self.CORRECTED_SENTENCE, text)
+
+    def test_a_deleted_corrected_sentence_fails_the_gate(self):
+        # The gate plant for the corrected pin. Deleting
+        # the corrected sentence from the brief the gate
+        # reads must draw the refusal problem, so the
+        # correction cannot fall out of the brief in
+        # silence the way the error it replaces stood
+        # in it.
+        text = re.sub(r"\s+", " ", BRIEF.read_text(encoding="utf-8"))
+        planted = text.replace(self.CORRECTED_SENTENCE, "")
+        self.assertNotEqual(planted, text)
+        with tempfile.TemporaryDirectory() as tmp:
+            brief = Path(tmp) / "mod-build7.md"
+            brief.write_text(planted, encoding="utf-8")
+            self.mod.BRIEF = brief
+            problems = self.mod.brief_problems()
+        self.assertTrue(
+            any(self.CORRECTED_LABEL in p for p in problems),
+            problems,
+        )
+
+    def test_a_member_write_in_a_returned_comma_sequence_is_refused_as_outside_the_family(self):
+        # The Round 28 fix plant. The brief once named a
+        # member write standing as one clause of a comma
+        # sequence inside a returned value a residual, on
+        # the ground that the write readings judge
+        # statements and a sequence clause is a value
+        # position. The Round 28 red team planted the
+        # shape in five returned value positions and every
+        # one drew the family refusal, so the shape stands
+        # priced here by execution, in the same five
+        # positions, and the brief sentence above stands
+        # corrected to say the census refuses it.
+        text = MODULE.read_text(encoding="utf-8")
+        shipped_catch = (
+            "function catchSpawnFailure($, e, next) {\n"
+            "  return {\n"
+            "    deny: \"recognitio: the packet gate hook failed, "
+            "so this review spawn is denied rather than let through\",\n"
+            "  };\n"
+            "}"
+        )
+        self.assertIn(shipped_catch, text)
+        shipped_deny = (
+            "  return {\n"
+            "    deny: \"recognitio: the review packet manifest is "
+            "not verified, so this review spawn is denied\",\n"
+            "  };"
+        )
+        self.assertIn(shipped_deny, text)
+        catch_variants = (
+            # The whole returned value of the catch handler.
+            (
+                "function catchSpawnFailure($, e, next) {\n"
+                "  const out = { deny: \"x\" };\n"
+                "  return (out.deny = \"y\", out);\n"
+                "}"
+            ),
+            # The whole returned value of a helper the
+            # catch handler delegates to.
+            (
+                "function denyFromHelper() {\n"
+                "  const out = { deny: \"x\" };\n"
+                "  return (out.deny = \"y\", out);\n"
+                "}\n\n"
+                "function catchSpawnFailure($, e, next) {\n"
+                "  return denyFromHelper();\n"
+                "}"
+            ),
+            # A property value inside the returned object.
+            (
+                "function catchSpawnFailure($, e, next) {\n"
+                "  const out = { deny: \"x\" };\n"
+                "  return { deny: (out.deny = \"y\", \"z\") };\n"
+                "}"
+            ),
+            # An element expression inside an array the
+            # handler returns from.
+            (
+                "function catchSpawnFailure($, e, next) {\n"
+                "  const out = { deny: \"x\" };\n"
+                "  return [ (out.deny = \"y\", out) ][0];\n"
+                "}"
+            ),
+        )
+        for planted_catch in catch_variants:
+            variant = text.replace(shipped_catch, planted_catch)
+            self.assertNotEqual(variant, text)
+            problems = self.problems_for(variant)
+            self.assertTrue(
+                any("assignment through a member" in p
+                    and "structural family" in p
+                    for p in problems),
+                problems,
+            )
+        # The deny path of the gating handler itself.
+        planted_deny = (
+            "  const out = {\n"
+            "    deny: \"recognitio: the review packet manifest is "
+            "not verified, so this review spawn is denied\",\n"
+            "  };\n"
+            "  return (out.deny = \"z\", out);"
+        )
+        variant = text.replace(shipped_deny, planted_deny)
+        self.assertNotEqual(variant, text)
+        problems = self.problems_for(variant)
+        self.assertTrue(
+            any("assignment through a member" in p
+                and "structural family" in p
+                for p in problems),
+            problems,
+        )
 
     def test_the_gate_problem_messages_carry_no_banned_mark(self):
         # The gate's problem messages follow the file's comma

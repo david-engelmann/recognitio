@@ -95,7 +95,7 @@ shipped module's structural family, the module's export
 surface, which is `register` and nothing else, the brief's
 stated limits and its pinned sentences, among them the
 marketplace entry and the live validation claim and the
-version floor and the seven named residuals, the existence
+version floor and the six named residuals, the existence
 of a host side test file under `hooks/`, and the marketplace
 copies of the module files and the licence, pinned byte for
 byte against their originals. The eval integrity check reads the

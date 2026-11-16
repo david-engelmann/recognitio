@@ -1132,7 +1132,7 @@ class TestRound16CodexReadmeFigures(unittest.TestCase):
             root = self.base.make_layout(tmp)
             text = self.base.read(root, "README.md")
             planted = text + (
-                "\n\nAGENTS.md totals 60,412 bytes.\n")
+                "\n\nAGENTS.md totals 60,410 bytes.\n")
             self.base.write(root, "README.md", planted)
             problems = self.base.problems(root)
             self.assertFalse(

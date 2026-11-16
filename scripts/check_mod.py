@@ -24,7 +24,7 @@ module with its comments stripped, so a comment quoting a call
 shape is not a call site. The mod brief at docs/mod-build7.md
 must state the second layer fail open as a limit, the in session
 gating boundary, the deployment gate check, the unset
-disable-model-invocation, the version floor, and the seven
+disable-model-invocation, the version floor, and the six
 named residuals of the contract. At least one *.test.ts file
 must exist for the host side test story.
 
@@ -7789,10 +7789,13 @@ def brief_problems():
         (
             "A write through a member standing as one clause "
             "of a comma sequence inside a returned value "
-            "reads as the value it stands in, since the write "
-            "readings judge statements and a sequence clause "
-            "is a value position.",
-            "the comma sequence write residual",
+            "stands among the judged shapes and not among "
+            "these residuals, because the write readings "
+            "judge a member write in a value position the "
+            "same way they judge one standing as a statement, "
+            "and the census refuses it as an assignment "
+            "through a member of an object.",
+            "the comma sequence write refusal",
         ),
         (
             "A handler standing under an export alias, or "

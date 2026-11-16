@@ -24,7 +24,7 @@ brief at [docs/mod-build7.md](../../docs/mod-build7.md).
 The contract the repo gate certifies is the shipped module and
 the modules standing in its structural family. A module carrying
 a construct outside that family is refused by the gate rather
-than judged, and the brief names the seven residual shapes that
+than judged, and the brief names the six residual shapes that
 stand outside what a structural gate can judge.
 
 The main recognitio plugin already includes this mod, because the
