@@ -1027,9 +1027,13 @@ def estimate_tokens(text):
     dense text, short lines, space runs and repeated character
     runs, a fresh measurement with the cl100k tokenizer put the
     real count between 0.49 and 1.35 times this estimate, so
-    the estimate never underprices a measured family by a
-    multiple and never overprices one by more than about twice.
-    Four families stand outside that band as named limits. A run
+    on those families the estimate never underprices by a
+    multiple and never overprices one by more than about
+    twice. Five families stand outside that band as named
+    limits, and two of them underprice by a multiple at
+    their worst measured shapes, the unspelled letter
+    family at up to about 5.1 times and the byte level
+    script family at up to about 2.5 times. A run
     of unspelled letters, a keyboard walk or a run of rare
     letters standing alone or beside a digit group, prices
     under the letter or embedded or digit readings while a
@@ -1057,6 +1061,29 @@ def estimate_tokens(text):
     underscores, and at about 0.40 times on lines of eight
     underscores, the separator line shape of plain text
     documents standing as the ordinary carrier of the run.
+    Ordinary prose in a script whose characters a real
+    tokenizer carries at the byte level rather than as
+    whole character tokens prices by the encoded length
+    rule above, at one whole token for a two byte character
+    and 1200 thousandths for a three byte character, while
+    the tokenizer runs near one token per byte on such
+    scripts, so its real count can stand up to about 2.5
+    times the estimate. The worst measured shapes stand
+    at that figure, in Ethiopic and in Cherokee and in
+    Mongolian and in Yi syllables, with Canadian
+    Aboriginal syllabics between about 2.36 and that
+    figure across the words measured, Armenian at about
+    2.0 times, Georgian and Myanmar and Sinhala and Lao
+    and halfwidth kana at about 1.67 times, Tibetan
+    between about 1.72 and 1.79 times, and keycap
+    presentation sequences at about 1.56 times as a
+    narrower carrier of the same mechanism. Chinese text
+    and Korean text hold inside the band above, because
+    the tokenizer carries whole character tokens for
+    them, so the family is exactly the scripts no whole
+    character token carries, and translated documents
+    and localisation files and comments written in those
+    scripts stand as its ordinary carriers.
     It is still an estimate and not a tokenizer, and every surface
     that names a budget names this method beside it.
     """

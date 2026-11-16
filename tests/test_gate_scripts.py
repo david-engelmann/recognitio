@@ -6277,7 +6277,54 @@ class TestWp5SessionScreenshots(unittest.TestCase):
             self.assertIn(name, record)
 
 
-def _page_weight_destination(value):
+def _decode_character_references(value, attribute=False):
+    """A destination value with its numeric references read.
+
+    A numeric character reference in a value stands for the
+    character it numbers, in decimal or in hexadecimal, and
+    the HTML parser decodes references in an attribute value
+    before any URL is read, so a separator or a dot spelled
+    as a reference names the same file as its plain spelling.
+    A reference the numbering cannot read stands as written,
+    so a malformed spelling fails closed under its own name.
+    A reference written without its closing semicolon stands
+    read only in an attribute value, and only where the
+    character after its digits is neither a letter nor a
+    digit nor an equals sign, because the parser decodes the
+    terminator free form there and leaves it standing as
+    literal text where that character is a letter or an
+    equals sign. Outside an attribute value the terminator
+    free form stands as written in every case, because the
+    Markdown forms do not decode it and the page loads no
+    file under the decoded name.
+    """
+    def replace(match):
+        digits = match.group(1)
+        if not match.group(2):
+            if not attribute:
+                return match.group(0)
+            following = value[match.end():match.end() + 1]
+            if (
+                following == "="
+                or "0" <= following <= "9"
+                or "a" <= following <= "z"
+                or "A" <= following <= "Z"
+            ):
+                return match.group(0)
+        try:
+            if digits[:1] in ("x", "X"):
+                return chr(int(digits[1:], 16))
+            return chr(int(digits, 10))
+        except (ValueError, OverflowError):
+            return match.group(0)
+
+    return re.sub(
+        r"&#([0-9]+|x[0-9a-fA-F]+|X[0-9a-fA-F]+)(;?)",
+        replace, value,
+    )
+
+
+def _page_weight_destination(value, attribute=False):
     """One weighed destination in its plain spelling.
 
     A destination may carry a leading dot slash in any form
@@ -6290,8 +6337,24 @@ def _page_weight_destination(value):
     a spelling that steps aside and back carries the one
     destination. A parent segment with no directory above
     it to step back to stands as written, and any other
-    spelling stands as written.
+    spelling stands as written. Two spellings stand read
+    before the segments resolve. A numeric character
+    reference stands for the character it numbers, as the
+    destination helper above states, and a backslash
+    stands as a path separator, because the URL standard
+    reads a backslash as one in the URLs a page carries,
+    so a destination spelled with references or with
+    backslashes resolves over the same segments as its
+    plain spelling and weighs the file it names. The
+    attribute word names a destination read from an HTML
+    attribute value, and it passes to the decoding above,
+    so a terminator free reference decodes in an attribute
+    destination as the parser decodes it there, and stands
+    as written in a destination from any other form.
     """
+    value = _decode_character_references(value, attribute).replace(
+        "\\", "/"
+    )
     parts = []
     for part in value.split("/"):
         if part in ("", "."):
@@ -6326,8 +6389,19 @@ def readme_page_weight_refs(readme):
     removes them all before the test. A label stands on
     its first definition, the definition the rendered
     page follows, and a later definition of the same
-    label changes nothing in the store. External targets
-    stand outside the weighing, as they always have.
+    label changes nothing in the store. A destination in
+    the HTML attribute families may spell a character as
+    a numeric character reference or a separator as a
+    backslash, and the destination helper reads both
+    spellings as the file they name, as it reads the
+    plain spelling. A destination in those families may
+    also write the reference without its closing
+    semicolon where the parser decodes that form, and the
+    weighing reads it the same way, while a Markdown
+    destination in that spelling stands as written,
+    because the Markdown forms do not decode it. External
+    targets stand outside the weighing, as they always
+    have.
     """
     refs = []
     for match in re.finditer(
@@ -6363,7 +6437,7 @@ def readme_page_weight_refs(readme):
         r"\bsrc\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
     ):
         value = _page_weight_destination(
-            match.group(1) or match.group(2)
+            match.group(1) or match.group(2), attribute=True
         )
         if value.startswith("docs/"):
             refs.append(value)
@@ -6374,14 +6448,16 @@ def readme_page_weight_refs(readme):
         for candidate in value.split(","):
             fields = candidate.split()
             if fields:
-                target = _page_weight_destination(fields[0])
+                target = _page_weight_destination(
+                    fields[0], attribute=True
+                )
                 if target.startswith("docs/"):
                     refs.append(target)
     for match in re.finditer(
         r"\bposter\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", readme, re.I
     ):
         value = _page_weight_destination(
-            match.group(1) or match.group(2)
+            match.group(1) or match.group(2), attribute=True
         )
         if value.startswith("docs/"):
             refs.append(value)
@@ -6496,16 +6572,17 @@ class TestBrandAssets(unittest.TestCase):
     # session stills on the page the ceiling guards.
     # The visual fix pass then rebuilds the hero
     # recording at 607,309 with its captions set on
-    # landmark boundaries, re-renders the three style
-    # stills at 18,972 plus 29,838 plus 22,297 with the
-    # spinner glyph drawn by fallback, adds the three
-    # phone width style stills at 14,455 plus 13,487
-    # plus 11,575 from a session run at phone width, and
-    # redraws the eval chart at 2,999 with its text
-    # raised, which moves the total to 740,901 in the
-    # open. The ceiling does not move, because 750,000
-    # still holds the new ledger with 9,099 of headroom
-    # over it.
+    # landmark boundaries, recuts the phone crop at
+    # 12,857 in place of the 18,094 it carried, re-renders
+    # the three style stills at 18,972 plus 29,838 plus
+    # 22,297 with the spinner glyph drawn by fallback,
+    # adds the three phone width style stills at 14,455
+    # plus 13,487 plus 11,575 from a session run at phone
+    # width, and redraws the eval chart at 2,999 with
+    # its text raised, which moves the total to 740,901
+    # in the open. The ceiling does not move, because
+    # 750,000 still holds the new ledger with 9,099 of
+    # headroom over it.
     # The storefront WP3 landing then moves the hero
     # slot to the Claude Code recording at 546,582 with
     # its phone crop at 11,580, replacing the Cursor
@@ -6830,6 +6907,150 @@ class TestBrandAssets(unittest.TestCase):
                 readme_page_weight(root, readme),
                 100 + 200 + 400 + 800 + 1600 + 3200,
             )
+
+    def test_the_page_weight_weighs_character_reference_spellings(self):
+        # Round 30 red team Minor 1. A quoted source spelling
+        # its path separator as the character reference for
+        # a slash drew no reference from the weighing and
+        # weighed nothing, while the rendered page decodes
+        # the reference before it reads the URL and loads
+        # the file at the decoded path, so an asset of any
+        # size could pass the ceiling uncounted in that
+        # spelling. The dot of a file name spelled as a
+        # reference escaped the same way, and where no file
+        # stood under that spelling the refusal printed the
+        # name cut at the hash of the reference itself
+        # instead of the path the page would load.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "images" / "a.png").write_bytes(
+                b"x" * 5000
+            )
+            (root / "docs" / "b.png").write_bytes(b"x" * 700)
+            readme = "\n".join([
+                '<img src="docs&#47;images&#47;a.png">',
+                "",
+                '<img src="docs&#47;b&#46;png">',
+                "",
+                "![the a picture again](docs/images/a.png)",
+            ])
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/a.png", refs)
+            self.assertIn("docs/b.png", refs)
+            # The a picture stands under two spellings and
+            # weighs once at its true size beside the b
+            # picture weighed through its reference spelling.
+            self.assertEqual(
+                readme_page_weight(root, readme), 5000 + 700
+            )
+            missing = '<img src="docs&#47;missing&#46;png">'
+            with self.assertRaises(AssertionError) as caught:
+                readme_page_weight(root, missing)
+            self.assertIn(
+                "docs/missing.png", str(caught.exception)
+            )
+
+    def test_the_page_weight_weighs_backslash_spellings(self):
+        # Round 30 red team Minor 1, the second spelling. A
+        # quoted source spelling its separator as a backslash
+        # drew the same empty reading, while the URL standard
+        # reads a backslash as a path separator in the URLs
+        # a page carries and the rendered page loads the file
+        # at the separated path.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "images" / "a.png").write_bytes(
+                b"x" * 5000
+            )
+            readme = "\n".join([
+                '<img src="docs\\images\\a.png">',
+                "",
+                '<img src="docs\\images\\.\\a.png">',
+            ])
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/a.png", refs)
+            # The one file stands under two backslash
+            # spellings and weighs once at its true size.
+            self.assertEqual(
+                readme_page_weight(root, readme), 5000
+            )
+
+    def test_the_page_weight_weighs_terminator_free_references_in_attributes(self):
+        # Round 30 red team confirmation Minor 1. A numeric
+        # character reference written without its closing
+        # semicolon, where the character after the digits is
+        # neither a letter nor an equals sign, is decoded by
+        # the HTML parser before any URL is read, while the
+        # weighing its decoder required the semicolon and
+        # read nothing in that spelling, so an asset of any
+        # size could pass the ceiling uncounted in the HTML
+        # attribute families.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "images" / "a.png").write_bytes(
+                b"x" * 5000
+            )
+            readme = "\n".join([
+                '<img src="docs&#47/images/a.png">',
+                "",
+                '<img src="docs&#47./images/a.png">',
+                "",
+                '<img src="docs&#x2f/images/a.png">',
+            ])
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/a.png", refs)
+            # The one file stands under three terminator
+            # free spellings and no other, and weighs once
+            # at its true size.
+            self.assertEqual(
+                readme_page_weight(root, readme), 5000
+            )
+
+    def test_the_page_weight_weighs_terminator_free_references_in_a_srcset(self):
+        # Round 30 red team confirmation Minor 1 in the
+        # srcset family, where the same terminator free
+        # spelling escaped on a candidate of the set while
+        # the browser may fetch any candidate it carries.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "images" / "a.png").write_bytes(
+                b"x" * 5000
+            )
+            (root / "docs" / "images" / "b.png").write_bytes(
+                b"x" * 700
+            )
+            readme = (
+                '<source srcset="docs&#47/images/a.png 1x, '
+                'docs/images/b.png 2x">'
+            )
+            refs = readme_page_weight_refs(readme)
+            self.assertIn("docs/images/a.png", refs)
+            self.assertIn("docs/images/b.png", refs)
+            self.assertEqual(
+                readme_page_weight(root, readme), 5000 + 700
+            )
+
+    def test_a_terminator_free_reference_stands_as_written_in_markdown(self):
+        # Round 30 delta, the Markdown side of the scoping.
+        # The Markdown forms do not decode a terminator free
+        # reference, so the page loads no file under the
+        # decoded name, and the weighing reads the spelling
+        # as written and admits nothing for it, where a
+        # decoding applied to every family would weigh a
+        # file the page never loads.
+        with RetryingTemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs" / "images").mkdir(parents=True)
+            (root / "docs" / "images" / "a.png").write_bytes(
+                b"x" * 5000
+            )
+            readme = "![the a picture](docs&#47/images/a.png)"
+            self.assertEqual(readme_page_weight_refs(readme), [])
+            self.assertEqual(readme_page_weight(root, readme), 0)
 
     def test_a_video_poster_weighs_its_still(self):
         # Round 20 spec Minor 1 and red team RT-2. The

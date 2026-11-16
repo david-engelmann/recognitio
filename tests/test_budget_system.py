@@ -1074,15 +1074,15 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
             self.assertIn(figure, reference)
         # The count word stands in agreement as well. The
         # docstring counts the named limit families at
-        # four and the reference opens its passage with
+        # five and the reference opens its passage with
         # the count of the families it goes on to name,
         # so the word cannot drift from the enumeration
         # standing under it in either home.
         self.assertIn(
-            "Four families stand outside that band", docstring
+            "Five families stand outside that band", docstring
         )
         self.assertIn(
-            "Four families stand outside that bound", reference
+            "Five families stand outside that bound", reference
         )
 
     def test_the_remaining_named_limits_stand_in_every_home(self):
@@ -1133,6 +1133,104 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
             for figure in ("5.1", "0.24", "0.02", "3.1"):
                 self.assertIn(figure, docstring, str(home))
                 self.assertIn(figure, reference, str(home))
+
+    def assert_inside_the_byte_fallback_limit(self, text, real_tokens):
+        # The named limit for byte level script prose. The
+        # real count may stand up to about 2.5 times the
+        # estimate, and the overprice side keeps the band
+        # floor, because a drift of the encoded length price
+        # in either direction moves the whole family.
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            49 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 250 * estimate,
+            "estimate %d underprices real %d past the named "
+            "limit" % (estimate, real_tokens),
+        )
+
+    def test_byte_fallback_scripts_stand_on_the_named_limit(self):
+        # Round 30 red team Minor 2. Ordinary prose in a
+        # script whose characters a real tokenizer carries
+        # at the byte level rather than as whole character
+        # tokens prices by the encoded length rule, at one
+        # whole token for a two byte character and 1200
+        # thousandths for a three byte character, while the
+        # tokenizer runs near one token per byte on such
+        # scripts, so the shapes stand outside the band and
+        # on the named limit the estimator docstring and
+        # the budget reference print in agreement, at the
+        # real counts measured with the cl100k tokenizer
+        # over the exact strings the probes below build.
+        probes = (
+            ("ሰላም" * 1000, 9000),
+            ("ᎠᏴᏫ" * 1000, 9000),
+            ("ᠮᠣᠩᠭᠣᠯ" * 500, 9000),
+            ("ꆈꌠ" * 1500, 9000),
+            ("ᐃᓄᒃᑎᑐᑦ" * 500, 8500),
+            ("բարև" * 1000, 8000),
+            ("გამარჯობა" * 500, 9000),
+            ("မင်္ဂလာပါ" * 500, 9000),
+            ("ආයුබෝවන්" * 500, 8000),
+            ("ສະບາຍດີ" * 500, 7000),
+            ("ｶﾀｶﾅ" * 1000, 8000),
+            ("བཀྲ་ཤིས་བདེ་ལེགས" * 300, 9900),
+            ("1️⃣" * 1000, 5000),
+        )
+        for text, real_tokens in probes:
+            self.assert_inside_the_byte_fallback_limit(
+                text, real_tokens
+            )
+        # The four worst shapes stand past the band top of
+        # 1.35 the docstring states for its in band families,
+        # so the family could not have stood inside the
+        # claim the settlement restates, and a retune that
+        # pulled the family into the band without restating
+        # the limit would fail here as well.
+        for text, real_tokens in probes[:4]:
+            estimate = extract_mod.estimate_tokens(text)
+            self.assertGreater(
+                100 * real_tokens, 135 * estimate,
+                "a worst byte level shape stands inside the band",
+            )
+        # The family statement and its figure stand in both
+        # homes of every copy that carries them, the
+        # estimator docstring and the budget reference, so
+        # a drift of the statement in any one home fails
+        # here naming its home.
+        homes = (
+            ROOT / ".agents" / "skills" / "recognitio",
+            ROOT / "agent-plugins-package" / "skills"
+            / "recognitio",
+            ROOT / ".cursor-plugin" / "skills" / "recognitio",
+            ROOT / ".comate" / "skills" / "recognitio",
+        )
+        for home in homes:
+            tree = ast.parse(
+                (home / "scripts" / "extract.py").read_text(
+                    encoding="utf-8"
+                )
+            )
+            function = next(
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "estimate_tokens"
+            )
+            docstring = " ".join(
+                ast.get_docstring(function).split()
+            )
+            reference = " ".join(
+                (
+                    home / "references" / "budget-system.md"
+                ).read_text(encoding="utf-8").split()
+            )
+            for marker in ("byte level", "Ethiopic"):
+                self.assertIn(marker, docstring, str(home))
+                self.assertIn(marker, reference, str(home))
+            self.assertIn("2.5", docstring, str(home))
+            self.assertIn("2.5", reference, str(home))
 
 
 class TestRound14BothTierShedding(unittest.TestCase):
