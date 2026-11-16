@@ -4158,3 +4158,13 @@ must agree with the manifest before the packet is called verified.
   README companion sentence at both its occurrences,
   the verified bullet and the principles local clone
   sentence.
+- The release file stands restated at the close of the
+  first thirty rounds of the capstone programme to
+  name the final landing head and tree of those
+  rounds, with the census of 3,242 tests and hosted
+  run 43883302582 standing success on that head. The
+  gate scripts pin on the release file stands moved
+  to the same pair of head and tree, and the gate
+  scripts byte figure stands restated at 441,071 in
+  the Claude pack sentence and in the submissions
+  pin.
