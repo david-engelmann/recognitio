@@ -4150,9 +4150,10 @@ class TestRound6PublicClaims(unittest.TestCase):
         # three in the checklist, so a claim spending that
         # word in any section raises the count. The release
         # notes carry no mention of the tag at all. And the
-        # only heads the file names are the storefront
-        # landing head and the tree that landing carried,
-        # in that order, so a claim naming any other head
+        # only heads the file names are the final landing
+        # head of the capstone programme and the tree that
+        # landing carried, in that order, so a claim naming
+        # any other head
         # in any section raises the heads reading. A claim
         # that spends neither counted word and names no
         # head stands outside these readings, and nothing
@@ -4171,8 +4172,8 @@ class TestRound6PublicClaims(unittest.TestCase):
         self.assertEqual(
             re.findall(r"\b[0-9a-f]{40}\b", release),
             [
-                "357ba2d43d74f295c8e1953fe3dadd3406c2eb63",
-                "5bd54e64ceec144b9408e9ee5a61730d735abce4",
+                "7c8651e8ae753251d810902753b1338aeb0ab9f7",
+                "dac6a1c9ce1381039a69eff4acd3adc1905ac17a",
             ],
         )
 

@@ -5,14 +5,17 @@
 This file holds the release notes and the tag checklist for
 recognitio 1.3.0, the first release of the skill and its plugin
 packaging. No tag candidate stands named on the face of this
-file while the tag stays held. The candidate is restated here
-to the final landing head at the close of the perfection
+file while the tag stays held. The candidate stands restated
+here to the final landing head at the close of the capstone
 programme, in the last step before the owner cuts the tag,
-and the first item of the checklist below holds that step
-open until then. These notes describe the tree the
-storefront landing carried onto main. That landing head is
-`357ba2d43d74f295c8e1953fe3dadd3406c2eb63` and its tree is
-`5bd54e64ceec144b9408e9ee5a61730d735abce4`. The heads this
+and the first item of the checklist below records that step
+as taken. These notes describe the tree the final landing of
+the capstone programme carried onto main. That landing head
+is `7c8651e8ae753251d810902753b1338aeb0ab9f7` and its tree is
+`dac6a1c9ce1381039a69eff4acd3adc1905ac17a`, the tree carrying
+the census of 3,242 tests with hosted run 43883302582
+standing success on that head and both check legs printing
+the census. The heads this
 file named in earlier rounds were the landing heads of
 their own restatements, and each one stopped being the head
 of main at the next landing, so no head named here is
