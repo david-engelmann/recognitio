@@ -163,8 +163,8 @@ class TestCheckZcode(unittest.TestCase):
             )
 
     def test_a_dropped_version_bump_sentence_fails(self):
-        # The version bump rule is the distribution claim:
-        # no bump means no update offered.
+        # The version bump rule is the distribution claim.
+        # No bump means no update offered.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.make_layout(tmp)
             problems = self.break_brief(
@@ -210,7 +210,7 @@ class TestCheckZcode(unittest.TestCase):
             text = self.read_brief(root)
             anchor = "### Z2."
             self.assertIn(anchor, text)
-            # Drop the Z1 derivation note: the note paragraph
+            # Drop the Z1 derivation note, the note paragraph
             # after the Z1 content, before the Z2 heading.
             start = text.find("Derives from the primary ZCode")
             end = text.find("### Z2.", start)

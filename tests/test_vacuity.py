@@ -764,6 +764,63 @@ class TestCheckTestVacuity(unittest.TestCase):
             root = self.make_tree(tmp, {"test_x.py": body})
             self.assertEqual(self.problems(root), [])
 
+    def test_a_bare_raise_inside_an_assert_raises_block_fails(self):
+        # Round 29 red team Minor 1. A with assertRaises
+        # block whose body only raises the named error
+        # itself calls no shipped code and reads no
+        # fixture, so the context form argues about
+        # nothing and the guard refuses the credit.
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        with self.assertRaises(ValueError):\n"
+            "            raise ValueError\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_constructed_raise_inside_an_assert_raises_block_fails(self):
+        # The expression a raise throws is the raising
+        # mechanism itself and not a call the block argues
+        # about, so a block whose only call builds the
+        # error it throws stands in the same refusal as
+        # the bare raise above.
+        body = (
+            "import unittest\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_quieted_case(self):\n"
+            "        with self.assertRaises(ValueError):\n"
+            "            raise ValueError('boom')\n"
+        )
+        self.assert_vacuous(body)
+
+    def test_a_call_inside_an_assert_raises_block_passes(self):
+        # The control beside the two refusal plants. A
+        # block holding a real call argues about the error
+        # that call raises, so the context form keeps its
+        # credit in full.
+        body = (
+            "import unittest\n"
+            "from pathlib import Path\n"
+            "ROOT = Path('.')\n"
+            "\n"
+            "\n"
+            "def explode():\n"
+            "    raise ValueError('x')\n"
+            "\n"
+            "\n"
+            "class TestSomething(unittest.TestCase):\n"
+            "    def test_a_real_case(self):\n"
+            "        with self.assertRaises(ValueError):\n"
+            "            explode()\n"
+            "        touched = ROOT.name\n"
+        )
+        self.assert_clean(body)
+
     def test_an_assertion_after_a_return_fails(self):
         # The round 19 execution blindness. An assertion in
         # dead code never runs, so it cannot fail the test.

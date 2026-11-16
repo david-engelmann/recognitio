@@ -14,8 +14,12 @@ assertion and to touch a fixture.
 A real assertion argues about a value. An assert statement
 whose test is a bare constant, and a self.assert call whose
 positional arguments are all constants, argue about nothing,
-so neither counts. A with self.assertRaises block counts,
-because it argues about the error a call raises. An assertion
+so neither counts. A with self.assertRaises block counts
+where the block holds a call, because it argues about the
+error a call raises. A block holding no call catches only
+an error the block raises out of the named class itself,
+and a test in that shape argues about nothing the suite
+exercises, so it does not count. An assertion
 may live in a same class helper the test calls, because the
 suite uses that shape for shared pins, but the helper body is
 judged by the same rules as a test body, so a helper holding
@@ -230,6 +234,14 @@ list at a call site, so a test that hands its helper a
 list literal holding the very problems it expects, and
 asserts over that parameter inside the helper, passes
 this guard while pinning nothing.
+The call a context block must hold stands at the grain
+of the block its own statements, outside any nested
+function or class definition standing in the block and
+outside the expression a raise in the block throws, and
+the reading does not settle what that call is, so a
+block whose one call only builds an error into a name
+the block then raises by that name passes this guard
+while pinning nothing.
 Assertions guarded by a
 data dependent condition that happens never to hold, and
 assertions after a call that happens never to return, are
@@ -1730,6 +1742,37 @@ def suppress_swallows(item):
     return False
 
 
+def block_holds_call(stmts):
+    """Whether a block holds a call of its own.
+
+    The walk does not descend into a nested function or
+    class definition standing in the block, because those
+    bodies do not run as part of the block, and it does
+    not descend into a raise statement, because the
+    expression a raise throws and the cause it names are
+    the raising mechanism itself and not a call the block
+    argues about.
+    """
+    stack = list(stmts)
+    while stack:
+        node = stack.pop()
+        if isinstance(
+            node,
+            (
+                ast.FunctionDef,
+                ast.AsyncFunctionDef,
+                ast.ClassDef,
+                ast.Lambda,
+                ast.Raise,
+            ),
+        ):
+            continue
+        if isinstance(node, ast.Call):
+            return True
+        stack.extend(ast.iter_child_nodes(node))
+    return False
+
+
 class ScopeResult:
     def __init__(self):
         self.assertions = []
@@ -2038,10 +2081,13 @@ class Collector:
             return False
         if isinstance(stmt, (ast.With, ast.AsyncWith)):
             body_swallowed = swallowed
+            holds_call = block_holds_call(stmt.body)
             for item in stmt.items:
                 if suppress_swallows(item):
                     body_swallowed = swallowed + 1
-                if isinstance(item.context_expr, ast.Call):
+                if isinstance(item.context_expr, ast.Call) and (
+                    holds_call
+                ):
                     result.context_call_ids.add(
                         id(item.context_expr)
                     )

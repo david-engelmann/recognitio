@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tokenize
 import unittest
 import zlib
 from contextlib import redirect_stderr
@@ -1372,6 +1373,123 @@ class TestCheckCopy(unittest.TestCase):
                     "of scripts/check_copy.py alone"
                     % (node.name, length),
                 )
+
+
+MODULE_PROSE_MARKS = (
+    ("\u2014", "em dash"),
+    ("\u2013", "en dash"),
+    (";", "semicolon"),
+    (":", "colon"),
+)
+
+
+def module_prose_problems(tests_dir):
+    """Banned marks in the prose of the test modules.
+
+    The copy fence reads no Python file, so the bar over
+    the suite its own prose stood as an audit claim and
+    nothing priced it. This reading prices it over the
+    test modules. It reads comments through the tokenizer
+    and docstrings through the syntax tree, so a string
+    literal never enters the reading and planted fixture
+    texts stand outside it as data. A comment opening
+    with the pragma directive is coverage syntax and
+    stands outside the reading on the same ground. A file
+    the reading cannot read or parse is a problem by
+    name, because silence over an unread file would read
+    as a pass.
+    """
+    problems = []
+    for path in sorted(tests_dir.rglob("*.py")):
+        name = str(path.relative_to(tests_dir.parent))
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(
+                "%s cannot be read as UTF-8 text, %s" % (name, exc)
+            )
+            continue
+        try:
+            tokens = tokenize.generate_tokens(
+                io.StringIO(text).readline
+            )
+            for tok in tokens:
+                if tok.type != tokenize.COMMENT:
+                    continue
+                comment = tok.string.lstrip("#").strip()
+                if comment.startswith("pragma:"):
+                    continue
+                for mark, label in MODULE_PROSE_MARKS:
+                    if mark in comment:
+                        problems.append(
+                            "%s carries a %s in a comment at "
+                            "line %d" % (name, label, tok.start[0])
+                        )
+            tree = ast.parse(text)
+        except (tokenize.TokenError, SyntaxError) as exc:
+            problems.append(
+                "%s does not parse for the prose reading, %s"
+                % (name, exc)
+            )
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(
+                node,
+                (
+                    ast.Module,
+                    ast.ClassDef,
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef,
+                ),
+            ):
+                continue
+            doc = ast.get_docstring(node, clean=False)
+            if not doc:
+                continue
+            for mark, label in MODULE_PROSE_MARKS:
+                if mark in doc:
+                    problems.append(
+                        "%s carries a %s in a docstring"
+                        % (name, label)
+                    )
+    return problems
+
+
+class TestTestModuleProse(unittest.TestCase):
+    """The copy bar over the suite its own Python prose.
+
+    Round 29 standards Minor 1. Two prose colons stood in
+    comments in tests/test_zcode.py while the shipped
+    copy fence, which reads no Python file, stood green
+    over them. This reading prices the bar over the test
+    modules so the pair cannot return in silence.
+    """
+
+    def test_the_test_modules_carry_no_banned_mark_in_their_prose(self):
+        self.assertEqual(module_prose_problems(ROOT / "tests"), [])
+
+    def test_a_prose_colon_planted_in_a_comment_fails_the_reading(self):
+        with RetryingTemporaryDirectory() as tmp:
+            tests = Path(tmp) / "tests"
+            tests.mkdir()
+            (tests / "test_plant.py").write_text(
+                "import unittest\n"
+                "\n"
+                "\n"
+                "class TestPlant(unittest.TestCase):\n"
+                "    # The claim stands here: it introduces this.\n"
+                "    def test_a_case(self):\n"
+                "        pass\n",
+                encoding="utf-8",
+            )
+            problems = module_prose_problems(tests)
+            self.assertTrue(
+                any("test_plant.py" in p for p in problems),
+                problems,
+            )
+            self.assertTrue(
+                any("colon" in p for p in problems), problems
+            )
 
 
 class TestUndecodableGateInputs(unittest.TestCase):

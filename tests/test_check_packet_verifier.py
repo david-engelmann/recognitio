@@ -26,6 +26,7 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stderr
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -2461,6 +2462,13 @@ class TestRound27LinksAndTime(Round27Fixture):
             self.save_manifest(out, manifest)
         self.assertEqual(self.run_check(out), 1)
 
+    def created_edit_passes(self, name, value):
+        out = self.clone(name)
+        manifest = self.manifest(out)
+        manifest["created_utc"] = value
+        self.save_manifest(out, manifest)
+        self.assertEqual(self.run_check(out), 0)
+
     def test_a_creation_time_that_is_a_sentence_fails(self):
         self.created_edit_fails(
             "timeword", "some time last tuesday, probably"
@@ -2470,6 +2478,21 @@ class TestRound27LinksAndTime(Round27Fixture):
         self.created_edit_fails(
             "timefuture", "2999-01-01T00:00:00+00:00"
         )
+
+    def test_a_creation_time_just_beyond_the_allowance_fails(self):
+        # Round 29 red team Minor 2. The year 2999 plant
+        # above prices the bound its existence and not its
+        # size, and a loosening of the comparison by six
+        # orders of magnitude stood green against it. This
+        # plant stands one minute past the stated one hour
+        # allowance, and the plant below stands one minute
+        # inside it, so the pair prices the size itself.
+        ahead = datetime.now(timezone.utc) + timedelta(minutes=61)
+        self.created_edit_fails("timenear", ahead.isoformat())
+
+    def test_a_creation_time_just_inside_the_allowance_passes(self):
+        ahead = datetime.now(timezone.utc) + timedelta(minutes=59)
+        self.created_edit_passes("timeinside", ahead.isoformat())
 
     def test_a_creation_time_holding_a_lone_surrogate_fails(self):
         self.created_edit_fails("timesurrogate", "\ud800", raw=True)
