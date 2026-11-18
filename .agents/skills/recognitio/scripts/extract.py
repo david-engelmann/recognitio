@@ -484,12 +484,26 @@ GITHUB_TOKEN_RE = re.compile(
     r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"
     r"|github_pat_[A-Za-z0-9_]{20,}"
 )
+KEY_BODY_LINE_RE = re.compile(r"[A-Za-z0-9+/]+={0,2}")
 REDACTED_KEY_LINE = "[redacted private key]"
 REDACTED_VALUE = "[redacted credential]"
 
 
 def mask_credential_text(text):
-    """Mask credential shaped values in printed packet text."""
+    """Mask credential shaped values in printed packet text.
+
+    A key block standing whole in the text is masked from
+    its opening line to its closing line. A severed key
+    block tail is masked as well, a run of key body lines
+    closing at a block closing line with no opening line
+    above it in the text, because the body lines are key
+    material whether or not the opening line stands in the
+    text. Key body lines standing with neither an opening
+    line above them nor a closing line below them in the
+    text engage no masking here, because a run of base64
+    shaped lines alone is ordinary text in too many shapes
+    to price as a key.
+    """
     if not text:
         return text
     out = []
@@ -512,10 +526,303 @@ def mask_credential_text(text):
             in_key_block = True
             out.append(prefix + REDACTED_KEY_LINE)
             continue
+        if PRIVATE_KEY_END_RE.search(line):
+            run = []
+            index = len(out) - 1
+            while index >= 0:
+                printed = out[index]
+                content = printed[1:] \
+                    if printed[:1] in ("+", "-", " ") else printed
+                if not key_body_line(content):
+                    break
+                run.append(index)
+                index -= 1
+            if run:
+                for index in run:
+                    marker = out[index][:1] \
+                        if out[index][:1] in ("+", "-", " ") else ""
+                    out[index] = marker + REDACTED_KEY_LINE
+                closing = prefix \
+                    if PRIVATE_KEY_END_RE.search(body) else ""
+                out.append(closing + REDACTED_KEY_LINE)
+                continue
         body = AWS_KEY_RE.sub(REDACTED_VALUE, body)
         body = GITHUB_TOKEN_RE.sub(REDACTED_VALUE, body)
         out.append(prefix + body)
     return "\n".join(out)
+
+
+def text_carries_credential_shape(text):
+    """Whether a text carries a credential shape in its body.
+
+    The three shapes the value mask reads, a private key
+    block opening, an AWS access key and a GitHub token, are
+    secrets by shape in any file that carries them, so a body
+    carrying one is credential bearing whatever name the
+    file stands under. A severed key block tail carries the
+    shape as well, a run of key body lines closing at a
+    block closing line with no opening line above it,
+    because the body lines are key material whether or not
+    the opening line stands in the file. Key body lines
+    standing with neither an opening nor a closing line in
+    the body engage no reading here, because a run of base64
+    shaped lines alone is ordinary text in too many shapes
+    to price as a key.
+    """
+    return bool(
+        PRIVATE_KEY_BEGIN_RE.search(text)
+        or severed_key_block_spans(text.split("\n"))
+        or AWS_KEY_RE.search(text)
+        or GITHUB_TOKEN_RE.search(text)
+    )
+
+
+HUNK_HEADER_RE = re.compile(
+    r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: (.*))?$"
+)
+
+
+def key_block_spans(lines):
+    """The inclusive line spans the private key blocks cover.
+
+    A span opens at a block opening line and closes at its
+    block closing line. A block no closing line ends runs to
+    the last line of the file, because the mask withholds a
+    block body from its opening onward on the same reading.
+    """
+    spans = []
+    start = None
+    for index, line in enumerate(lines):
+        if start is None:
+            if PRIVATE_KEY_BEGIN_RE.search(line):
+                start = index
+        elif PRIVATE_KEY_END_RE.search(line):
+            spans.append((start, index))
+            start = None
+    if start is not None:
+        spans.append((start, len(lines) - 1))
+    return spans
+
+
+def key_body_line(line):
+    """Whether a line reads as the body line of a key block.
+
+    A key body line is base64 text and nothing else, at
+    least eight characters of the base64 alphabet with its
+    padding, a carriage return the line ending carries set
+    aside. Prose and code lines carry spaces and marks the
+    alphabet does not, so the reading prices the shape of a
+    key body and not the shape of ordinary text.
+    """
+    text = line.rstrip("\r")
+    return len(text) >= 8 and \
+        KEY_BODY_LINE_RE.fullmatch(text) is not None
+
+
+def severed_key_block_spans(lines):
+    """The inclusive line spans the severed key blocks cover.
+
+    A severed block is the tail of a key block standing with
+    no opening line above it, a run of key body lines closing
+    at a block closing line, and its span opens at the first
+    line of the run and closes at the closing line. A closing
+    line a whole block span covers closes that block and
+    opens no severed span. A run standing under an opening
+    line is no severed block, because the whole block
+    reading covers it, and key body lines standing with no
+    closing line below them open no span, because a run of
+    base64 shaped lines alone is ordinary text in too many
+    shapes to price as a key.
+    """
+    spans = []
+    covered = key_block_spans(lines)
+    for index, line in enumerate(lines):
+        if not PRIVATE_KEY_END_RE.search(line):
+            continue
+        if any(low <= index <= high for low, high in covered):
+            continue
+        start = index - 1
+        while start >= 0 and key_body_line(lines[start]):
+            start -= 1
+        start += 1
+        if start < index:
+            spans.append((start, index))
+    return spans
+
+
+def label_line_index(lines, start, label):
+    """The index of the line a hunk header label names, or None.
+
+    The label is the function context line git read above the
+    hunk, so the search walks upward from the line above the
+    hunk opening and takes the nearest line that matches. A
+    carriage return the line ending carries is not part of
+    the line for the match.
+    """
+    wanted = label.rstrip("\r")
+    index = start - 2
+    while index >= 0:
+        if lines[index].rstrip("\r") == wanted:
+            return index
+        index -= 1
+    return None
+
+
+def mask_hunk_header_labels(repo, diff_base, head, entry, chunk):
+    """Mask credential shapes standing in hunk header labels.
+
+    A hunk header can carry a line of the file as its function
+    context label, and a line of a private key block standing
+    there prints in clear where the value mask never looks,
+    because the mask reads body lines and a label is not one.
+    A label standing on a key block line is replaced whole by
+    the redacted key line, and a label carrying an AWS access
+    key or a GitHub token shape is masked in place, while an
+    ordinary function label prints untouched. Whether a label
+    stands on a key block line is read from the file bodies
+    themselves, because the block opening can stand outside
+    the hunk the label heads, so no reading of the chunk
+    alone can settle it. A severed key block tail counts
+    as a block here as well, its spans read from the same
+    bodies, because its body lines are key material whether
+    or not an opening line stands in the file. The bodies
+    are read only for an entry whose chunk carries a
+    labelled header.
+    """
+    lines = chunk.split("\n")
+    labeled = []
+    for index, line in enumerate(lines):
+        match = HUNK_HEADER_RE.match(line)
+        if match and match.group(5):
+            labeled.append((index, match))
+    if not labeled:
+        return chunk
+    sides = {}
+    for side, ref, path in (
+        ("old", diff_base, entry.get("old_path") or entry["path"]),
+        ("new", head, entry["path"]),
+    ):
+        data = file_bytes(repo, ref, path)
+        if data is None:
+            sides[side] = (None, [])
+        else:
+            body_lines = decode_bytes(data).split("\n")
+            spans = key_block_spans(body_lines)
+            spans += severed_key_block_spans(body_lines)
+            sides[side] = (body_lines, spans)
+    for index, match in labeled:
+        label = match.group(5)
+        old_count = int(match.group(2)) if match.group(2) else 1
+        order = ("old", "new") if old_count else ("new", "old")
+        masked = None
+        for side in order:
+            body_lines, spans = sides[side]
+            if body_lines is None:
+                continue
+            start = int(match.group(1)) if side == "old" \
+                else int(match.group(3))
+            found = label_line_index(body_lines, start, label)
+            if found is None:
+                continue
+            if any(low <= found <= high for low, high in spans):
+                masked = REDACTED_KEY_LINE
+            break
+        if masked is None:
+            if PRIVATE_KEY_BEGIN_RE.search(label) or \
+                    PRIVATE_KEY_END_RE.search(label):
+                masked = REDACTED_KEY_LINE
+            else:
+                masked = GITHUB_TOKEN_RE.sub(
+                    REDACTED_VALUE,
+                    AWS_KEY_RE.sub(REDACTED_VALUE, label),
+                )
+        if masked != label:
+            lines[index] = lines[index][:match.start(5)] + masked
+    return "\n".join(lines)
+
+
+def mask_chunk_key_block_bodies(repo, diff_base, head, entry, chunk):
+    """Mask key block body lines standing in a diff chunk.
+
+    The value mask tracks a key block from an opening line
+    standing in the printed text, so a hunk that opens below
+    the opening of a block prints the block its body lines
+    in clear as context and changed lines, and a severed key
+    block tail, whose opening line stands nowhere in the
+    file, prints the same way. This pass reads the block
+    spans from the file bodies themselves, whole blocks and
+    severed tails alike, and replaces every chunk body line
+    whose place in its file falls inside a span with the
+    redacted key line, keeping the line its diff marker so
+    line counts and diff structure stand unchanged. A
+    context line is read at both its places, an added line
+    at its new place and a removed line at its old place,
+    and a body line standing outside every span prints
+    untouched. The bodies are read only for a chunk carrying
+    a line that could stand inside a block, a block boundary
+    line or a key body shaped line, so an ordinary chunk
+    pays no body read.
+    """
+    lines = chunk.split("\n")
+    candidate = False
+    for line in lines:
+        body = line[1:] if line[:1] in ("+", "-", " ") else line
+        if PRIVATE_KEY_BEGIN_RE.search(body) or \
+                PRIVATE_KEY_END_RE.search(body) or \
+                key_body_line(body):
+            candidate = True
+            break
+    if not candidate:
+        return chunk
+    sides = {}
+    for side, ref, path in (
+        ("old", diff_base, entry.get("old_path") or entry["path"]),
+        ("new", head, entry["path"]),
+    ):
+        data = file_bytes(repo, ref, path)
+        if data is None:
+            sides[side] = []
+        else:
+            body_lines = decode_bytes(data).split("\n")
+            spans = key_block_spans(body_lines)
+            spans += severed_key_block_spans(body_lines)
+            sides[side] = spans
+    if not sides["old"] and not sides["new"]:
+        return chunk
+    old_place = None
+    new_place = None
+    for index, line in enumerate(lines):
+        if line.startswith("diff --git "):
+            old_place = None
+            new_place = None
+            continue
+        match = HUNK_HEADER_RE.match(line)
+        if match:
+            old_place = int(match.group(1)) - 1
+            new_place = int(match.group(3)) - 1
+            continue
+        if old_place is None or line == "":
+            continue
+        marker = line[:1]
+        if marker == "-":
+            places = (("old", old_place),)
+            old_place += 1
+        elif marker == "+":
+            places = (("new", new_place),)
+            new_place += 1
+        elif marker == " ":
+            places = (("old", old_place), ("new", new_place))
+            old_place += 1
+            new_place += 1
+        else:
+            continue
+        for side, place in places:
+            if any(
+                low <= place <= high for low, high in sides[side]
+            ):
+                lines[index] = marker + REDACTED_KEY_LINE
+                break
+    return "\n".join(lines)
 
 
 def decode_bytes(data):
@@ -1024,16 +1331,19 @@ def estimate_tokens(text):
     other ASCII mark at 800. On the
     shape families the audit measured, prose, code, CJK, base64,
     hex in both its forms, identifier heavy text, punctuation
-    dense text, short lines, space runs and repeated character
+    dense text, short lines, space runs standing alone and repeated character
     runs, a fresh measurement with the cl100k tokenizer put the
     real count between 0.49 and 1.35 times this estimate, so
     on those families the estimate never underprices by a
     multiple and never overprices one by more than about
-    twice. Five families stand outside that band as named
-    limits, and two of them underprice by a multiple at
+    twice. Eight families stand outside that band as named
+    limits, and five of them underprice by a multiple at
     their worst measured shapes, the unspelled letter
-    family at up to about 5.1 times and the byte level
-    script family at up to about 2.5 times. A run
+    family at up to about 5.1 times, the digit group
+    family at up to about 3.2 times, the repeated mark or
+    whitespace family at up to about 3.1 times, the space
+    run word family at up to about 2.6 times and the byte
+    level script family at up to about 2.5 times. A run
     of unspelled letters, a keyboard walk or a run of rare
     letters standing alone or beside a digit group, prices
     under the letter or embedded or digit readings while a
@@ -1047,13 +1357,41 @@ def estimate_tokens(text):
     repeated rate while a real tokenizer merges eight copies
     into one token, so the real count of either can stand
     down to about 0.24 times the estimate. A text built from
-    one repeated mark or whitespace character prices at the
-    mark or blank rate while a real tokenizer merges such
+    one short hex string repeated prices every period at the
+    hex rate while a real tokenizer merges a period whole
+    once it repeats, so its real count can stand down to
+    about 0.23 times the estimate, the worst measured shape
+    a letter only period the tokenizer merges into one token
+    per period, with the full digit and letter block repeated
+    standing at about 0.446 times the estimate. A text built
+    from one repeated mark or whitespace character prices
+    at the mark or blank rate while a real tokenizer merges such
     runs far harder or splits them finer, so its real count
     can stand far outside the band in either direction, down
     to about 0.02 times the estimate on a repeated dash and
-    up to about 3.1 times on a repeated tab. A run of one
-    repeated underscore character prices at the repeated
+    up to about 3.1 times on a repeated tab. Word text whose
+    words stand separated by runs of two or more spaces
+    prices the words at the prose rate and the runs near the
+    blank rate while a real tokenizer pays about a token a
+    word beside its run, so its real count can stand up to
+    about 2.6 times the estimate, the worst measured shapes
+    standing at the shortest words, single letters separated
+    by space runs at that figure and short common words just
+    under it, while a run of spaces standing alone holds
+    inside the band above. A text built from digit groups
+    standing separated by spaces prices each group under
+    the digit readings and the spaces near the blank rate
+    while a real tokenizer pays about a token for a group
+    beside its spaces, so its real count can stand up to
+    about 3.2 times the estimate, the worst measured shape
+    standing at single digits separated by runs of two
+    spaces, with single digits at one space at about 2.2
+    times the estimate and two digit groups at about 1.8
+    times, while a group of three digits holds inside the
+    band above because the tokenizer splits a digit group
+    at three digits just as the digit readings price it.
+    A run of one repeated underscore
+    character prices at the repeated
     rate through the word run reading, while a real
     tokenizer merges such runs far harder, so its real
     count can stand down to about 0.031 times the estimate
@@ -2831,6 +3169,25 @@ def enrich_files(repo, diff_base, head, change):
                 receipt = found
         if receipt is not None:
             exclusions.append(receipt)
+    for entry in files:
+        if entry.get("status") not in ("copied", "renamed"):
+            continue
+        if entry["binary"] or entry_is_credential(entry):
+            continue
+        data = file_bytes(repo, head, entry["path"])
+        if data is not None and text_carries_credential_shape(
+            decode_bytes(data)
+        ):
+            entry["credential_content"] = True
+    for entry in files:
+        chunk = chunks.get(entry["path"])
+        if chunk:
+            chunk = mask_hunk_header_labels(
+                repo, diff_base, head, entry, chunk
+            )
+            chunks[entry["path"]] = mask_chunk_key_block_bodies(
+                repo, diff_base, head, entry, chunk
+            )
     return exclusions
 
 
@@ -3497,13 +3854,23 @@ def is_credential_path(path):
 def entry_is_credential(entry):
     """Whether a changed file is a credential bearing file.
 
-    The judging rule mirrors the instruction rule. A rename is
-    judged from either name, so renaming a credential file to a
-    plain name or a plain file to a credential name flags the
-    entry either way, and a copy is judged from its destination
-    alone, because its source still stands in the tree under
-    its own name with its own entry.
+    A rename is judged from either name, so renaming a
+    credential file to a plain name or a plain file to a
+    credential name flags the entry either way. A copy is
+    judged from its destination name and from its content,
+    because a copy carries the body of its source under the
+    new name, so a credential file copied to a plain name is
+    flagged exactly as a credential at its own name is. A
+    rename between two plain names is judged from its
+    content on the same ground. The content reading stands
+    in enrich_files, which reads the head body of every copy
+    and rename whose names alone do not flag it and marks
+    the entry when the body carries a credential shape. An
+    entry no enrichment has read is judged from its names
+    alone.
     """
+    if entry.get("credential_content"):
+        return True
     if entry.get("status") == "copied":
         return is_credential_path(entry.get("path"))
     return is_credential_path(entry.get("path")) or \
@@ -4210,14 +4577,24 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
             content_cache[path] = show_companion_file(repo, head, path)
         content = content_cache[path]
         if content is None:
-            return None
+            return None, False
         rows = companion_lines(content)
         start = max(1, lineno - 1)
         end = min(len(rows), lineno + 1)
         block = []
         for number in range(start, end + 1):
             block.append("%s:%d: %s" % (display_path(path), number, rows[number - 1]))
-        return "\n".join(block)
+        text = "\n".join(block)
+        # The block is judged the way the assembly reading
+        # judges the packet, over the text as it would ship.
+        # The packet builder names a raw NUL before the reading
+        # runs, so a named NUL is showable here as it is there,
+        # and the newline the assembly sets after the block
+        # completes any carriage return the last row carries.
+        judged = sanitize_packet_text(text) + "\n"
+        if terminal_control_character(judged) is not None:
+            return None, True
+        return text, False
 
     for entry in source_entries(files):
         path = entry["path"]
@@ -4251,11 +4628,19 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
             lines.append("```")
             dropped = 0
             dropped_paths = []
+            unshowable = 0
+            unshowable_paths = []
             for hit_path, hit_line, _content in shown:
-                block = context_block(hit_path, hit_line)
+                block, unshowable_hit = context_block(
+                    hit_path, hit_line
+                )
                 if block:
                     lines.append(block)
                     lines.append("")
+                elif unshowable_hit:
+                    unshowable += 1
+                    if hit_path not in unshowable_paths:
+                        unshowable_paths.append(hit_path)
                 else:
                     dropped += 1
                     if hit_path not in dropped_paths:
@@ -4271,6 +4656,20 @@ def call_sites_section(repo, head, files, functions_by_file, notes,
                             display_path(item) for item in dropped_paths
                         ),
                         dropped,
+                        len(shown),
+                    )
+                )
+            if unshowable:
+                notes.append(
+                    "call site contexts in %s carry a terminal "
+                    "control character and were not shown for "
+                    "%d of %d shown hits"
+                    % (
+                        ", ".join(
+                            display_path(item)
+                            for item in unshowable_paths
+                        ),
+                        unshowable,
                         len(shown),
                     )
                 )

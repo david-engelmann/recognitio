@@ -1074,15 +1074,15 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
             self.assertIn(figure, reference)
         # The count word stands in agreement as well. The
         # docstring counts the named limit families at
-        # five and the reference opens its passage with
+        # eight and the reference opens its passage with
         # the count of the families it goes on to name,
         # so the word cannot drift from the enumeration
         # standing under it in either home.
         self.assertIn(
-            "Five families stand outside that band", docstring
+            "Eight families stand outside that band", docstring
         )
         self.assertIn(
-            "Five families stand outside that bound", reference
+            "Eight families stand outside that bound", reference
         )
 
     def test_the_remaining_named_limits_stand_in_every_home(self):
@@ -1127,12 +1127,286 @@ class TestRound12EstimatorAndPartialClone(unittest.TestCase):
                 "unspelled",
                 "hex letters",
                 "repeated mark or whitespace",
+                "short hex string repeated",
+                "separated by runs of two or more spaces",
+                "digit groups standing separated by spaces",
             ):
                 self.assertIn(marker, docstring, str(home))
                 self.assertIn(marker, reference, str(home))
-            for figure in ("5.1", "0.24", "0.02", "3.1"):
+            for figure in ("5.1", "0.24", "0.02", "3.2", "3.1", "0.23", "2.6"):
                 self.assertIn(figure, docstring, str(home))
                 self.assertIn(figure, reference, str(home))
+
+    def assert_inside_the_periodic_hex_limit(self, text, real_tokens):
+        # The named limit for periodic hex text. The real
+        # count may stand down to about 0.23 times the
+        # estimate, and the underprice side keeps the band
+        # top, because a drift of the hex price in either
+        # direction moves the whole family.
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            23 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d past the named "
+            "limit" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 135 * estimate,
+            "estimate %d underprices real %d" % (estimate, real_tokens),
+        )
+
+    def test_periodic_hex_stands_on_the_named_limit(self):
+        # Round 32 spec Minor 1. A short hex string repeated
+        # prices every period at the hex rate while the
+        # cl100k tokenizer merges a period whole once it
+        # repeats, so the shape stands outside the band and
+        # on the named limit the estimator docstring and
+        # the budget reference print in agreement, at the
+        # real counts measured with the cl100k tokenizer
+        # over the exact strings the probes below build.
+        probes = (
+            ("0123456789abcdef" * 200, 1000),
+            ("abcdef" * 533, 533),
+            ("face" * 800, 800),
+            (("0123456789abcdef" + "\n") * 200, 1200),
+        )
+        for text, real_tokens in probes:
+            self.assert_inside_the_periodic_hex_limit(
+                text, real_tokens
+            )
+        # The audited shape stands past the band floor of
+        # 0.49 the docstring states for its in band families,
+        # so the family could not have stood inside the
+        # claim the settlement restates.
+        estimate = extract_mod.estimate_tokens(
+            "0123456789abcdef" * 200
+        )
+        self.assertLess(100 * 1000, 49 * estimate)
+        homes = (
+            ROOT / ".agents" / "skills" / "recognitio",
+            ROOT / "agent-plugins-package" / "skills"
+            / "recognitio",
+            ROOT / ".cursor-plugin" / "skills" / "recognitio",
+            ROOT / ".comate" / "skills" / "recognitio",
+        )
+        for home in homes:
+            tree = ast.parse(
+                (home / "scripts" / "extract.py").read_text(
+                    encoding="utf-8"
+                )
+            )
+            function = next(
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "estimate_tokens"
+            )
+            docstring = " ".join(
+                ast.get_docstring(function).split()
+            )
+            reference = " ".join(
+                (
+                    home / "references" / "budget-system.md"
+                ).read_text(encoding="utf-8").split()
+            )
+            self.assertIn(
+                "short hex string repeated", docstring, str(home)
+            )
+            self.assertIn(
+                "short hex string repeated", reference, str(home)
+            )
+            self.assertIn("0.23", docstring, str(home))
+            self.assertIn("0.23", reference, str(home))
+
+    def assert_inside_the_space_run_word_limit(self, text, real_tokens):
+        # The named limit for word text separated by space
+        # runs. The real count may stand up to about 2.6
+        # times the estimate, and the overprice side keeps
+        # the band floor.
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            49 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 260 * estimate,
+            "estimate %d underprices real %d past the named "
+            "limit" % (estimate, real_tokens),
+        )
+
+    def test_space_run_words_stand_on_the_named_limit(self):
+        # Round 32 spec Minor 2. Word text whose words stand
+        # separated by runs of two or more spaces prices the
+        # words at the prose rate and the runs near the blank
+        # rate while the cl100k tokenizer pays about a token
+        # a word beside its run, so the shape stands outside
+        # the band and on the named limit the estimator
+        # docstring and the budget reference print in
+        # agreement, at the real counts measured with the
+        # cl100k tokenizer over the exact strings the probes
+        # below build. The same sentence at single spacing
+        # and a run of spaces standing alone both price
+        # inside the band.
+        probes = (
+            (("  ".join("a b c d e f g h".split())) * 300, 4201),
+            (("  ".join("we do go on it is as at".split())) * 400, 6000),
+            (("  ".join(
+                "the quick brown fox jumps over the lazy dog "
+                "and then runs through the dark forest toward "
+                "the river bank".split()
+            )) * 30, 1170),
+            (("  ".join(
+                "alpha bravo charlie delta echo foxtrot golf "
+                "hotel india".split()
+            )) * 40, 840),
+        )
+        for text, real_tokens in probes:
+            self.assert_inside_the_space_run_word_limit(
+                text, real_tokens
+            )
+        # The worst shape stands past the band top of 1.35
+        # the docstring states for its in band families, so
+        # the family could not have stood inside the claim
+        # the settlement restates.
+        estimate = extract_mod.estimate_tokens(
+            ("  ".join("a b c d e f g h".split())) * 300
+        )
+        self.assertGreater(100 * 4201, 135 * estimate)
+        self.assert_inside_the_estimator_band(
+            (" ".join(
+                "the quick brown fox jumps over the lazy dog "
+                "and then runs through the dark forest toward "
+                "the river bank".split()
+            )) * 30, 600,
+        )
+        self.assert_inside_the_estimator_band(" " * 100, 2)
+        homes = (
+            ROOT / ".agents" / "skills" / "recognitio",
+            ROOT / "agent-plugins-package" / "skills"
+            / "recognitio",
+            ROOT / ".cursor-plugin" / "skills" / "recognitio",
+            ROOT / ".comate" / "skills" / "recognitio",
+        )
+        for home in homes:
+            tree = ast.parse(
+                (home / "scripts" / "extract.py").read_text(
+                    encoding="utf-8"
+                )
+            )
+            function = next(
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "estimate_tokens"
+            )
+            docstring = " ".join(
+                ast.get_docstring(function).split()
+            )
+            reference = " ".join(
+                (
+                    home / "references" / "budget-system.md"
+                ).read_text(encoding="utf-8").split()
+            )
+            self.assertIn(
+                "separated by runs of two or more spaces",
+                docstring, str(home),
+            )
+            self.assertIn(
+                "separated by runs of two or more spaces",
+                reference, str(home),
+            )
+            self.assertIn("2.6", docstring, str(home))
+            self.assertIn("2.6", reference, str(home))
+
+    def assert_inside_the_digit_group_limit(self, text, real_tokens):
+        # The named limit for digit groups standing
+        # separated by spaces. The real count may stand up
+        # to about 3.2 times the estimate, and the
+        # overprice side keeps the band floor, because a
+        # drift of the digit or blank price in either
+        # direction moves the whole family.
+        estimate = extract_mod.estimate_tokens(text)
+        self.assertLessEqual(
+            49 * estimate, 100 * real_tokens,
+            "estimate %d overprices real %d" % (estimate, real_tokens),
+        )
+        self.assertLessEqual(
+            100 * real_tokens, 320 * estimate,
+            "estimate %d underprices real %d past the named "
+            "limit" % (estimate, real_tokens),
+        )
+
+    def test_digit_groups_stand_on_the_named_limit(self):
+        # Round 32 red team confirmation Note 4, settled in
+        # the delta fix. A text built from digit groups
+        # standing separated by spaces prices each group
+        # under the digit readings and the spaces near the
+        # blank rate while the cl100k tokenizer pays about
+        # a token for a group beside its spaces, so the
+        # shape stands outside the band and on the named
+        # limit the estimator docstring and the budget
+        # reference print in agreement, at the real counts
+        # measured with the cl100k tokenizer over the exact
+        # strings the probes below build. A group of three
+        # digits prices inside the band, because the
+        # tokenizer splits a digit group at three just as
+        # the digit readings price it.
+        digits = "1 2 3 4 5 6 7 8".split()
+        pairs = "12 34 56 78 90".split()
+        probes = (
+            (("  ".join(digits)) * 300, 6301),
+            (("   ".join(digits)) * 300, 6301),
+            ((" ".join(digits)) * 300, 4201),
+            (("  ".join(pairs)) * 300, 3900),
+        )
+        for text, real_tokens in probes:
+            self.assert_inside_the_digit_group_limit(
+                text, real_tokens
+            )
+        # The worst shape stands past the band top of 1.35
+        # the docstring states for its in band families, so
+        # the family could not have stood inside the claim
+        # the settlement restates.
+        estimate = extract_mod.estimate_tokens(
+            ("  ".join(digits)) * 300
+        )
+        self.assertGreater(100 * 6301, 135 * estimate)
+        self.assert_inside_the_estimator_band(
+            ("  ".join("123 456 789".split())) * 300, 2100
+        )
+        homes = (
+            ROOT / ".agents" / "skills" / "recognitio",
+            ROOT / "agent-plugins-package" / "skills"
+            / "recognitio",
+            ROOT / ".cursor-plugin" / "skills" / "recognitio",
+            ROOT / ".comate" / "skills" / "recognitio",
+        )
+        for home in homes:
+            tree = ast.parse(
+                (home / "scripts" / "extract.py").read_text(
+                    encoding="utf-8"
+                )
+            )
+            function = next(
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name == "estimate_tokens"
+            )
+            docstring = " ".join(
+                ast.get_docstring(function).split()
+            )
+            reference = " ".join(
+                (
+                    home / "references" / "budget-system.md"
+                ).read_text(encoding="utf-8").split()
+            )
+            self.assertIn(
+                "digit groups standing separated by spaces",
+                docstring, str(home),
+            )
+            self.assertIn(
+                "digit groups standing separated by spaces",
+                reference, str(home),
+            )
+            self.assertIn("3.2", docstring, str(home))
+            self.assertIn("3.2", reference, str(home))
 
     def assert_inside_the_byte_fallback_limit(self, text, real_tokens):
         # The named limit for byte level script prose. The

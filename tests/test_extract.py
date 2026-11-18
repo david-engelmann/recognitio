@@ -9069,3 +9069,537 @@ class TestRound22ConstantPlants(unittest.TestCase):
                 ), notes,
             )
             self.assertEqual("\n".join(lines).count("#### tests/"), 10)
+
+
+class TestCredentialContentJudgement(unittest.TestCase):
+    """A copy or rename is judged from its content, not its name alone."""
+
+    KEY_BODY = (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "MIIsecretlineone\n"
+        "MIIsecretlinetwo\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+        "aws_key = \"AKIAIOSFODNN7EXAMPLE\"\n"
+        "PASSWORD=hunter2\n"
+        "EXTRA=one\n"
+    )
+
+    def _section(self, packet, name):
+        tier = packet.split("## T1 The change", 1)[1]
+        for part in tier.split("\n### ")[1:]:
+            if part.split("\n", 1)[0].strip() == name:
+                return part
+        raise AssertionError("no change tier section for %s" % name)
+
+    def test_a_copied_credential_is_flagged_and_withheld(self):
+        edited = self.KEY_BODY.replace("EXTRA=one", "EXTRA=two")
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"id_rsa": self.KEY_BODY},
+                {"innocent.py": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "credential shaped files, namely innocent.py", packet
+            )
+            self.assertIn(
+                "Credential file with",
+                self._section(packet, "innocent.py"),
+            )
+            self.assertNotIn("hunter2", packet)
+            self.assertNotIn("MIIsecretlineone", packet)
+
+    def test_a_renamed_credential_under_two_plain_names_is_flagged(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = Path(tmp) / "repo"
+            init_repo(repo)
+            write_tree(repo, {"notes.txt": self.KEY_BODY})
+            commit_all(repo, "base")
+            (repo / "notes.txt").rename(repo / "innocent.py")
+            commit_all(repo, "rename")
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "credential shaped files, namely innocent.py", packet
+            )
+            self.assertNotIn("hunter2", packet)
+
+    def test_an_ordinary_code_copy_prints_in_full(self):
+        body = (
+            "def compute_total(items):\n"
+            "    total = 0\n"
+            "    for item in items:\n"
+            "        total += item\n"
+            "    return total\n"
+        )
+        edited = body.replace("total = 0", "total = 1")
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"mod.py": body},
+                {"mod_copy.py": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("credential shaped files", packet)
+            section = self._section(packet, "mod_copy.py")
+            self.assertIn("total = 1", section)
+            self.assertIn("def compute_total(items):", section)
+
+    def test_an_unenriched_entry_is_judged_from_its_names_alone(self):
+        entry = {
+            "status": "copied", "path": "innocent.py",
+            "old_path": "id_rsa",
+        }
+        self.assertFalse(extract_mod.entry_is_credential(entry))
+        entry["credential_content"] = True
+        self.assertTrue(extract_mod.entry_is_credential(entry))
+
+
+class TestHunkHeaderLabelMasking(unittest.TestCase):
+    """A key block line standing in a hunk header label is masked."""
+
+    BODY = (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "MIIsecretlineone\n"
+        "MIIsecretlinetwo\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+        "aws_key = \"AKIAIOSFODNN7EXAMPLE\"\n"
+        "PASSWORD=hunter2\n"
+        "EXTRA=one\n"
+    )
+
+    def test_a_key_block_line_in_a_header_label_is_masked(self):
+        edited = self.BODY.replace("EXTRA=one", "EXTRA=two")
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"worker.py": self.BODY},
+                {"worker.py": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertNotIn("MIIsecretlinetwo", packet)
+            self.assertIn("[redacted private key]", packet)
+
+    def test_the_label_reading_masks_a_key_line_and_keeps_a_function_line(self):
+        funcs = (
+            "# helpers\n"
+            "def compute_total(items):\n"
+            "    return 0\n"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"worker.py": self.BODY, "funcs.py": funcs},
+                {"worker.py": self.BODY.replace(
+                    "EXTRA=one", "EXTRA=two"
+                )},
+            ])
+            base = git(repo, "rev-parse", "HEAD~1")
+            head = git(repo, "rev-parse", "HEAD")
+            entry = {"path": "worker.py", "old_path": None}
+            chunk = (
+                "@@ -4,4 +4,4 @@ MIIsecretlinetwo\n"
+                " -----END OPENSSH PRIVATE KEY-----\n"
+            )
+            masked = extract_mod.mask_hunk_header_labels(
+                repo, base, head, entry, chunk
+            )
+            self.assertIn(
+                "@@ -4,4 +4,4 @@ [redacted private key]", masked
+            )
+            plain_entry = {"path": "funcs.py", "old_path": None}
+            plain = (
+                "@@ -3,2 +3,2 @@ def compute_total(items):\n"
+                "     return 0\n"
+            )
+            self.assertEqual(
+                extract_mod.mask_hunk_header_labels(
+                    repo, base, head, plain_entry, plain
+                ),
+                plain,
+            )
+
+
+class TestCompanionControlContextDrops(unittest.TestCase):
+    """An unshowable companion context drops with a note."""
+
+    def test_a_control_byte_context_drops_and_the_packet_verifies(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "caller.py": (
+                        "from mod import helper\n"
+                        "print(helper(41))\n"
+                    ),
+                    "carrier.py": (
+                        b"import os\nprint(helper(42))\n"
+                        b"note = 'bad \x1b[31m red'\n"
+                    ),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("caller.py:2: print(helper(41))", packet)
+            self.assertIn(
+                "call site contexts in carrier.py carry a terminal "
+                "control character and were not shown for 1 of 3 "
+                "shown hits",
+                packet,
+            )
+            self.assertNotIn("\x1b", packet)
+
+    def test_a_control_byte_outside_the_window_keeps_the_context(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {
+                    "mod.py": "def helper(x):\n    return x + 1\n",
+                    "carrier.py": (
+                        b"import os\nprint(helper(42))\n"
+                        b"a = 1\nb = 2\nc = 3\nd = 4\ne = 5\n"
+                        b"note = 'bad \x1b[31m red'\n"
+                    ),
+                },
+                {"mod.py": "def helper(x):\n    return x + 2\n"},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("carrier.py:2: print(helper(42))", packet)
+            self.assertNotIn(
+                "carry a terminal control character", packet
+            )
+
+class TestSeveredKeyBlocksAndChunkBodies(unittest.TestCase):
+    """A severed key block tail is credential content wherever
+    a body would print, and a key block body line standing in
+    a diff chunk is masked from the file body wherever the
+    hunk opens."""
+
+    SEVERED_TAIL = (
+        "MIIsecretlineone\n"
+        "MIIsecretlinetwo\n"
+        "MIIsecretlinethree\n"
+        "MIIsecretlinefour\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+        "filler b one\n"
+        "filler b two\n"
+    )
+
+    BLOCK_BODY = (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "MIIsecretlineone\n"
+        "MIIsecretlinetwo\n"
+        "MIIsecretlinethree\n"
+        "MIIsecretlinefour\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+        " spacer one\n"
+        " spacer two\n"
+        " spacer three\n"
+        " target line for editing\n"
+        " spacer four\n"
+        " trailer one\n"
+        " trailer two\n"
+    )
+
+    KEY_LINES = (
+        "MIIsecretlineone", "MIIsecretlinetwo",
+        "MIIsecretlinethree", "MIIsecretlinefour",
+    )
+
+    def test_a_copied_severed_tail_is_judged_and_withheld(self):
+        edited = self.SEVERED_TAIL.replace(
+            "filler b one", "filler b one edited"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"part_b.txt": self.SEVERED_TAIL},
+                {"xb2.txt": edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            self.assertTrue(manifest["verified"])
+            copied = [
+                f for f in manifest["files"]
+                if f["path"] == "xb2.txt"
+            ]
+            self.assertEqual(len(copied), 1, manifest["files"])
+            self.assertTrue(copied[0]["credential_file"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "credential shaped files, namely xb2.txt", packet
+            )
+            for line in self.KEY_LINES:
+                self.assertNotIn(line, packet)
+
+    def test_a_severed_tail_prints_masked_not_in_clear(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"readme.txt": "a plain repository\n"},
+                {"tail.txt": self.SEVERED_TAIL},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            for line in self.KEY_LINES:
+                self.assertNotIn(line, packet)
+            self.assertNotIn("END OPENSSH PRIVATE KEY", packet)
+            self.assertIn("filler b one", packet)
+            self.assertGreaterEqual(
+                packet.count("[redacted private key]"), 5
+            )
+
+    def test_a_body_fragment_alone_engages_no_reading(self):
+        fragment = (
+            "MIIsecretlineone\n"
+            "MIIsecretlinetwo\n"
+            "release notes stay in the file\n"
+            "a second ordinary line\n"
+            "a third ordinary line\n"
+            "a fourth ordinary line\n"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"notes.txt": fragment},
+                {"notes_copy.txt": fragment.replace(
+                    "release notes stay", "release notes move")},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            copied = [
+                f for f in manifest["files"]
+                if f["path"] == "notes_copy.txt"
+            ]
+            self.assertEqual(len(copied), 1, manifest["files"])
+            self.assertFalse(copied[0]["credential_file"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn("MIIsecretlineone", packet)
+
+    def test_a_closing_line_alone_engages_no_reading(self):
+        body = (
+            "the runbook quotes the closing line of a key block\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+            "and then explains what it means\n"
+            "with a second quoted line for company\n"
+            "and a third line standing under it\n"
+            "and a fourth line closing the quotation\n"
+        )
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"runbook.txt": body},
+                {"runbook_copy.txt": body.replace(
+                    "explains what it means", "explains its shape")},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = read_manifest(out)
+            copied = [
+                f for f in manifest["files"]
+                if f["path"] == "runbook_copy.txt"
+            ]
+            self.assertEqual(len(copied), 1, manifest["files"])
+            self.assertFalse(copied[0]["credential_file"])
+            packet = (out / "packet.md").read_text()
+            self.assertIn(
+                "-----END OPENSSH PRIVATE KEY-----", packet
+            )
+
+    def test_a_body_line_below_the_block_opening_is_masked(self):
+        edited = self.BLOCK_BODY.replace(
+            " target line for editing",
+            " target line has been edited",
+        )
+        crlf = self.BLOCK_BODY.replace("\n", "\r\n")
+        crlf_edited = edited.replace("\n", "\r\n")
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"plain_notes.txt": self.BLOCK_BODY,
+                 "crlf.txt": crlf},
+                {"plain_notes.txt": edited,
+                 "crlf.txt": crlf_edited},
+            ])
+            out = Path(tmp) / "out"
+            result = run_extract_cli(
+                repo, out, "--range", "HEAD~1..HEAD"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(read_manifest(out)["verified"])
+            packet = (out / "packet.md").read_text()
+            for line in self.KEY_LINES:
+                self.assertNotIn(line, packet)
+            self.assertIn("target line has been edited", packet)
+
+    def test_the_chunk_pass_masks_from_the_file_body(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"plain_notes.txt": self.BLOCK_BODY},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            chunk = (
+                "@@ -3,5 +3,5 @@ MIIsecretlinetwo\n"
+                " MIIsecretlinetwo\n"
+                " MIIsecretlinethree\n"
+                " MIIsecretlinefour\n"
+                " -----END OPENSSH PRIVATE KEY-----\n"
+                " spacer one\n"
+            )
+            entry = {"path": "plain_notes.txt", "old_path": None}
+            masked = extract_mod.mask_chunk_key_block_bodies(
+                repo, head, head, entry, chunk
+            )
+            lines = masked.split("\n")
+            self.assertEqual(lines[1], " [redacted private key]")
+            self.assertEqual(lines[2], " [redacted private key]")
+            self.assertEqual(lines[3], " [redacted private key]")
+            self.assertEqual(lines[4], " [redacted private key]")
+            self.assertEqual(lines[5], " spacer one")
+
+    def test_the_label_pass_reads_severed_spans(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"part_b.txt": self.SEVERED_TAIL},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            chunk = (
+                "@@ -3,3 +3,3 @@ MIIsecretlinetwo\n"
+                " MIIsecretlinethree\n"
+            )
+            entry = {"path": "part_b.txt", "old_path": None}
+            masked = extract_mod.mask_hunk_header_labels(
+                repo, head, head, entry, chunk
+            )
+            self.assertIn(
+                "@@ -3,3 +3,3 @@ [redacted private key]", masked
+            )
+
+    def test_the_chunk_pass_masks_a_severed_tail(self):
+        with RetryingTemporaryDirectory() as tmp:
+            repo = make_repo(tmp, [
+                {"part_b.txt": self.SEVERED_TAIL},
+            ])
+            head = git(repo, "rev-parse", "HEAD")
+            chunk = (
+                "@@ -1,5 +1,5 @@\n"
+                " MIIsecretlineone\n"
+                " MIIsecretlinetwo\n"
+                " MIIsecretlinethree\n"
+                " MIIsecretlinefour\n"
+                " -----END OPENSSH PRIVATE KEY-----\n"
+            )
+            entry = {"path": "part_b.txt", "old_path": None}
+            masked = extract_mod.mask_chunk_key_block_bodies(
+                repo, head, head, entry, chunk
+            )
+            lines = masked.split("\n")
+            for index in range(1, 6):
+                self.assertEqual(
+                    lines[index], " [redacted private key]"
+                )
+
+    def test_the_value_mask_redacts_a_severed_tail(self):
+        text = (
+            "MIIsecretlineone\n"
+            "MIIsecretlinetwo\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+            "a plain tail line"
+        )
+        masked = extract_mod.mask_credential_text(text)
+        self.assertNotIn("MIIsecretlineone", masked)
+        self.assertNotIn("MIIsecretlinetwo", masked)
+        self.assertNotIn("END OPENSSH PRIVATE KEY", masked)
+        self.assertIn("a plain tail line", masked)
+        self.assertEqual(masked.count("[redacted private key]"), 3)
+
+    def test_the_value_mask_leaves_unanchored_shapes(self):
+        lone = (
+            "some prose\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+            "more prose"
+        )
+        self.assertEqual(extract_mod.mask_credential_text(lone), lone)
+        fragment = "MIIsecretlineone\nMIIsecretlinetwo\na plain tail"
+        self.assertEqual(
+            extract_mod.mask_credential_text(fragment), fragment
+        )
+
+    def test_severed_spans_open_and_close_as_stated(self):
+        end = "-----END OPENSSH PRIVATE KEY-----"
+        begin = "-----BEGIN OPENSSH PRIVATE KEY-----"
+        lines = [
+            "head", "MIIsecretlineone", "MIIsecretlinetwo",
+            end, "tail",
+        ]
+        self.assertEqual(
+            extract_mod.severed_key_block_spans(lines), [(1, 3)]
+        )
+        self.assertEqual(
+            extract_mod.severed_key_block_spans(
+                [begin, "MIIsecretlineone", end]
+            ),
+            [],
+        )
+        self.assertEqual(
+            extract_mod.severed_key_block_spans(
+                ["MIIsecretlineone", "MIIsecretlinetwo"]
+            ),
+            [],
+        )
+        self.assertEqual(
+            extract_mod.severed_key_block_spans([end]), []
+        )
+        self.assertTrue(
+            extract_mod.text_carries_credential_shape(
+                "\n".join(lines)
+            )
+        )
+        self.assertFalse(
+            extract_mod.text_carries_credential_shape(
+                "MIIsecretlineone\nMIIsecretlinetwo"
+            )
+        )
+
