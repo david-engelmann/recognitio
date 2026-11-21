@@ -1760,8 +1760,8 @@ def contents_problems(packet_text, manifest, totals):
         standing_line = joined[:1].upper() + joined[1:]
     if standing_line not in lines:
         problems.append(
-            "the packet contents block does not describe the tier "
-            "states its manifest records"
+            "the packet contents block does not carry the tier "
+            "line its manifest requires: %s" % standing_line
         )
     return problems
 

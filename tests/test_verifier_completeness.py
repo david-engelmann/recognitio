@@ -354,6 +354,29 @@ class TestContentsMarker(CompletenessFixture):
         self.assertEqual(self.run_check(out), 1)
 
 
+class TestTierLineRefusal(CompletenessFixture):
+    """The tier disagreement refusal names the wanted line."""
+
+    def test_a_wrong_tier_line_refuses_naming_the_wanted_line(self):
+        out = self.clone("tierline")
+        text = self.packet_text(out)
+        self.assertIn("All four tiers stand in full", text)
+        self.save_packet(out, text.replace(
+            "All four tiers stand in full",
+            "All four tiers stand in part",
+            1,
+        ))
+        self.fix_accounting(out)
+        code, output = self.run_check_capture(out)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "the packet contents block does not carry the tier "
+            "line its manifest requires: "
+            "All four tiers stand in full",
+            output,
+        )
+
+
 class TestCreationTimeBounds(CompletenessFixture):
     """Closure 6. The creation time is held against the repository."""
 

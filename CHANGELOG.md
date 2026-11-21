@@ -4168,3 +4168,21 @@ must agree with the manifest before the packet is called verified.
   scripts byte figure stands restated at 441,071 in
   the Claude pack sentence and in the submissions
   pin.
+- The extractor now judges a copied or renamed file by
+  its content wherever a body would print, so a credential
+  shaped body standing under a plain name is flagged in
+  the manifest and withheld behind the notice naming the
+  operation. Key body lines standing inside a hunk header
+  label are masked with the same redaction as the body
+  lines themselves, and a key block severed from its
+  opening line is read by its body lines and its closing
+  line together in the content judgement, in the header
+  label pass and in the chunk pass, with the packet value
+  mask reading back over the lines it has just printed. A
+  companion context carrying control bytes that cannot be
+  shown now drops with a note in the form of the
+  unreadable path, in place of refusing the whole packet.
+  The token estimator its limit families stand settled by
+  measurement at eight named families, the periodic hex
+  text and the digit groups standing separated by spaces
+  joining the set, and nothing in the estimator retuned.
