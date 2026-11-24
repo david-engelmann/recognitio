@@ -100,13 +100,13 @@ PACK_PINS = {
     CLAUDE_PACK: (
         "at least 40 words",
         "must stay under 5 MiB",
-        "holds 274 files",
+        "holds 275 files",
         "held 267 files",
         "held 274 files",
-        "at 274 files against a cap of 512 files",
+        "at 275 files against a cap of 512 files",
         "demo recording at 24,222,065 bytes",
-        "tests/test_gate_scripts.py at 441,071 bytes",
-        "scan over all 274 files in the tree",
+        "tests/test_gate_scripts.py at 459,293 bytes",
+        "scan over all 275 files in the tree",
     ),
     PORTABLE_PACK: (
         "six month cycle",
@@ -506,17 +506,29 @@ def _tracked_paths(root):
     return {path for path in text.split("\0") if path}
 
 
-def _runner_output_stands_aside(rel, tracked):
-    """Whether one walked path stands aside as runner output.
+def _stands_aside(rel, tracked):
+    """Whether one walked path stands aside from the figures.
 
-    A path stands aside only where one of its components
-    names the runner output folder and the index does not
-    name the path itself. A tracked reading of None means
-    git could not be read over the root, in which case no
-    path under the root is tracked and every path under
-    the folder stands aside.
+    A path stands aside only where it stands under the
+    runner output folder, or under one of the cache folder
+    names, or carries the compiled cache suffix, and the
+    git index does not name the path itself. Content the
+    index names is committed content wherever it stands
+    and is measured like any other file, because the
+    figures the pack states describe the tracked tree and
+    a forced add can put real content under a cache name
+    as readily as under the runner folder name. A tracked
+    reading of None means git could not be read over the
+    root, in which case no path under the root is tracked
+    and every path in those shapes stands aside.
     """
-    if ".gate-logs" not in rel.split("/"):
+    parts = rel.split("/")
+    if (
+        ".gate-logs" not in parts
+        and "__pycache__" not in parts
+        and ".pytest_cache" not in parts
+        and not rel.endswith(".pyc")
+    ):
         return False
     if tracked is None:
         return True
@@ -524,35 +536,34 @@ def _runner_output_stands_aside(rel, tracked):
 
 
 def tree_files(root):
-    """Every file and link under a root, caches aside.
+    """Every file and link under a root, untracked caches aside.
 
-    The git directory and the bytecode caches stand aside,
-    because neither is a file the pack describes and the
-    caches come and go with every test run on a working tree.
-    The gate runner output folder stands aside only for
-    the content git does not track under it. Its logs and
-    run records are artefacts the runner writes into the
-    tree it judges while that tree tracks none of them, and
+    The git directory stands aside, because it is not a
+    file the pack describes. The bytecode caches and the
+    gate runner output folder stand aside only for the
+    content git does not track under them. Their artefacts
+    come and go with every test run on a working tree, and
+    the runner writes its logs and run records into the
+    tree it judges while that tree tracks none of them, so
     a measurement that counted them would refuse a tree for
-    the runner own writing. Content the index names under
-    the folder is committed content wherever it stands, so
-    it is measured like any other file, because the figures
-    the pack states describe the tracked tree and a forced
-    add can put real content under the folder name. Where
-    git cannot be read at all, no path under the root is
-    tracked and the whole folder stands aside. Sizes are
-    read with lstat so a link counts at the length of its
-    target spelling, the same size the tree listing records
-    for it.
+    writing no reader of the pack asked it to hold. Content
+    the index names under a cache name, under the runner
+    folder, or under the compiled suffix is committed
+    content wherever it stands, so it is measured like any
+    other file, because the figures the pack states
+    describe the tracked tree and a forced add can put
+    real content under those names. Where git cannot be
+    read at all, no path under the root is tracked and the
+    cache shapes and the runner folder stand aside whole.
+    Sizes are read with lstat so a link counts at the
+    length of its target spelling, the same size the tree
+    listing records for it.
     """
     tracked = _tracked_paths(root)
     found = []
     for dirpath, dirnames, filenames in os.walk(root):
-        for skipped in (
-            ".git", "__pycache__", ".pytest_cache",
-        ):
-            if skipped in dirnames:
-                dirnames.remove(skipped)
+        if ".git" in dirnames:
+            dirnames.remove(".git")
         # A link to a directory stands in the dirname list,
         # and a linked worktree carries its git pointer as a
         # file rather than a directory. The link is a file of
@@ -568,8 +579,6 @@ def tree_files(root):
                 found.append(
                     (path.relative_to(root).as_posix(), size))
         for name in filenames:
-            if name.endswith(".pyc"):
-                continue
             path = Path(dirpath) / name
             rel = path.relative_to(root).as_posix()
             if rel == ".git":
@@ -581,7 +590,7 @@ def tree_files(root):
             found.append((rel, size))
     return sorted(
         (rel, size) for rel, size in found
-        if not _runner_output_stands_aside(rel, tracked)
+        if not _stands_aside(rel, tracked)
     )
 
 

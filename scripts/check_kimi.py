@@ -1659,7 +1659,7 @@ def collision_problems(root=None):
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
     # R29-RT-02 and R29-RT-12. The precedence is an ordering
-    # claim, not a verb list: any clause that puts the plugin
+    # claim, not a verb list. Any clause that puts the plugin
     # above the user, the user below the plugin, or the
     # collision resolving to the plugin in any noun form
     # states it. The brief's own sentences put the plugin
@@ -1818,8 +1818,8 @@ def qualified_problems(root=None):
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
     # R29-RT-03 and R29-RT-12. Bare name acceptance is a
-    # meaning claim across number, synonym, and word order:
-    # bare names in the plural, unqualified names, short
+    # meaning claim across number, synonym, and word order.
+    # Bare names in the plural, unqualified names, short
     # names, names alone, and a qualification requirement
     # being absent all state it. Negation is judged per
     # segment, so a sentence that negates the bare name in
@@ -2028,7 +2028,7 @@ def workdir_problems(root=None):
         return ["docs/kimi-plugin-brief.md is missing"]
     problems = []
     # R29-RT-04 and R29-RT-12. The working directory claim is
-    # a location claim, not two noun phrases: any sentence
+    # a location claim, not two noun phrases. Any sentence
     # that places hooks in a server directory, a server
     # working directory, a startup directory, or a launch
     # directory states it, in any case. A location preceded
@@ -2692,7 +2692,7 @@ def fixture_content_problems(root=None):
             "the kimi collision fixture is missing the user and "
             "plugin reviewer pair"
         ]
-    # R29-RT-09. Word presence is not meaning: a fixture
+    # R29-RT-09. Word presence is not meaning. A fixture
     # that says the plugin wins still contains the word wins,
     # so each fixture must state its own side's outcome in a
     # sentence whose subject and outcome agree, and neither
@@ -2714,7 +2714,7 @@ def fixture_content_problems(root=None):
                 "proves the precedence" % label
             )
     user_sentences = _sentences(user_text)
-    # The fixture file itself supplies the subject: the user
+    # The fixture file itself supplies the subject. The user
     # fixture must carry a sentence where the win lands over
     # the plugin, and the plugin fixture one where the loss
     # lands to the user. A sentence where the plugin wins is

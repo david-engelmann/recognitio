@@ -27,7 +27,7 @@ Run the gate before every push and keep it green.
 
 ```bash
 make check
-python3 -m unittest discover -s tests
+python3 scripts/discover.py -s tests
 ```
 
 The first command is the full gate and the second is the narrow form
@@ -146,8 +146,11 @@ test, and it refuses a working state that differs from its head
 unless the caller names its local mode, counting only untracked
 entries under its own log folder as its own output and every other
 entry as a difference, and it holds the discover count against a
-pinned floor that moves only with the census, and it records the
-step frontier of a stopped run. A verdict that cannot name its
+pinned floor that moves only with the census, the count being one
+the runner takes itself from a static reading of the sources of
+the suite the step names, held against the report of the step as
+a cross check, and
+it records the step frontier of a stopped run. A verdict that cannot name its
 tree certifies nothing, and the runner is the shipped form of
 that rule.
 

@@ -8,7 +8,7 @@ PYTHON ?= python3
 .PHONY: check test gates
 
 check:
-	$(PYTHON) -m unittest discover -s tests
+	$(PYTHON) scripts/discover.py -s tests
 	$(PYTHON) scripts/check_skill.py
 	$(PYTHON) scripts/check_version.py
 	$(PYTHON) scripts/check_copy.py

@@ -728,8 +728,8 @@ def trust_problems(root=None):
     if raw is None:
         return ["docs/copilot-sdk-brief.md is missing"]
     problems = []
-    # R29-RT-13. Trust is a meaning claim, not one phrase:
-    # reliable, trustworthy, followable, or trusted head
+    # R29-RT-13. Trust is a meaning claim, not one phrase.
+    # Reliable, trustworthy, followable, or trusted head
     # branch content all state it.
     patterns = (
         r"\btrusted input\b",
@@ -1020,7 +1020,7 @@ def approval_problems(root=None):
         return ["docs/copilot-sdk-brief.md is missing"]
     problems = []
     # R29-RT-13. Permission is a meaning claim, not one
-    # verb: an approval that goes ahead, is granted,
+    # verb. An approval that goes ahead, is granted,
     # proceeds, or is allowed on a red packet states it.
     patterns = (
         r"\b(?:may|can|will|shall|does) fire\b",

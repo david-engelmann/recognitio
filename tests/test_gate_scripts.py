@@ -10037,12 +10037,12 @@ class TestTreeFigureCensus(unittest.TestCase):
     # tree the pack describes.
     PACK = ROOT / "docs" / "submission-claude.md"
     COUNT = (
-        "The repo holds 274 files and tens of megabytes in "
+        "The repo holds 275 files and tens of megabytes in "
         "total, as restated on 2026-11-11 against the tree "
         "that now holds that count."
     )
     CAP = (
-        "at 274 files against a cap of 512 files"
+        "at 275 files against a cap of 512 files"
     )
     LARGEST = (
         "Its largest file is the demo recording at "
@@ -10053,8 +10053,8 @@ class TestTreeFigureCensus(unittest.TestCase):
         mod = load_script("check_submissions")
         measured = mod.tree_measurements(ROOT)
         self.assertIsNotNone(measured)
-        self.assertEqual(measured["count"], 274)
-        self.assertEqual(measured["scan_files"], 274)
+        self.assertEqual(measured["count"], 275)
+        self.assertEqual(measured["scan_files"], 275)
         self.assertEqual(measured["largest_size"], 24222065)
         self.assertEqual(
             measured["largest_plain_path"],
@@ -10707,6 +10707,482 @@ class TestSourceLoadsIgnoreShadows(unittest.TestCase):
             loaded, problems = mod.load_fanout()
             self.assertEqual(problems, [])
             self.assertEqual(loaded.MARKER, "pristine")
+
+class TestDiscoverRunsTheSource(unittest.TestCase):
+    """Round 34 red team Minor 3. The discover step runs the source.
+
+    The discover step imported its test modules through the
+    ordinary import system, which honours an unchecked hash
+    based compiled cache standing beside the source, so a
+    shadow compiled from a passing variant of a failing
+    test module executed in place of the source and the
+    step reported the suite green over a source that fails.
+    The step now runs through the shipped wrapper at
+    scripts/discover.py, whose loader compiles the source
+    bytes alone in the shape the Round 25 loads take, and
+    these tests plant the audit construction in a scratch
+    suite. The control runs the plain discover command over
+    the same plant and passes, so the plant stands live and
+    the wrapper is the difference.
+    """
+
+    FAILING = (
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_source_position(self):\n"
+        "        self.assertEqual(1, 2)\n"
+    )
+    PASSING = (
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_source_position(self):\n"
+        "        self.assertEqual(1, 1)\n"
+    )
+
+    def plant_suite(self, tmp, source_text, shadow):
+        tests = Path(tmp) / "tests"
+        tests.mkdir(parents=True)
+        source = tests / "test_plant.py"
+        source.write_text(source_text, encoding="utf-8")
+        if shadow:
+            code = compile(
+                self.PASSING, str(source.resolve()), "exec",
+                dont_inherit=True,
+            )
+            header = (
+                importlib.util.MAGIC_NUMBER
+                + struct.pack("<I", 1)
+                + importlib.util.source_hash(
+                    self.PASSING.encode())
+            )
+            cache = tests / "__pycache__"
+            cache.mkdir()
+            tag = "cpython-%d%d" % sys.version_info[:2]
+            (cache / ("test_plant.%s.pyc" % tag)).write_bytes(
+                header + marshal.dumps(code)
+            )
+        return tests
+
+    def run_argv(self, argv, cwd, env=None):
+        return subprocess.run(
+            argv, cwd=str(cwd), capture_output=True, text=True,
+            timeout=120, env=env,
+        )
+
+    def test_the_wrapper_fails_the_source_the_shadow_would_pass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.FAILING, True)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("FAILED", result.stderr)
+            self.assertIn("Ran 1 test", result.stderr)
+
+    def test_the_plain_command_passes_on_the_same_plant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.FAILING, True)
+            result = self.run_argv(
+                [
+                    sys.executable, "-m", "unittest",
+                    "discover", "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("OK", result.stderr)
+
+    def test_the_wrapper_passes_a_clean_suite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.PASSING, False)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("OK", result.stderr)
+            self.assertIn("Ran 1 test", result.stderr)
+
+    PACKAGE_SOURCE = (
+        "VALUE = 'source'\n"
+    )
+    PACKAGE_SHADOW = (
+        "VALUE = 'shadow'\n"
+    )
+    PACKAGE_TEST = (
+        "import unittest\n"
+        "\n"
+        "import plantpkg\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_package_position(self):\n"
+        "        self.assertEqual(plantpkg.VALUE, 'source')\n"
+    )
+
+    def plant_package_suite(self, tmp):
+        tests = Path(tmp) / "tests"
+        package = tests / "plantpkg"
+        package.mkdir(parents=True)
+        init = package / "__init__.py"
+        init.write_text(self.PACKAGE_SOURCE, encoding="utf-8")
+        (tests / "test_plant.py").write_text(
+            self.PACKAGE_TEST, encoding="utf-8")
+        code = compile(
+            self.PACKAGE_SHADOW, str(init.resolve()), "exec",
+            dont_inherit=True,
+        )
+        header = (
+            importlib.util.MAGIC_NUMBER
+            + struct.pack("<I", 1)
+            + importlib.util.source_hash(
+                self.PACKAGE_SHADOW.encode())
+        )
+        cache = package / "__pycache__"
+        cache.mkdir()
+        tag = "cpython-%d%d" % sys.version_info[:2]
+        (cache / ("__init__.%s.pyc" % tag)).write_bytes(
+            header + marshal.dumps(code)
+        )
+        return tests
+
+    def test_the_wrapper_runs_a_package_from_its_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_package_suite(tmp)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("OK", result.stderr)
+            self.assertIn("Ran 1 test", result.stderr)
+
+    STDLIB_TEST = (
+        "import asyncio.tasks\n"
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_stdlib_position(self):\n"
+        "        loader = asyncio.tasks.__spec__.loader\n"
+        "        self.assertEqual(\n"
+        "            type(loader).__name__, 'SourceFileLoader')\n"
+        "        self.assertTrue(hasattr(asyncio.tasks, 'Task'))\n"
+    )
+
+    def test_the_wrapper_leaves_stdlib_submodules_to_the_search(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.STDLIB_TEST, False)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("OK", result.stderr)
+            self.assertIn("Ran 1 test", result.stderr)
+
+    def test_the_makefile_discover_step_names_the_wrapper(self):
+        text = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn(
+            "\t$(PYTHON) scripts/discover.py -s tests\n", text)
+        self.assertNotIn("-m unittest discover", text)
+
+    def test_the_wrapper_writes_the_measured_count(self):
+        # Round 34 delta, restated in the delta 4 form.
+        # Where the runner names a count file in the
+        # environment, the wrapper writes the report of
+        # the run it made to that file, the count of the
+        # run standing as the first line and the identity
+        # of the case that ran standing after it. The
+        # suite holds one test, whose summary the runner
+        # prints in the singular, so the measurement
+        # stands independent of the printed wording and
+        # of every line the suite could print in its
+        # place.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.PASSING, False)
+            count_file = Path(tmp) / "count.txt"
+            env = dict(os.environ)
+            env["RECOGNITIO_COUNT_FILE"] = str(count_file)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                count_file.read_text(encoding="utf-8"),
+                "1\n"
+                "test_plant.TestPlant.test_the_source_position\n")
+
+    THREE = (
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_a(self):\n"
+        "        self.assertEqual(1, 1)\n"
+        "    def test_b(self):\n"
+        "        self.assertEqual(1, 1)\n"
+        "    def test_c(self):\n"
+        "        self.assertEqual(1, 1)\n"
+    )
+
+    def test_the_wrapper_measures_the_whole_suite(self):
+        # The measured count is the count of the run, so
+        # a suite holding three tests writes three, with
+        # the identities of the three cases standing
+        # after the count in sorted order.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.THREE, False)
+            count_file = Path(tmp) / "count.txt"
+            env = dict(os.environ)
+            env["RECOGNITIO_COUNT_FILE"] = str(count_file)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                count_file.read_text(encoding="utf-8"),
+                "3\n"
+                "test_plant.TestPlant.test_a\n"
+                "test_plant.TestPlant.test_b\n"
+                "test_plant.TestPlant.test_c\n")
+
+    SEALED = (
+        "import atexit\n"
+        "import os\n"
+        "import unittest\n"
+        "\n"
+        "\n"
+        "def _forge():\n"
+        "    path = os.environ.get('RECOGNITIO_COUNT_FILE')\n"
+        "    if path:\n"
+        "        with open(path, 'w') as handle:\n"
+        "            handle.write('9999\\n')\n"
+        "\n"
+        "\n"
+        "atexit.register(_forge)\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_sealed_position(self):\n"
+        "        self.assertEqual(1, 1)\n"
+    )
+
+    def test_a_shutdown_handler_cannot_rewrite_the_count(self):
+        # The seal on the measurement. The suite module
+        # registers a shutdown handler that writes a
+        # forged count into the named file, the writer
+        # the forged summary block finding stood on. The
+        # wrapper leaves through the hard exit once the
+        # measurement stands, so the handler never runs
+        # and the file keeps the report of the run, its
+        # count and the identity of its one case.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.SEALED, False)
+            count_file = Path(tmp) / "count.txt"
+            env = dict(os.environ)
+            env["RECOGNITIO_COUNT_FILE"] = str(count_file)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                count_file.read_text(encoding="utf-8"),
+                "1\n"
+                "test_plant.TestPlant.test_the_sealed_position\n")
+
+    SPOOFED = (
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_stated_position(self):\n"
+        "        self.assertEqual(1, 2)\n"
+        "\n"
+        "\n"
+        "def load_tests(loader, standard_tests, pattern):\n"
+        "    class TestForged(unittest.TestCase):\n"
+        "        def test_the_stated_position(self):\n"
+        "            self.assertEqual(1, 1)\n"
+        "    TestForged.__module__ = 'test_plant'\n"
+        "    TestForged.__qualname__ = 'TestPlant'\n"
+        "    return loader.loadTestsFromTestCase(TestForged)\n"
+    )
+
+    def test_the_wrapper_writes_no_report_for_an_unstated_case(self):
+        # Round 34 delta 5. The holding the report
+        # stands on. The plant its hook returns a case
+        # of a class the hook itself builds wearing the
+        # stated module name and qualified name, so the
+        # case names itself with the identity of the
+        # sources while the stated failing test never
+        # runs and the run stands green. The class is
+        # not the class the sources state under that
+        # name, so the case stands unstated, the
+        # wrapper writes no report into the file the
+        # runner named, and it names the case and its
+        # ground in its own output, leaving with the
+        # verdict of the run as the report path leaves.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.SPOOFED, False)
+            count_file = Path(tmp) / "count.txt"
+            env = dict(os.environ)
+            env["RECOGNITIO_COUNT_FILE"] = str(count_file)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("OK", result.stderr)
+            self.assertFalse(count_file.exists())
+            self.assertIn("is not a stated case", result.stderr)
+            self.assertIn(
+                "test_plant.TestPlant.test_the_stated_position",
+                result.stderr)
+
+    def test_the_wrapper_refuses_an_unstated_case_in_its_own_exit(self):
+        # The same plant with no count file named. No
+        # floor arm stands behind the wrapper on the
+        # wiring its own discover step, so the wrapper
+        # refuses in its own exit, and the green the
+        # forged case earned does not stand.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.SPOOFED, False)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("is not a stated case", result.stderr)
+
+    NESTED = (
+        "import unittest\n"
+        "\n"
+        "\n"
+        "class TestPlant(unittest.TestCase):\n"
+        "    def test_the_stated_position(self):\n"
+        "        self.assertEqual(1, 1)\n"
+        "\n"
+        "\n"
+        "class Outer:\n"
+        "    class Inner(unittest.TestCase):\n"
+        "        def test_the_nested_position(self):\n"
+        "            self.assertEqual(1, 1)\n"
+        "\n"
+        "\n"
+        "def load_tests(loader, standard_tests, pattern):\n"
+        "    suite = unittest.TestSuite()\n"
+        "    suite.addTests(standard_tests)\n"
+        "    suite.addTests(\n"
+        "        loader.loadTestsFromTestCase(Outer.Inner))\n"
+        "    return suite\n"
+    )
+
+    def test_the_wrapper_reports_a_genuinely_nested_class(self):
+        # Round 34 delta 6. The record the holding
+        # trusts is keyed on the bindings, so a class
+        # the sources state nested inside a plain class
+        # stands recorded under its own nested path, and
+        # a case of it carries that very path as its
+        # name. The hook returns the nested cases beside
+        # the stated ones, every case stands stated, and
+        # the report of the run stands whole with the
+        # nested identity spelled in its own form.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.NESTED, False)
+            count_file = Path(tmp) / "count.txt"
+            env = dict(os.environ)
+            env["RECOGNITIO_COUNT_FILE"] = str(count_file)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "-s", str(tests),
+                ],
+                tmp,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                count_file.read_text(encoding="utf-8"),
+                "2\n"
+                "test_plant.Outer.Inner."
+                "test_the_nested_position\n"
+                "test_plant.TestPlant."
+                "test_the_stated_position\n")
+
+    def test_the_wrapper_carries_no_measuring_mode(self):
+        # Round 34 delta 3. The measuring run of the
+        # delta 2 form is gone, because the census the
+        # floor reads is taken by the gate runner from
+        # the sources of the suite and no measuring run
+        # stands for the wrapper to carry. Named with
+        # the count only flag, the wrapper refuses the
+        # flag as an argument it does not carry, and the
+        # refusal is the usage error of the argument
+        # parser.
+        with tempfile.TemporaryDirectory() as tmp:
+            tests = self.plant_suite(tmp, self.PASSING, False)
+            result = self.run_argv(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "discover.py"),
+                    "--count-only",
+                    "-s", str(tests),
+                ],
+                tmp,
+            )
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("unrecognized arguments",
+                          result.stderr)
 
 class TestCopyMarkBlocksAgree(unittest.TestCase):
     """Round 24 standards Note 1. The two hand written mark blocks.

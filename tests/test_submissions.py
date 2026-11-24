@@ -2795,9 +2795,9 @@ class TestCheckSubmissions(unittest.TestCase):
         problems = self.mutate_text(
             CLAUDE_PACK,
             lambda t: t.replace(
-                "holds 274 files", "holds 236 files"))
+                "holds 275 files", "holds 236 files"))
         self.assertTrue(
-            any("274 files" in p for p in problems), problems)
+            any("275 files" in p for p in problems), problems)
 
     def test_the_pack_figures_match_the_measured_tree(self):
         # SC3. The Claude pack states its tree figures in the
@@ -3285,6 +3285,154 @@ class TestTrackedRunnerOutputIsMeasured(unittest.TestCase):
             self.plant_payload(root)
             found = dict(self.mod.tree_files(root))
             self.assertNotIn(".gate-logs/payload.txt", found)
+            self.assertEqual(self.base.problems(root), before)
+
+
+class TestTrackedCacheContentIsMeasured(unittest.TestCase):
+    """Round 34 red team Minor 1, the cache named payload.
+
+    The walk pruned the two cache folder names from the
+    walk by name alone and skipped every file whose name
+    ends in the compiled suffix, and neither reading
+    consulted the index, so a payload committed under a
+    cache name stood unmeasured and the credential scan
+    whose set is the walk counted no hit on it, while the
+    figures the walk feeds describe the tracked tree. The
+    walk now sets a cache shape aside only for the content
+    the index does not name, on the distinction the runner
+    output aside already drew, and these tests plant the
+    audit constructions in a git held layout with their
+    controls beside them. The key shaped line in the scan
+    construction is assembled from fragments in the code,
+    so the shipped tree its own scan reads never carries
+    the shape whole.
+    """
+
+    def setUp(self):
+        self.mod = load_script("check_submissions")
+        self.base = TestCheckSubmissions()
+        self.base.mod = self.mod
+
+    def git(self, root, *args):
+        import subprocess
+        return subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True, text=True, check=True,
+            env=scrubbed_git_env(),
+        )
+
+    def hold_in_git(self, root):
+        self.git(root, "init", "-q")
+        self.git(root, "config", "user.email",
+                 "test@example.invalid")
+        self.git(root, "config", "user.name", "Submissions Test")
+
+    def plant(self, root, rel, data):
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return path
+
+    def commit_path(self, root, rel):
+        self.hold_in_git(root)
+        self.git(root, "add", "-f", rel)
+        self.git(root, "commit", "-q", "-m", "tracked payload")
+
+    def test_a_tracked_payload_under_a_bytecode_cache_is_measured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.mod.tree_measurements(root)
+            self.assertIsNotNone(before)
+            rel = "__pycache__/payload.txt"
+            self.plant(root, rel, b"z" * 500000)
+            self.commit_path(root, rel)
+            found = dict(self.mod.tree_files(root))
+            self.assertEqual(found[rel], 500000)
+            measured = self.mod.tree_measurements(root)
+            self.assertEqual(measured["count"], before["count"] + 1)
+            self.assertEqual(measured["largest_plain_path"], rel)
+            self.assertEqual(measured["largest_plain_size"], 500000)
+            problems = self.base.problems(root)
+            self.assertTrue(
+                any("the tree holds" in p for p in problems),
+                problems)
+            self.assertTrue(
+                any("largest file that is not an image" in p
+                    for p in problems),
+                problems)
+
+    def test_a_tracked_payload_under_a_pytest_cache_is_measured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.mod.tree_measurements(root)
+            self.assertIsNotNone(before)
+            rel = ".pytest_cache/payload.txt"
+            self.plant(root, rel, b"z" * 500000)
+            self.commit_path(root, rel)
+            found = dict(self.mod.tree_files(root))
+            self.assertEqual(found[rel], 500000)
+            measured = self.mod.tree_measurements(root)
+            self.assertEqual(measured["count"], before["count"] + 1)
+            self.assertEqual(measured["largest_plain_path"], rel)
+
+    def test_a_tracked_file_under_the_compiled_suffix_is_measured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.mod.tree_measurements(root)
+            self.assertIsNotNone(before)
+            rel = "payload.pyc"
+            self.plant(root, rel, b"z" * 500000)
+            self.commit_path(root, rel)
+            found = dict(self.mod.tree_files(root))
+            self.assertEqual(found[rel], 500000)
+            measured = self.mod.tree_measurements(root)
+            self.assertEqual(measured["count"], before["count"] + 1)
+            self.assertEqual(measured["largest_plain_path"], rel)
+
+    def test_a_tracked_cache_payload_counts_in_the_credential_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.mod.tree_measurements(root)
+            self.assertIsNotNone(before)
+            key_shape = b"AK" + b"IA" + b"0123456789ABCDEF"
+            rel = "__pycache__/payload.txt"
+            self.plant(
+                root, rel, b"header line\n" + key_shape + b"\n")
+            self.commit_path(root, rel)
+            measured = self.mod.tree_measurements(root)
+            self.assertEqual(
+                measured["scan_hits"], before["scan_hits"] + 1)
+
+    def test_an_untracked_payload_under_a_cache_name_stands_aside(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            rel = "__pycache__/payload.txt"
+            self.plant(root, rel, b"z" * 500000)
+            self.hold_in_git(root)
+            found = dict(self.mod.tree_files(root))
+            self.assertNotIn(rel, found)
+            self.assertEqual(self.base.problems(root), before)
+
+    def test_an_untracked_compiled_file_stands_aside(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            rel = "loose.pyc"
+            self.plant(root, rel, b"z" * 500000)
+            self.hold_in_git(root)
+            found = dict(self.mod.tree_files(root))
+            self.assertNotIn(rel, found)
+            self.assertEqual(self.base.problems(root), before)
+
+    def test_the_cache_shapes_stand_aside_where_git_cannot_say(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.base.figure_layout(tmp)
+            before = self.base.problems(root)
+            rel = ".pytest_cache/payload.txt"
+            self.plant(root, rel, b"z" * 500000)
+            found = dict(self.mod.tree_files(root))
+            self.assertNotIn(rel, found)
             self.assertEqual(self.base.problems(root), before)
 
 

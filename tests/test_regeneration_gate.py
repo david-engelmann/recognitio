@@ -131,7 +131,7 @@ def clone_tree(tmp):
 
 TOOL_STEPS = ("check_packet.py", "check_headless.py")
 SMOKE_STEP = "smoke_extract.py"
-DISCOVER_STEP = "$(PYTHON) -m unittest discover -s tests"
+DISCOVER_STEP = "$(PYTHON) scripts/discover.py -s tests"
 STEP_SEQUENCE = (
     "check_skill.py",
     "check_version.py",

@@ -155,15 +155,15 @@ would name. The root README runs to thousands of words, far
 past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
-**Partly met, the size limits.** The closing statements this pack rests on stand scoped to the heads they were earned on, and each record that carries one scopes its own closing figures to the head they were earned on. The repo holds 274 files and tens of megabytes in total, as
+**Partly met, the size limits.** The closing statements this pack rests on stand scoped to the heads they were earned on, and each record that carries one scopes its own closing figures to the head they were earned on. The repo holds 275 files and tens of megabytes in total, as
 restated on 2026-11-11 against the tree that now holds that
 count. Its largest file is the
 demo recording at 24,222,065 bytes, well over the 5 MiB file
 limit, so that limit stands unmet. The file count also holds
-under the cap the checklist holds for a reviewer, at 274
+under the cap the checklist holds for a reviewer, at 275
 files against a cap of 512 files. Its largest file that is
 not an image or a font or a video is
-tests/test_gate_scripts.py at 441,071 bytes, over
+tests/test_gate_scripts.py at 459,293 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files, so two limits in this item stand unmet while
 the remaining limit in it holds. Its tracked extensions run
@@ -223,7 +223,7 @@ entry, all resolve inside the repo root on relative paths.
 The three component files carry frontmatter descriptions
 as single text values, the skill at 548 characters and the
 reviewer agent at 122 characters and the output style at
-172 characters. A credential pattern scan over all 274
+172 characters. A credential pattern scan over all 275
 files in the tree, for private key headers and AWS key shapes
 and GitHub token shapes, rerun on 2026-11-11, returned zero
 hits, so no real credential stands in the folder. No package.json ships
