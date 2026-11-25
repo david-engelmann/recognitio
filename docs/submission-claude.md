@@ -155,23 +155,23 @@ would name. The root README runs to thousands of words, far
 past the 40 word floor, and it documents what the tool does,
 how it is installed, and how a review runs from a packet.
 
-**Partly met, the size limits.** The closing statements this pack rests on stand scoped to the heads they were earned on, and each record that carries one scopes its own closing figures to the head they were earned on. The repo holds 275 files and tens of megabytes in total, as
+**Partly met, the size limits.** The closing statements this pack rests on stand scoped to the heads they were earned on, and each record that carries one scopes its own closing figures to the head they were earned on. The repo holds 287 files and tens of megabytes in total, as
 restated on 2026-11-11 against the tree that now holds that
 count. Its largest file is the
 demo recording at 24,222,065 bytes, well over the 5 MiB file
 limit, so that limit stands unmet. The file count also holds
-under the cap the checklist holds for a reviewer, at 275
+under the cap the checklist holds for a reviewer, at 287
 files against a cap of 512 files. Its largest file that is
 not an image or a font or a video is
 tests/test_gate_scripts.py at 459,293 bytes, over
 the 256 KiB cap of 262,144 bytes the same checklist holds
 for such files, so two limits in this item stand unmet while
 the remaining limit in it holds. Its tracked extensions run
-to .gif and .js and .json and .md and .mdc and .mp4 and
-.patch and .png and .py and .svg and .ts and .webm and .yaml
-and .yml beside
-five entries with no extension, of which one is the Claude
-skill symlink and four are regular files, so no file falls
+to .css and .gif and .js and .json and .md and .mdc and
+.mjs and .mp4 and .patch and .png and .py and .svg and .ts
+and .tsx and .webm and .yaml and .yml beside
+six entries with no extension, of which one is the Claude
+skill symlink and five are regular files, so no file falls
 outside the allowed file type list on its extension.
 
 **Open, the worked examples.** The directory policy asks for
@@ -223,13 +223,14 @@ entry, all resolve inside the repo root on relative paths.
 The three component files carry frontmatter descriptions
 as single text values, the skill at 548 characters and the
 reviewer agent at 122 characters and the output style at
-172 characters. A credential pattern scan over all 275
+172 characters. A credential pattern scan over all 287
 files in the tree, for private key headers and AWS key shapes
 and GitHub token shapes, rerun on 2026-11-11, returned zero
-hits, so no real credential stands in the folder. No package.json ships
-anywhere in the tree and the shipped manifest carries no
-launcher field, so the launcher pinning row has nothing to
-engage. The terms of service URL field stands absent from
+hits, so no real credential stands in the folder. A
+package.json ships under showcase/ as the web showcase app
+manifest and carries no launcher field, and the shipped
+manifest carries none either, so the launcher pinning row
+has nothing to engage. The terms of service URL field stands absent from
 the shipped manifest in the same unset state as the
 documentation and support fields the listing URLs item
 above records. The privacy policy URL field also stands

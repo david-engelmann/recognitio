@@ -468,7 +468,7 @@ The script at `scripts/check_packet.py` validates a packet directory before a re
 
 ## Going deeper
 
-The full record stands in [the documentation index](docs/README.md). The brand assets and their builder and the palette record live under docs/brand/.
+The full record stands in [the documentation index](docs/README.md). The brand assets and their builder and the palette record live under docs/brand/. The showcase app under showcase/ renders the worked example packet as a web page, with its four tiers, one hunk in full, and the closing recount, every figure taken from the packet it shows.
 
 - [The tier model](.agents/skills/recognitio/SKILL.md#the-tier-model) states what each tier holds and how a budget spends itself.
 - [The completeness discipline](.agents/skills/recognitio/SKILL.md#completeness-discipline) states the recount the packet must pass before it may call itself verified.
